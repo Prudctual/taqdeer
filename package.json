@@ -1,0 +1,40 @@
+{
+  "name": "pitchlab",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "sync": "tsx scripts/sync-data.ts",
+    "sync:crests": "tsx scripts/sync-data.ts --crests-only",
+    "fit": ".venv/bin/python scripts/fit-and-predict.py",
+    "pipeline": "bun run sync && bun run fit",
+    "check": "tsx scripts/selfcheck.ts && tsc --noEmit && eslint .",
+    "postinstall": "cd node_modules/better-sqlite3 && npm run build-release || true"
+  },
+  "engines": {
+    "node": ">=22 <25"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.10.0",
+    "csv-parse": "^5.6.0",
+    "next": "^15.3.3",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "^3.3.6",
+    "@tailwindcss/postcss": "^4.1.8",
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^20.17.50",
+    "@types/react": "^19.1.6",
+    "@types/react-dom": "^19.1.5",
+    "eslint": "^9",
+    "eslint-config-next": "^15.3.3",
+    "tailwindcss": "^4.1.8",
+    "tsx": "^4.19.4",
+    "typescript": "^5.8.3"
+  }
+}

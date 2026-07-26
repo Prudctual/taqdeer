@@ -1,0 +1,548 @@
+@import "tailwindcss";
+
+/*
+  توقّع — نظام تصميم "طاولة تحليل"
+  أسطح صلبة، خطوط شعرية، رقم واضح. بلا زجاج ولا توهج ولا صور بطولية.
+  اللون دلالي فقط: 1X2 والدوريات. كل ما عدا ذلك رمادي أزرق هادئ.
+*/
+
+:root {
+  color-scheme: dark;
+
+  /* أسطح — صلبة، بلا شفافية */
+  --bg: oklch(0.16 0.011 250);
+  --surface: oklch(0.202 0.013 250);
+  --panel: oklch(0.245 0.015 250);
+  --raised: oklch(0.285 0.016 250);
+
+  /* حبر */
+  --ink: oklch(0.968 0.004 250);
+  --muted: oklch(0.735 0.011 250);
+  --faint: oklch(0.62 0.012 250);
+
+  /* خطوط */
+  --line: oklch(1 0 0 / 0.085);
+  --line-strong: oklch(1 0 0 / 0.17);
+
+  /* لهجة واحدة — أزرق قراءة لا أزرق إعلان */
+  --accent: oklch(0.7 0.115 245);
+  --accent-dim: oklch(0.34 0.055 245);
+  --on-fill: oklch(0.16 0.011 250);
+
+  /* 1X2 — ثلاثية متمايزة في الفاتح والداكن */
+  --home: oklch(0.715 0.115 248);
+  --draw: oklch(0.79 0.1 85);
+  --away: oklch(0.7 0.125 33);
+  --home-fill: var(--home);
+  --draw-fill: var(--draw);
+  --away-fill: var(--away);
+  --draw-ink: oklch(0.24 0.04 85);
+
+  --success: oklch(0.76 0.11 165);
+  --danger: oklch(0.68 0.15 25);
+
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+  --motion-fast: 140ms;
+  --motion-base: 200ms;
+  --content-max: 1080px;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-panel: var(--panel);
+  --color-raised: var(--raised);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-faint: var(--faint);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-accent: var(--accent);
+  --color-accent-dim: var(--accent-dim);
+  --color-on-fill: var(--on-fill);
+  --color-home: var(--home);
+  --color-draw: var(--draw);
+  --color-away: var(--away);
+  --color-home-fill: var(--home-fill);
+  --color-draw-fill: var(--draw-fill);
+  --color-away-fill: var(--away-fill);
+  --color-draw-ink: var(--draw-ink);
+  --color-success: var(--success);
+  --color-danger: var(--danger);
+  --font-sans: var(--font-arabic);
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-arabic), "IBM Plex Sans Arabic", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: var(--accent-dim);
+  color: var(--ink);
+}
+
+/* ——— طباعة ——— */
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+.type-display {
+  font-size: clamp(1.5rem, 2.2vw, 1.75rem);
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.006em;
+}
+
+.type-page {
+  font-size: clamp(1.25rem, 1.7vw, 1.4rem);
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.type-section {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.type-label {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  line-height: 1.3;
+  color: var(--muted);
+}
+
+/* رقم بارز — للقراءة السريعة لا للاستعراض */
+.type-figure {
+  font-size: 1.5rem;
+  font-weight: 600;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+/* ——— أسطح ——— */
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+}
+
+.card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.card-head-sub {
+  margin-top: 0.15rem;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+/* ——— الرأس العلوي ——— */
+
+.site-header {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  background: var(--bg);
+  border-bottom: 1px solid var(--line);
+}
+
+.site-header-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  max-width: var(--content-max);
+  margin-inline: auto;
+  min-height: 3.25rem;
+  padding-inline: 1rem;
+}
+
+.site-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  text-decoration: none;
+}
+
+.site-brand-name {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.site-brand-tagline {
+  font-size: 0.6875rem;
+  color: var(--faint);
+}
+
+.site-brand-mark {
+  display: block;
+  border-radius: 0.3rem;
+  color: var(--on-fill);
+}
+
+.site-brand-mark rect.fill-accent {
+  fill: var(--accent);
+}
+
+.site-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.site-nav::-webkit-scrollbar {
+  display: none;
+}
+
+.site-nav-link {
+  position: relative;
+  flex-shrink: 0;
+  padding: 0.4rem 0.6rem;
+  border-radius: 0.375rem;
+  font-size: 0.8125rem;
+  color: var(--muted);
+  text-decoration: none;
+  transition: color var(--motion-fast) var(--ease),
+    background-color var(--motion-fast) var(--ease);
+}
+
+.site-nav-link:hover {
+  color: var(--ink);
+  background: var(--panel);
+}
+
+.site-nav-link.is-active {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+/* خط سفلي رفيع بدل الكبسولة الممتلئة */
+.site-nav-link.is-active::after {
+  content: "";
+  position: absolute;
+  inset-inline: 0.6rem;
+  bottom: -0.9rem;
+  height: 2px;
+  background: var(--accent);
+}
+
+/* ——— صفوف المباريات ——— */
+
+.match-row {
+  transition: background-color var(--motion-fast) var(--ease);
+}
+
+.match-row:hover,
+.match-row:focus-visible {
+  background: var(--panel);
+}
+
+.match-row:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+/* سكة اليوم اللاصقة داخل القائمة */
+.day-rail {
+  position: sticky;
+  top: 3.25rem;
+  z-index: 10;
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+}
+
+.day-rail-label {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+/* ——— شريط الاحتمال 1X2 ——— */
+
+.prob-track {
+  display: flex;
+  width: 100%;
+  overflow: hidden;
+  border-radius: 2px;
+  background: var(--panel);
+}
+
+.prob-fill {
+  min-width: 2px;
+  height: 100%;
+}
+
+.prob-fill-dim {
+  opacity: 0.5;
+}
+
+.prob-figure {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ——— شارات ——— */
+
+.pick-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  border-radius: 0.3rem;
+  padding: 0.15rem 0.4rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--on-fill);
+}
+
+.verdict-chip {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 0.25rem;
+  padding: 0.05rem 0.3rem;
+  font-size: 0.625rem;
+  font-weight: 600;
+}
+
+.verdict-chip-hit {
+  color: var(--success);
+  background: color-mix(in oklch, var(--success) 16%, transparent);
+}
+
+.verdict-chip-miss {
+  color: var(--faint);
+  background: var(--panel);
+}
+
+.chip-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border: 1px solid var(--line);
+  border-radius: 0.375rem;
+  padding: 0.35rem 0.6rem;
+  font-size: 0.75rem;
+  color: var(--muted);
+  text-decoration: none;
+  background: var(--surface);
+  transition: color var(--motion-fast) var(--ease),
+    border-color var(--motion-fast) var(--ease),
+    background-color var(--motion-fast) var(--ease);
+}
+
+.chip-filter:hover {
+  color: var(--ink);
+  background: var(--panel);
+  border-color: var(--line-strong);
+}
+
+.chip-filter[aria-current="page"] {
+  color: var(--ink);
+  font-weight: 600;
+  border-color: var(--accent);
+  background: var(--accent-dim);
+}
+
+/* نقطة لون الدوري داخل الشارة — اللون تصنيف لا زينة */
+.chip-dot {
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 999px;
+  background: var(--league, var(--faint));
+  flex-shrink: 0;
+}
+
+.score-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.15rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+/* ——— جداول ——— */
+
+.table-clean {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table-clean th {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  color: var(--muted);
+  text-align: start;
+  padding: 0.5rem 0.5rem;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+  white-space: nowrap;
+}
+
+.table-clean td {
+  padding: 0.5rem;
+  border-bottom: 1px solid var(--line);
+  font-size: 0.8125rem;
+}
+
+.table-clean tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.table-clean tbody tr {
+  transition: background-color var(--motion-fast) var(--ease);
+}
+
+.table-clean tbody tr:hover {
+  background: var(--panel);
+}
+
+.table-num {
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ——— ألوان الدوريات — تصنيف فقط، تظهر كنقطة أو خط بدء ——— */
+
+[data-league="pl"] {
+  --league: oklch(0.66 0.14 300);
+}
+[data-league="pd"] {
+  --league: oklch(0.72 0.14 55);
+}
+[data-league="bl1"] {
+  --league: oklch(0.68 0.16 25);
+}
+[data-league="sa"] {
+  --league: oklch(0.68 0.12 230);
+}
+[data-league="fl1"] {
+  --league: oklch(0.7 0.11 265);
+}
+[data-league="kl1"] {
+  --league: oklch(0.7 0.13 155);
+}
+
+.league-band {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.5rem 1rem;
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+  box-shadow: inset 2px 0 0 0 var(--league, transparent);
+}
+
+.league-name-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.6875rem;
+  color: var(--muted);
+}
+
+.league-name-chip::before {
+  content: "";
+  width: 0.35rem;
+  height: 0.35rem;
+  border-radius: 999px;
+  background: var(--league, var(--faint));
+}
+
+.league-row {
+  box-shadow: inset 2px 0 0 0 var(--league, transparent);
+  transition: background-color var(--motion-fast) var(--ease);
+}
+
+.league-row:hover,
+.league-row:focus-visible {
+  background: var(--panel);
+}
+
+/* ——— خريطة النتائج ——— */
+
+.heatmap-cell {
+  transition: outline-color var(--motion-fast) var(--ease);
+  outline: 1px solid transparent;
+}
+
+.heatmap-cell:hover {
+  outline-color: var(--line-strong);
+}
+
+.heatmap-cell-top {
+  outline: 1.5px solid var(--ink);
+}
+
+/* ——— حركة ——— */
+
+.motion-colors {
+  transition: color var(--motion-fast) var(--ease),
+    background-color var(--motion-fast) var(--ease),
+    border-color var(--motion-fast) var(--ease);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* كشف واحد لأشرطة البيانات عند أول ظهور — لا تسلسل دخول للصفحة */
+  .is-inview .prob-fill,
+  .is-inview .meter-fill {
+    transform-origin: right center;
+    animation: bar-reveal var(--motion-base) var(--ease) both;
+  }
+
+  @keyframes bar-reveal {
+    from {
+      transform: scaleX(0);
+    }
+    to {
+      transform: scaleX(1);
+    }
+  }
+
+  .skeleton-pulse {
+    animation: skeleton-pulse 1.6s ease-in-out infinite;
+  }
+
+  @keyframes skeleton-pulse {
+    0%,
+    100% {
+      opacity: 0.5;
+    }
+    50% {
+      opacity: 0.85;
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
