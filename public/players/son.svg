@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bgSon" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#132257" />
+      <stop offset="100%" stop-color="#0b1437" />
+    </linearGradient>
+    <linearGradient id="skin" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ffdfc4" />
+      <stop offset="100%" stop-color="#f0c09d" />
+    </linearGradient>
+    <linearGradient id="jersey" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" />
+      <stop offset="100%" stop-color="#e2e8f0" />
+    </linearGradient>
+  </defs>
+  <rect width="200" height="200" rx="100" fill="url(#bgSon)" />
+  <circle cx="100" cy="100" r="94" fill="none" stroke="#2563eb" stroke-width="4" />
+  
+  <!-- Torso / Jersey -->
+  <path d="M 40 200 C 40 150 160 150 160 200 Z" fill="url(#jersey)" />
+  <path d="M 85 160 L 100 180 L 115 160 Z" fill="#132257" />
+  
+  <!-- Neck -->
+  <rect x="84" y="125" width="32" height="35" rx="8" fill="url(#skin)" />
+  
+  <!-- Head -->
+  <ellipse cx="100" cy="98" rx="36" ry="44" fill="url(#skin)" />
+  
+  <!-- Hair (Son style - sleek side swept) -->
+  <path d="M 62 95 C 60 60 80 48 100 48 C 122 48 140 60 138 95 C 130 75 110 65 100 68 C 85 70 70 80 62 95 Z" fill="#18181b" />
+  
+  <!-- Eyes & Eyebrows -->
+  <path d="M 78 82 Q 88 78 94 83" fill="none" stroke="#09090b" stroke-width="3" stroke-linecap="round" />
+  <path d="M 106 83 Q 112 78 122 82" fill="none" stroke="#09090b" stroke-width="3" stroke-linecap="round" />
+  <ellipse cx="86" cy="91" rx="4" ry="2.5" fill="#09090b" />
+  <ellipse cx="114" cy="91" rx="4" ry="2.5" fill="#09090b" />
+  
+  <!-- Smile -->
+  <path d="M 88 116 Q 100 126 112 116" fill="none" stroke="#713f12" stroke-width="3" stroke-linecap="round" />
+  
+  <!-- Text Label Badge -->
+  <rect x="40" y="165" width="120" height="24" rx="12" fill="#132257" stroke="#3b82f6" stroke-width="2" />
+  <text x="100" y="181" text-anchor="middle" fill="#ffffff" font-family="sans-serif" font-size="12" font-weight="bold">SON #7</text>
+</svg>
