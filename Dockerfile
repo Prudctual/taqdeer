@@ -30,6 +30,9 @@ RUN pip install pandas numpy scipy scikit-learn
 # Copy application files
 COPY . .
 
+# Make start script executable
+RUN chmod +x scripts/start_server.sh
+
 # Build SQLite databases and standings
 RUN python3 scripts/build_historic_standings.py
 RUN python3 scripts/build_2026_season_standings.py
@@ -44,4 +47,4 @@ ENV PORT 10000
 ENV NODE_ENV production
 ENV PYTHONPATH python
 
-CMD ["bun", "run", "start", "--port", "10000"]
+CMD ["bash", "scripts/start_server.sh"]

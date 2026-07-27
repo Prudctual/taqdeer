@@ -16,19 +16,3 @@ services:
         value: sportspage-feeds.p.rapidapi.com
       - key: PYTHONPATH
         value: python
-
-  - type: cron
-    name: taqdeer-cron-sync
-    env: docker
-    dockerfilePath: ./Dockerfile.cron
-    schedule: "0 * * * *"
-    plan: free
-    envVars:
-      - key: FOOTBALL_DATA_API_KEY
-        value: 59de9de068b278683ae1a2649a0ead98
-      - key: RAPIDAPI_KEY
-        value: eba270730cmsh926c754a32cb815p1ec397jsnf771a5ebb722
-      - key: RAPIDAPI_HOST
-        value: sportspage-feeds.p.rapidapi.com
-      - key: PYTHONPATH
-        value: python
