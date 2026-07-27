@@ -61,14 +61,26 @@ function TeamSide({
     return (
       <Link
         href={href}
-        className="group press-scale block h-full min-w-0 no-underline hover:bg-panel/60 focus-visible:relative focus-visible:z-10 rounded-lg"
+        className="group press-scale relative block h-full min-w-0 no-underline hover:bg-panel/60 focus-visible:relative focus-visible:z-10 rounded-lg overflow-hidden"
         aria-label={`${label} ${name}`}
       >
+        <span
+          className="absolute top-0 inset-x-0 h-[2px] opacity-70 transition-opacity group-hover:opacity-100"
+          style={{ backgroundColor: color }}
+        />
         {body}
       </Link>
     );
   }
-  return <div className="block h-full min-w-0">{body}</div>;
+  return (
+    <div className="relative block h-full min-w-0 overflow-hidden">
+      <span
+        className="absolute top-0 inset-x-0 h-[2px] opacity-70"
+        style={{ backgroundColor: color }}
+      />
+      {body}
+    </div>
+  );
 }
 
 type Props = {

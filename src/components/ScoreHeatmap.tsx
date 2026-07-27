@@ -147,11 +147,11 @@ export function ScoreHeatmap({ matrix, homeLabel, awayLabel }: Props) {
                   return (
                     <td
                       key={`${i}-${j}`}
-                      className={`heatmap-cell h-8 border border-line text-center text-[10px] tabular ${
+                      className={`heatmap-cell h-8.5 border border-line text-center text-[11px] tabular transition-all duration-150 select-none hover:scale-110 hover:z-10 hover:shadow-lg ${
                         isTop
-                          ? "heatmap-cell-top font-semibold text-ink"
+                          ? "heatmap-cell-top font-bold text-ink ring-2 ring-accent shadow-md scale-105"
                           : isRunner
-                            ? "font-semibold text-ink"
+                            ? "font-semibold text-ink border-accent/40"
                             : t > 0.2
                               ? "text-ink"
                               : "text-muted"
