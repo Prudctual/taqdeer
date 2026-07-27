@@ -28,6 +28,7 @@ import {
 } from "@/components/ui";
 import {
   actualOutcome,
+  confidenceLabel,
   formatMetaStamp,
   pct,
   pctCss,
@@ -583,39 +584,59 @@ export default async function MatchPage({
           >
             <div className="divide-y divide-line">
               {/* بطاقة الملخص المباشر الميسر للمستخدم */}
-              <div className="bg-emerald-950/20 border-b border-emerald-800/30 p-4 sm:p-5">
-                <div className="flex items-center gap-2.5 mb-2">
-                  <span className="text-xl">🎯</span>
-                  <h3 className="font-bold text-emerald-400 text-base">
-                    التوصية المباشرة: {pick.key === "H" ? `فوز ${match.home_name_ar}` : pick.key === "A" ? `فوز ${match.away_name_ar}` : "رجحان التعادل"} (بنسبة {pct(pick.p)})
-                  </h3>
+              <div className="border-b border-line bg-panel/40 p-4 sm:p-6 space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-panel border border-line-strong/30 rounded-xl p-4 shadow-sm">
+                  <div className="flex items-center gap-3">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent/15 text-accent text-lg">
+                      🎯
+                    </span>
+                    <div>
+                      <p className="text-[11px] font-semibold text-accent uppercase tracking-wider">التوصية المباشرة</p>
+                      <h3 className="font-extrabold text-ink text-base sm:text-lg">
+                        {pick.key === "H" ? `فوز ${match.home_name_ar}` : pick.key === "A" ? `فوز ${match.away_name_ar}` : "رجحان التعادل"}
+                        <span className="ms-2 font-bold tabular text-accent">({pct(pick.p)})</span>
+                      </h3>
+                    </div>
+                  </div>
+                  <span className="inline-flex items-center self-start sm:self-center px-3 py-1 rounded-full text-xs font-semibold bg-surface border border-line text-muted">
+                    {confidenceLabel(match.confidence ?? 0.7)}
+                  </span>
                 </div>
-                <p className="text-xs text-muted leading-relaxed">
-                  تحليل خوارزميات «تقدير» يرشح نتيجة <span className="font-semibold text-ink">{OUTCOME_LABEL[pick.key]}</span> بناءً على القوة الهجومية وتوازن حركة الأسواق ومؤشرات الحزم.
+
+                <p className="text-xs text-muted leading-relaxed max-w-3xl">
+                  تحليل خوارزميات «تقدير» يرشح نتيجة <span className="font-bold text-ink">{OUTCOME_LABEL[pick.key]}</span> بناءً على القوة الهجومية وتوازن حركة الأسواق ومؤشرات الحزم.
                 </p>
 
                 {/* 4 نقاط موجزة تهم المتابع من النظرة الأولى */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mt-3.5 pt-3 border-t border-line text-xs">
-                  <div className="flex items-center gap-2 text-ink">
-                    <span>⚽ التهديف:</span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 text-xs">
+                  <div className="press-scale flex items-center justify-between rounded-lg border border-line bg-surface/70 px-3.5 py-2.5">
+                    <span className="font-semibold text-ink flex items-center gap-2">
+                      <span>⚽</span> التهديف:
+                    </span>
                     <span className="font-medium text-muted">
                       {match.p_over25 != null && match.p_over25 > 0.5 ? "مباراة هجومية (أكثر من هدفين)" : "مباراة متوازنة تكتيكياً"}
                     </span>
                   </div>
-                  <div className="flex items-center gap-2 text-ink">
-                    <span>⚡ حركة السوق:</span>
+                  <div className="press-scale flex items-center justify-between rounded-lg border border-line bg-surface/70 px-3.5 py-2.5">
+                    <span className="font-semibold text-ink flex items-center gap-2">
+                      <span>⚡</span> حركة السوق:
+                    </span>
                     <span className="font-medium text-muted">
                       {match.sharpSteamSide ? `سيولة المحترفين تتجه لـ ${match.sharpSteamSide === "home" ? match.home_name_ar : match.sharpSteamSide === "away" ? match.away_name_ar : "التعادل"}` : "أسعار هادئة ومتكافئة"}
                     </span>
                   </div>
-                  <div className="flex items-center gap-2 text-ink">
-                    <span>🟨 صرامة الحكم:</span>
+                  <div className="press-scale flex items-center justify-between rounded-lg border border-line bg-surface/70 px-3.5 py-2.5">
+                    <span className="font-semibold text-ink flex items-center gap-2">
+                      <span>🟨</span> صرامة الحكم:
+                    </span>
                     <span className="font-medium text-muted">
                       {match.refereeName ? `${match.refereeName} (معدل ~4 إنذارات)` : "حكم حازم (معدل متكافئ)"}
                     </span>
                   </div>
-                  <div className="flex items-center gap-2 text-ink">
-                    <span>🌤️ الطقس والملعب:</span>
+                  <div className="press-scale flex items-center justify-between rounded-lg border border-line bg-surface/70 px-3.5 py-2.5">
+                    <span className="font-semibold text-ink flex items-center gap-2">
+                      <span>🌤️</span> الطقس والملعب:
+                    </span>
                     <span className="font-medium text-muted">
                       {match.weatherCondition ?? "طقس ممتاز للعب وأرضية جافة"}
                     </span>
@@ -721,32 +742,32 @@ export default async function MatchPage({
               {hasShots ? (
                 <div className="space-y-4 px-4 py-4 sm:px-5">
                   <div className="flex items-center justify-between border-b border-line pb-2">
-                    <p className="type-label text-ink font-semibold">
-                      ⚡ 1. تحليل الأحداث والمؤشرات المؤسسية (Opta/StatsBomb Standard)
+                    <p className="type-label text-ink font-semibold flex items-center gap-2">
+                      <span>⚡</span> 1. تحليل الأحداث والمؤشرات المؤسسية (Opta/StatsBomb Standard)
                     </p>
-                    <span className="text-[11px] text-faint">xG · xA · PPDA</span>
+                    <span className="text-[11px] text-faint font-mono">xG · xA · PPDA</span>
                   </div>
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     {hasXg ? (
-                      <div className="rounded-xl border border-line bg-surface-subtle p-3.5">
+                      <div className="card-interactive p-4">
                         <ShotsPair label="الأهداف المتوقعة (xG)" home={xgHome!} away={xgAway!} />
                       </div>
                     ) : null}
                     {hasXa ? (
-                      <div className="rounded-xl border border-line bg-surface-subtle p-3.5">
+                      <div className="card-interactive p-4">
                         <ShotsPair label="التمريرات المتوقعة (xA)" home={xaHome!} away={xaAway!} />
                       </div>
                     ) : null}
                     {hasPpda ? (
-                      <div className="rounded-xl border border-line bg-surface-subtle p-3.5">
+                      <div className="card-interactive p-4">
                         <ShotsPair label="مؤشر الضغط العالي (PPDA)" home={ppdaHome!} away={ppdaAway!} />
                       </div>
                     ) : null}
-                    <div className="rounded-xl border border-line bg-surface-subtle p-3.5">
+                    <div className="card-interactive p-4">
                       <ShotsPair label="التسديدات الإجمالية" home={shotsHome} away={shotsAway} />
                     </div>
                     {hasSot ? (
-                      <div className="rounded-xl border border-line bg-surface-subtle p-3.5">
+                      <div className="card-interactive p-4">
                         <ShotsPair label="تسديدات على المرمى" home={sotHome!} away={sotAway!} />
                       </div>
                     ) : null}
@@ -757,18 +778,18 @@ export default async function MatchPage({
               {/* القسم الثاني: حركة أسعار السوق وصرامة الحكم وحالة السيناريو */}
               <div className="space-y-4 border-t border-line px-4 py-4 sm:px-5">
                 <div className="flex items-center justify-between border-b border-line pb-2">
-                  <p className="type-label text-ink font-semibold">
-                    🎯 2. حركة أسعار السوق وصرامة الحكم وظروف اللقاء (Sharp & Market Vectors)
+                  <p className="type-label text-ink font-semibold flex items-center gap-2">
+                    <span>🎯</span> 2. حركة أسعار السوق وصرامة الحكم وظروف اللقاء (Sharp & Market Vectors)
                   </p>
-                  <span className="text-[11px] text-faint">Line Movement · Referee · Weather</span>
+                  <span className="text-[11px] text-faint font-mono">Line Movement · Referee · Weather</span>
                 </div>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   {/* بطاقة Sharp Money */}
-                  <div className="rounded-xl border border-line bg-surface-subtle p-3.5 space-y-1">
-                    <p className="text-[11px] text-muted">مؤشر حركة أسعار المحترفين (Sharp Money):</p>
+                  <div className="card-interactive p-4 space-y-1">
+                    <p className="text-[11px] font-medium text-muted">مؤشر حركة أسعار المحترفين (Sharp Money):</p>
                     <p className="text-[13px] font-semibold text-ink">
                       {match.sharpSteamSide ? (
-                        <span className="text-emerald-500">
+                        <span className="text-accent font-bold">
                           ⚡ تدفق سيولة ذكية لصالح {match.sharpSteamSide === "home" ? match.home_name_ar : match.sharpSteamSide === "away" ? match.away_name_ar : "التعادل"}
                         </span>
                       ) : (
@@ -778,8 +799,8 @@ export default async function MatchPage({
                   </div>
 
                   {/* بطاقة Game-State */}
-                  <div className="rounded-xl border border-line bg-surface-subtle p-3.5 space-y-1">
-                    <p className="text-[11px] text-muted">توازن حالة المباراة (Neutral Game-State):</p>
+                  <div className="card-interactive p-4 space-y-1">
+                    <p className="text-[11px] font-medium text-muted">توازن حالة المباراة (Neutral Game-State):</p>
                     <p className="text-[13px] font-semibold text-ink">
                       {match.gamestateBiasRatio ? (
                         <span>موازنة النتيجة: {(match.gamestateBiasRatio * 100).toFixed(1)}% أداء محايد</span>
@@ -790,21 +811,21 @@ export default async function MatchPage({
                   </div>
 
                   {/* بطاقة صرامة الحكم */}
-                  <div className="rounded-xl border border-line bg-surface-subtle p-3.5 space-y-1">
+                  <div className="card-interactive p-4 space-y-1">
                     <div className="flex items-center justify-between">
-                      <p className="text-[11px] text-muted">حكم اللقاء ومؤشر الصرامة (Referee Vector):</p>
+                      <p className="text-[11px] font-medium text-muted">حكم اللقاء ومؤشر الصرامة (Referee Vector):</p>
                       <span className="text-[12px] font-medium text-ink">{match.refereeName ?? "معين من الاتحاد"}</span>
                     </div>
                     <div className="flex items-center justify-between text-[12px] font-semibold text-ink pt-1">
                       <span>الإنذارات المتوقعة: 🟨 ~4.2</span>
-                      <span className="text-amber-500">معدل الصرامة: 1.05 (حازم)</span>
+                      <span className="text-accent font-medium">معدل الصرامة: 1.05 (حازم)</span>
                     </div>
                   </div>
 
                   {/* بطاقة الطقس وجودة الملعب */}
-                  <div className="rounded-xl border border-line bg-surface-subtle p-3.5 space-y-1">
-                    <p className="text-[11px] text-muted">ظروف الطقس وأرضية الملعب (Weather & Pitch):</p>
-                    <p className="text-[12px] font-medium text-emerald-500 pt-1">
+                  <div className="card-interactive p-4 space-y-1">
+                    <p className="text-[11px] font-medium text-muted">ظروف الطقس وأرضية الملعب (Weather & Pitch):</p>
+                    <p className="text-[12px] font-medium text-ink pt-1">
                       {match.weatherCondition ?? "🌤️ طقس معتدل (18°C · أرضية جافة)"}
                     </p>
                   </div>

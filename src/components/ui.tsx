@@ -246,27 +246,32 @@ export function OutcomeCards({
 }) {
   const values: Record<string, number> = { H: pHome, D: pDraw, A: pAway };
   return (
-    <dl className="grid grid-cols-3 text-center" aria-label="احتمالات 1X2">
-      {OUTCOMES.map((o, i) => {
+    <dl className="grid grid-cols-3 text-center divide-x divide-x-reverse divide-line bg-panel/30 border-b border-line" aria-label="احتمالات 1X2">
+      {OUTCOMES.map((o) => {
         const active = pickKey === o.key;
         const value = values[o.key]!;
         return (
           <div
             key={o.key}
-            className={`relative px-2 py-4 ${i > 0 ? "border-s border-line" : ""}`}
+            className={`press-scale relative px-3 py-4 transition-colors duration-150 hover:bg-panel/60 ${
+              active ? "bg-panel/50" : ""
+            }`}
           >
             {active ? (
               <span
-                className="absolute inset-x-0 top-0 h-0.5"
+                className="absolute inset-x-0 top-0 h-1 rounded-b-sm shadow-sm"
                 style={{ background: o.color }}
                 aria-hidden
               />
             ) : null}
-            <dt className="text-[11px] text-muted">
-              <span className="tabular font-medium">{o.short}</span> {o.label}
+            <dt className="text-xs font-semibold text-muted flex items-center justify-center gap-1.5">
+              <span className="tabular font-bold text-ink" style={{ color: active ? o.color : undefined }}>
+                {o.short}
+              </span>
+              <span>{o.label}</span>
             </dt>
             <dd
-              className="type-figure mt-2"
+              className="type-figure mt-1.5 text-xl sm:text-2xl font-black tracking-tight"
               style={{ color: active ? o.color : "var(--muted)" }}
             >
               {`${(value * 100).toFixed(0)}٪`}

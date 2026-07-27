@@ -24,32 +24,34 @@ function TeamSide({
 
   const body = (
     <div className="flex h-full min-w-0 flex-col items-center justify-center gap-3 px-3 py-5 text-center sm:px-4 sm:py-6">
-      <Crest
-        src={crestUrl}
-        alt={name}
-        size="lg"
-        fallback={crestInitials(name)}
-        tone={side}
-      />
-      <div className="min-w-0 w-full">
+      <div className="transition-transform duration-200 ease-out group-hover:scale-105">
+        <Crest
+          src={crestUrl}
+          alt={name}
+          size="lg"
+          fallback={crestInitials(name)}
+          tone={side}
+        />
+      </div>
+      <div className="min-w-0 w-full space-y-1">
         <p className="type-label flex items-center justify-center gap-1.5">
           <span
-            className="tabular font-semibold"
+            className="tabular font-bold"
             style={{ color }}
             aria-hidden
           >
             {glyph}
           </span>
-          <span>{label}</span>
+          <span className="font-medium text-muted">{label}</span>
         </p>
         <p
-          className="mt-1.5 line-clamp-2 text-sm font-semibold leading-snug text-ink sm:text-base"
+          className="line-clamp-2 text-base font-extrabold leading-snug text-ink sm:text-lg"
           title={name}
         >
           {name}
         </p>
         {meta ? (
-          <p className="mt-1.5 text-[11px] tabular text-muted">{meta}</p>
+          <p className="text-[11px] tabular font-medium text-muted/80">{meta}</p>
         ) : null}
       </div>
     </div>
@@ -59,7 +61,7 @@ function TeamSide({
     return (
       <Link
         href={href}
-        className="motion-colors block h-full min-w-0 no-underline hover:bg-panel focus-visible:relative focus-visible:z-10"
+        className="group press-scale block h-full min-w-0 no-underline hover:bg-panel/60 focus-visible:relative focus-visible:z-10 rounded-lg"
         aria-label={`${label} ${name}`}
       >
         {body}
@@ -94,7 +96,7 @@ export function TeamMatchup({
   score,
 }: Props) {
   return (
-    <div className="card overflow-hidden">
+    <div className="card overflow-hidden shadow-sm">
       <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-stretch">
         <TeamSide
           name={homeName}
@@ -104,14 +106,19 @@ export function TeamMatchup({
           crestUrl={homeCrestUrl}
         />
 
-        <div className="flex flex-col items-center justify-center gap-1.5 border-x border-line px-3 py-5 sm:px-5">
+        <div className="flex flex-col items-center justify-center gap-1.5 border-x border-line px-4 py-5 sm:px-6 bg-panel/30">
           {score ? (
             <>
-              <span className="type-label">النتيجة</span>
-              <span className="type-figure text-ink">{score}</span>
+              <span className="type-label text-[11px] uppercase tracking-wider font-semibold text-faint">النتيجة</span>
+              <span className="type-figure text-ink font-black text-2xl sm:text-3xl tracking-tight">{score}</span>
             </>
           ) : (
-            <span className="type-label text-faint">ضد</span>
+            <div className="flex flex-col items-center gap-1">
+              <span className="type-label text-[11px] font-medium text-faint">ضد</span>
+              <span className="text-xs font-bold text-accent px-2 py-0.5 rounded-full bg-accent-dim/20 border border-accent-dim/30">
+                VS
+              </span>
+            </div>
           )}
         </div>
 
