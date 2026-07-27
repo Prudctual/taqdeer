@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { MatchList } from "@/components/MatchList";
+import { DynamicMatchSection } from "@/components/DynamicMatchSection";
 import { NextKickoff } from "@/components/NextKickoff";
 import {
   Chip,
@@ -101,7 +102,7 @@ export default function HomePage() {
       {upcomingCount > 0 ? (
         <SectionCard
           title="الجولة القادمة"
-          subtitle={`${upcomingCount} مباراة · أقرب المواعيد في كل دوري`}
+          subtitle={`${upcomingCount} مباراة · تحديث وبحث وتصنيف تفاعلي حي`}
           flush
           headerRight={
             <Link
@@ -112,29 +113,8 @@ export default function HomePage() {
             </Link>
           }
         >
-          <div className="divide-y divide-line">
-            {groups.map((group) => (
-              <div key={group.leagueId} data-league={group.leagueId}>
-                <div className="league-band relative flex items-center justify-center py-2 px-4 bg-panel border-b border-line">
-                  <Link
-                    href={`/leagues/${group.leagueId}`}
-                    className="league-name-chip motion-colors rounded-sm font-semibold no-underline text-amber-400 hover:text-ink text-center"
-                  >
-                    {group.leagueNameAr}
-                  </Link>
-                  <span className="absolute left-4 type-label tabular text-faint">
-                    <span className="sr-only">عدد المباريات </span>
-                    {group.matches.length} مباراة
-                  </span>
-                </div>
-                <MatchList
-                  matches={group.matches}
-                  groupDays={true}
-                  showLeague={false}
-                  leagueId={group.leagueId}
-                />
-              </div>
-            ))}
+          <div className="p-3">
+            <DynamicMatchSection groups={groups} totalUpcomingCount={upcomingCount} />
           </div>
         </SectionCard>
       ) : null}

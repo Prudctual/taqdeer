@@ -16,6 +16,8 @@ import { RevealOnView } from "@/components/RevealOnView";
 import { ScoreHeatmap } from "@/components/ScoreHeatmap";
 import { SignalBreakdown } from "@/components/SignalBreakdown";
 import { TeamMatchup } from "@/components/TeamMatchup";
+import { LiveCountdownTimer } from "@/components/LiveCountdownTimer";
+import { InteractiveScenarioSimulator } from "@/components/InteractiveScenarioSimulator";
 import {
   BackBar,
   EmptyState,
@@ -513,12 +515,17 @@ export default async function MatchPage({
               <span className="mx-2 font-normal text-faint">ضد</span>
               {match.away_name_ar}
             </h1>
-            <MatchWhen
-              iso={match.utc_date}
-              variant="detail"
-              finished={finished}
-              showCountdown={upcoming}
-            />
+            <div className="flex flex-wrap items-center gap-3">
+              <MatchWhen
+                iso={match.utc_date}
+                variant="detail"
+                finished={finished}
+                showCountdown={upcoming}
+              />
+              {!finished ? (
+                <LiveCountdownTimer targetDate={match.utc_date} />
+              ) : null}
+            </div>
             {!finished && !upcoming ? (
               <p className="text-xs text-muted">لم تُلعب بعد</p>
             ) : null}
@@ -626,6 +633,19 @@ export default async function MatchPage({
                   awayName={match.away_name_ar}
                 />
               ) : null}
+
+              {/* 🎯 محاكي السيناريوهات التفاعلي للمباراة */}
+              <div className="pt-2 px-1">
+                <InteractiveScenarioSimulator
+                  homeTeam={match.home_name_ar}
+                  awayTeam={match.away_name_ar}
+                  baseHomeP={match.p_home ?? 0.38}
+                  baseDrawP={match.p_draw ?? 0.32}
+                  baseAwayP={match.p_away ?? 0.30}
+                  baseLambdaHome={match.lambda_home ?? 1.25}
+                  baseLambdaAway={match.lambda_away ?? 0.95}
+                />
+              </div>
               {verdict ? (
                 <div className="space-y-1.5 px-4 py-3.5 sm:px-5">
                   <p className="type-label">قراءة ما بعد المباراة</p>
