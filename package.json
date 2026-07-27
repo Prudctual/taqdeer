@@ -11,6 +11,7 @@
     "sync:crests": "tsx scripts/sync-data.ts --crests-only",
     "fit": ".venv/bin/python scripts/fit-and-predict.py",
     "pipeline": "bun run sync && bun run fit",
+    "telegram": "bun scripts/telegram-bot.ts",
     "check": "tsx scripts/selfcheck.ts && tsc --noEmit && eslint .",
     "postinstall": "cd node_modules/better-sqlite3 && npm run build-release || true"
   },
