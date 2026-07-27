@@ -68,9 +68,6 @@ export function PlayerCascadeStack() {
               alt={p.name}
               className="h-full w-full rounded-full object-cover transition-transform duration-300 group-hover:scale-105"
             />
-
-            {/* Glowing Live Pulse Dot */}
-            <span className="absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full bg-emerald-500 ring-2 ring-panel animate-pulse" />
           </div>
         ))}
 
