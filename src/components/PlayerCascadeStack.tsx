@@ -70,11 +70,6 @@ export function PlayerCascadeStack() {
             />
           </div>
         ))}
-
-        {/* Dynamic Plus Badge */}
-        <div className="flex h-14 w-14 sm:h-16 sm:w-16 items-center justify-center rounded-full border-2 border-panel bg-gradient-to-br from-blue-600 to-indigo-700 font-mono text-xs font-black text-white shadow-lg z-0 hover:scale-110 transition-all">
-          +634
-        </div>
       </div>
 
       <style jsx global>{`
