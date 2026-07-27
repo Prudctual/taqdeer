@@ -54,7 +54,7 @@ export function PlayerCascadeStack() {
         {STAR_PLAYERS.map((p, idx) => (
           <div
             key={idx}
-            className={`group relative h-14 w-14 sm:h-16 sm:w-16 shrink-0 rounded-full border-2 border-panel bg-zinc-900 shadow-xl transition-all duration-300 hover:scale-125 hover:z-30 hover:-translate-y-2 hover:rotate-3 cursor-pointer ring-2 ${p.ringColor}/50 hover:ring-blue-400`}
+            className={`group relative h-14 w-14 sm:h-16 sm:w-16 shrink-0 rounded-full border-2 border-panel bg-zinc-900 shadow-xl transition-all duration-200 ease-out hover:scale-110 hover:z-30 hover:-translate-y-1 active:scale-95 cursor-pointer ring-2 ${p.ringColor}/50 hover:ring-blue-400`}
             title={`${p.name} — ${p.club}`}
             style={{
               zIndex: 10 - idx,
@@ -73,12 +73,21 @@ export function PlayerCascadeStack() {
       </div>
 
       <style jsx global>{`
-        @keyframes floatSlow {
-          0%, 100% {
-            transform: translateY(0px);
+        @media (prefers-reduced-motion: no-preference) {
+          @keyframes floatSlow {
+            0%, 100% {
+              transform: translateY(0px);
+            }
+            50% {
+              transform: translateY(-6px);
+            }
           }
-          50% {
-            transform: translateY(-6px);
+        }
+        @media (prefers-reduced-motion: reduce) {
+          @keyframes floatSlow {
+            0%, 100%, 50% {
+              transform: none !important;
+            }
           }
         }
       `}</style>
