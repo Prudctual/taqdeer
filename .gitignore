@@ -47,6 +47,11 @@ __pycache__/
 # vercel
 .vercel
 
+# temp / chrome
+chrome-profile/
+*.png
+*.tar.gz
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
