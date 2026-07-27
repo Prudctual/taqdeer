@@ -307,4 +307,30 @@ async function pollUpdates() {
   }
 }
 
+// ⏱️ إرسال إشعار تجريبي دوري كل دقيقة لجميع المشتركين المسجلين
+async function startMinuteTestNotifier() {
+  console.log("⏱️ Automatic 1-minute test notification loop enabled...");
+  setInterval(async () => {
+    try {
+      const rows = db.query(`SELECT chat_id FROM telegram_subscribers`).all() as { chat_id: number }[];
+      if (!rows.length) return;
+
+      const matches = getTodayMatches();
+      const nowStr = new Date().toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+      let text = `⏰ <b>إشعار تجريبي دوري (التوقيت: ${nowStr}) — «تقدير» ⚽📊</b>\n\n`;
+      text += `تحديث أحدث احتمالات وتوصيات المباريات للمشتركين:\n\n`;
+      text += matches.length
+        ? matches.slice(0, 3).map((m) => formatMatchCard(m)).join("\n──────────────\n")
+        : "لا تتوفر مباريات اليوم حالياً.";
+
+      for (const row of rows) {
+        await sendMessage(row.chat_id, text, MAIN_KEYBOARD);
+      }
+    } catch (err) {
+      console.error("Error in minute notifier:", err);
+    }
+  }, 60000); // 60,000ms = 1 minute
+}
+
+startMinuteTestNotifier();
 pollUpdates();
