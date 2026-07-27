@@ -176,15 +176,55 @@ const MAIN_KEYBOARD = {
   ],
 };
 
+// Ensure subscribers table exists
+db.run(`
+  CREATE TABLE IF NOT EXISTS telegram_subscribers (
+    chat_id INTEGER PRIMARY KEY,
+    username TEXT,
+    first_name TEXT,
+    created_at TEXT NOT NULL
+  );
+`);
+
+function saveSubscriber(chatId: number, username?: string, firstName?: string) {
+  try {
+    const stmt = db.prepare(`
+      INSERT INTO telegram_subscribers (chat_id, username, first_name, created_at)
+      VALUES (?, ?, ?, datetime('now'))
+      ON CONFLICT(chat_id) DO UPDATE SET
+        username = excluded.username,
+        first_name = excluded.first_name;
+    `);
+    stmt.run(chatId, username || null, firstName || null);
+  } catch (e) {
+    console.error("Error saving subscriber:", e);
+  }
+}
+
 async function handleUpdate(update: any) {
+  const user = update.message?.from || update.callback_query?.from;
+  const chatId = update.message?.chat?.id || update.callback_query?.message?.chat?.id;
+
+  if (chatId && user) {
+    saveSubscriber(chatId, user.username, user.first_name);
+  }
+
   if (update.message) {
     const msg = update.message;
     const chatId = msg.chat.id;
     const text = (msg.text || "").trim();
 
     if (text.startsWith("/start") || text.startsWith("/help")) {
-      const welcome = `<b>مرحباً بك في بوت منصة «تقدير» ⚽📊</b>\n\nنظام التحليل الرياضي والتنبؤ الخوارزمي المتقدم لمباريات كرة القدم بالاعتماد على نماذج <i>Dixon-Coles</i>، <i>Pi-ratings</i>، وتتبع حركة أسعار المحترفين.\n\nاختر من القائمة أدناه أو اكتب اسم أي فريق لبدء التحليل:`;
+      const welcome = `<b>مرحباً بك في بوت منصة «تقدير» ⚽📊</b>\n\nتم تفعيل اشتراكك التلقائي لاستلام أحدث التوقعات اليومية والتنبيهات المباشرة!\n\nنظام التحليل الرياضي والتنبؤ الخوارزمي المتقدم لمباريات كرة القدم بالاعتماد على نماذج <i>Dixon-Coles</i>، <i>Pi-ratings</i>، وتتبع حركة أسعار المحترفين.\n\nإليك توقعات ومباريات اليوم:`;
       await sendMessage(chatId, welcome, MAIN_KEYBOARD);
+
+      // 🔔 إرسال ملخص التوقعات فورياً للمستخدم بمجرد التفعيل!
+      const matches = getTodayMatches();
+      if (matches.length) {
+        let reply = `🚀 <b>التوقعات الخوارزمية الفورية لمباريات اليوم:</b>\n\n`;
+        reply += matches.map((m) => formatMatchCard(m)).join("\n──────────────\n");
+        await sendMessage(chatId, reply, MAIN_KEYBOARD);
+      }
       return;
     }
 

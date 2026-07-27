@@ -96,15 +96,31 @@ async function sendNotification(targetChatId: string, customMessage?: string) {
   }
 }
 
-if (!chatIdArg) {
-  console.log("⚠️ No --chat_id specified. Fetching bot info...");
-  fetch(`${API_URL}/getMe`)
-    .then((r) => r.json())
-    .then((botInfo) => {
-      console.log("🤖 Bot Info:", botInfo);
-      console.log("\n💡 لتجربة إرسال إشعار لشات معين أو قناة، افتح البوت في تليغرام واضغط /start، ثم شغل الأمر:");
-      console.log("   bun scripts/send-telegram-notification.ts --chat_id=<YOUR_CHAT_ID>");
-    });
-} else {
-  sendNotification(chatIdArg, textArg);
+function getSubscribedChatIds(): string[] {
+  try {
+    const rows = db.query(`SELECT chat_id FROM telegram_subscribers`).all() as { chat_id: number }[];
+    return rows.map((r) => String(r.chat_id));
+  } catch (e) {
+    return [];
+  }
 }
+
+async function main() {
+  if (chatIdArg) {
+    await sendNotification(chatIdArg, textArg);
+  } else {
+    const chatIds = getSubscribedChatIds();
+    if (!chatIds.length) {
+      console.log("⚠️ No active subscribers found in DB yet.");
+      console.log("💡 افتح البوت @Taqdeerbot في تليغرام واضغط /start لاشتراك حسابك أوتوماتيكياً!");
+      return;
+    }
+
+    console.log(`📢 Broadcasting notification to ${chatIds.length} active subscriber(s)...`);
+    for (const id of chatIds) {
+      await sendNotification(id, textArg);
+    }
+  }
+}
+
+main();
