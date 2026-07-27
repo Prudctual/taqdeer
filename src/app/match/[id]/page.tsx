@@ -17,7 +17,7 @@ import { ScoreHeatmap } from "@/components/ScoreHeatmap";
 import { SignalBreakdown } from "@/components/SignalBreakdown";
 import { TeamMatchup } from "@/components/TeamMatchup";
 import { LiveCountdownTimer } from "@/components/LiveCountdownTimer";
-import { InteractiveScenarioSimulator } from "@/components/InteractiveScenarioSimulator";
+import { AutomatedModelAdjustments } from "@/components/AutomatedModelAdjustments";
 import {
   BackBar,
   EmptyState,
@@ -634,16 +634,21 @@ export default async function MatchPage({
                 />
               ) : null}
 
-              {/* 🎯 محاكي السيناريوهات التفاعلي للمباراة */}
+              {/* 🤖 تحليل المعاملات والتعديلات المحسوبة آلياً بالكامل */}
               <div className="pt-2 px-1">
-                <InteractiveScenarioSimulator
+                <AutomatedModelAdjustments
                   homeTeam={match.home_name_ar}
                   awayTeam={match.away_name_ar}
-                  baseHomeP={match.p_home ?? 0.38}
-                  baseDrawP={match.p_draw ?? 0.32}
-                  baseAwayP={match.p_away ?? 0.30}
-                  baseLambdaHome={match.lambda_home ?? 1.25}
-                  baseLambdaAway={match.lambda_away ?? 0.95}
+                  homeP={match.p_home ?? 0.38}
+                  drawP={match.p_draw ?? 0.32}
+                  awayP={match.p_away ?? 0.30}
+                  lambdaHome={match.lambda_home ?? 1.25}
+                  lambdaAway={match.lambda_away ?? 0.95}
+                  sharpSteamSide={match.sharpSteamSide}
+                  refereeName={match.refereeName}
+                  weatherCondition={match.weatherCondition}
+                  homeVenueRecord={homeVenue}
+                  awayVenueRecord={awayVenue}
                 />
               </div>
               {verdict ? (
