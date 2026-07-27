@@ -21,7 +21,7 @@ const pickName: Record<string, string> = {
 };
 
 /** شبكة موحّدة للرأس والصف — المحاذاة داخل كل عمود تتبع عنصره */
-const rowGrid =
+export const rowGrid =
   "sm:grid-cols-[6rem_minmax(0,1fr)_minmax(8.5rem,10rem)_5rem] sm:items-center sm:gap-x-4";
 
 export function MatchListHeader({
@@ -34,19 +34,19 @@ export function MatchListHeader({
     <div
       data-league={tone}
       aria-hidden
-      className={`type-label hidden border-b border-line bg-panel px-4 py-2 sm:grid ${rowGrid}`}
+      className={`type-label hidden border-b border-line bg-panel px-4 py-2 sm:grid ${rowGrid} text-center`}
     >
-      <span className="text-start">الموعد</span>
+      <span className="text-center">الموعد</span>
 
-      <span className="grid grid-cols-[1fr_auto_1fr] items-center gap-1.5 sm:gap-2">
+      <span className="grid grid-cols-[1fr_2.25rem_2rem_2.25rem_1fr] items-center gap-1 sm:gap-2 text-center">
         <span className="text-end">مضيف</span>
-        <span className="px-1 text-center text-faint">المباراة</span>
+        <span className="col-span-3 text-center text-faint">المباراة</span>
         <span className="text-start">ضيف</span>
       </span>
 
       <span className="text-center">احتمال 1X2</span>
 
-      <span className="text-end">الأرجح</span>
+      <span className="text-center">الأرجح</span>
     </div>
   );
 }

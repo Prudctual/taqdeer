@@ -33,13 +33,16 @@ def update_elo(
     k: float = 20.0,
     home_adv: float = 80.0,
     initial: float = 1500.0,
+    seeds: Dict[str, float] | None = None,
 ) -> Tuple[Dict[str, float], List[Tuple[str, str, float]]]:
+    """`seeds` overrides `initial` per team at first appearance (promoted-team prior)."""
+    seeds = seeds or {}
     ratings: Dict[str, float] = {}
     history: List[Tuple[str, str, float]] = []
 
     for m in matches:
-        rh = ratings.get(m.home, initial)
-        ra = ratings.get(m.away, initial)
+        rh = ratings.get(m.home, seeds.get(m.home, initial))
+        ra = ratings.get(m.away, seeds.get(m.away, initial))
         eh = expected_score(rh + home_adv, ra)
         ea = 1.0 - eh
         if m.home_goals > m.away_goals:

@@ -539,12 +539,18 @@ function ingestCsv(
       id, league_id, season, matchday, utc_date, status,
       home_team_id, away_team_id, home_goals, away_goals, source, external_id,
       odds_home, odds_draw, odds_away,
-      shots_home, shots_away, sot_home, sot_away
+      odds_open_home, odds_open_draw, odds_open_away,
+      shots_home, shots_away, sot_home, sot_away,
+      fouls_home, fouls_away, corners_home, corners_away,
+      referee_name
     ) VALUES (
       @id, @league_id, @season, @matchday, @utc_date, @status,
       @home_team_id, @away_team_id, @home_goals, @away_goals, @source, @external_id,
       @odds_home, @odds_draw, @odds_away,
-      @shots_home, @shots_away, @sot_home, @sot_away
+      @odds_open_home, @odds_open_draw, @odds_open_away,
+      @shots_home, @shots_away, @sot_home, @sot_away,
+      @fouls_home, @fouls_away, @corners_home, @corners_away,
+      @referee_name
     )
     ON CONFLICT(id) DO UPDATE SET
       home_goals=excluded.home_goals,
@@ -553,10 +559,18 @@ function ingestCsv(
       odds_home=excluded.odds_home,
       odds_draw=excluded.odds_draw,
       odds_away=excluded.odds_away,
+      odds_open_home=excluded.odds_open_home,
+      odds_open_draw=excluded.odds_open_draw,
+      odds_open_away=excluded.odds_open_away,
       shots_home=excluded.shots_home,
       shots_away=excluded.shots_away,
       sot_home=excluded.sot_home,
-      sot_away=excluded.sot_away
+      sot_away=excluded.sot_away,
+      fouls_home=excluded.fouls_home,
+      fouls_away=excluded.fouls_away,
+      corners_home=excluded.corners_home,
+      corners_away=excluded.corners_away,
+      referee_name=excluded.referee_name
   `);
 
   const num = (v: string | undefined) => {
@@ -599,10 +613,18 @@ function ingestCsv(
         odds_home: num(r.AvgH) ?? num(r.B365H) ?? num(r.PSH),
         odds_draw: num(r.AvgD) ?? num(r.B365D) ?? num(r.PSD),
         odds_away: num(r.AvgA) ?? num(r.B365A) ?? num(r.PSA),
+        odds_open_home: num(r.PSH) ?? num(r.B365H),
+        odds_open_draw: num(r.PSD) ?? num(r.B365D),
+        odds_open_away: num(r.PSA) ?? num(r.B365A),
         shots_home: num(r.HS),
         shots_away: num(r.AS),
         sot_home: num(r.HST),
         sot_away: num(r.AST),
+        fouls_home: num(r.HF),
+        fouls_away: num(r.AF),
+        corners_home: num(r.HC),
+        corners_away: num(r.AC),
+        referee_name: r.Referee ? String(r.Referee).trim() : null,
       });
       n++;
     }

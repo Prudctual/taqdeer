@@ -1,5 +1,5 @@
 import { DayRail } from "./DayRail";
-import { MatchListHeader, MatchRow } from "./MatchRow";
+import { MatchListHeader, MatchRow, rowGrid } from "./MatchRow";
 import type { MatchCard } from "@/lib/queries";
 import { formatLongDate, groupByDay } from "@/lib/format";
 
@@ -42,22 +42,27 @@ export function MatchList({
         {days.map((day) => (
           <section key={day.key} aria-label={day.label}>
             <DayRail>
-              <div className="flex items-baseline justify-between gap-3">
-                <h3 className="day-rail-label min-w-0 truncate">
-                  {day.relative ? (
-                    <>
-                      <span className="text-accent">{day.relative}</span>
-                      <span className="mx-1.5 text-faint" aria-hidden>
-                        ·
-                      </span>
-                    </>
-                  ) : null}
-                  <span>{formatLongDate(day.items[0]!.utcDate)}</span>
-                </h3>
-                <span className="shrink-0 text-[11px] tabular text-faint">
-                  <span className="sr-only">عدد المباريات </span>
-                  {day.items.length}
-                </span>
+              <div className={`grid grid-cols-[minmax(0,1fr)_auto] ${rowGrid} px-4 py-1 items-center`}>
+                <div className="hidden sm:block"></div>
+                <div className="min-w-0 text-center flex items-center justify-center">
+                  <h3 className="day-rail-label truncate font-bold text-yellow-400 text-center">
+                    {day.relative ? (
+                      <>
+                        <span className="text-yellow-400 font-extrabold">{day.relative}</span>
+                        <span className="mx-1.5 text-yellow-500/70" aria-hidden>
+                          ·
+                        </span>
+                      </>
+                    ) : null}
+                    <span className="text-yellow-200">{formatLongDate(day.items[0]!.utcDate)}</span>
+                  </h3>
+                </div>
+                <div className="hidden sm:block col-span-2 text-end">
+                  <span className="text-[11px] tabular text-yellow-400/80 font-medium">
+                    <span className="sr-only">عدد المباريات </span>
+                    {day.items.length} مباراة
+                  </span>
+                </div>
               </div>
             </DayRail>
             <ul className="divide-y divide-line">

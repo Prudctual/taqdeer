@@ -3,7 +3,7 @@ import fs from "fs";
 import path from "path";
 
 const dataDir = path.join(process.cwd(), "data");
-const dbPath = path.join(dataDir, "pitchlab.db");
+const dbPath = path.join(dataDir, "taqdeer.db");
 
 let _db: Database.Database | null = null;
 
@@ -113,7 +113,9 @@ function initSchema(db: Database.Database) {
       accuracy REAL NOT NULL,
       brier REAL NOT NULL,
       log_loss REAL NOT NULL,
-      created_at TEXT NOT NULL
+      created_at TEXT NOT NULL,
+      model_version TEXT,
+      rps REAL
     );
 
     CREATE TABLE IF NOT EXISTS team_strengths (
@@ -151,12 +153,50 @@ function migrate(db: Database.Database) {
     ["shots_away", "REAL"],
     ["sot_home", "REAL"],
     ["sot_away", "REAL"],
+    ["fouls_home", "REAL"],
+    ["fouls_away", "REAL"],
+    ["corners_home", "REAL"],
+    ["corners_away", "REAL"],
+    ["xg_home", "REAL"],
+    ["xg_away", "REAL"],
+    ["xa_home", "REAL"],
+    ["xa_away", "REAL"],
+    ["ppda_home", "REAL"],
+    ["ppda_away", "REAL"],
+    ["lineup_status", "TEXT"],
+    ["missing_home_json", "TEXT"],
+    ["missing_away_json", "TEXT"],
+    ["gamestate_bias_ratio", "REAL"],
+    ["odds_open_home", "REAL"],
+    ["odds_open_draw", "REAL"],
+    ["odds_open_away", "REAL"],
+    ["sharp_steam_side", "TEXT"],
+    ["referee_name", "TEXT"],
+    ["weather_condition", "TEXT"],
   ];
   for (const [name, typ] of addMatch) {
     if (!cols.has(name)) {
-      db.exec(`ALTER TABLE matches ADD COLUMN ${name} ${typ}`);
+      db.exec(`ALTER TABLE matches ADD COLUMN ${name} ${typ};`);
     }
   }
+
+  // جدول الحكام ومعدلات الصرامة والإنذارات
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS referees (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      league_id TEXT,
+      matches_count INTEGER DEFAULT 0,
+      yellow_cards INTEGER DEFAULT 0,
+      red_cards INTEGER DEFAULT 0,
+      fouls INTEGER DEFAULT 0,
+      yellow_per_game REAL DEFAULT 0.0,
+      red_per_game REAL DEFAULT 0.0,
+      fouls_per_game REAL DEFAULT 0.0,
+      strictness_index REAL DEFAULT 1.0,
+      updated_at TEXT
+    );
+  `);
 
   const pcols = new Set(
     (
@@ -180,6 +220,19 @@ function migrate(db: Database.Database) {
   }
   if (!pcols.has("market_away")) {
     db.exec(`ALTER TABLE predictions ADD COLUMN market_away REAL`);
+  }
+
+  const mcols = new Set(
+    (
+      db.prepare(`PRAGMA table_info(model_metrics)`).all() as { name: string }[]
+    ).map((c) => c.name),
+  );
+  // يميّز صفوف النموذج عن صفوف خط أساس السوق ('market') في نفس الجدول
+  if (!mcols.has("model_version")) {
+    db.exec(`ALTER TABLE model_metrics ADD COLUMN model_version TEXT`);
+  }
+  if (!mcols.has("rps")) {
+    db.exec(`ALTER TABLE model_metrics ADD COLUMN rps REAL`);
   }
 }
 

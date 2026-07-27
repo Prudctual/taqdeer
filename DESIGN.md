@@ -1,4 +1,4 @@
-# Design System — توقّع
+# Design System — تقدير
 
 ## Visual Theme
 

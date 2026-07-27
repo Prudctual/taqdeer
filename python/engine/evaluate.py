@@ -22,6 +22,18 @@ def log_loss(probs: List[Tuple[float, float, float]], outcomes: List[str]) -> fl
     return total / max(len(probs), 1)
 
 
+def rps(probs: List[Tuple[float, float, float]], outcomes: List[str]) -> float:
+    """Ranked probability score على الترتيب H<D<A — يعاقب الخطأ البعيد أشد من القريب."""
+    total = 0.0
+    for (ph, pd, _pa), o in zip(probs, outcomes):
+        y1 = 1.0 if o == "H" else 0.0
+        y2 = y1 + (1.0 if o == "D" else 0.0)
+        c1 = ph - y1
+        c2 = ph + pd - y2
+        total += (c1 * c1 + c2 * c2) / 2.0
+    return total / max(len(probs), 1)
+
+
 def accuracy(probs: List[Tuple[float, float, float]], outcomes: List[str]) -> float:
     correct = 0
     for (ph, pd, pa), o in zip(probs, outcomes):
@@ -39,4 +51,5 @@ def summarize(
         "accuracy": accuracy(probs, outcomes),
         "brier": brier_score(probs, outcomes),
         "log_loss": log_loss(probs, outcomes),
+        "rps": rps(probs, outcomes),
     }

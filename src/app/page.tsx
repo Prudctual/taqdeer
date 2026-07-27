@@ -25,11 +25,9 @@ export default function HomePage() {
   const recentByLeague = getRecentFinishedByLeague(3);
   const lastFit = getMeta("last_fit");
   const leagues = getLeagues();
-  // الأقرب زمنياً عبر الدوريات كلها يتصدّر، ولا يتكرر داخل جدول دوريه
+  // الأقرب زمنياً عبر الدوريات كلها يتصدّر في البنَر ومدرج أيضاً بجدول دوريه
   const next = upcomingByLeague[0]?.matches[0] ?? null;
-  const groups = upcomingByLeague
-    .map((g) => ({ ...g, matches: g.matches.filter((m) => m.id !== next?.id) }))
-    .filter((g) => g.matches.length > 0);
+  const groups = upcomingByLeague.filter((g) => g.matches.length > 0);
   const upcomingCount = groups.reduce((n, g) => n + g.matches.length, 0);
 
   if (count === 0) {
@@ -81,7 +79,7 @@ export default function HomePage() {
         {leagues.length > 0 ? (
           <nav
             aria-label="الدوريات"
-            className="flex flex-wrap items-center gap-2"
+            className="flex flex-wrap items-center justify-center gap-5 sm:gap-6 md:gap-7 py-3"
           >
             {leagues.map((l) => (
               <Chip
@@ -93,7 +91,7 @@ export default function HomePage() {
                 {l.name_ar}
               </Chip>
             ))}
-            <Chip href="/leagues">كل الدوريات</Chip>
+            <Chip href="/leagues">كل المباريات</Chip>
           </nav>
         ) : null}
       </div>
@@ -117,20 +115,21 @@ export default function HomePage() {
           <div className="divide-y divide-line">
             {groups.map((group) => (
               <div key={group.leagueId} data-league={group.leagueId}>
-                <div className="league-band">
+                <div className="league-band relative flex items-center justify-center py-2 px-4 bg-panel border-b border-line">
                   <Link
                     href={`/leagues/${group.leagueId}`}
-                    className="league-name-chip motion-colors rounded-sm font-semibold no-underline hover:text-ink"
+                    className="league-name-chip motion-colors rounded-sm font-semibold no-underline text-amber-400 hover:text-ink text-center"
                   >
                     {group.leagueNameAr}
                   </Link>
-                  <span className="type-label tabular text-faint">
+                  <span className="absolute left-4 type-label tabular text-faint">
                     <span className="sr-only">عدد المباريات </span>
-                    {group.matches.length}
+                    {group.matches.length} مباراة
                   </span>
                 </div>
                 <MatchList
                   matches={group.matches}
+                  groupDays={true}
                   showLeague={false}
                   leagueId={group.leagueId}
                 />
@@ -188,6 +187,7 @@ export default function HomePage() {
                 </div>
                 <MatchList
                   matches={group.matches}
+                  groupDays={true}
                   showLeague={false}
                   leagueId={group.leagueId}
                 />

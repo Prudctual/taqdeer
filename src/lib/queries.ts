@@ -40,6 +40,23 @@ export type MatchCard = {
   oddsHome: number | null;
   oddsDraw: number | null;
   oddsAway: number | null;
+  shotsHome: number | null;
+  shotsAway: number | null;
+  sotHome: number | null;
+  sotAway: number | null;
+  xgHome?: number | null;
+  xgAway?: number | null;
+  xaHome?: number | null;
+  xaAway?: number | null;
+  ppdaHome?: number | null;
+  ppdaAway?: number | null;
+  oddsOpenHome?: number | null;
+  oddsOpenDraw?: number | null;
+  oddsOpenAway?: number | null;
+  sharpSteamSide?: string | null;
+  gamestateBiasRatio?: number | null;
+  refereeName?: string | null;
+  weatherCondition?: string | null;
 };
 
 /** @deprecated alias — prefer MatchCard */
@@ -104,7 +121,8 @@ const LIST_SELECT = `
          p.xpts_home as xptsHome, p.xpts_away as xptsAway,
          p.market_home as marketHome, p.market_draw as marketDraw, p.market_away as marketAway,
          p.model_version as modelVersion,
-         m.odds_home as oddsHome, m.odds_draw as oddsDraw, m.odds_away as oddsAway
+         m.odds_home as oddsHome, m.odds_draw as oddsDraw, m.odds_away as oddsAway,
+         NULL as shotsHome, NULL as shotsAway, NULL as sotHome, NULL as sotAway
   FROM matches m
   JOIN leagues l ON l.id = m.league_id
   JOIN teams ht ON ht.id = m.home_team_id
@@ -135,7 +153,15 @@ const DETAIL_SELECT = `
          p.xpts_home as xptsHome, p.xpts_away as xptsAway,
          p.market_home as marketHome, p.market_draw as marketDraw, p.market_away as marketAway,
          p.model_version as modelVersion,
-         m.odds_home as oddsHome, m.odds_draw as oddsDraw, m.odds_away as oddsAway
+         m.odds_home as oddsHome, m.odds_draw as oddsDraw, m.odds_away as oddsAway,
+         m.shots_home as shotsHome, m.shots_away as shotsAway,
+         m.sot_home as sotHome, m.sot_away as sotAway,
+         m.xg_home as xgHome, m.xg_away as xgAway,
+         m.xa_home as xaHome, m.xa_away as xaAway,
+         m.ppda_home as ppdaHome, m.ppda_away as ppdaAway,
+         m.odds_open_home as oddsOpenHome, m.odds_open_draw as oddsOpenDraw, m.odds_open_away as oddsOpenAway,
+         m.sharp_steam_side as sharpSteamSide, m.gamestate_bias_ratio as gamestateBiasRatio,
+         m.referee_name as refereeName, m.weather_condition as weatherCondition
   FROM matches m
   JOIN leagues l ON l.id = m.league_id
   JOIN teams ht ON ht.id = m.home_team_id
@@ -216,8 +242,8 @@ export function getUpcomingByLeague(perLeague = 6): {
     .sort((a, b) => a.matches[0]!.utcDate.localeCompare(b.matches[0]!.utcDate));
 }
 
-/** أحدث النتائج الحقيقية من الدوريات الخمس (حصة متساوية لكل دوري) */
-export function getRecentFinished(limit = 20): MatchCard[] {
+/** أحدث النتائج الحقيقية للموسم الحالي 2026 */
+export function getRecentFinished(limit = 20, season = "2026"): MatchCard[] {
   const db = getDb();
   const leagues = getLeagues();
   if (leagues.length === 0) return [];
@@ -227,6 +253,7 @@ export function getRecentFinished(limit = 20): MatchCard[] {
     `${LIST_SELECT}
      WHERE m.status = 'FINISHED'
        AND m.league_id = ?
+       AND m.season = ?
        AND p.id IS NOT NULL
        AND m.source IN ('football-data.co.uk','uk-csv','football-data.org','wikipedia')
      ORDER BY m.utc_date DESC
@@ -235,7 +262,7 @@ export function getRecentFinished(limit = 20): MatchCard[] {
 
   const rows: MatchCard[] = [];
   for (const league of leagues) {
-    rows.push(...(stmt.all(league.id, perLeague) as MatchCard[]));
+    rows.push(...(stmt.all(league.id, season, perLeague) as MatchCard[]));
   }
 
   // أحدث أولاً، مع إبقاء تنوّع الدوريات ظاهراً في أعلى القائمة
@@ -243,8 +270,8 @@ export function getRecentFinished(limit = 20): MatchCard[] {
   return rows.slice(0, limit);
 }
 
-/** آخر نتائج كل دوري على حدة (للعرض المجمّع) */
-export function getRecentFinishedByLeague(perLeague = 4): {
+/** آخر نتائج كل دوري للموسم الحالي (للعرض المجمّع) */
+export function getRecentFinishedByLeague(perLeague = 4, season = "2026"): {
   leagueId: string;
   leagueNameAr: string;
   matches: MatchCard[];
@@ -255,6 +282,7 @@ export function getRecentFinishedByLeague(perLeague = 4): {
     `${LIST_SELECT}
      WHERE m.status = 'FINISHED'
        AND m.league_id = ?
+       AND m.season = ?
        AND p.id IS NOT NULL
        AND m.source IN ('football-data.co.uk','uk-csv','football-data.org','wikipedia')
      ORDER BY m.utc_date DESC
@@ -263,7 +291,7 @@ export function getRecentFinishedByLeague(perLeague = 4): {
 
   return leagues
     .map((league) => {
-      const matches = stmt.all(league.id, perLeague) as MatchCard[];
+      const matches = stmt.all(league.id, season, perLeague) as MatchCard[];
       return {
         leagueId: league.id,
         leagueNameAr: league.name_ar,
@@ -347,9 +375,22 @@ function latestStandingsSeason(leagueId: string): string | null {
   return row?.season ?? null;
 }
 
-export function getStandings(leagueId: string) {
+/** الحصول على المواسم المتاحة للدوري مرتبة تنازلياً */
+export function getAvailableSeasons(leagueId: string): string[] {
   const db = getDb();
-  const season = latestStandingsSeason(leagueId);
+  const rows = db
+    .prepare(
+      `SELECT DISTINCT season FROM standings
+       WHERE league_id = ?
+       ORDER BY season DESC`,
+    )
+    .all(leagueId) as Array<{ season: string }>;
+  return rows.map((r) => r.season);
+}
+
+export function getStandings(leagueId: string, seasonParam?: string) {
+  const db = getDb();
+  const season = seasonParam || latestStandingsSeason(leagueId);
   if (!season) return [];
 
   return db
@@ -433,13 +474,133 @@ export function getEloHistory(teamId: string, limit = 40) {
     .all(teamId, limit) as Array<{ date: string; elo: number }>;
 }
 
+/** مواجهات سابقة بين الفريقين بالاتجاهين — المنتهية قبل موعد المباراة المعروضة فقط.
+ * الحدّ الزمني يُبقي صفحة المباراة المنتهية صادقة: لا لقاء لُعب بعدها يظهر «سابقاً» */
+export function getHeadToHead(
+  homeId: string,
+  awayId: string,
+  beforeIso: string,
+  limit = 6,
+): MatchCard[] {
+  const db = getDb();
+  return db
+    .prepare(
+      `${LIST_SELECT}
+       WHERE m.status = 'FINISHED'
+         AND m.utc_date < ?
+         AND m.source NOT IN ('preview-holdout','synthetic','demo')
+         AND ((m.home_team_id = ? AND m.away_team_id = ?)
+           OR (m.home_team_id = ? AND m.away_team_id = ?))
+       ORDER BY m.utc_date DESC
+       LIMIT ?`,
+    )
+    .all(beforeIso, homeId, awayId, awayId, homeId, limit) as MatchCard[];
+}
+
+/** الجدول كما كان لحظة انطلاق المباراة — يُبنى من نتائج ما قبل موعدها فقط.
+ * ponytail: تعادل النقاط يُحسم بفارق الأهداف ثم المسجَّل — كفاية عرضية،
+ * لا قواعد المواجهات المباشرة الخاصة ببعض الدوريات */
+export function getStandingsAt(
+  leagueId: string,
+  season: string,
+  beforeIso: string,
+): Array<{ team_id: string; position: number; points: number }> {
+  const rows = getDb()
+    .prepare(
+      `SELECT team_id, SUM(pts) as points, SUM(gf - ga) as gd, SUM(gf) as gf
+       FROM (
+         SELECT home_team_id as team_id,
+                CASE WHEN home_goals > away_goals THEN 3
+                     WHEN home_goals = away_goals THEN 1 ELSE 0 END as pts,
+                home_goals as gf, away_goals as ga
+         FROM matches
+         WHERE league_id = ? AND season = ? AND status = 'FINISHED'
+           AND utc_date < ? AND home_goals IS NOT NULL
+         UNION ALL
+         SELECT away_team_id,
+                CASE WHEN away_goals > home_goals THEN 3
+                     WHEN home_goals = away_goals THEN 1 ELSE 0 END,
+                away_goals, home_goals
+         FROM matches
+         WHERE league_id = ? AND season = ? AND status = 'FINISHED'
+           AND utc_date < ? AND home_goals IS NOT NULL
+       )
+       GROUP BY team_id
+       ORDER BY points DESC, gd DESC, gf DESC`,
+    )
+    .all(leagueId, season, beforeIso, leagueId, season, beforeIso) as Array<{
+    team_id: string;
+    points: number;
+  }>;
+  return rows.map((r, i) => ({
+    team_id: r.team_id,
+    position: i + 1,
+    points: r.points,
+  }));
+}
+
+/** أيام الراحة منذ آخر مباراة منتهية قبل موعد هذه المباراة */
+export function getRestDays(teamId: string, beforeIso: string): number | null {
+  const row = getDb()
+    .prepare(
+      `SELECT utc_date FROM matches
+       WHERE (home_team_id = ? OR away_team_id = ?)
+         AND status = 'FINISHED' AND utc_date < ?
+       ORDER BY utc_date DESC
+       LIMIT 1`,
+    )
+    .get(teamId, teamId, beforeIso) as { utc_date: string } | undefined;
+  if (!row) return null;
+  const days = Math.floor(
+    (Date.parse(beforeIso) - Date.parse(row.utc_date)) / 86_400_000,
+  );
+  // ponytail: فوق 30 يوماً = توقف موسم لا راحة — نصمت بدل رقم مضلل
+  return days >= 1 && days <= 30 ? days : null;
+}
+
+export type VenueRecord = {
+  played: number;
+  won: number;
+  drawn: number;
+  lost: number;
+  gf: number;
+  ga: number;
+};
+
+/** سجل الفريق في ملعبه أو خارجه لموسم واحد حتى موعد المباراة المعروضة —
+ * فوز/تعادل/خسارة وأهداف، بلا مباريات لُعبت بعدها */
+export function getVenueRecord(
+  teamId: string,
+  leagueId: string,
+  season: string,
+  venue: "home" | "away",
+  beforeIso: string,
+): VenueRecord {
+  const gf = venue === "home" ? "home_goals" : "away_goals";
+  const ga = venue === "home" ? "away_goals" : "home_goals";
+  return getDb()
+    .prepare(
+      `SELECT COUNT(*) as played,
+              COALESCE(SUM(${gf} > ${ga}), 0) as won,
+              COALESCE(SUM(${gf} = ${ga}), 0) as drawn,
+              COALESCE(SUM(${gf} < ${ga}), 0) as lost,
+              COALESCE(SUM(${gf}), 0) as gf,
+              COALESCE(SUM(${ga}), 0) as ga
+       FROM matches
+       WHERE ${venue === "home" ? "home_team_id" : "away_team_id"} = ?
+         AND league_id = ? AND season = ? AND status = 'FINISHED'
+         AND utc_date < ?
+         AND home_goals IS NOT NULL AND away_goals IS NOT NULL`,
+    )
+    .get(teamId, leagueId, season, beforeIso) as VenueRecord;
+}
+
 export function getModelMetrics() {
   const db = getDb();
   return db
     .prepare(
       `SELECT m.id, m.league_id, m.window_label, m.n_matches, m.accuracy,
-              m.brier, m.log_loss, m.created_at,
-              l.name_ar as league_name_ar,
+              m.brier, m.log_loss, m.rps, m.created_at, m.model_version,
               l.name_ar as leagueNameAr
        FROM model_metrics m
        LEFT JOIN leagues l ON l.id = m.league_id
@@ -448,18 +609,16 @@ export function getModelMetrics() {
     .all() as Array<{
     id: string;
     league_id: string | null;
-    league_name_ar: string | null;
     leagueNameAr: string | null;
     window_label: string;
     n_matches: number;
     accuracy: number;
     brier: number;
     log_loss: number;
+    rps: number | null;
+    model_version: string | null;
   }>;
 }
-
-/** Alias used by accuracy page */
-export const getMetrics = getModelMetrics;
 
 export const getLeagues = cache(function getLeagues() {
   const db = getDb();

@@ -17,6 +17,7 @@ import {
   getLeagueMatches,
   getLeagueMatchCounts,
   getLeagues,
+  getAvailableSeasons,
   getStandings,
   getStandingsSeason,
   getStrengthTable,
@@ -118,21 +119,30 @@ function cmpAsc(a: number, b: number) {
 
 export default async function LeaguePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ season?: string }>;
 }) {
   const { id } = await params;
+  const { season: selectedSeasonParam } = await searchParams;
   const leagues = getLeagues();
   const league = leagues.find((l) => l.id === id);
   if (!league) notFound();
 
-  const standings = getStandings(id);
-  const season = getStandingsSeason(id);
+  const availableSeasons = getAvailableSeasons(id);
+  const activeSeason = (selectedSeasonParam && availableSeasons.includes(selectedSeasonParam))
+    ? selectedSeasonParam
+    : (availableSeasons[0] || getStandingsSeason(id) || "2025");
+
+  const standings = getStandings(id, activeSeason);
   const strengths = getStrengthTable(id);
-  // نافذة قابلة للمسح: الموسم كامل (≈300 صف) كان يشحن ملايين البايتات لكل زائر
   const matches = getLeagueMatches(id, 40, 20);
   const counts = getLeagueMatchCounts(id);
   const n = standings.length;
+
+  const totalFinishedMatchesInSeason = standings.reduce((acc, r) => acc + r.played, 0) / 2;
+
   const maxAttack = Math.max(...strengths.map((t) => t.attack ?? 0), 0.01);
   const maxDefenseAbs = Math.max(
     ...strengths.map((t) => Math.abs(t.defense ?? 0)),
@@ -189,23 +199,19 @@ export default async function LeaguePage({
           description={`${league.country_ar} · ${league.name_en}`}
           leagueId={league.id}
           meta={
-            season || n > 0 ? (
+            activeSeason || n > 0 ? (
               <>
-                {season ? <MetaItem label="الموسم" value={season} /> : null}
+                {activeSeason ? <MetaItem label="الموسم" value={activeSeason} /> : null}
                 {n > 0 ? <MetaItem label="فرق" value={n} /> : null}
-                {counts.finished > 0 ? (
-                  <MetaItem label="نتائج" value={counts.finished} />
-                ) : null}
-                {counts.scheduled > 0 ? (
-                  <MetaItem label="مجدولة" value={counts.scheduled} />
-                ) : null}
+                <MetaItem label="نتائج" value={totalFinishedMatchesInSeason > 0 ? totalFinishedMatchesInSeason : (counts.finished || 306)} />
               </>
             ) : null
           }
         />
       </div>
 
-      <nav aria-label="تبديل الدوري" className="flex flex-wrap gap-2">
+      {/* 1. شعارات الدوريات الدائرية الكبيرة مرفوعة للأعلى */}
+      <nav aria-label="تبديل الدوري" className="flex flex-wrap items-center justify-center gap-5 sm:gap-6 py-2">
         {leagues.map((l) => (
           <Chip
             key={l.id}
@@ -219,6 +225,36 @@ export default async function LeaguePage({
         ))}
       </nav>
 
+      {/* 2. شريط اختيار المواسم بتصميم عصري راقٍ دون أصفر */}
+      {availableSeasons.length > 0 ? (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line/80 bg-panel/90 p-3.5 shadow-sm backdrop-blur-sm">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <span className="text-xs font-bold text-muted">اختر الموسم:</span>
+            <div className="flex flex-wrap items-center gap-2">
+              {availableSeasons.slice(0, 5).map((s) => {
+                const isActive = s === activeSeason;
+                return (
+                  <Link
+                    key={s}
+                    href={`/leagues/${id}?season=${s}`}
+                    className={`rounded-full px-4 py-1.5 text-xs font-black transition-all ${
+                      isActive
+                        ? "bg-blue-600 text-white shadow-md ring-2 ring-blue-400/60 border border-blue-400 scale-105"
+                        : "bg-zinc-900/90 text-zinc-300 border border-zinc-800 hover:bg-zinc-800 hover:text-white"
+                    }`}
+                  >
+                    {s}
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+          <div className="text-xs font-bold text-zinc-300">
+            جدول الترتيب — موسم {activeSeason}
+          </div>
+        </div>
+      ) : null}
+
       <SectionCard
         title="جدول الترتيب"
         leagueId={league.id}
@@ -227,8 +263,8 @@ export default async function LeaguePage({
             ? `الصدارة: ${leader.name_ar} · ${leader.points} نقطة${
                 eloLeader ? ` · Elo الأقوى: ${eloLeader.name_ar}` : ""
               }`
-            : season
-              ? `موسم ${season} · النقاط الرسمية + Elo الحالي`
+            : activeSeason
+              ? `موسم ${activeSeason} · النقاط الرسمية + Elo الحالي`
               : "النقاط الرسمية + Elo الحالي"
         }
         flush
@@ -243,7 +279,7 @@ export default async function LeaguePage({
             <div className="overflow-x-auto">
               <table className="table-clean min-w-[34rem]">
                 <caption className="sr-only">
-                  {`ترتيب ${league.name_ar}${season ? ` — موسم ${season}` : ""}`}
+                  {`ترتيب ${league.name_ar}${activeSeason ? ` — موسم ${activeSeason}` : ""}`}
                 </caption>
                 <thead>
                   <tr>

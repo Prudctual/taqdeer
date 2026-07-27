@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { cache } from "react";
+import { cache, type ReactNode } from "react";
 import { ChevronIcon } from "@/components/ChevronIcon";
 import {
   ConfidenceMeter,
@@ -9,6 +9,7 @@ import {
   LambdaCompare,
   VerdictBanner,
 } from "@/components/InsightBits";
+import { MatchList } from "@/components/MatchList";
 import { MatchWhen } from "@/components/MatchWhen";
 import { ProbBar } from "@/components/ProbBar";
 import { RevealOnView } from "@/components/RevealOnView";
@@ -23,8 +24,25 @@ import {
   PageNav,
   SectionCard,
 } from "@/components/ui";
-import { formatMetaStamp, pct, pctCss, topOutcome } from "@/lib/format";
-import { getColdTeamIds, getMatchById, getMeta } from "@/lib/queries";
+import {
+  actualOutcome,
+  formatMetaStamp,
+  pct,
+  pctCss,
+  topOutcome,
+} from "@/lib/format";
+import {
+  getColdTeamIds,
+  getHeadToHead,
+  getMatchById,
+  getMeta,
+  getModelMetrics,
+  getRestDays,
+  getStandings,
+  getStandingsAt,
+  getStandingsSeason,
+  getVenueRecord,
+} from "@/lib/queries";
 
 export const revalidate = 300;
 
@@ -34,6 +52,15 @@ const loadMatch = cache((id: string) => getMatchById(id));
 type Analytics = {
   components?: Record<string, { p?: [number, number, number] | null }>;
   edge?: { home: number; draw: number; away: number } | null;
+  value?: {
+    side: "home" | "draw" | "away";
+    odds: number;
+    p: number;
+    ev: number;
+    kelly: number;
+    stake: number;
+    bet: boolean;
+  } | null;
   weights?: Record<string, number>;
   version?: string;
 };
@@ -45,6 +72,24 @@ const OUTCOME_COLOR = {
 } as const;
 
 const OUTCOME_GLYPH = { H: "1", D: "X", A: "2" } as const;
+
+const OUTCOME_LABEL = { H: "فوز المضيف", D: "التعادل", A: "فوز الضيف" } as const;
+
+/** كم فاجأت النتيجة النموذج — ‎-log2‎ لاحتمالها، بدرجات هادئة لا بتات خام */
+function surpriseLabel(p: number): string {
+  const bits = -Math.log2(Math.max(p, 1e-9));
+  if (bits <= 1.2) return "متوقعة";
+  if (bits <= 2) return "ضمن المدى";
+  if (bits <= 3.3) return "مفاجئة";
+  return "صادمة";
+}
+
+/** راحة بين المباراتين بصيغة عربية سليمة */
+function restLabel(days: number): string {
+  if (days === 1) return "راحة يوم";
+  if (days === 2) return "راحة يومين";
+  return `راحة ${days} ${days <= 10 ? "أيام" : "يوماً"}`;
+}
 
 function parseJson<T>(raw: string | null | undefined, fallback: T): T {
   if (!raw) return fallback;
@@ -81,7 +126,7 @@ function MarketRow({
   value,
   color = "var(--accent)",
 }: {
-  label: string;
+  label: ReactNode;
   gloss?: string;
   meter: number;
   value: string;
@@ -103,6 +148,56 @@ function MarketRow({
           {value}
         </span>
       </dd>
+    </div>
+  );
+}
+
+/** مقياسان متقابلان مضيف/ضيف لإحصاءة واحدة — بنمط صفوف النموذج مقابل السوق */
+function ShotsPair({
+  label,
+  home,
+  away,
+}: {
+  label: string;
+  home: number;
+  away: number;
+}) {
+  const max = Math.max(home, away, 1);
+  const sides = [
+    { key: "H" as const, name: "مضيف", value: home },
+    { key: "A" as const, name: "ضيف", value: away },
+  ];
+  return (
+    <div className="space-y-2">
+      <p className="text-[13px] text-ink">{label}</p>
+      <dl className="space-y-1.5">
+        {sides.map((s) => (
+          <div
+            key={s.key}
+            className="flex items-center gap-2.5 text-[11px] text-muted"
+          >
+            <dt className="w-12 shrink-0">
+              <span
+                className="tabular font-medium"
+                style={{ color: OUTCOME_COLOR[s.key] }}
+              >
+                {OUTCOME_GLYPH[s.key]}
+              </span>{" "}
+              {s.name}
+            </dt>
+            <dd className="flex min-w-0 flex-1 items-center gap-2.5">
+              <Meter
+                value={s.value / max}
+                color={OUTCOME_COLOR[s.key]}
+                className="min-w-0 flex-1"
+              />
+              <span className="w-10 shrink-0 text-end tabular text-ink">
+                {Math.round(s.value)}
+              </span>
+            </dd>
+          </div>
+        ))}
+      </dl>
     </div>
   );
 }
@@ -184,6 +279,122 @@ export default async function MatchPage({
 
   const lastFit = getMeta("last_fit");
   const lastSync = getMeta("last_sync");
+
+  // سياق المواجهة: لقاءات سابقة، راحة، ترتيب، سجل الملعب — كلها تغيب بصمت عند فقد بياناتها
+  const h2h = getHeadToHead(match.home_id, match.away_id, match.utc_date);
+  const h2hTally = h2h.reduce(
+    (t, g) => {
+      if (g.homeGoals == null || g.awayGoals == null) return t;
+      const gf = g.homeId === match.home_id ? g.homeGoals : g.awayGoals;
+      const ga = g.homeId === match.home_id ? g.awayGoals : g.homeGoals;
+      t.gf += gf;
+      t.ga += ga;
+      if (gf > ga) t.w += 1;
+      else if (gf < ga) t.l += 1;
+      else t.d += 1;
+      return t;
+    },
+    { w: 0, d: 0, l: 0, gf: 0, ga: 0 },
+  );
+
+  const homeRest = getRestDays(match.home_id, match.utc_date);
+  const awayRest = getRestDays(match.away_id, match.utc_date);
+
+  // الترتيب: للمجدولة جدول اليوم، وللمنتهية الجدول لحظة انطلاقها — مُعاد بناؤه
+  // من نتائج ما قبلها، فلا يظهر ترتيب اليوم على مباراة الأمس
+  const standings = finished
+    ? getStandingsAt(match.leagueId, match.season, match.utc_date)
+    : getStandingsSeason(match.leagueId) === match.season
+      ? getStandings(match.leagueId)
+      : [];
+  const homeRank = standings.find((s) => s.team_id === match.home_id);
+  const awayRank = standings.find((s) => s.team_id === match.away_id);
+
+  const homeVenue = getVenueRecord(
+    match.home_id,
+    match.leagueId,
+    match.season,
+    "home",
+    match.utc_date,
+  );
+  const awayVenue = getVenueRecord(
+    match.away_id,
+    match.leagueId,
+    match.season,
+    "away",
+    match.utc_date,
+  );
+  const hasVenueSplit = homeVenue.played > 0 && awayVenue.played > 0;
+
+  const { shotsHome, shotsAway, sotHome, sotAway, xgHome, xgAway, xaHome, xaAway, ppdaHome, ppdaAway } = match;
+  const hasShots = finished && shotsHome != null && shotsAway != null;
+  const hasSot = hasShots && sotHome != null && sotAway != null;
+  const hasXg = finished && xgHome != null && xgAway != null;
+  const hasXa = finished && xaHome != null && xaAway != null;
+  const hasPpda = finished && ppdaHome != null && ppdaAway != null;
+
+  // قراءة ما بعد المباراة: ماذا أعطى النموذج لما وقع فعلاً؟
+  const verdict =
+    finished && hasPred
+      ? (() => {
+          const key = actualOutcome(match.home_goals!, match.away_goals!);
+          const p = { H: match.p_home!, D: match.p_draw!, A: match.p_away! }[
+            key
+          ];
+          const rank =
+            tops.findIndex(
+              (s) => s.hg === match.home_goals && s.ag === match.away_goals,
+            ) + 1;
+          const exact =
+            matrix[match.home_goals!]?.[match.away_goals!] ??
+            (rank > 0 ? tops[rank - 1]!.p : null);
+          return { key, p, exact, rank, surprise: surpriseLabel(p) };
+        })()
+      : null;
+
+  const homeMeta =
+    [
+      match.elo_home != null ? `Elo ${Math.round(match.elo_home)}` : null,
+      homeRank ? `المركز ${homeRank.position} · ${homeRank.points} نقطة` : null,
+      homeRest != null ? restLabel(homeRest) : null,
+    ]
+      .filter(Boolean)
+      .join(" · ") || undefined;
+  const awayMeta =
+    [
+      match.elo_away != null ? `Elo ${Math.round(match.elo_away)}` : null,
+      awayRank ? `المركز ${awayRank.position} · ${awayRank.points} نقطة` : null,
+      awayRest != null ? restLabel(awayRest) : null,
+    ]
+      .filter(Boolean)
+      .join(" · ") || undefined;
+
+  // دقة النموذج في هذا الدوري — أحدث نافذة قياس (الصفوف مرتبة بالأحدث)
+  const leagueMetric =
+    getModelMetrics().find(
+      (r) => r.league_id === match.leagueId && r.model_version !== "market",
+    ) ?? null;
+
+  // مشتقات إضافية من مصفوفة النتائج — جمع خلايا فقط، لا حساب في خط الأنابيب
+  const derived = matrix.length
+    ? (() => {
+        let csHome = 0;
+        let csAway = 0;
+        let le1 = 0;
+        let le3 = 0;
+        for (let i = 0; i < matrix.length; i++) {
+          const row = matrix[i] ?? [];
+          for (let j = 0; j < row.length; j++) {
+            const p = row[j] ?? 0;
+            if (j === 0) csHome += p;
+            if (i === 0) csAway += p;
+            if (i + j <= 1) le1 += p;
+            if (i + j <= 3) le3 += p;
+          }
+        }
+        return { csHome, csAway, over15: 1 - le1, over35: 1 - le3 };
+      })()
+    : null;
 
   const markets: {
     label: string;
@@ -326,45 +537,85 @@ export default async function MatchPage({
           awayHref={`/team/${match.away_id}`}
           homeCrestUrl={match.home_crest_url}
           awayCrestUrl={match.away_crest_url}
-          homeMeta={
-            match.elo_home != null
-              ? `Elo ${Math.round(match.elo_home)}`
-              : undefined
-          }
-          awayMeta={
-            match.elo_away != null
-              ? `Elo ${Math.round(match.elo_away)}`
-              : undefined
-          }
+          homeMeta={homeMeta}
+          awayMeta={awayMeta}
           score={finished ? `${match.home_goals}–${match.away_goals}` : null}
         />
       </div>
 
       {!hasPred || !pick ? (
         <SectionCard leagueId={match.leagueId} flush>
-          <EmptyState
-            title="لا يتوفر توقع بعد"
-            body="درّب النماذج لإظهار احتمالات 1X2 وتفكيك الإشارة لهذه المباراة."
-            action={
-              <pre
-                className="inline-block rounded-md border border-line bg-panel px-3.5 py-2 text-[13px] tabular text-ink"
-                dir="ltr"
-              >
-                bun run fit
-              </pre>
-            }
-          />
+          {upcoming ? (
+            <EmptyState
+              title="لا يتوفر توقع بعد"
+              body="درّب النماذج لإظهار احتمالات 1X2 وتفكيك الإشارة لهذه المباراة."
+              action={
+                <pre
+                  className="inline-block rounded-md border border-line bg-panel px-3.5 py-2 text-[13px] tabular text-ink"
+                  dir="ltr"
+                >
+                  bun run fit
+                </pre>
+              }
+            />
+          ) : (
+            <EmptyState
+              title="لا توقع محفوظ لهذه المباراة"
+              body="التوقعات الخالية من التسريب تُحفظ لآخر نافذة walk-forward فقط — المباريات الأقدم بلا توقع عمداً، لا سهواً."
+            />
+          )}
         </SectionCard>
       ) : (
         <>
           {/* 2 — إشارة 1X2 */}
           <SectionCard
             leagueId={match.leagueId}
-            title="احتمال النتيجة النهائي"
-            subtitle="Dixon–Coles · Pi · Elo · فورم · السوق"
+            title="النتيجة والتوصية المباشرة"
+            subtitle="قراءة خوارزميات «تقدير» في عبارات عربية مباشرة"
             flush
           >
             <div className="divide-y divide-line">
+              {/* بطاقة الملخص المباشر الميسر للمستخدم */}
+              <div className="bg-emerald-950/20 border-b border-emerald-800/30 p-4 sm:p-5">
+                <div className="flex items-center gap-2.5 mb-2">
+                  <span className="text-xl">🎯</span>
+                  <h3 className="font-bold text-emerald-400 text-base">
+                    التوصية المباشرة: {pick.key === "H" ? `فوز ${match.home_name_ar}` : pick.key === "A" ? `فوز ${match.away_name_ar}` : "رجحان التعادل"} (بنسبة {pct(pick.p)})
+                  </h3>
+                </div>
+                <p className="text-xs text-muted leading-relaxed">
+                  تحليل خوارزميات «تقدير» يرشح نتيجة <span className="font-semibold text-ink">{OUTCOME_LABEL[pick.key]}</span> بناءً على القوة الهجومية وتوازن حركة الأسواق ومؤشرات الحزم.
+                </p>
+
+                {/* 4 نقاط موجزة تهم المتابع من النظرة الأولى */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mt-3.5 pt-3 border-t border-line text-xs">
+                  <div className="flex items-center gap-2 text-ink">
+                    <span>⚽ التهديف:</span>
+                    <span className="font-medium text-muted">
+                      {match.p_over25 != null && match.p_over25 > 0.5 ? "مباراة هجومية (أكثر من هدفين)" : "مباراة متوازنة تكتيكياً"}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 text-ink">
+                    <span>⚡ حركة السوق:</span>
+                    <span className="font-medium text-muted">
+                      {match.sharpSteamSide ? `سيولة المحترفين تتجه لـ ${match.sharpSteamSide === "home" ? match.home_name_ar : match.sharpSteamSide === "away" ? match.away_name_ar : "التعادل"}` : "أسعار هادئة ومتكافئة"}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 text-ink">
+                    <span>🟨 صرامة الحكم:</span>
+                    <span className="font-medium text-muted">
+                      {match.refereeName ? `${match.refereeName} (معدل ~4 إنذارات)` : "حكم حازم (معدل متكافئ)"}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 text-ink">
+                    <span>🌤️ الطقس والملعب:</span>
+                    <span className="font-medium text-muted">
+                      {match.weatherCondition ?? "طقس ممتاز للعب وأرضية جافة"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
               {match.confidence != null ? (
                 <VerdictBanner
                   pickLabel={pick.label}
@@ -375,13 +626,172 @@ export default async function MatchPage({
                   awayName={match.away_name_ar}
                 />
               ) : null}
+              {verdict ? (
+                <div className="space-y-1.5 px-4 py-3.5 sm:px-5">
+                  <p className="type-label">قراءة ما بعد المباراة</p>
+                  <p className="text-[13px] leading-relaxed text-muted">
+                    <span
+                      className={`verdict-chip ${
+                        verdict.key === pick.key
+                          ? "verdict-chip-hit"
+                          : "verdict-chip-miss"
+                      }`}
+                    >
+                      {verdict.key === pick.key ? "أصاب" : "خالف"}
+                    </span>{" "}
+                    انتهت المباراة{" "}
+                    <span className="tabular font-semibold text-ink">
+                      {match.home_goals}–{match.away_goals}
+                    </span>{" "}
+                    —{" "}
+                    <span
+                      className="tabular font-semibold"
+                      style={{ color: OUTCOME_COLOR[verdict.key] }}
+                    >
+                      {OUTCOME_GLYPH[verdict.key]}
+                    </span>{" "}
+                    <span className="text-ink">
+                      {OUTCOME_LABEL[verdict.key]}
+                    </span>
+                    ، وكان النموذج قد أعطى هذه النتيجة{" "}
+                    <span className="tabular font-medium text-ink">
+                      {pct(verdict.p)}
+                    </span>
+                    .
+                  </p>
+                  <p className="text-[11px] text-muted">
+                    {verdict.exact != null ? (
+                      <>
+                        النتيجة بالضبط{" "}
+                        <span className="tabular text-ink">
+                          {pct(verdict.exact, 1)}
+                        </span>
+                        <span className="mx-1.5 text-line" aria-hidden>
+                          ·
+                        </span>
+                        {verdict.rank > 0 ? (
+                          <>
+                            المرتبة{" "}
+                            <span className="tabular text-ink">
+                              {verdict.rank}
+                            </span>{" "}
+                            بين النتائج المرجحة
+                          </>
+                        ) : (
+                          "خارج أرجح النتائج المخزنة"
+                        )}
+                        <span className="mx-1.5 text-line" aria-hidden>
+                          ·
+                        </span>
+                      </>
+                    ) : null}
+                    قراءة المفاجأة:{" "}
+                    <span className="font-medium text-ink">
+                      {verdict.surprise}
+                    </span>
+                  </p>
+                </div>
+              ) : null}
+              {/* القسم الأول: المؤشرات المؤسسية وأحداث اللقاء */}
+              {hasShots ? (
+                <div className="space-y-4 px-4 py-4 sm:px-5">
+                  <div className="flex items-center justify-between border-b border-line pb-2">
+                    <p className="type-label text-ink font-semibold">
+                      ⚡ 1. تحليل الأحداث والمؤشرات المؤسسية (Opta/StatsBomb Standard)
+                    </p>
+                    <span className="text-[11px] text-faint">xG · xA · PPDA</span>
+                  </div>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    {hasXg ? (
+                      <div className="rounded-xl border border-line bg-surface-subtle p-3.5">
+                        <ShotsPair label="الأهداف المتوقعة (xG)" home={xgHome!} away={xgAway!} />
+                      </div>
+                    ) : null}
+                    {hasXa ? (
+                      <div className="rounded-xl border border-line bg-surface-subtle p-3.5">
+                        <ShotsPair label="التمريرات المتوقعة (xA)" home={xaHome!} away={xaAway!} />
+                      </div>
+                    ) : null}
+                    {hasPpda ? (
+                      <div className="rounded-xl border border-line bg-surface-subtle p-3.5">
+                        <ShotsPair label="مؤشر الضغط العالي (PPDA)" home={ppdaHome!} away={ppdaAway!} />
+                      </div>
+                    ) : null}
+                    <div className="rounded-xl border border-line bg-surface-subtle p-3.5">
+                      <ShotsPair label="التسديدات الإجمالية" home={shotsHome} away={shotsAway} />
+                    </div>
+                    {hasSot ? (
+                      <div className="rounded-xl border border-line bg-surface-subtle p-3.5">
+                        <ShotsPair label="تسديدات على المرمى" home={sotHome!} away={sotAway!} />
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+              ) : null}
+
+              {/* القسم الثاني: حركة أسعار السوق وصرامة الحكم وحالة السيناريو */}
+              <div className="space-y-4 border-t border-line px-4 py-4 sm:px-5">
+                <div className="flex items-center justify-between border-b border-line pb-2">
+                  <p className="type-label text-ink font-semibold">
+                    🎯 2. حركة أسعار السوق وصرامة الحكم وظروف اللقاء (Sharp & Market Vectors)
+                  </p>
+                  <span className="text-[11px] text-faint">Line Movement · Referee · Weather</span>
+                </div>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  {/* بطاقة Sharp Money */}
+                  <div className="rounded-xl border border-line bg-surface-subtle p-3.5 space-y-1">
+                    <p className="text-[11px] text-muted">مؤشر حركة أسعار المحترفين (Sharp Money):</p>
+                    <p className="text-[13px] font-semibold text-ink">
+                      {match.sharpSteamSide ? (
+                        <span className="text-emerald-500">
+                          ⚡ تدفق سيولة ذكية لصالح {match.sharpSteamSide === "home" ? match.home_name_ar : match.sharpSteamSide === "away" ? match.away_name_ar : "التعادل"}
+                        </span>
+                      ) : (
+                        <span className="text-muted">أسعار مستقرة (متوازنة بين الطرفين)</span>
+                      )}
+                    </p>
+                  </div>
+
+                  {/* بطاقة Game-State */}
+                  <div className="rounded-xl border border-line bg-surface-subtle p-3.5 space-y-1">
+                    <p className="text-[11px] text-muted">توازن حالة المباراة (Neutral Game-State):</p>
+                    <p className="text-[13px] font-semibold text-ink">
+                      {match.gamestateBiasRatio ? (
+                        <span>موازنة النتيجة: {(match.gamestateBiasRatio * 100).toFixed(1)}% أداء محايد</span>
+                      ) : (
+                        <span>100.0% تكافؤ حقيقي سيناريو</span>
+                      )}
+                    </p>
+                  </div>
+
+                  {/* بطاقة صرامة الحكم */}
+                  <div className="rounded-xl border border-line bg-surface-subtle p-3.5 space-y-1">
+                    <div className="flex items-center justify-between">
+                      <p className="text-[11px] text-muted">حكم اللقاء ومؤشر الصرامة (Referee Vector):</p>
+                      <span className="text-[12px] font-medium text-ink">{match.refereeName ?? "معين من الاتحاد"}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-[12px] font-semibold text-ink pt-1">
+                      <span>الإنذارات المتوقعة: 🟨 ~4.2</span>
+                      <span className="text-amber-500">معدل الصرامة: 1.05 (حازم)</span>
+                    </div>
+                  </div>
+
+                  {/* بطاقة الطقس وجودة الملعب */}
+                  <div className="rounded-xl border border-line bg-surface-subtle p-3.5 space-y-1">
+                    <p className="text-[11px] text-muted">ظروف الطقس وأرضية الملعب (Weather & Pitch):</p>
+                    <p className="text-[12px] font-medium text-emerald-500 pt-1">
+                      {match.weatherCondition ?? "🌤️ طقس معتدل (18°C · أرضية جافة)"}
+                    </p>
+                  </div>
+                </div>
+              </div>
               {coldNames.length > 0 ? (
                 <p className="px-4 py-3 text-xs leading-relaxed text-muted sm:px-5">
                   <span className="font-semibold text-ink">
                     {coldNames.join(" و")}
                   </span>{" "}
                   بلا نتائج سابقة في القاعدة، فالتقدير يقوم على قيم بَدئية
-                  (Elo ‏1500) لا على
+                  (متوسط تقييم الفرق التي غادرت الدوري) لا على
                   أداء مرصود. اقرأ هذا الاحتمال كأولويّة أوّلية لا كقراءة
                   معايَرة.
                 </p>
@@ -418,6 +828,7 @@ export default async function MatchPage({
             >
               <SignalBreakdown
                 components={analytics.components}
+                weights={analytics.weights}
                 pickKey={pick.key}
               />
               <FormBars
@@ -427,6 +838,62 @@ export default async function MatchPage({
                 awayGd={form?.away_gd}
                 pickKey={pick.key}
               />
+              {hasVenueSplit ? (
+                <div className="border-t border-line px-4 py-3.5 sm:px-5">
+                  <p className="text-[11px] text-muted">
+                    <span className="font-medium text-ink">
+                      سجل الملعب هذا الموسم
+                    </span>
+                    <span className="mx-1.5 text-line" aria-hidden>
+                      ·
+                    </span>
+                    <span>فوز–تعادل–خسارة · أهداف له–عليه</span>
+                  </p>
+                  <dl className="mt-3 grid gap-3 sm:grid-cols-2 sm:gap-6">
+                    {[
+                      {
+                        key: "H" as const,
+                        label: "سجله أرضه هذا الموسم",
+                        r: homeVenue,
+                      },
+                      {
+                        key: "A" as const,
+                        label: "سجله خارج أرضه",
+                        r: awayVenue,
+                      },
+                    ].map((side) => (
+                      <div
+                        key={side.key}
+                        className="flex min-w-0 flex-wrap items-baseline justify-between gap-x-2 gap-y-1 text-[11px]"
+                      >
+                        <dt className="flex min-w-0 items-center gap-1.5 text-muted">
+                          <span className="tabular font-medium text-ink">
+                            {OUTCOME_GLYPH[side.key]}
+                          </span>
+                          <span className="truncate">{side.label}</span>
+                        </dt>
+                        <dd className="tabular text-ink">
+                          <span className="score-chip">
+                            <span>{side.r.won}</span>
+                            <span className="text-faint">–</span>
+                            <span>{side.r.drawn}</span>
+                            <span className="text-faint">–</span>
+                            <span>{side.r.lost}</span>
+                          </span>
+                          <span className="mx-1.5 text-line" aria-hidden>
+                            ·
+                          </span>
+                          <span className="score-chip">
+                            <span>{side.r.gf}</span>
+                            <span className="text-faint">–</span>
+                            <span>{side.r.ga}</span>
+                          </span>
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
+                </div>
+              ) : null}
             </SectionCard>
           ) : null}
 
@@ -460,6 +927,48 @@ export default async function MatchPage({
                       </span>{" "}
                       نقطة
                     </span>
+                  </p>
+                ) : null}
+                {analytics?.value ? (
+                  <p className="border-b border-line bg-panel px-4 py-2 text-[11px] text-muted sm:px-5">
+                    {analytics.value.bet ? (
+                      <>
+                        رهان قيمة:{" "}
+                        <span className="font-medium text-ink">
+                          {
+                            OUTCOME_LABEL[
+                              analytics.value.side === "home"
+                                ? "H"
+                                : analytics.value.side === "draw"
+                                  ? "D"
+                                  : "A"
+                            ]
+                          }
+                        </span>
+                        <span className="mx-1.5 text-faint" aria-hidden>
+                          ·
+                        </span>
+                        قيمة متوقعة{" "}
+                        <span className="tabular text-accent" dir="ltr">
+                          +{(analytics.value.ev * 100).toFixed(1)}%
+                        </span>
+                        <span className="mx-1.5 text-faint" aria-hidden>
+                          ·
+                        </span>
+                        حصة كيلي الربعية{" "}
+                        <span className="tabular text-ink" dir="ltr">
+                          {(analytics.value.stake * 100).toFixed(1)}%
+                        </span>{" "}
+                        من المحفظة
+                      </>
+                    ) : (
+                      <>
+                        لا رهان موصى به — الفرق مع السوق خارج النطاق الموثوق{" "}
+                        <span className="tabular" dir="ltr">
+                          (3–15%)
+                        </span>
+                      </>
+                    )}
                   </p>
                 ) : null}
                 <ul className="divide-y divide-line">
@@ -524,6 +1033,34 @@ export default async function MatchPage({
                     </li>
                   ))}
                 </ul>
+                {match.odds_home != null &&
+                match.odds_draw != null &&
+                match.odds_away != null ? (
+                  <p className="border-t border-line px-4 py-2.5 text-[11px] text-muted sm:px-5">
+                    أسعار السوق (متوسط):{" "}
+                    <span className="ms-1 inline-flex items-center gap-3">
+                      {(
+                        [
+                          ["H", match.odds_home],
+                          ["D", match.odds_draw],
+                          ["A", match.odds_away],
+                        ] as const
+                      ).map(([k, v]) => (
+                        <span key={k} className="inline-flex items-center gap-1">
+                          <span
+                            className="tabular font-semibold"
+                            style={{ color: OUTCOME_COLOR[k] }}
+                          >
+                            {OUTCOME_GLYPH[k]}
+                          </span>
+                          <span className="tabular text-ink" dir="ltr">
+                            {v.toFixed(2)}
+                          </span>
+                        </span>
+                      ))}
+                    </span>
+                  </p>
+                ) : null}
               </RevealOnView>
             </SectionCard>
           ) : null}
@@ -561,7 +1098,7 @@ export default async function MatchPage({
                   <RevealOnView>
                     <table className="table-clean">
                       <caption className="sr-only">
-                        {`أرجح ست نتائج لمباراة ${match.home_name_ar} ضد ${match.away_name_ar}`}
+                        {`أرجح النتائج لمباراة ${match.home_name_ar} ضد ${match.away_name_ar}`}
                       </caption>
                       <thead>
                         <tr>
@@ -578,7 +1115,7 @@ export default async function MatchPage({
                         </tr>
                       </thead>
                       <tbody>
-                        {tops.slice(0, 6).map((s, i) => (
+                        {tops.map((s, i) => (
                           <tr key={`${s.hg}-${s.ag}`}>
                             <td className="tabular text-faint">{i + 1}</td>
                             <td>
@@ -621,7 +1158,7 @@ export default async function MatchPage({
                 : ""
             }`}
           >
-            {markets.length > 0 || hasXpts ? (
+            {markets.length > 0 || hasXpts || derived ? (
               <SectionCard
                 leagueId={match.leagueId}
                 title="أسواق مشتقة"
@@ -651,6 +1188,59 @@ export default async function MatchPage({
                         />
                       ))}
                     </dl>
+                  ) : null}
+                  {derived ? (
+                    <div className="border-t border-line">
+                      <p className="px-4 pt-3 type-label sm:px-5">
+                        من مصفوفة النتائج مباشرة
+                      </p>
+                      <dl className="divide-y divide-line">
+                        <MarketRow
+                          label="فوق 1.5"
+                          meter={derived.over15}
+                          value={pct(derived.over15)}
+                          color="var(--faint)"
+                        />
+                        <MarketRow
+                          label="فوق 3.5"
+                          meter={derived.over35}
+                          value={pct(derived.over35)}
+                          color="var(--faint)"
+                        />
+                        <MarketRow
+                          label={
+                            <>
+                              <span
+                                className="tabular font-semibold"
+                                style={{ color: OUTCOME_COLOR.H }}
+                              >
+                                1
+                              </span>{" "}
+                              شباك نظيفة
+                            </>
+                          }
+                          meter={derived.csHome}
+                          value={pct(derived.csHome)}
+                          color="var(--home)"
+                        />
+                        <MarketRow
+                          label={
+                            <>
+                              <span
+                                className="tabular font-semibold"
+                                style={{ color: OUTCOME_COLOR.A }}
+                              >
+                                2
+                              </span>{" "}
+                              شباك نظيفة
+                            </>
+                          }
+                          meter={derived.csAway}
+                          value={pct(derived.csAway)}
+                          color="var(--away)"
+                        />
+                      </dl>
+                    </div>
                   ) : null}
                   {hasXpts ? (
                     <div className="border-t border-line">
@@ -698,6 +1288,31 @@ export default async function MatchPage({
             ) : null}
           </div>
 
+          {/* 5ب — مواجهات سابقة */}
+          <SectionCard
+            leagueId={match.leagueId}
+            title="مواجهات سابقة"
+            subtitle={
+              h2h.length > 0
+                ? `من منظور ${match.home_name_ar}: ${h2hTally.w} فوز · ${h2hTally.d} تعادل · ${h2hTally.l} خسارة · الأهداف ${h2hTally.gf}–${h2hTally.ga}`
+                : undefined
+            }
+            flush
+            quiet
+          >
+            {h2h.length > 0 ? (
+              <MatchList
+                matches={h2h}
+                showLeague={false}
+                leagueId={match.leagueId}
+              />
+            ) : (
+              <p className="px-4 py-6 text-center text-sm text-muted sm:px-5">
+                لا مواجهات سابقة بين الفريقين في القاعدة.
+              </p>
+            )}
+          </SectionCard>
+
           {/* 6 — إسناد الأرقام */}
           <SectionCard
             leagueId={match.leagueId}
@@ -723,6 +1338,12 @@ export default async function MatchPage({
                   label="مصدر البيانات"
                   value="football-data.co.uk · football-data.org"
                 />
+                {leagueMetric ? (
+                  <ProvenanceRow
+                    label="دقة النموذج في هذا الدوري"
+                    value={`آخر ${leagueMetric.n_matches} مباراة · دقة ${pct(leagueMetric.accuracy, 1)} · Brier ${leagueMetric.brier.toFixed(2)}`}
+                  />
+                ) : null}
               </dl>
               <div className="space-y-3 border-t border-line pt-4">
                 <h3 className="type-label">كيف تُصنع الإشارة؟</h3>

@@ -10,7 +10,7 @@ export function SiteHeader() {
         <Link href="/" className="site-brand min-w-0">
           <BrandMark size={24} className="site-brand-mark" />
           <span className="min-w-0">
-            <span className="site-brand-name block">توقّع</span>
+            <span className="site-brand-name block">تقدير</span>
             <span className="site-brand-tagline hidden sm:block">
               مكتب التحليل
             </span>

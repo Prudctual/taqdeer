@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import Link from "next/link";
 import {
   BackBar,
@@ -9,7 +10,7 @@ import {
   StatTile,
 } from "@/components/ui";
 import { formatMetaStamp, pct, pctCss } from "@/lib/format";
-import { getMetrics, getMeta } from "@/lib/queries";
+import { getModelMetrics, getMeta } from "@/lib/queries";
 
 export const revalidate = 300;
 
@@ -29,13 +30,44 @@ const GLOSSARY: { term: string; body: string }[] = [
   },
   {
     term: "walk-forward",
-    body: "التقييم يجري بالترتيب الزمني: النموذج يتدرّب على ما قبل المباراة فقط ثم يُسأل عنها. لا يرى نتيجتها ولا ما بعدها، فلا يوجد تسرّب من المستقبل يضخّم الأرقام.",
+    body: "التقييم يجري بالترتيب الزمني: النموذج يتدرّب على ما قبل المباراة فقط ثم يُسأل عنها. لا يرى نتيجتها ولا ما بعدها، فلا يوجد تسرّب من المستقبل يضخّم الأرقام. حتى معايرة الحرارة تُقدَّر على شريحة سابقة منفصلة عن شريحة القياس.",
+  },
+  {
+    term: "RPS",
+    body: "Ranked Probability Score — المقياس المرجعي في أدبيات توقع كرة القدم. يعامل النتائج كسلّم مرتّب (فوز، تعادل، خسارة) فيعاقب من توقّع الفوز وجاءت الخسارة أشد ممن توقّعه وجاء التعادل. الأقل أفضل.",
+  },
+  {
+    term: "خط السوق",
+    body: "احتمالات أسعار المراهنات بعد خصم هامش الشركة، مقيّمة على نفس شريحة المباريات تماماً — المقارنة التي يطلبها أي متشكك: هل يضيف النموذج شيئاً فوق السوق؟ الدوري الكوري بلا أسعار مخزّنة فلا خط له.",
   },
 ];
 
+type ValueBacktest = {
+  policy: string;
+  total: { n_bets: number; hits: number; staked: number; pnl: number };
+};
+
 export default function AccuracyPage() {
-  const metrics = getMetrics();
+  const allMetrics = getModelMetrics();
   const lastFit = getMeta("last_fit");
+
+  let vb: ValueBacktest | null = null;
+  try {
+    const raw = getMeta("value_backtest");
+    vb = raw ? (JSON.parse(raw) as ValueBacktest) : null;
+  } catch {
+    vb = null;
+  }
+
+  // صفوف خط أساس السوق تعيش في نفس الجدول بعلامة model_version='market'
+  const isMarketRow = (m: (typeof allMetrics)[0]) =>
+    m.model_version === "market";
+  const metrics = allMetrics.filter((m) => !isMarketRow(m));
+  const marketByLeague = new Map(
+    allMetrics
+      .filter((m) => isMarketRow(m) && m.league_id != null)
+      .map((m) => [m.league_id, m]),
+  );
 
   // صف «كل الدوريات» تجميعي: عدّه كدوري يضخّم العدد ويحسب مبارياته مرتين
   const perLeague = metrics.filter((m) => m.league_id != null);
@@ -69,7 +101,7 @@ export default function AccuracyPage() {
           title="دقة النموذج"
           description={`تقييم walk-forward: التدريب على الماضي فقط، ثم الاختبار على${
             windowSize ? ` آخر ${windowSize} مباراة` : " نافذة أخيرة"
-          } لكل دوري. الدقة الأعلى أفضل؛ Brier وLog-loss الأقل أفضل.`}
+          } لكل دوري. الدقة الأعلى أفضل؛ Brier وLog-loss وRPS الأقل أفضل.`}
           meta={
             lastFit || metrics.length > 0 ? (
               <>
@@ -120,11 +152,48 @@ export default function AccuracyPage() {
             </div>
           </SectionCard>
 
+          {vb && vb.total.n_bets > 0 && vb.total.staked > 0 ? (
+            <SectionCard
+              title="طبقة القيمة — backtest"
+              subtitle={`سياسة ${vb.policy} على شريحة القياس النظيفة · عينة صغيرة، للاسترشاد لا للحكم`}
+            >
+              <div className="grid grid-cols-4">
+                <StatTile label="رهانات" value={vb.total.n_bets} />
+                <StatTile
+                  label="إصابة"
+                  value={pct(vb.total.hits / vb.total.n_bets, 0)}
+                />
+                <StatTile
+                  label="ROI"
+                  value={
+                    <span dir="ltr" className="inline-block tabular">
+                      {vb.total.pnl >= 0 ? "+" : ""}
+                      {((vb.total.pnl / vb.total.staked) * 100).toFixed(1)}%
+                    </span>
+                  }
+                  hint="على المبلغ المُخاطَر"
+                />
+                <StatTile
+                  label="الصافي"
+                  value={
+                    <>
+                      <span dir="ltr" className="inline-block tabular">
+                        {vb.total.pnl >= 0 ? "+" : ""}
+                        {vb.total.pnl.toFixed(3)}
+                      </span>{" "}
+                      وحدة
+                    </>
+                  }
+                />
+              </div>
+            </SectionCard>
+          ) : null}
+
           <SectionCard
             title="حسب الدوري"
             subtitle={
               best
-                ? `الأفضل: ${best.leagueNameAr ?? best.league_name_ar ?? "—"} · ${pct(best.accuracy, 1)}`
+                ? `الأفضل: ${best.leagueNameAr ?? "—"} · ${pct(best.accuracy, 1)}`
                 : "نافذة الاختبار الأخيرة"
             }
             flush
@@ -133,7 +202,7 @@ export default function AccuracyPage() {
               <table className="table-clean min-w-[38rem]">
                 <caption className="sr-only">
                   دقة النموذج ومقاييس المعايرة لكل دوري في نافذة الاختبار
-                  الأخيرة
+                  الأخيرة، مع خط أساس السوق على النافذة نفسها حيث تتوفر الأسعار
                 </caption>
                 <thead>
                   <tr>
@@ -143,52 +212,86 @@ export default function AccuracyPage() {
                     <th scope="col">دقة 1X2</th>
                     <th scope="col">Brier</th>
                     <th scope="col">Log-loss</th>
+                    <th scope="col">RPS</th>
                   </tr>
                 </thead>
                 <tbody>
                   {metrics.map((m) => {
                     const isBest = best != null && m.id === best.id;
-                    const name = m.leagueNameAr ?? m.league_name_ar ?? "—";
+                    const name = m.leagueNameAr ?? "—";
+                    const mkt = m.league_id
+                      ? marketByLeague.get(m.league_id)
+                      : undefined;
                     return (
-                      <tr key={m.id} data-league={m.league_id ?? undefined}>
-                        <td>
-                          <span className="inline-flex items-center gap-2">
-                            {m.league_id ? (
-                              <span className="chip-dot" aria-hidden />
-                            ) : null}
-                            <span className="font-medium text-ink">{name}</span>
-                            {isBest ? (
-                              <span className="text-[10px] font-medium text-accent">
-                                الأفضل
+                      <Fragment key={m.id}>
+                        <tr data-league={m.league_id ?? undefined}>
+                          <td>
+                            <span className="inline-flex items-center gap-2">
+                              {m.league_id ? (
+                                <span className="chip-dot" aria-hidden />
+                              ) : null}
+                              <span className="font-medium text-ink">
+                                {name}
                               </span>
-                            ) : null}
-                          </span>
-                        </td>
-                        <td className="text-muted">{m.window_label}</td>
-                        <td className="tabular text-muted">{m.n_matches}</td>
-                        <td>
-                          <span className="flex items-center gap-2">
-                            <span
-                              className={`w-12 shrink-0 tabular font-medium ${
-                                isBest ? "text-accent" : "text-ink"
-                              }`}
-                            >
-                              {pct(m.accuracy, 1)}
+                              {isBest ? (
+                                <span className="text-[10px] font-medium text-accent">
+                                  الأفضل
+                                </span>
+                              ) : null}
                             </span>
-                            <span
-                              className="h-1.5 w-16 overflow-hidden rounded-[2px] bg-panel sm:w-24"
-                              aria-hidden
-                            >
+                          </td>
+                          <td className="text-muted">{m.window_label}</td>
+                          <td className="tabular text-muted">{m.n_matches}</td>
+                          <td>
+                            <span className="flex items-center gap-2">
                               <span
-                                className="meter-fill block h-full bg-accent"
-                                style={{ width: pctCss(m.accuracy / maxAcc) }}
-                              />
+                                className={`w-12 shrink-0 tabular font-medium ${
+                                  isBest ? "text-accent" : "text-ink"
+                                }`}
+                              >
+                                {pct(m.accuracy, 1)}
+                              </span>
+                              <span
+                                className="h-1.5 w-16 overflow-hidden rounded-[2px] bg-panel sm:w-24"
+                                aria-hidden
+                              >
+                                <span
+                                  className="meter-fill block h-full bg-accent"
+                                  style={{ width: pctCss(m.accuracy / maxAcc) }}
+                                />
+                              </span>
                             </span>
-                          </span>
-                        </td>
-                        <td className="tabular">{m.brier.toFixed(3)}</td>
-                        <td className="tabular">{m.log_loss.toFixed(3)}</td>
-                      </tr>
+                          </td>
+                          <td className="tabular">{m.brier.toFixed(3)}</td>
+                          <td className="tabular">{m.log_loss.toFixed(3)}</td>
+                          <td className="tabular">
+                            {m.rps != null ? m.rps.toFixed(4) : "—"}
+                          </td>
+                        </tr>
+                        {mkt ? (
+                          <tr data-league={m.league_id ?? undefined}>
+                            <td className="ps-6 text-muted">
+                              السوق على نفس النافذة
+                            </td>
+                            <td className="text-faint">{mkt.window_label}</td>
+                            <td className="tabular text-faint">
+                              {mkt.n_matches}
+                            </td>
+                            <td className="tabular text-muted">
+                              {pct(mkt.accuracy, 1)}
+                            </td>
+                            <td className="tabular text-muted">
+                              {mkt.brier.toFixed(3)}
+                            </td>
+                            <td className="tabular text-muted">
+                              {mkt.log_loss.toFixed(3)}
+                            </td>
+                            <td className="tabular text-muted">
+                              {mkt.rps != null ? mkt.rps.toFixed(4) : "—"}
+                            </td>
+                          </tr>
+                        ) : null}
+                      </Fragment>
                     );
                   })}
                 </tbody>

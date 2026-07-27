@@ -142,14 +142,17 @@ export function TeamNamesInline({
   score?: string | null;
 }) {
   return (
-    <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-1.5 text-[13px] sm:gap-2">
-      <span className="flex min-w-0 items-center justify-end gap-2">
-        <span
-          className="min-w-0 truncate text-end font-medium leading-tight text-ink"
-          title={homeName}
-        >
-          {homeName}
-        </span>
+    <div className="grid grid-cols-[1fr_2.25rem_2rem_2.25rem_1fr] items-center gap-1 text-[15px] sm:text-base sm:gap-2">
+      {/* اسم المضيف */}
+      <span
+        className="min-w-0 truncate text-end font-bold leading-tight text-ink"
+        title={homeName}
+      >
+        {homeName}
+      </span>
+
+      {/* شعار المضيف — محاذاة عمودية موحدة */}
+      <span className="flex items-center justify-center">
         <Crest
           src={homeCrestUrl}
           alt={homeName}
@@ -159,18 +162,20 @@ export function TeamNamesInline({
         />
       </span>
 
+      {/* ضد / النتيجة — منتصف عمودي محاذى بالتمام */}
       {score ? (
-        <span className="shrink-0 px-1 font-semibold tabular text-ink">
+        <span className="shrink-0 text-center font-bold tabular text-ink text-base">
           <span className="sr-only">النتيجة </span>
           {score}
         </span>
       ) : (
-        <span className="shrink-0 px-1 text-[11px] text-faint" aria-hidden>
+        <span className="shrink-0 text-center text-xs font-semibold text-muted" aria-hidden>
           ضد
         </span>
       )}
 
-      <span className="flex min-w-0 items-center justify-start gap-2">
+      {/* شعار الضيف — محاذاة عمودية موحدة */}
+      <span className="flex items-center justify-center">
         <Crest
           src={awayCrestUrl}
           alt={awayName}
@@ -178,12 +183,14 @@ export function TeamNamesInline({
           fallback={crestInitials(awayName)}
           tone="away"
         />
-        <span
-          className="min-w-0 truncate text-start font-medium leading-tight text-ink"
-          title={awayName}
-        >
-          {awayName}
-        </span>
+      </span>
+
+      {/* اسم الضيف */}
+      <span
+        className="min-w-0 truncate text-start font-bold leading-tight text-ink"
+        title={awayName}
+      >
+        {awayName}
       </span>
     </div>
   );

@@ -18,7 +18,6 @@ class MatchObs:
     home_goals: int
     away_goals: int
     days_ago: float
-    weight: float
 
 
 @dataclass
@@ -28,6 +27,7 @@ class DixonColesResult:
     defense: Dict[str, float]
     home_advantage: float
     rho: float
+    intercept: float = 0.0
 
 
 def _poisson_logpmf(k: np.ndarray, lam: np.ndarray) -> np.ndarray:
@@ -76,18 +76,22 @@ def fit_dixon_coles(
     yg = np.array([m.away_goals for m in matches], dtype=float)
     weights = make_weights([m.days_ago for m in matches], half_life_days)
 
-    def unpack(theta: np.ndarray) -> Tuple[np.ndarray, np.ndarray, float, float]:
+    def unpack(theta: np.ndarray) -> Tuple[np.ndarray, np.ndarray, float, float, float]:
         attack = theta[:n].copy()
         defense = theta[n : 2 * n].copy()
         home_adv = float(theta[2 * n])
         rho = float(np.clip(theta[2 * n + 1], -0.3, 0.3))
+        intercept = float(theta[2 * n + 2])
+        # الهجوم والدفاع كلاهما متمركز حول الصفر؛ intercept حر يحمل مستوى التهديف
+        # العام — بدونه كان متوسط الدفاع هو الـintercept الفعلي فيقلّصه الـridge
         attack = attack - attack.mean()
-        return attack, defense, home_adv, rho
+        defense = defense - defense.mean()
+        return attack, defense, home_adv, rho, intercept
 
     def nll(theta: np.ndarray) -> float:
-        attack, defense, home_adv, rho = unpack(theta)
-        lam = np.exp(home_adv + attack[home_i] - defense[away_i])
-        mu = np.exp(attack[away_i] - defense[home_i])
+        attack, defense, home_adv, rho, intercept = unpack(theta)
+        lam = np.exp(intercept + home_adv + attack[home_i] - defense[away_i])
+        mu = np.exp(intercept + attack[away_i] - defense[home_i])
         lam = np.clip(lam, 1e-3, 8.0)
         mu = np.clip(mu, 1e-3, 8.0)
         t = tau_vec(xg, yg, lam, mu, rho)
@@ -96,9 +100,10 @@ def fit_dixon_coles(
         total += 0.01 * float(np.sum(attack**2) + np.sum(defense**2))
         return total
 
-    x0 = np.zeros(2 * n + 2)
+    x0 = np.zeros(2 * n + 3)
     x0[2 * n] = 0.25
     x0[2 * n + 1] = -0.05
+    x0[2 * n + 2] = 0.1
 
     res = minimize(
         nll,
@@ -109,13 +114,14 @@ def fit_dixon_coles(
     if not res.success:
         # لا نُسقط النتيجة — لكن الصمت على عدم التقارب يخفي انحيازاً في التقديرات
         print(f"    ⚠ Dixon-Coles لم يتقارب: {res.message}")
-    attack, defense, home_adv, rho = unpack(res.x)
+    attack, defense, home_adv, rho, intercept = unpack(res.x)
     return DixonColesResult(
         teams=teams,
         attack={t: float(attack[idx[t]]) for t in teams},
         defense={t: float(defense[idx[t]]) for t in teams},
         home_advantage=float(home_adv),
         rho=float(rho),
+        intercept=float(intercept),
     )
 
 
@@ -126,8 +132,8 @@ def expected_goals(
     a_a = model.attack.get(away, 0.0)
     d_h = model.defense.get(home, 0.0)
     d_a = model.defense.get(away, 0.0)
-    lam = math.exp(model.home_advantage + a_h - d_a)
-    mu = math.exp(a_a - d_h)
+    lam = math.exp(model.intercept + model.home_advantage + a_h - d_a)
+    mu = math.exp(model.intercept + a_a - d_h)
     return float(min(max(lam, 0.2), 5.5)), float(min(max(mu, 0.2), 5.5))
 
 

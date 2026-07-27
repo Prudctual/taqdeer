@@ -18,7 +18,7 @@ export function SiteFooter() {
   return (
     <footer className="mt-10 border-t border-line">
       <div className="mx-auto flex w-full max-w-[1180px] flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-4 text-[11px] leading-relaxed text-faint">
-        <span className="font-semibold text-muted">توقّع</span>
+        <span className="font-semibold text-muted">تقدير</span>
         <Rule />
         <span>احتمال وليس يقيناً</span>
         <Rule />

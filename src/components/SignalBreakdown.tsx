@@ -4,6 +4,7 @@ import { RevealOnView } from "./RevealOnView";
 type Comp = {
   p: [number, number, number];
   label: string;
+  w?: number;
 };
 
 const TONE = ["var(--home)", "var(--draw)", "var(--away)"] as const;
@@ -32,21 +33,33 @@ function MiniBar({ p }: { p: [number, number, number] }) {
 
 export function SignalBreakdown({
   components,
+  weights,
   pickKey,
 }: {
   components: Record<string, { p?: [number, number, number] | null }>;
+  /** أوزان المزج من analytics_json — مفاتيحها المختصرة dc/pi/elo/form/market */
+  weights?: Record<string, number>;
   /** قراءة المزيج — تمييز الاتفاق / الخلاف */
   pickKey?: "H" | "D" | "A";
 }) {
-  const rows: Comp[] = [
-    { label: "Dixon–Coles", p: components.dixon_coles?.p ?? null },
-    { label: "Pi-ratings", p: components.pi_ratings?.p ?? null },
-    { label: "Elo", p: components.elo?.p ?? null },
-    { label: "الفورم", p: components.form?.p ?? null },
-    { label: "السوق", p: components.market?.p ?? null },
-  ].filter((r): r is Comp => r.p != null);
+  const candidates: Array<{
+    label: string;
+    p: [number, number, number] | null;
+    w?: number;
+  }> = [
+    { label: "Dixon–Coles", p: components.dixon_coles?.p ?? null, w: weights?.dc },
+    { label: "Pi-ratings", p: components.pi_ratings?.p ?? null, w: weights?.pi },
+    { label: "Elo", p: components.elo?.p ?? null, w: weights?.elo },
+    { label: "الفورم", p: components.form?.p ?? null, w: weights?.form },
+    { label: "السوق", p: components.market?.p ?? null, w: weights?.market },
+  ];
+  const rows: Comp[] = candidates.filter((r): r is Comp => r.p != null);
 
   if (!rows.length) return null;
+
+  // الأوزان تُعاد تسويتها على الإشارات الحاضرة فقط — كما يفعل المزج نفسه
+  // (بلا سوق مثلاً تصير 42٪ الاسمية 48٪ فعلياً)
+  const tw = rows.reduce((s, r) => s + (r.w ?? 0), 0);
 
   const agreeCount =
     pickKey != null
@@ -119,6 +132,11 @@ export function SignalBreakdown({
                     className="px-4 py-2.5 text-start text-sm font-medium text-ink sm:px-5"
                   >
                     {r.label}
+                    {r.w != null && tw > 0 ? (
+                      <span className="ms-2 text-[10px] font-normal tabular text-faint">
+                        وزن {pct(r.w / tw)}
+                      </span>
+                    ) : null}
                     {agrees ? (
                       <span className="ms-2 text-[10px] font-medium text-accent">
                         متفق

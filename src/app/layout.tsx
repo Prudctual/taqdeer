@@ -14,8 +14,8 @@ const arabic = IBM_Plex_Sans_Arabic({
 
 export const metadata: Metadata = {
   title: {
-    default: "توقّع — تحليلات وتوقع مباريات الدوريات الكبرى",
-    template: "%s · توقّع",
+    default: "تقدير — تحليلات وتوقع مباريات الدوريات الكبرى",
+    template: "%s · تقدير",
   },
   description:
     "احتمالات 1X2 وتوزيع النتائج للدوريات الأوروبية الخمس الكبرى والدوري الكوري، بنماذج Dixon–Coles وElo معايرة على نتائج حقيقية.",

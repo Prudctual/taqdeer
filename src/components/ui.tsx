@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { ChevronIcon } from "./ChevronIcon";
+import { LeagueIcon } from "./LeagueIcon";
 
 export function PageHeader({
   eyebrow,
@@ -176,8 +177,8 @@ export function SectionCard({
   return (
     <section className="card overflow-hidden" data-league={tone}>
       {(title || headerRight) && (
-        <div className="card-head">
-          <div className="min-w-0">
+        <div className="card-head relative flex items-center justify-center text-center">
+          <div className="min-w-0 text-center">
             {title ? (
               <h2
                 className={
@@ -190,10 +191,10 @@ export function SectionCard({
               </h2>
             ) : null}
             {subtitle ? (
-              <p className="card-head-sub max-w-[62ch]">{subtitle}</p>
+              <p className="card-head-sub mx-auto">{subtitle}</p>
             ) : null}
           </div>
-          {headerRight ? <div className="shrink-0">{headerRight}</div> : null}
+          {headerRight ? <div className="absolute left-4 shrink-0">{headerRight}</div> : null}
         </div>
       )}
       {flush ? children : <div className="p-4 sm:p-5">{children}</div>}
@@ -294,16 +295,19 @@ export function Chip({
   leagueId?: string | null;
 }) {
   const tone = leagueId?.toLowerCase() || undefined;
+  const labelText = typeof children === "string" ? children : undefined;
   return (
     <Link
       href={href}
-      title={hint}
+      title={hint ?? labelText}
+      aria-label={hint ?? labelText}
       data-league={tone}
       aria-current={active ? "page" : undefined}
-      className="chip-filter"
+      className="chip-filter group"
     >
-      {tone ? <span className="chip-dot" aria-hidden /> : icon}
-      <span className="min-w-0 truncate">{children}</span>
+      <div className="flex h-full w-full items-center justify-center p-1 transition-transform group-hover:scale-110">
+        {icon ? icon : <LeagueIcon leagueId={leagueId} className="h-14 w-14 sm:h-16 sm:w-16" />}
+      </div>
     </Link>
   );
 }

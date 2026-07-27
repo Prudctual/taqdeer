@@ -1,6 +1,7 @@
 """
-Pi-ratings (Constantinou & Fenton): dynamic offensive/defensive ratings
-updated after every match — strong short-term signal for football.
+Simplified pi-style ratings (inspired by Constantinou & Fenton): dynamic
+offensive/defensive ratings updated after every match — linear updates,
+no home/away rating split.
 """
 
 from __future__ import annotations
@@ -23,28 +24,28 @@ class PiState:
     deff: Dict[str, float]  # "def" reserved
 
 
-def _expected_goal_diff(off_a: float, def_b: float) -> float:
-    # Squashing function keeps expected margin in a sensible range
-    return off_a - def_b
-
-
 def update_pi(
     matches: List[PiMatch],
     learn_rate: float = 0.12,
     initial: float = 0.0,
+    off_seeds: Dict[str, float] | None = None,
+    def_seeds: Dict[str, float] | None = None,
 ) -> PiState:
+    """Seeds override `initial` per team at first appearance (promoted-team prior)."""
+    o_seed = off_seeds or {}
+    d_seed = def_seeds or {}
     off: Dict[str, float] = {}
     deff: Dict[str, float] = {}
 
     def get(d: Dict[str, float], k: str) -> float:
-        return d.get(k, initial)
+        s = o_seed if d is off else d_seed
+        return d.get(k, s.get(k, initial))
 
     for m in matches:
-        eh = _expected_goal_diff(get(off, m.home), get(deff, m.away))
-        ea = _expected_goal_diff(get(off, m.away), get(deff, m.home))
+        eh = get(off, m.home) - get(deff, m.away)
+        ea = get(off, m.away) - get(deff, m.home)
         err_h = (m.home_goals - m.away_goals) - eh
         err_a = (m.away_goals - m.home_goals) - ea
-        # Update with diminishing returns for large errors
         off[m.home] = get(off, m.home) + learn_rate * err_h
         deff[m.away] = get(deff, m.away) - learn_rate * err_h * 0.7
         off[m.away] = get(off, m.away) + learn_rate * err_a
