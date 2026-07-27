@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { MatchList } from "@/components/MatchList";
 import { DynamicMatchSection } from "@/components/DynamicMatchSection";
+import { PlayerCascadeStack } from "@/components/PlayerCascadeStack";
 import { NextKickoff } from "@/components/NextKickoff";
 import {
   Chip,
@@ -75,6 +76,7 @@ export default function HomePage() {
               />
             </>
           }
+          actions={<PlayerCascadeStack />}
         />
 
         {leagues.length > 0 ? (
