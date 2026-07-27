@@ -12,6 +12,7 @@
     "fit": ".venv/bin/python scripts/fit-and-predict.py",
     "pipeline": "bun run sync && bun run fit",
     "telegram": "bun scripts/telegram-bot.ts",
+    "notify": "bun scripts/send-telegram-notification.ts",
     "check": "tsx scripts/selfcheck.ts && tsc --noEmit && eslint .",
     "postinstall": "cd node_modules/better-sqlite3 && npm run build-release || true"
   },
