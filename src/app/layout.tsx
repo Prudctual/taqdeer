@@ -19,6 +19,11 @@ export const metadata: Metadata = {
   },
   description:
     "احتمالات 1X2 وتوزيع النتائج للدوريات الأوروبية الخمس الكبرى والدوري الكوري، بنماذج Dixon–Coles وElo معايرة على نتائج حقيقية.",
+  icons: {
+    icon: "/favicon.svg",
+    shortcut: "/favicon.svg",
+    apple: "/favicon.svg",
+  },
 };
 
 export default function RootLayout({
