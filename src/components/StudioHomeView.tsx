@@ -38,7 +38,6 @@ export function StudioHomeView({
   upcomingCount,
   leagues = [],
   groups = [],
-  recentGroups = [],
   nextMatch,
   standingsByLeague = {},
 }: StudioHomeViewProps) {
@@ -46,17 +45,9 @@ export function StudioHomeView({
     "matches" | "value" | "bankers" | "standings"
   >("matches");
 
-  const [matchViewMode, setMatchViewMode] = useState<"upcoming" | "recent">("upcoming");
-
   const upcomingMatchesList: MatchCard[] = groups
     ? groups.flatMap((g) => g.matches || g.items || [])
     : [];
-
-  const recentMatchesList: MatchCard[] = recentGroups
-    ? recentGroups.flatMap((g) => g.matches || g.items || [])
-    : [];
-
-  const activeMatchesDisplay = matchViewMode === "upcoming" ? upcomingMatchesList : recentMatchesList;
 
   const heroMatch = nextMatch || upcomingMatchesList[0];
 
@@ -155,49 +146,28 @@ export function StudioHomeView({
         {/* Tab 1: Matches Feed */}
         {activeTab === "matches" && (
           <div className="space-y-4 animate-in fade-in duration-200">
-            {/* Matchweek Filter Control Bar */}
+            {/* Upcoming Matches Header Bar */}
             <div className="flex flex-wrap items-center justify-between gap-3 bg-panel p-3 rounded-2xl border border-line">
               <div className="flex items-center gap-2">
-                <span className="h-2 w-2 rounded-full bg-accent animate-pulse" />
+                <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
                 <h3 className="text-xs font-black text-ink">
-                  {matchViewMode === "upcoming" ? "الجولة الحالية والجولات القادمة المباشرة" : "أرشيف الجولات المكتملة حديثاً"}
+                  مواعيد ومباريات الجولة القادمة المباشرة
                 </h3>
               </div>
 
-              <div className="flex items-center gap-1.5 bg-surface p-1 rounded-xl border border-line">
-                <button
-                  type="button"
-                  onClick={() => setMatchViewMode("upcoming")}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                    matchViewMode === "upcoming"
-                      ? "bg-accent text-white shadow-xs font-black"
-                      : "text-muted hover:text-ink"
-                  }`}
-                >
-                  🟢 الجولة القادمة ({upcomingMatchesList.length})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setMatchViewMode("recent")}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                    matchViewMode === "recent"
-                      ? "bg-accent text-white shadow-xs font-black"
-                      : "text-muted hover:text-ink"
-                  }`}
-                >
-                  🏁 الجولات المكتملة ({recentMatchesList.length})
-                </button>
-              </div>
+              <span className="px-3 py-1 rounded-xl bg-surface border border-line text-xs font-black text-emerald-600 dark:text-emerald-400">
+                🟢 {upcomingMatchesList.length} مواجهة قادمة
+              </span>
             </div>
 
-            {activeMatchesDisplay.length > 0 ? (
+            {upcomingMatchesList.length > 0 ? (
               <div className="rounded-2xl border border-line bg-surface p-4 sm:p-6 shadow-2xs">
-                <MatchList matches={activeMatchesDisplay} groupDays showLeague />
+                <MatchList matches={upcomingMatchesList} groupDays showLeague />
               </div>
             ) : (
               <div className="rounded-2xl border border-line bg-surface p-8 text-center space-y-2 shadow-2xs">
-                <h3 className="text-sm font-black text-ink">لا توجد مباريات مسجلة لهذا التصنيف حالياً</h3>
-                <p className="text-xs text-muted">ترتفع الجولة القادمة أوتوماتيكياً بمجرد استكمال الجولة الحالية.</p>
+                <h3 className="text-sm font-black text-ink">لا توجد مباريات مجدولة حالياً</h3>
+                <p className="text-xs text-muted">ترتفع الجولة القادمة أوتوماتيكياً بمجرد إدراج المباريات الجديدة.</p>
               </div>
             )}
           </div>
