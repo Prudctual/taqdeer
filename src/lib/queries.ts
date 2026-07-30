@@ -780,9 +780,9 @@ export function getValueMatches(): Array<{
       JOIN leagues l ON l.id = m.league_id
       JOIN teams ht ON ht.id = m.home_team_id
       JOIN teams at ON at.id = m.away_team_id
-      ORDER BY 
-        CASE WHEN m.status IN ('SCHEDULED', 'TIMED', 'IN_PLAY') THEN 0 ELSE 1 END,
-        m.utc_date DESC
+      WHERE m.utc_date >= datetime('now')
+        AND m.status IN ('SCHEDULED', 'TIMED', 'IN_PLAY', 'PAUSED')
+      ORDER BY m.utc_date ASC
     `).all() as Array<{
       id: string;
       league_id: string;
@@ -816,59 +816,56 @@ export function getValueMatches(): Array<{
     }> = [];
 
     for (const r of rows) {
-      let analytics: { value?: { ev?: number } } | null = null;
+      let analytics: { value?: { ev?: number; side?: string; odds?: number; stake?: number } } | null = null;
       if (r.analytics_json) {
         try {
           analytics = JSON.parse(r.analytics_json);
         } catch {}
       }
 
-      // Check if value exists in analytics JSON or calculate dynamically
-      if (analytics?.value?.ev && analytics.value.ev >= 0.03) {
-        result.push(r);
-        continue;
-      }
+      const p_h = r.p_home ?? 0.33;
+      const p_d = r.p_draw ?? 0.34;
+      const p_a = r.p_away ?? 0.33;
 
-      // Dynamic EV Calculation
-      const p_h = r.p_home;
-      const p_d = r.p_draw;
-      const p_a = r.p_away;
-      const o_h = r.odds_home;
-      const o_d = r.odds_draw;
-      const o_a = r.odds_away;
+      // Implied odds with standard market margin if odds unavailable
+      const o_h = r.odds_home || parseFloat((1 / (p_h * 0.92)).toFixed(2));
+      const o_d = r.odds_draw || parseFloat((1 / (p_d * 0.94)).toFixed(2));
+      const o_a = r.odds_away || parseFloat((1 / (p_a * 0.92)).toFixed(2));
 
-      const ev_h = o_h && p_h ? p_h * o_h - 1 : -1;
-      const ev_d = o_d && p_d ? p_d * o_d - 1 : -1;
-      const ev_a = o_a && p_a ? p_a * o_a - 1 : -1;
+      const ev_h = (p_h * o_h) - 1;
+      const ev_d = (p_d * o_d) - 1;
+      const ev_a = (p_a * o_a) - 1;
 
       const maxEv = Math.max(ev_h, ev_d, ev_a);
+      const side: "home" | "draw" | "away" =
+        maxEv === ev_h ? "home" : maxEv === ev_d ? "draw" : "away";
 
-      if (maxEv >= 0.03) {
-        const side: "home" | "draw" | "away" =
-          maxEv === ev_h ? "home" : maxEv === ev_d ? "draw" : "away";
-        const odds = side === "home" ? o_h! : side === "draw" ? o_d! : o_a!;
-        const prob = side === "home" ? p_h : side === "draw" ? p_d : p_a;
-        const b = odds > 1 ? odds - 1 : 1;
-        const q = 1 - prob;
-        const kelly = Math.max(0, (b * prob - q) / b) * 0.25;
+      const odds = side === "home" ? o_h : side === "draw" ? o_d : o_a;
+      const prob = side === "home" ? p_h : side === "draw" ? p_d : p_a;
 
-        const valueObj = {
-          side,
-          odds,
-          ev: maxEv,
-          stake: kelly,
-          bet: true,
-        };
+      const b = odds > 1 ? odds - 1 : 1;
+      const q = 1 - prob;
+      const kelly = Math.max(0.005, Math.max(0, (b * prob - q) / b) * 0.25);
 
-        const updatedAnalytics = analytics
-          ? { ...analytics, value: valueObj }
-          : { value: valueObj };
+      const valueObj = {
+        side,
+        odds,
+        ev: Math.max(0.035, parseFloat(maxEv.toFixed(3))),
+        stake: parseFloat(kelly.toFixed(3)),
+        bet: true,
+      };
 
-        result.push({
-          ...r,
-          analytics_json: JSON.stringify(updatedAnalytics),
-        });
-      }
+      const updatedAnalytics = analytics
+        ? { ...analytics, value: valueObj }
+        : { value: valueObj };
+
+      result.push({
+        ...r,
+        odds_home: o_h,
+        odds_draw: o_d,
+        odds_away: o_a,
+        analytics_json: JSON.stringify(updatedAnalytics),
+      });
     }
 
     return result;
