@@ -711,8 +711,8 @@ function recomputeStandings(db: ReturnType<typeof getDb>, leagueId: string, seas
     return y[1].gf - x[1].gf;
   });
 
-  // Wipe all seasons for this league so legacy labels (2025-26) cannot duplicate rows
-  db.prepare(`DELETE FROM standings WHERE league_id=?`).run(leagueId);
+  // Wipe standings for this specific league and season
+  db.prepare(`DELETE FROM standings WHERE league_id=? AND season=?`).run(leagueId, season);
   const ins = db.prepare(`
     INSERT INTO standings (
       id, league_id, season, team_id, position, played, won, drawn, lost,
@@ -915,12 +915,8 @@ async function main() {
       console.log(
         `  ${league.code} ${seg}: ${n} مباراة حقيقية${forceRefresh ? " (محدّث)" : ""}`,
       );
+      recomputeStandings(db, league.id, String(year));
     }
-    recomputeStandings(
-      db,
-      league.id,
-      latestSeasonWithResults(db, league.id) ?? String(latestYear),
-    );
   }
 
   await syncKleagueFromWikipedia(db);

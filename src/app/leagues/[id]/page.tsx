@@ -17,7 +17,6 @@ import {
   getLeagues,
   getAvailableSeasons,
   getStandings,
-  getStandingsSeason,
   getStrengthTable,
 } from "@/lib/queries";
 import { leagueEmblemUrl, tournamentEmblemUrl, type TournamentType } from "@/lib/leagues";
@@ -213,10 +212,14 @@ export default async function LeaguePage({
   if (!league) notFound();
 
   const availableSeasons = getAvailableSeasons(id);
+  const defaultSeason =
+    availableSeasons.find((s) => getStandings(id, s).length > 0) ||
+    availableSeasons[0] ||
+    "2025";
   const activeSeason =
     selectedSeasonParam && availableSeasons.includes(selectedSeasonParam)
       ? selectedSeasonParam
-      : availableSeasons[0] || getStandingsSeason(id) || "2025";
+      : defaultSeason;
 
   const standings = getStandings(id, activeSeason);
   const strengths = getStrengthTable(id);
