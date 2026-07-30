@@ -8,7 +8,8 @@ export const metadata: Metadata = {
   description: "ترشيح المباريات القادمة التي تحتوي على عائد متوقع موجب (+EV) وحصة كيلي الموصى بها.",
 };
 
-export const revalidate = 300;
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export default function ValueMatchesPage() {
   const matches = getValueMatches();
