@@ -243,14 +243,15 @@ const MAIN_KEYBOARD = {
     ],
     [
       { text: "💎 فرص القيمة (+EV)", callback_data: "cmd_value" },
-      { text: "🏆 ترتيب الدوريات", callback_data: "cmd_leagues" },
+      { text: "🛡️ أأمن التوقعات (Bankers)", callback_data: "cmd_bankers" },
     ],
     [
+      { text: "🏆 ترتيب الدوريات الـ 6", callback_data: "cmd_leagues" },
       { text: "📊 سجل الدقة والأداء", callback_data: "cmd_accuracy" },
-      { text: "🧠 المنهجية الحسابية", callback_data: "cmd_methodology" },
     ],
     [
-      { text: "🌐 فتح منصة «تقدير» الحية", url: "http://13.53.56.196" },
+      { text: "🧠 المنهجية الحسابية", callback_data: "cmd_methodology" },
+      { text: "🌐 منصة «تقدير» الحية", url: "http://13.53.56.196" },
     ],
   ],
 };
@@ -411,6 +412,14 @@ async function handleUpdate(update: TelegramUpdate) {
       return;
     }
 
+    if (text.startsWith("/bankers") || text === "أأمن التوقعات") {
+      const matches = getBankerPicks();
+      let reply = `<b>🛡️ أأمن التوقعات للجولة الحالية (Banker Picks):</b>\n\n`;
+      reply += matches.map((m) => formatMatchCard(m)).join("\n──────────────\n");
+      await sendMessage(chatId, reply, MAIN_KEYBOARD);
+      return;
+    }
+
     if (text.startsWith("/value") || text === "فرص القيمة") {
       const matches = getValueBets();
       let reply = `<b>💎 أبرز فرص القيمة والأعلى ثقة (+EV):</b>\n\n`;
@@ -484,6 +493,11 @@ async function handleUpdate(update: TelegramUpdate) {
       const matches = getUpcomingMatches(8);
       let reply = `<b>المباريات القادمة المجدولة:</b>\n\n`;
       reply += matches.length ? matches.map((m) => formatMatchCard(m)).join("\n──────────────\n") : "لا تتوفر مباريات قادمة.";
+      await sendMessage(chatId, reply, MAIN_KEYBOARD);
+    } else if (data === "cmd_bankers") {
+      const matches = getBankerPicks();
+      let reply = `<b>🛡️ أأمن التوقعات للجولة الحالية (Banker Picks):</b>\n\n`;
+      reply += matches.map((m) => formatMatchCard(m)).join("\n──────────────\n");
       await sendMessage(chatId, reply, MAIN_KEYBOARD);
     } else if (data === "cmd_value") {
       const matches = getValueBets();
