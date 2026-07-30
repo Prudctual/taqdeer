@@ -50,17 +50,22 @@ export function MatchList({
               <div className="bg-slate-100/90 rounded-2xl px-4 py-2.5 flex items-center justify-between border border-slate-200/60 shadow-2xs">
                 <div className="flex items-center gap-2">
                   {day.relative ? (
-                    <span className="bg-rose-100 text-rose-700 px-3 py-0.5 rounded-full text-xs font-black border border-rose-200/60">
+                    <span className="bg-accent-dim text-accent px-3 py-0.5 rounded-full text-xs font-black border border-accent/20">
                       {day.relative}
                     </span>
                   ) : null}
-                  <h3 className="text-xs sm:text-sm font-black text-slate-900 tracking-tight">
+                  {day.items[0]?.matchday ? (
+                    <span className="bg-panel text-ink px-2.5 py-0.5 rounded-md text-[11px] font-black font-mono border border-line">
+                      الجولة {day.items[0].matchday}
+                    </span>
+                  ) : null}
+                  <h3 className="text-xs sm:text-sm font-black text-ink tracking-tight">
                     {formatLongDate(day.items[0]!.utcDate)}
                   </h3>
                 </div>
 
-                <div className="shrink-0">
-                  <span className="text-[11px] font-extrabold text-slate-700 bg-white px-3 py-1 rounded-full border border-slate-200/50 shadow-2xs">
+                <div className="shrink-0 flex items-center gap-2">
+                  <span className="text-[11px] font-extrabold text-muted bg-surface px-3 py-1 rounded-full border border-line shadow-2xs">
                     {formatMatchCount(day.items.length)}
                   </span>
                 </div>

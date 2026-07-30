@@ -57,6 +57,7 @@ export type MatchCard = {
   gamestateBiasRatio?: number | null;
   refereeName?: string | null;
   weatherCondition?: string | null;
+  matchday?: number | null;
 };
 
 /** @deprecated alias — prefer MatchCard */

@@ -134,6 +134,7 @@ export default function HomePage() {
       leagues={leagues}
       tableMatches={allMatchesList}
       groups={groups}
+      recentGroups={recentByLeague}
       nextMatch={nextMatch}
       standingsByLeague={standingsByLeague}
     />

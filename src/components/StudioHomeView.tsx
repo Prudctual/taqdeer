@@ -29,6 +29,7 @@ interface StudioHomeViewProps {
   leagues: LeagueItem[];
   tableMatches: unknown[];
   groups: MatchGroup[];
+  recentGroups?: MatchGroup[];
   nextMatch?: MatchCard;
   standingsByLeague?: Record<string, StandingTeam[]>;
 }
@@ -37,6 +38,7 @@ export function StudioHomeView({
   upcomingCount,
   leagues = [],
   groups = [],
+  recentGroups = [],
   nextMatch,
   standingsByLeague = {},
 }: StudioHomeViewProps) {
@@ -44,10 +46,19 @@ export function StudioHomeView({
     "matches" | "value" | "bankers" | "standings"
   >("matches");
 
-  const allMatchesList: MatchCard[] = groups
+  const [matchViewMode, setMatchViewMode] = useState<"upcoming" | "recent">("upcoming");
+
+  const upcomingMatchesList: MatchCard[] = groups
     ? groups.flatMap((g) => g.matches || g.items || [])
     : [];
-  const heroMatch = nextMatch || allMatchesList[0];
+
+  const recentMatchesList: MatchCard[] = recentGroups
+    ? recentGroups.flatMap((g) => g.matches || g.items || [])
+    : [];
+
+  const activeMatchesDisplay = matchViewMode === "upcoming" ? upcomingMatchesList : recentMatchesList;
+
+  const heroMatch = nextMatch || upcomingMatchesList[0];
 
   return (
     <div className="space-y-6">
@@ -89,7 +100,7 @@ export function StudioHomeView({
             <svg className="h-4 w-4 shrink-0 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
               <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
             </svg>
-            <span>مواعيد ومباريات الجولة ({upcomingCount || allMatchesList.length})</span>
+            <span>مواعيد ومباريات الجولة ({upcomingCount || upcomingMatchesList.length})</span>
           </button>
 
           {/* Tab 2: Value (+EV) */}
@@ -144,14 +155,49 @@ export function StudioHomeView({
         {/* Tab 1: Matches Feed */}
         {activeTab === "matches" && (
           <div className="space-y-4 animate-in fade-in duration-200">
-            {allMatchesList.length > 0 ? (
+            {/* Matchweek Filter Control Bar */}
+            <div className="flex flex-wrap items-center justify-between gap-3 bg-panel p-3 rounded-2xl border border-line">
+              <div className="flex items-center gap-2">
+                <span className="h-2 w-2 rounded-full bg-accent animate-pulse" />
+                <h3 className="text-xs font-black text-ink">
+                  {matchViewMode === "upcoming" ? "الجولة الحالية والجولات القادمة المباشرة" : "أرشيف الجولات المكتملة حديثاً"}
+                </h3>
+              </div>
+
+              <div className="flex items-center gap-1.5 bg-surface p-1 rounded-xl border border-line">
+                <button
+                  type="button"
+                  onClick={() => setMatchViewMode("upcoming")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    matchViewMode === "upcoming"
+                      ? "bg-accent text-white shadow-xs font-black"
+                      : "text-muted hover:text-ink"
+                  }`}
+                >
+                  🟢 الجولة القادمة ({upcomingMatchesList.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMatchViewMode("recent")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    matchViewMode === "recent"
+                      ? "bg-accent text-white shadow-xs font-black"
+                      : "text-muted hover:text-ink"
+                  }`}
+                >
+                  🏁 الجولات المكتملة ({recentMatchesList.length})
+                </button>
+              </div>
+            </div>
+
+            {activeMatchesDisplay.length > 0 ? (
               <div className="rounded-2xl border border-line bg-surface p-4 sm:p-6 shadow-2xs">
-                <MatchList matches={allMatchesList} groupDays showLeague />
+                <MatchList matches={activeMatchesDisplay} groupDays showLeague />
               </div>
             ) : (
               <div className="rounded-2xl border border-line bg-surface p-8 text-center space-y-2 shadow-2xs">
-                <h3 className="text-sm font-black text-ink">لا توجد مباريات قادمة مسجلة حالياً</h3>
-                <p className="text-xs text-muted">سيظهر جدول الجولة القادمة هنا أوتوماتيكياً عند التحديث.</p>
+                <h3 className="text-sm font-black text-ink">لا توجد مباريات مسجلة لهذا التصنيف حالياً</h3>
+                <p className="text-xs text-muted">ترتفع الجولة القادمة أوتوماتيكياً بمجرد استكمال الجولة الحالية.</p>
               </div>
             )}
           </div>
