@@ -45,8 +45,8 @@ async function sendNotification(targetChatId: string, customMessage?: string) {
 
   if (!messageText) {
     const topMatches = getTopRecommendations();
-    messageText = `🚀 <b>إشعار تلقائي من منصة «تقدير» ⚽📊</b>\n\n`;
-    messageText += `أبرز التوصيات الخوارزمية ذات نسبة الثقة العالية:\n\n`;
+    messageText = `<b>تحديث «تقدير» الدوري والتحليلات</b>\n\n`;
+    messageText += `أبرز المواجهات القادمة وأعلى الإشارات:\n\n`;
 
     if (topMatches.length) {
       for (const m of topMatches) {
@@ -59,16 +59,15 @@ async function sendNotification(targetChatId: string, customMessage?: string) {
         if (pA > pH && pA > pD) rec = `فوز ${m.away_team}`;
         if (pD > pH && pD > pA) rec = "التعادل";
 
-        messageText += `🔹 <b>${m.home_team} × ${m.away_team}</b>\n`;
-        messageText += `🏆 ${m.league_name}\n`;
-        messageText += `🎯 التوصية: <b>${rec}</b> | الثقة: <b>${conf}%</b>\n`;
-        messageText += `📈 الاحتمالات: 🏠 ${pH}% | 🤝 ${pD}% | ✈️ ${pA}%\n\n`;
+        messageText += `• <b>${m.home_team} × ${m.away_team}</b> (${m.league_name})\n`;
+        messageText += `  التوقع: <b>${rec}</b> (${conf}% ثقة)\n`;
+        messageText += `  الاحتمالات: ${pH}% / ${pD}% / ${pA}%\n\n`;
       }
     } else {
       messageText += `لا تتوفر توقعات جديدة حالياً.\n`;
     }
 
-    messageText += `🌐 للمزيد من التفاصيل والتحليلات: https://taqdeer.app`;
+    messageText += `المزيد عبر المنصة: https://taqdeer.app`;
   }
 
   console.log(`📤 Sending Telegram Notification to Chat ID: ${targetChatId}...`);

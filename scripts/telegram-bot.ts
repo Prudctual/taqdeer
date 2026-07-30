@@ -114,11 +114,11 @@ function formatMatchCard(m: MatchRow): string {
   const timeStr = dateObj.toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" });
   const dateStr = dateObj.toLocaleDateString("ar-EG", { day: "numeric", month: "short" });
 
-  let text = `⚽ <b>${m.home_team} × ${m.away_team}</b>\n`;
-  text += `🏆 <i>${m.league_name}</i> · ⏰ ${dateStr} ${timeStr}\n`;
+  let text = `<b>${m.home_team} × ${m.away_team}</b>\n`;
+  text += `<i>${m.league_name}</i> · ${dateStr} ${timeStr}\n`;
 
   if (m.status === "FINISHED" && m.home_goals !== null) {
-    text += `📊 النتيجة النهائية: <b>${m.home_goals} - ${m.away_goals}</b>\n`;
+    text += `النتيجة النهائية: <b>${m.home_goals} - ${m.away_goals}</b>\n`;
   }
 
   if (m.p_home != null && m.p_draw != null && m.p_away != null) {
@@ -136,16 +136,86 @@ function formatMatchCard(m: MatchRow): string {
       pickP = pA;
     }
 
-    text += `🎯 التوصية: <b>${pick} (${pickP}%)</b>\n`;
-    text += `📈 الاحتمالات: 🏠 ${pH}% | 🤝 ${pD}% | ✈️ ${pA}%\n`;
+    text += `التوصية: <b>${pick} (${pickP}%)</b>\n`;
+    text += `الاحتمالات: 🏠 ${pH}% | 🤝 ${pD}% | ✈️ ${pA}%\n`;
     if (m.confidence) {
-      text += `💡 الثقة: <b>${Math.round(m.confidence * 100)}%</b>\n`;
+      text += `نسبة الثقة: <b>${Math.round(m.confidence * 100)}%</b>\n`;
     }
   } else {
-    text += `⏳ التوقع: <i>جاري تحليل البيانات...</i>\n`;
+    text += `التوقع: <i>جاري تحليل البيانات...</i>\n`;
   }
 
   return text;
+}
+
+function getConciseHighlights(): string {
+  const query = `
+    SELECT m.id, m.utc_date, m.status,
+           ht.name_ar as home_team, at.name_ar as away_team,
+           l.name_ar as league_name,
+           p.p_home, p.p_draw, p.p_away, p.confidence
+    FROM matches m
+    JOIN leagues l ON l.id = m.league_id
+    JOIN teams ht ON ht.id = m.home_team_id
+    JOIN teams at ON at.id = m.away_team_id
+    JOIN predictions p ON p.match_id = m.id
+    WHERE m.status IN ('TIMED', 'SCHEDULED')
+      AND m.utc_date >= datetime('now')
+      AND m.utc_date <= datetime('now', '+36 hours')
+    ORDER BY p.confidence DESC, m.utc_date ASC
+    LIMIT 4;
+  `;
+
+  const topMatches = db.query(query).all() as MatchRow[];
+
+  let text = `<b>تحديث «تقدير» الدوري والتحليلات</b>\n\n`;
+
+  if (topMatches.length > 0) {
+    text += `أبرز المواجهات القادمة وأعلى الإشارات:\n\n`;
+    for (const m of topMatches) {
+      const dateObj = new Date(m.utc_date);
+      const timeStr = dateObj.toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" });
+      const pH = Math.round((m.p_home || 0) * 100);
+      const pD = Math.round((m.p_draw || 0) * 100);
+      const pA = Math.round((m.p_away || 0) * 100);
+      const conf = Math.round((m.confidence || 0) * 100);
+
+      let pick = `فوز ${m.home_team}`;
+      if (pA > pH && pA > pD) pick = `فوز ${m.away_team}`;
+      if (pD > pH && pD > pA) pick = "التعادل";
+
+      text += `• <b>${m.home_team} × ${m.away_team}</b> (${m.league_name})\n`;
+      text += `  الموعد: ${timeStr} | التوقع: <b>${pick}</b> (${conf}% ثقة)\n`;
+      text += `  الاحتمالات: ${pH}% / ${pD}% / ${pA}%\n\n`;
+    }
+  } else {
+    text += `لا تتوفر مباريات مجدولة خلال الساعات القادمة.\nيمكنك متابعة جداول الترتيب والتحليلات عبر المنصة.\n\n`;
+  }
+
+  text += `المزيد عبر المنصة: https://taqdeer.app`;
+  return text;
+}
+
+async function broadcastToAllSubscribers() {
+  try {
+    const subscribers = db.query(`SELECT chat_id FROM telegram_subscribers`).all() as { chat_id: number }[];
+    if (!subscribers.length) return;
+
+    const message = getConciseHighlights();
+    const keyboard = {
+      inline_keyboard: [
+        [{ text: "فتح منصة تقدير", url: "https://taqdeer.app" }],
+      ],
+    };
+
+    console.log(`🤖 [30-Min Broadcast] Sending update to ${subscribers.length} subscriber(s)...`);
+    for (const sub of subscribers) {
+      await sendMessage(sub.chat_id, message, keyboard);
+      await new Promise((r) => setTimeout(r, 100));
+    }
+  } catch (err) {
+    console.error("Broadcast error:", err);
+  }
 }
 
 async function sendMessage(chatId: number, text: string, replyMarkup?: unknown) {
@@ -169,12 +239,12 @@ async function sendMessage(chatId: number, text: string, replyMarkup?: unknown) 
 const MAIN_KEYBOARD = {
   inline_keyboard: [
     [
-      { text: "⚽ مباريات اليوم", callback_data: "cmd_today" },
-      { text: "🔮 المباريات القادمة", callback_data: "cmd_upcoming" },
+      { text: "مباريات اليوم", callback_data: "cmd_today" },
+      { text: "المباريات القادمة", callback_data: "cmd_upcoming" },
     ],
     [
-      { text: "📊 من نحن والمنهجية", callback_data: "cmd_methodology" },
-      { text: "🌐 زيارة منصة «تقدير»", url: "https://taqdeer.app" },
+      { text: "المنهجية الحسابية", callback_data: "cmd_methodology" },
+      { text: "منصة «تقدير»", url: "https://taqdeer.app" },
     ],
   ],
 };
@@ -232,13 +302,12 @@ async function handleUpdate(update: TelegramUpdate) {
     const text = (msg.text || "").trim();
 
     if (text.startsWith("/start") || text.startsWith("/help")) {
-      const welcome = `<b>مرحباً بك في بوت منصة «تقدير» ⚽📊</b>\n\nتم تفعيل اشتراكك التلقائي لاستلام أحدث التوقعات اليومية والتنبيهات المباشرة!\n\nنظام التحليل الرياضي والتنبؤ الخوارزمي المتقدم لمباريات كرة القدم بالاعتماد على نماذج <i>Dixon-Coles</i>، <i>Pi-ratings</i>، وتتبع حركة أسعار المحترفين.\n\nإليك توقعات ومباريات اليوم:`;
+      const welcome = `<b>مرحباً بك في منصة «تقدير» ⚽</b>\n\nتم تفعيل اشتراكك لتلقي التحديثات التلقائية المختصرة كل 30 دقيقة لأبرز المباريات والتوقعات.\n\nإليك التوقعات لمباريات اليوم:`;
       await sendMessage(chatId, welcome, MAIN_KEYBOARD);
 
-      // 🔔 إرسال ملخص التوقعات فورياً للمستخدم بمجرد التفعيل!
       const matches = getTodayMatches();
       if (matches.length) {
-        let reply = `🚀 <b>التوقعات الخوارزمية الفورية لمباريات اليوم:</b>\n\n`;
+        let reply = `<b>التوقعات الخوارزمية لمباريات اليوم:</b>\n\n`;
         reply += matches.map((m) => formatMatchCard(m)).join("\n──────────────\n");
         await sendMessage(chatId, reply, MAIN_KEYBOARD);
       }
@@ -248,10 +317,10 @@ async function handleUpdate(update: TelegramUpdate) {
     if (text.startsWith("/today") || text.startsWith("/matches") || text === "المباريات") {
       const matches = getTodayMatches();
       if (!matches.length) {
-        await sendMessage(chatId, "📋 لا تتوفر مباريات مسجلة لهذا اليوم حالياً.", MAIN_KEYBOARD);
+        await sendMessage(chatId, "لا تتوفر مباريات مسجلة لهذا اليوم حالياً.", MAIN_KEYBOARD);
         return;
       }
-      let reply = `📋 <b>مباريات اليوم والتوقعات الخوارزمية:</b>\n\n`;
+      let reply = `<b>مباريات اليوم والتوقعات:</b>\n\n`;
       reply += matches.map((m) => formatMatchCard(m)).join("\n──────────────\n");
       await sendMessage(chatId, reply, MAIN_KEYBOARD);
       return;
@@ -260,10 +329,10 @@ async function handleUpdate(update: TelegramUpdate) {
     if (text.startsWith("/upcoming") || text === "القادمة") {
       const matches = getUpcomingMatches();
       if (!matches.length) {
-        await sendMessage(chatId, "🔮 لا تتوفر مباريات قادمة مسجلة.", MAIN_KEYBOARD);
+        await sendMessage(chatId, "لا تتوفر مباريات قادمة مسجلة.", MAIN_KEYBOARD);
         return;
       }
-      let reply = `🔮 <b>المباريات القادمة المجدولة:</b>\n\n`;
+      let reply = `<b>المباريات القادمة المجدولة:</b>\n\n`;
       reply += matches.map((m) => formatMatchCard(m)).join("\n──────────────\n");
       await sendMessage(chatId, reply, MAIN_KEYBOARD);
       return;
@@ -273,10 +342,10 @@ async function handleUpdate(update: TelegramUpdate) {
     if (text && !text.startsWith("/")) {
       const matches = searchMatchesByTeam(text);
       if (!matches.length) {
-        await sendMessage(chatId, `🔍 لم نجد مباريات مطابقة للبحث: "<b>${text}</b>"`, MAIN_KEYBOARD);
+        await sendMessage(chatId, `لم نجد مباريات مطابقة للبحث: "<b>${text}</b>"`, MAIN_KEYBOARD);
         return;
       }
-      let reply = `🔍 <b>نتائج البحث عن "${text}":</b>\n\n`;
+      let reply = `<b>نتائج البحث عن "${text}":</b>\n\n`;
       reply += matches.map((m) => formatMatchCard(m)).join("\n──────────────\n");
       await sendMessage(chatId, reply, MAIN_KEYBOARD);
       return;
@@ -290,16 +359,16 @@ async function handleUpdate(update: TelegramUpdate) {
 
     if (data === "cmd_today") {
       const matches = getTodayMatches();
-      let reply = `📋 <b>مباريات اليوم والتوقعات:</b>\n\n`;
+      let reply = `<b>مباريات اليوم والتوقعات:</b>\n\n`;
       reply += matches.length ? matches.map((m) => formatMatchCard(m)).join("\n──────────────\n") : "لا تتوفر مباريات اليوم حالياً.";
       await sendMessage(chatId, reply, MAIN_KEYBOARD);
     } else if (data === "cmd_upcoming") {
       const matches = getUpcomingMatches();
-      let reply = `🔮 <b>المباريات القادمة المجدولة:</b>\n\n`;
+      let reply = `<b>المباريات القادمة المجدولة:</b>\n\n`;
       reply += matches.length ? matches.map((m) => formatMatchCard(m)).join("\n──────────────\n") : "لا تتوفر مباريات قادمة.";
       await sendMessage(chatId, reply, MAIN_KEYBOARD);
     } else if (data === "cmd_methodology") {
-      const text = `📊 <b>منهجية «تقدير» في تحليل المباريات:</b>\n\nتعتمد منصتنا على دمج 4 محركات رياضية مستقلة:\n1. <b>Dixon-Coles:</b> لحساب معاملات الهجوم والدفاع وقوة التهديف.\n2. <b>Pi-ratings & Elo:</b> لتقييم وتتبع الأداء التاريخي والفورم.\n3. <b>Sharp Money Flow:</b> رصد حركة السيولة بأسواق المحترفين.\n4. <b>Temperature Scaling:</b> معايرة الاحتمالات الخالية من التسريب.`;
+      const text = `<b>منهجية «تقدير» التحليلية:</b>\n\nتعتمد منصتنا على دمج 4 محركات رياضية مستقلة:\n1. <b>Dixon-Coles:</b> لحساب معاملات الهجوم والدفاع وقوة التهديف.\n2. <b>Pi-ratings & Elo:</b> لتقييم الأداء التاريخي والفورم.\n3. <b>De-margined Odds:</b> قراءة الاحتمالات بعد إزالة هامش ربح المراهن.\n4. <b>Temperature Scaling:</b> معايرة الاحتمالات الخالية من التسريب.`;
       await sendMessage(chatId, text, MAIN_KEYBOARD);
     }
   }
@@ -324,4 +393,9 @@ async function pollUpdates() {
   }
 }
 
+// ⏰ Start 30-minute recurring broadcast loop (1,800,000 ms)
+const THIRTY_MINUTES_MS = 30 * 60 * 1000;
+setInterval(broadcastToAllSubscribers, THIRTY_MINUTES_MS);
+
+// Start polling
 pollUpdates();
