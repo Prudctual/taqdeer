@@ -11,22 +11,38 @@ interface PlayerInfo {
   isHome: boolean;
 }
 
-// قائمة النجوم الحقيقيين للأندية الأكثر شيوعاً
+// قائمة النجوم الحقيقيين للأندية بمختلف الدوريات
 const KNOWN_PLAYERS: Record<
   string,
   Array<{ name: string; number: string; position: string; rating: string; xg: string; initials: string }>
 > = {
-  جونبوك: [
-    { name: "سونغ مين كيو", number: "10", position: "صانع ألعاب", rating: "1740", xg: "+2.85", initials: "SM" },
-    { name: "إيرنانتيس", number: "9", position: "مهاجم صريح", rating: "1725", xg: "+2.40", initials: "HR" },
+  غانغوون: [
+    { name: "يانغ مين هيوك", number: "47", position: "وسط مهاجم / جناح", rating: "1785", xg: "+2.95", initials: "YM" },
+    { name: "لي سانغ هون", number: "10", position: "مهاجم صريح", rating: "1760", xg: "+2.60", initials: "LS" },
+  ],
+  غانغون: [
+    { name: "يانغ مين هيوك", number: "47", position: "وسط مهاجم / جناح", rating: "1785", xg: "+2.95", initials: "YM" },
+    { name: "لي سانغ هون", number: "10", position: "مهاجم صريح", rating: "1760", xg: "+2.60", initials: "LS" },
   ],
   بوتشيون: [
     { name: "نيلسون جونيور", number: "6", position: "مدافع محوري", rating: "1680", xg: "+1.95", initials: "NJ" },
     { name: "رودريغو باساني", number: "10", position: "مهاجم أيسر", rating: "1695", xg: "+2.10", initials: "RB" },
   ],
+  جونبوك: [
+    { name: "سونغ مين كيو", number: "10", position: "صانع ألعاب", rating: "1740", xg: "+2.85", initials: "SM" },
+    { name: "إيرنانتيس", number: "9", position: "مهاجم صريح", rating: "1725", xg: "+2.40", initials: "HR" },
+  ],
   سيول: [
     { name: "جيسي لينجارد", number: "10", position: "وسط مهاجم", rating: "1765", xg: "+3.15", initials: "JL" },
     { name: "تشو يونغ ووك", number: "11", position: "مهاجم أيمن", rating: "1720", xg: "+2.30", initials: "CY" },
+  ],
+  أولسان: [
+    { name: "أوم وون سانغ", number: "11", position: "جناح أيمن", rating: "1755", xg: "+2.75", initials: "OW" },
+    { name: "جو مين كيو", number: "18", position: "رأس حربة", rating: "1745", xg: "+2.50", initials: "JM" },
+  ],
+  بوهانغ: [
+    { name: "بايك سونغ دونغ", number: "7", position: "صانع ألعاب", rating: "1730", xg: "+2.40", initials: "BS" },
+    { name: "هيتشيم", number: "9", position: "مهاجم", rating: "1715", xg: "+2.20", initials: "HC" },
   ],
   مدريد: [
     { name: "فينيسيوس جونيور", number: "7", position: "مهاجم أيسر", rating: "1940", xg: "+4.12", initials: "VJ" },
@@ -52,13 +68,9 @@ const KNOWN_PLAYERS: Record<
     { name: "هاري كين", number: "9", position: "رأس حربة", rating: "1945", xg: "+4.30", initials: "HK" },
     { name: "جمال موسيالا", number: "42", position: "وسط مهاجم", rating: "1915", xg: "+3.55", initials: "JM" },
   ],
-  الهلال: [
-    { name: "ألكسندر ميتروفيتش", number: "9", position: "رأس حربة", rating: "1850", xg: "+3.80", initials: "AM" },
-    { name: "روبن نيفيز", number: "8", position: "وسط محوري", rating: "1830", xg: "+2.95", initials: "RN" },
-  ],
-  النصر: [
-    { name: "كريستيانو رونالدو", number: "7", position: "مهاجم صريح", rating: "1885", xg: "+4.10", initials: "CR" },
-    { name: "ساديو ماني", number: "10", position: "جناح أيسر", rating: "1835", xg: "+3.10", initials: "SM" },
+  باريس: [
+    { name: "عثمان ديمبيلي", number: "10", position: "جناح أيمن", rating: "1885", xg: "+3.40", initials: "OD" },
+    { name: "برادلي باركولا", number: "29", position: "جناح أيسر", rating: "1860", xg: "+3.10", initials: "BB" },
   ],
 };
 
@@ -121,7 +133,7 @@ export function SquadGridWidget({
           <div
             key={idx}
             className={`press-scale group relative overflow-hidden rounded-2xl border bg-surface p-4 shadow-2xs transition-all hover:border-line-strong cursor-pointer ${
-              p.isHome ? "border-blue-500/20" : "border-rose-500/20"
+              p.isHome ? "border-blue-500/25" : "border-rose-500/25"
             }`}
           >
             {/* Header bar blue for home, red for away */}
