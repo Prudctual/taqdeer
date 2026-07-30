@@ -6,7 +6,7 @@ import { useTheme } from "./ThemeContext";
 
 export function SideSidebarNav() {
   const pathname = usePathname();
-  const { mode, setMode, toggleCustomizer, toggleCommand } = useTheme();
+  const { mode, setMode, toggleCommand } = useTheme();
 
   const navItems = [
     {
@@ -118,17 +118,7 @@ export function SideSidebarNav() {
           </svg>
         </button>
 
-        {/* Customizer Panel */}
-        <button
-          type="button"
-          onClick={toggleCustomizer}
-          title="تخصيص المظهر (Studio)"
-          className="h-10 w-10 rounded-xl flex items-center justify-center text-muted hover:bg-panel hover:text-accent transition-colors cursor-pointer"
-        >
-          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
-          </svg>
-        </button>
+
 
         {/* Dark/Light mode toggle */}
         <button

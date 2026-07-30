@@ -84,7 +84,7 @@ export function SiteSidebar() {
           </div>
           <div className="flex flex-col">
             <span className="font-black text-[0.9375rem] tracking-tight text-ink leading-tight">تقدير</span>
-            <span className="text-[10px] font-bold text-muted leading-tight">Studio v2.4</span>
+            <span className="text-[10px] font-bold text-muted leading-tight">تحليلات متقدمة</span>
           </div>
         </Link>
       </div>
