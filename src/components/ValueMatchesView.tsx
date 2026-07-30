@@ -133,36 +133,38 @@ export function ValueMatchesView({ matches }: { matches: ValueMatchItem[] }) {
         </div>
 
         {/* Scrollable League Tabs Pills Bar */}
-        <div className="flex items-center gap-2 overflow-x-auto scrollbar-none rounded-2xl bg-panel p-2 border border-line">
-          {LEAGUES_CONFIG.map((league) => {
-            const count = leagueCounts[league.id] || 0;
-            const isActive = selectedLeague === league.id;
+        <div className="w-full max-w-full overflow-x-auto scrollbar-none rounded-2xl bg-panel p-2 border border-line" dir="rtl">
+          <div className="flex items-center gap-2 min-w-max">
+            {LEAGUES_CONFIG.map((league) => {
+              const count = leagueCounts[league.id] || 0;
+              const isActive = selectedLeague === league.id;
 
-            return (
-              <button
-                key={league.id}
-                type="button"
-                onClick={() => setSelectedLeague(league.id)}
-                className={`press-scale flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
-                  isActive
-                    ? "bg-surface text-ink border border-emerald-500/50 shadow-xs font-black"
-                    : "text-muted hover:text-ink hover:bg-surface/50 border border-transparent"
-                }`}
-              >
-                <span className="text-sm">{league.icon}</span>
-                <span>{league.name}</span>
-                <span
-                  className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-black ${
+              return (
+                <button
+                  key={league.id}
+                  type="button"
+                  onClick={() => setSelectedLeague(league.id)}
+                  className={`shrink-0 press-scale flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
                     isActive
-                      ? "bg-emerald-500 text-white"
-                      : "bg-surface border border-line text-muted"
+                      ? "bg-surface text-ink border border-emerald-500/60 shadow-xs font-black ring-1 ring-emerald-500/30"
+                      : "text-muted hover:text-ink hover:bg-surface/50 border border-transparent"
                   }`}
                 >
-                  {count}
-                </span>
-              </button>
-            );
-          })}
+                  <span className="text-sm shrink-0">{league.icon}</span>
+                  <span className="shrink-0">{league.name}</span>
+                  <span
+                    className={`shrink-0 px-2 py-0.5 rounded-full text-[10px] font-mono font-black ${
+                      isActive
+                        ? "bg-emerald-500 text-white"
+                        : "bg-surface border border-line text-muted"
+                    }`}
+                  >
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         {/* Search Input Bar */}
