@@ -380,12 +380,20 @@ export function getAvailableSeasons(leagueId: string): string[] {
   const db = getDb();
   const rows = db
     .prepare(
-      `SELECT DISTINCT season FROM standings
-       WHERE league_id = ?
+      `SELECT DISTINCT season FROM (
+         SELECT season FROM standings WHERE league_id = ?
+         UNION
+         SELECT season FROM matches WHERE league_id = ?
+       )
+       WHERE season IS NOT NULL AND season != ''
        ORDER BY season DESC`,
     )
-    .all(leagueId) as Array<{ season: string }>;
-  return rows.map((r) => r.season);
+    .all(leagueId, leagueId) as Array<{ season: string }>;
+  const list = rows.map((r) => r.season);
+  if (leagueId !== "kl1" && !list.includes("2026")) {
+    list.unshift("2026");
+  }
+  return list;
 }
 
 export function getStandings(leagueId: string, seasonParam?: string) {
@@ -743,3 +751,128 @@ export function getMeta(key: string): string | null {
     return null;
   }
 }
+
+export function getValueMatches(): Array<{
+  id: string;
+  league_id: string;
+  league_name_ar: string;
+  home_name_ar: string;
+  away_name_ar: string;
+  utc_date: string;
+  p_home: number;
+  p_draw: number;
+  p_away: number;
+  odds_home: number | null;
+  odds_draw: number | null;
+  odds_away: number | null;
+  analytics_json: string | null;
+}> {
+  try {
+    const db = getDb();
+    const rows = db.prepare(`
+      SELECT m.id, m.league_id, l.name_ar as league_name_ar,
+             ht.name_ar as home_name_ar, at.name_ar as away_name_ar,
+             m.utc_date, p.p_home, p.p_draw, p.p_away,
+             m.odds_home, m.odds_draw, m.odds_away, p.analytics_json
+      FROM predictions p
+      JOIN matches m ON m.id = p.match_id
+      JOIN leagues l ON l.id = m.league_id
+      JOIN teams ht ON ht.id = m.home_team_id
+      JOIN teams at ON at.id = m.away_team_id
+      ORDER BY 
+        CASE WHEN m.status IN ('SCHEDULED', 'TIMED', 'IN_PLAY') THEN 0 ELSE 1 END,
+        m.utc_date DESC
+    `).all() as Array<{
+      id: string;
+      league_id: string;
+      league_name_ar: string;
+      home_name_ar: string;
+      away_name_ar: string;
+      utc_date: string;
+      p_home: number;
+      p_draw: number;
+      p_away: number;
+      odds_home: number | null;
+      odds_draw: number | null;
+      odds_away: number | null;
+      analytics_json: string | null;
+    }>;
+
+    const result: Array<{
+      id: string;
+      league_id: string;
+      league_name_ar: string;
+      home_name_ar: string;
+      away_name_ar: string;
+      utc_date: string;
+      p_home: number;
+      p_draw: number;
+      p_away: number;
+      odds_home: number | null;
+      odds_draw: number | null;
+      odds_away: number | null;
+      analytics_json: string | null;
+    }> = [];
+
+    for (const r of rows) {
+      let analytics: { value?: { ev?: number } } | null = null;
+      if (r.analytics_json) {
+        try {
+          analytics = JSON.parse(r.analytics_json);
+        } catch {}
+      }
+
+      // Check if value exists in analytics JSON or calculate dynamically
+      if (analytics?.value?.ev && analytics.value.ev >= 0.03) {
+        result.push(r);
+        continue;
+      }
+
+      // Dynamic EV Calculation
+      const p_h = r.p_home;
+      const p_d = r.p_draw;
+      const p_a = r.p_away;
+      const o_h = r.odds_home;
+      const o_d = r.odds_draw;
+      const o_a = r.odds_away;
+
+      const ev_h = o_h && p_h ? p_h * o_h - 1 : -1;
+      const ev_d = o_d && p_d ? p_d * o_d - 1 : -1;
+      const ev_a = o_a && p_a ? p_a * o_a - 1 : -1;
+
+      const maxEv = Math.max(ev_h, ev_d, ev_a);
+
+      if (maxEv >= 0.03) {
+        const side: "home" | "draw" | "away" =
+          maxEv === ev_h ? "home" : maxEv === ev_d ? "draw" : "away";
+        const odds = side === "home" ? o_h! : side === "draw" ? o_d! : o_a!;
+        const prob = side === "home" ? p_h : side === "draw" ? p_d : p_a;
+        const b = odds > 1 ? odds - 1 : 1;
+        const q = 1 - prob;
+        const kelly = Math.max(0, (b * prob - q) / b) * 0.25;
+
+        const valueObj = {
+          side,
+          odds,
+          ev: maxEv,
+          stake: kelly,
+          bet: true,
+        };
+
+        const updatedAnalytics = analytics
+          ? { ...analytics, value: valueObj }
+          : { value: valueObj };
+
+        result.push({
+          ...r,
+          analytics_json: JSON.stringify(updatedAnalytics),
+        });
+      }
+    }
+
+    return result;
+  } catch {
+    return [];
+  }
+}
+

@@ -78,7 +78,7 @@ export function NextKickoff({ m }: { m: MatchCard }) {
             {m.leagueNameAr}
           </span>
         </span>
-        <span className="flex flex-wrap items-center gap-x-1.5 text-[11px] tabular text-muted">
+        <span suppressHydrationWarning className="flex flex-wrap items-center gap-x-1.5 text-[11px] tabular text-muted">
           {relative ? (
             <>
               <span className="font-medium text-ink">{relative}</span>

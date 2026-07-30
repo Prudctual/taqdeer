@@ -60,7 +60,9 @@ function getTodayMatches(): MatchRow[] {
     ORDER BY m.utc_date ASC
     LIMIT 15;
   `;
-  return db.query(query).all() as MatchRow[];
+  const matches = db.query(query).all() as MatchRow[];
+  if (matches.length > 0) return matches;
+  return getUpcomingMatches();
 }
 
 function getUpcomingMatches(): MatchRow[] {
@@ -77,7 +79,8 @@ function getUpcomingMatches(): MatchRow[] {
     JOIN teams ht ON ht.id = m.home_team_id
     JOIN teams at ON at.id = m.away_team_id
     LEFT JOIN predictions p ON p.match_id = m.id
-    WHERE m.status = 'TIMED' OR m.status = 'SCHEDULED'
+    WHERE (m.status = 'TIMED' OR m.status = 'SCHEDULED')
+      AND m.utc_date >= datetime('now', '-1 day')
     ORDER BY m.utc_date ASC
     LIMIT 10;
   `;
@@ -145,7 +148,7 @@ function formatMatchCard(m: MatchRow): string {
   return text;
 }
 
-async function sendMessage(chatId: number, text: string, replyMarkup?: any) {
+async function sendMessage(chatId: number, text: string, replyMarkup?: unknown) {
   try {
     const res = await fetch(`${API_URL}/sendMessage`, {
       method: "POST",
@@ -201,7 +204,21 @@ function saveSubscriber(chatId: number, username?: string, firstName?: string) {
   }
 }
 
-async function handleUpdate(update: any) {
+type TelegramUpdate = {
+  message?: {
+    chat: { id: number };
+    from?: { username?: string; first_name?: string };
+    text?: string;
+  };
+  callback_query?: {
+    id: string;
+    data?: string;
+    from?: { username?: string; first_name?: string };
+    message?: { chat: { id: number } };
+  };
+};
+
+async function handleUpdate(update: TelegramUpdate) {
   const user = update.message?.from || update.callback_query?.from;
   const chatId = update.message?.chat?.id || update.callback_query?.message?.chat?.id;
 

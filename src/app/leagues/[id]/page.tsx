@@ -4,15 +4,13 @@ import type { ReactNode } from "react";
 import { Crest } from "@/components/Crest";
 import { MatchList } from "@/components/MatchList";
 import { RevealOnView } from "@/components/RevealOnView";
+import { BankerPicksWidget } from "@/components/BankerPicksWidget";
 import {
   BackBar,
-  Chip,
   EmptyState,
-  MetaItem,
-  PageHeader,
   PageNav,
-  SectionCard,
 } from "@/components/ui";
+
 import {
   getLeagueMatches,
   getLeagueMatchCounts,
@@ -22,23 +20,102 @@ import {
   getStandingsSeason,
   getStrengthTable,
 } from "@/lib/queries";
+import { leagueEmblemUrl, tournamentEmblemUrl, type TournamentType } from "@/lib/leagues";
 
 export const revalidate = 300;
 
-type Zone = { color: string; label: string };
+type Zone = {
+  color: string;
+  bgColor: string;
+  textColor: string;
+  positionBgColor: string;
+  positionTextColor: string;
+  borderColor: string;
+  label: string;
+  tournamentType?: TournamentType;
+};
 
-/** نطاق الترتيب — خط بدء 2px فقط، لا خلفية ملوّنة */
-function zoneOf(position: number, total: number): Zone | null {
-  if (position <= 4) return { color: "var(--success)", label: "المراكز 1–4" };
-  if (total >= 8 && position >= total - 2)
-    return { color: "var(--danger)", label: "منطقة الهبوط" };
+function zoneOf(leagueId: string, position: number, total: number): Zone | null {
+  if (leagueId === "kl1") {
+    if (position === 1) {
+      return {
+        color: "#0284c7",
+        bgColor: "bg-sky-500/10 hover:bg-sky-500/20",
+        textColor: "text-sky-500 font-black",
+        positionBgColor: "bg-sky-500/20",
+        positionTextColor: "text-sky-500",
+        borderColor: "border-sky-500/30",
+        label: "دوري أبطال آسيا للنخبة",
+        tournamentType: "acl_elite",
+      };
+    }
+    if (position === 2 || position === 3) {
+      return {
+        color: "#0d9488",
+        bgColor: "bg-teal-500/10 hover:bg-teal-500/20",
+        textColor: "text-teal-500 font-black",
+        positionBgColor: "bg-teal-500/20",
+        positionTextColor: "text-teal-500",
+        borderColor: "border-teal-500/30",
+        label: "دوري أبطال آسيا 2",
+        tournamentType: "acl_2",
+      };
+    }
+    if (total >= 6 && position >= total - 1) {
+      return {
+        color: "#dc2626",
+        bgColor: "bg-rose-500/10 hover:bg-rose-500/20",
+        textColor: "text-rose-500 font-black",
+        positionBgColor: "bg-rose-500/20",
+        positionTextColor: "text-rose-500",
+        borderColor: "border-rose-500/30",
+        label: "مرحلة الهبوط / التصفيات",
+      };
+    }
+    return null;
+  }
+
+  if (position <= 4) {
+    return {
+      color: "#0056b3",
+      bgColor: "bg-blue-500/10 hover:bg-blue-500/20",
+      textColor: "text-blue-500 font-black",
+      positionBgColor: "bg-blue-500/20",
+      positionTextColor: "text-blue-500",
+      borderColor: "border-blue-500/30",
+      label: "دوري أبطال أوروبا",
+      tournamentType: "ucl",
+    };
+  }
+  if (position === 5 || position === 6) {
+    return {
+      color: "#ff6600",
+      bgColor: "bg-orange-500/10 hover:bg-orange-500/20",
+      textColor: "text-orange-500 font-black",
+      positionBgColor: "bg-orange-500/20",
+      positionTextColor: "text-orange-500",
+      borderColor: "border-orange-500/30",
+      label: "الدوري الأوروبي",
+      tournamentType: "uel",
+    };
+  }
+  if (total >= 8 && position >= total - 2) {
+    return {
+      color: "#dc2626",
+      bgColor: "bg-rose-500/10 hover:bg-rose-500/20",
+      textColor: "text-rose-500 font-black",
+      positionBgColor: "bg-rose-500/20",
+      positionTextColor: "text-rose-500",
+      borderColor: "border-rose-500/30",
+      label: "منطقة الهبوط",
+    };
+  }
   return null;
 }
 
-/** ترويسة عمود رقمي — وسط ومختصر */
 function NumTh({ children, full }: { children: ReactNode; full?: string }) {
   return (
-    <th scope="col" className="table-num" style={{ textAlign: "center" }}>
+    <th scope="col" className="px-3 py-3 text-center text-xs font-black text-ink uppercase">
       {full ? (
         <abbr title={full} className="no-underline">
           {children}
@@ -50,7 +127,6 @@ function NumTh({ children, full }: { children: ReactNode; full?: string }) {
   );
 }
 
-/** صف في قائمة مرتّبة — رتبة، فريق، مقياس صغير، قيمة */
 function MeterRow({
   rank,
   teamId,
@@ -65,24 +141,23 @@ function MeterRow({
   pct: number;
 }) {
   return (
-    <li className="flex items-center gap-2.5 border-b border-line py-1.5 last:border-b-0">
-      <span className="w-4 shrink-0 tabular text-[11px] text-faint">{rank}</span>
+    <li className="flex items-center gap-3 border-b border-line py-2.5 last:border-b-0">
+      <span className="w-5 shrink-0 text-center font-mono font-extrabold text-xs text-faint">
+        {rank}
+      </span>
       <Link
         href={`/team/${teamId}`}
-        className="motion-colors min-w-0 flex-1 truncate rounded-sm text-xs text-ink no-underline hover:text-accent"
+        className="min-w-0 flex-1 truncate text-xs font-black text-ink no-underline hover:text-accent transition-colors"
       >
         {name}
       </Link>
-      <span
-        className="h-1 w-10 shrink-0 overflow-hidden rounded-[1px] bg-panel sm:w-12"
-        aria-hidden
-      >
-        <span
-          className="meter-fill block h-full bg-accent"
-          style={{ width: `${pct}%` }}
+      <div className="h-2 w-16 sm:w-20 shrink-0 overflow-hidden rounded-full bg-panel" aria-hidden>
+        <div
+          className="h-full bg-accent rounded-full transition-all"
+          style={{ width: `${Math.max(5, pct)}%` }}
         />
-      </span>
-      <span className="w-10 shrink-0 text-end tabular text-[11px] text-muted">
+      </div>
+      <span className="w-12 shrink-0 text-end font-mono font-extrabold text-xs text-muted">
         {value}
       </span>
     </li>
@@ -92,19 +167,26 @@ function MeterRow({
 function RankedList({
   title,
   hint,
+  icon,
   children,
 }: {
   title: string;
   hint: string;
+  icon: string;
   children: ReactNode;
 }) {
   return (
-    <div className="min-w-0">
-      <div className="flex items-baseline justify-between gap-2 border-b border-line-strong pb-1.5">
-        <h3 className="text-xs font-semibold text-ink">{title}</h3>
-        <span className="text-[11px] text-faint">{hint}</span>
+    <div className="bg-panel/50 p-4 rounded-2xl border border-line min-w-0 space-y-2">
+      <div className="flex items-center justify-between border-b border-line pb-2">
+        <h3 className="text-xs font-black text-ink flex items-center gap-1.5">
+          <span>{icon}</span>
+          <span>{title}</span>
+        </h3>
+        <span className="text-[10px] font-extrabold text-muted bg-surface px-2 py-0.5 rounded-md border border-line">
+          {hint}
+        </span>
       </div>
-      <ol className="mt-1">{children}</ol>
+      <ol>{children}</ol>
     </div>
   );
 }
@@ -131,9 +213,10 @@ export default async function LeaguePage({
   if (!league) notFound();
 
   const availableSeasons = getAvailableSeasons(id);
-  const activeSeason = (selectedSeasonParam && availableSeasons.includes(selectedSeasonParam))
-    ? selectedSeasonParam
-    : (availableSeasons[0] || getStandingsSeason(id) || "2025");
+  const activeSeason =
+    selectedSeasonParam && availableSeasons.includes(selectedSeasonParam)
+      ? selectedSeasonParam
+      : availableSeasons[0] || getStandingsSeason(id) || "2025";
 
   const standings = getStandings(id, activeSeason);
   const strengths = getStrengthTable(id);
@@ -141,7 +224,8 @@ export default async function LeaguePage({
   const counts = getLeagueMatchCounts(id);
   const n = standings.length;
 
-  const totalFinishedMatchesInSeason = standings.reduce((acc, r) => acc + r.played, 0) / 2;
+  const totalFinishedMatchesInSeason =
+    standings.reduce((acc, r) => acc + r.played, 0) / 2;
 
   const maxAttack = Math.max(...strengths.map((t) => t.attack ?? 0), 0.01);
   const maxDefenseAbs = Math.max(
@@ -164,26 +248,10 @@ export default async function LeaguePage({
   );
 
   const leader = standings[0] ?? null;
-  const eloLeader = standings.reduce(
-    (best, r) => (!best || r.elo > best.elo ? r : best),
-    null as (typeof standings)[0] | null,
-  );
-  const sharpestAtk = strengths.reduce(
-    (best, t) =>
-      !best || (t.attack ?? -Infinity) > (best.attack ?? -Infinity) ? t : best,
-    null as (typeof strengths)[0] | null,
-  );
-  const firmestDef = strengths.reduce(
-    (best, t) =>
-      !best ||
-      Math.abs(t.defense ?? Infinity) < Math.abs(best.defense ?? Infinity)
-        ? t
-        : best,
-    null as (typeof strengths)[0] | null,
-  );
 
   return (
     <div className="space-y-6">
+      {/* Header & Nav */}
       <div>
         <PageNav
           backHref="/leagues"
@@ -194,100 +262,174 @@ export default async function LeaguePage({
             { label: league.name_ar },
           ]}
         />
-        <PageHeader
-          title={league.name_ar}
-          description={`${league.country_ar} · ${league.name_en}`}
-          leagueId={league.id}
-          meta={
-            activeSeason || n > 0 ? (
-              <>
-                {activeSeason ? <MetaItem label="الموسم" value={activeSeason} /> : null}
-                {n > 0 ? <MetaItem label="فرق" value={n} /> : null}
-                <MetaItem label="نتائج" value={totalFinishedMatchesInSeason > 0 ? totalFinishedMatchesInSeason : (counts.finished || 306)} />
-              </>
-            ) : null
-          }
-        />
-      </div>
 
-      {/* 1. شعارات الدوريات الدائرية الكبيرة مرفوعة للأعلى */}
-      <nav aria-label="تبديل الدوري" className="flex flex-wrap items-center justify-center gap-5 sm:gap-6 py-2">
-        {leagues.map((l) => (
-          <Chip
-            key={l.id}
-            href={`/leagues/${l.id}`}
-            active={l.id === id}
-            leagueId={l.id}
-            hint={l.name_en}
-          >
-            {l.name_ar}
-          </Chip>
-        ))}
-      </nav>
-
-      {/* 2. شريط اختيار المواسم بتصميم عصري راقٍ دون أصفر */}
-      {availableSeasons.length > 0 ? (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line/80 bg-panel/90 p-3.5 shadow-sm backdrop-blur-sm">
-          <div className="flex flex-wrap items-center gap-2.5">
-            <span className="text-xs font-bold text-muted">اختر الموسم:</span>
-            <div className="flex flex-wrap items-center gap-2">
-              {availableSeasons.slice(0, 5).map((s) => {
-                const isActive = s === activeSeason;
-                return (
-                  <Link
-                    key={s}
-                    href={`/leagues/${id}?season=${s}`}
-                    className={`rounded-full px-4 py-1.5 text-xs font-black transition-all ${
-                      isActive
-                        ? "bg-blue-600 text-white shadow-md ring-2 ring-blue-400/60 border border-blue-400 scale-105"
-                        : "bg-zinc-900/90 text-zinc-300 border border-zinc-800 hover:bg-zinc-800 hover:text-white"
-                    }`}
-                  >
-                    {s}
-                  </Link>
-                );
-              })}
+        {/* Hero Card for League */}
+        <div className="bg-surface p-6 sm:p-8 rounded-2xl border border-line shadow-xs flex flex-wrap items-center justify-between gap-6">
+          <div className="flex items-center gap-4">
+            <div className="p-3 rounded-xl bg-panel border border-line">
+              <Crest
+                src={leagueEmblemUrl(league.code)}
+                alt={league.name_ar}
+                size="md"
+                shape="soft"
+                fallback={league.name_ar.slice(0, 1)}
+              />
+            </div>
+            <div className="space-y-1">
+              <span className="text-xs font-black text-accent bg-accent-dim/40 px-3 py-0.5 rounded-full border border-accent/20">
+                {league.country_ar}
+              </span>
+              <h1 className="text-2xl sm:text-4xl font-black text-ink tracking-tight">
+                {league.name_ar}
+              </h1>
+              <p className="text-xs font-semibold text-faint font-mono" dir="ltr">
+                {league.name_en}
+              </p>
             </div>
           </div>
-          <div className="text-xs font-bold text-zinc-300">
-            جدول الترتيب — موسم {activeSeason}
+
+          <div className="flex flex-wrap items-center gap-2 text-xs font-black">
+            <span className="bg-panel text-ink px-3.5 py-1.5 rounded-full shadow-2xs border border-line">
+              موسم {activeSeason}
+            </span>
+            {n > 0 && (
+              <span className="bg-panel text-ink px-3.5 py-1.5 rounded-full shadow-2xs border border-line">
+                {n} فريقاً
+              </span>
+            )}
+            <span className="bg-panel text-ink px-3.5 py-1.5 rounded-full shadow-2xs border border-line">
+              {totalFinishedMatchesInSeason > 0
+                ? `${totalFinishedMatchesInSeason} مباراة مكتملة`
+                : `${counts.finished || 306} مباراة`}
+            </span>
           </div>
         </div>
-      ) : null}
+      </div>
 
-      <SectionCard
-        title="جدول الترتيب"
-        leagueId={league.id}
-        subtitle={
-          leader
-            ? `الصدارة: ${leader.name_ar} · ${leader.points} نقطة${
-                eloLeader ? ` · Elo الأقوى: ${eloLeader.name_ar}` : ""
-              }`
-            : activeSeason
-              ? `موسم ${activeSeason} · النقاط الرسمية + Elo الحالي`
-              : "النقاط الرسمية + Elo الحالي"
-        }
-        flush
-      >
+      {/* Top Leagues Selector Pills */}
+      <nav aria-label="تبديل الدوري" className="flex flex-wrap items-center justify-center gap-2.5 py-1">
+        {leagues.map((l) => {
+          const isActive = l.id === id;
+          return (
+            <Link
+              key={l.id}
+              href={`/leagues/${l.id}`}
+              className={`press-scale px-4 py-2 rounded-full text-xs font-black no-underline transition-all duration-200 ${
+                isActive
+                  ? "bg-accent text-white shadow-sm scale-105"
+                  : "bg-surface text-ink hover:bg-panel hover:text-accent border border-line shadow-2xs"
+              }`}
+            >
+              {l.name_ar}
+            </Link>
+          );
+        })}
+      </nav>
+
+      {/* Seasons Selector */}
+      {availableSeasons.length > 0 && (
+        <div className="bg-surface p-4 sm:p-5 rounded-2xl border border-line shadow-xs space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <span className="text-xs font-black text-ink">المواسم المتاحة:</span>
+            <span className="text-xs font-black text-accent bg-accent-dim/40 px-3 py-1 rounded-full border border-accent/20">
+              {activeSeason === "2026"
+                ? "التحضير للموسم القادم (2026/2027)"
+                : `جدول الترتيب الرسمي — موسم ${activeSeason}`}
+            </span>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 pt-1">
+            {availableSeasons.map((s) => {
+              const isActive = s === activeSeason;
+              const isUpcoming = s === "2026";
+              return (
+                <Link
+                  key={s}
+                  href={`/leagues/${id}?season=${s}`}
+                  className={`px-4 py-2 rounded-full text-xs font-mono font-black no-underline transition-all ${
+                    isActive
+                      ? "bg-accent !text-white shadow-sm border-0 scale-105"
+                      : isUpcoming
+                      ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/30 hover:bg-emerald-500/20"
+                      : "bg-panel text-ink hover:bg-panel/80 border border-line"
+                  }`}
+                >
+                  {isUpcoming ? "التحضير للموسم القادم 2026 ⏳" : `موسم ${s}`}
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Standings Table Section */}
+      <div className="card bg-surface p-5 sm:p-7 rounded-2xl border border-line shadow-xs space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line pb-3">
+          <div className="space-y-0.5">
+            <h2 className="text-base sm:text-lg font-black text-ink tracking-tight">
+              {activeSeason === "2026"
+                ? "التحضير للموسم القادم (2026/2027)"
+                : "جدول ترتيب الفرق"}
+            </h2>
+            <p className="text-xs text-muted font-medium">
+              {activeSeason === "2026"
+                ? "جاهزية النموذج وتصنيفات القوة الأولية والمباريات التحضيرية"
+                : leader
+                ? `الصدارة: ${leader.name_ar} برصيد ${leader.points} نقطة`
+                : `المواسم الرسمية وتقييم Elo النماذج`}
+            </p>
+          </div>
+          <span className="text-xs font-black text-muted bg-panel px-3 py-1 rounded-full border border-line">
+            {activeSeason === "2026" ? "التحضير للموسم الجاري" : "محدث أوتوماتيكياً"}
+          </span>
+        </div>
+
         {n === 0 ? (
-          <EmptyState
-            title="لا ترتيب بعد"
-            body="عند توفّر ترتيب الموسم من المصدر يظهر الجدول هنا."
-          />
-        ) : (
-          <>
-            <div className="overflow-x-auto">
-              <table className="table-clean min-w-[34rem]">
-                <caption className="sr-only">
-                  {`ترتيب ${league.name_ar}${activeSeason ? ` — موسم ${activeSeason}` : ""}`}
-                </caption>
-                <thead>
-                  <tr>
-                    <NumTh full="المركز">#</NumTh>
-                    <th
-                      scope="col"
-                      className="min-w-[8.5rem] sm:min-w-[11rem]"
+          <div className="bg-panel/50 p-6 sm:p-8 rounded-2xl border border-line space-y-6 text-center">
+            <div className="inline-flex items-center justify-center h-14 w-14 rounded-2xl bg-emerald-500/10 text-emerald-500 font-black text-2xl shadow-2xs">
+              ⏳
+            </div>
+            <div className="max-w-md mx-auto space-y-2">
+              <h3 className="text-lg font-black text-ink">
+                التحضير للموسم القادم (2026/2027)
+              </h3>
+              <p className="text-xs font-semibold text-muted leading-relaxed">
+                يجري حالياً تجهيز جداول المباريات والمعايرة النهائية لمعاملات قوة الهجوم والدفاع وتقييمات Elo الافتتاحية للموسم الجاري.
+              </p>
+            </div>
+
+            {/* Strengths Preview Grid */}
+            {strengths.length > 0 && (
+              <div className="space-y-3 text-start border-t border-line pt-6">
+                <h4 className="text-xs font-black text-ink">
+                  تصنيفات القوة الأولية المتوقعة للأندية ({strengths.length} نادياً):
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {strengths.slice(0, 12).map((t) => (
+                    <div
+                      key={t.id}
+                      className="bg-surface p-3 rounded-xl border border-line flex items-center justify-between text-xs"
                     >
+                      <div className="flex items-center gap-2.5">
+                        <Crest alt={t.name_ar} size="xs" />
+                        <span className="font-black text-ink">{t.name_ar}</span>
+                      </div>
+                      <span className="font-mono font-black text-ink bg-panel px-2 py-0.5 rounded-md border border-line">
+                        {Math.round(t.elo)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="overflow-x-auto rounded-xl border border-line">
+              <table className="w-full text-xs border-collapse">
+                <thead>
+                  <tr className="bg-panel border-b border-line">
+                    <NumTh full="المركز">#</NumTh>
+                    <th scope="col" className="px-4 py-3 text-start text-xs font-black text-ink min-w-[10rem]">
                       الفريق
                     </th>
                     <NumTh full="لعب">ل</NumTh>
@@ -299,28 +441,43 @@ export default async function LeaguePage({
                     <NumTh full="تقييم Elo">Elo</NumTh>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className="divide-y divide-line">
                   {standings.map((r) => {
-                    const zone = zoneOf(r.position, n);
+                    const zone = zoneOf(id, r.position, n);
+                    const isRelegation = zone?.label === "منطقة الهبوط" || zone?.label === "مرحلة الهبوط / التصفيات";
+                    const isQualified = !!zone && !isRelegation;
+
                     return (
-                      <tr key={r.team_id}>
+                      <tr
+                        key={r.team_id}
+                        className={`transition-colors font-black ${
+                          zone
+                            ? zone.bgColor
+                            : "hover:bg-panel/50 text-ink"
+                        }`}
+                      >
                         <td
-                          className="table-num text-muted"
+                          className={`px-3 py-3 text-center font-mono font-black ${
+                            zone
+                              ? `${zone.positionTextColor} ${zone.positionBgColor}`
+                              : "text-muted"
+                          }`}
                           style={
                             zone
-                              ? { borderInlineStart: `2px solid ${zone.color}` }
+                              ? { borderInlineStart: `5px solid ${zone.color}` }
                               : undefined
                           }
                         >
                           {r.position}
-                          {zone ? (
-                            <span className="sr-only"> — {zone.label}</span>
-                          ) : null}
                         </td>
-                        <td>
+                        <td className="px-4 py-3 font-black">
                           <Link
                             href={`/team/${r.team_id}`}
-                            className="motion-colors flex min-w-0 items-center gap-2 rounded-sm font-medium no-underline hover:text-accent"
+                            className={`flex items-center gap-2.5 no-underline transition-colors ${
+                              zone
+                                ? zone.textColor
+                                : "text-ink hover:text-accent"
+                            }`}
                           >
                             <Crest
                               src={r.crest_url}
@@ -329,21 +486,30 @@ export default async function LeaguePage({
                               fallback={String(r.position)}
                             />
                             <span className="truncate">{r.name_ar}</span>
+
+                            {isQualified && zone?.tournamentType && (
+                              <div className="ms-auto shrink-0" title={zone.label}>
+                                <Crest
+                                  src={tournamentEmblemUrl(zone.tournamentType)}
+                                  alt={zone.label}
+                                  size="xs"
+                                  shape="circle"
+                                />
+                              </div>
+                            )}
                           </Link>
                         </td>
-                        <td className="table-num">{r.played}</td>
-                        <td className="table-num">{r.won}</td>
-                        <td className="table-num">{r.drawn}</td>
-                        <td className="table-num">{r.lost}</td>
-                        <td className="table-num text-muted">
-                          {r.goal_difference > 0
-                            ? `+${r.goal_difference}`
-                            : r.goal_difference}
+                        <td className="px-3 py-3 text-center font-mono font-bold text-muted">{r.played}</td>
+                        <td className="px-3 py-3 text-center font-mono font-bold text-ink">{r.won}</td>
+                        <td className="px-3 py-3 text-center font-mono font-bold text-muted">{r.drawn}</td>
+                        <td className="px-3 py-3 text-center font-mono font-bold text-muted">{r.lost}</td>
+                        <td className="px-3 py-3 text-center font-mono font-bold text-muted">
+                          {r.goal_difference > 0 ? `+${r.goal_difference}` : r.goal_difference}
                         </td>
-                        <td className="table-num font-semibold text-ink">
+                        <td className="px-3 py-3 text-center font-mono font-black text-sm text-accent">
                           {r.points}
                         </td>
-                        <td className="table-num text-muted">
+                        <td className="px-3 py-3 text-center font-mono font-extrabold text-ink">
                           {Math.round(r.elo)}
                         </td>
                       </tr>
@@ -352,44 +518,44 @@ export default async function LeaguePage({
                 </tbody>
               </table>
             </div>
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-line px-4 py-2.5 text-[11px] text-muted">
-              <span className="inline-flex items-center gap-1.5">
-                <span
-                  className="h-3 w-0.5 shrink-0"
-                  style={{ background: "var(--success)" }}
-                  aria-hidden
-                />
-                <span className="tabular">المراكز 1–4</span>
-              </span>
-              <span className="inline-flex items-center gap-1.5">
-                <span
-                  className="h-3 w-0.5 shrink-0"
-                  style={{ background: "var(--danger)" }}
-                  aria-hidden
-                />
-                منطقة الهبوط
-              </span>
-            </div>
-          </>
-        )}
-      </SectionCard>
 
-      <SectionCard
-        title="قوة النموذج"
-        leagueId={league.id}
-        subtitle={
-          sharpestAtk && firmestDef
-            ? `أخطر هجوم: ${sharpestAtk.name_ar} · أصلب دفاع: ${firmestDef.name_ar} · هجوم أعلى = أخطر · دفاع أقرب للصفر = أصلب`
-            : "هجوم أعلى = أخطر · دفاع أقرب للصفر = أصلب"
-        }
-      >
+            <div className="flex flex-wrap items-center gap-4 text-xs font-bold text-muted pt-1">
+              {(() => {
+                const seen = new Map<string, string>();
+                standings.forEach((r) => {
+                  const z = zoneOf(id, r.position, n);
+                  if (z && !seen.has(z.label)) seen.set(z.label, z.color);
+                });
+                return Array.from(seen.entries()).map(([label, color]) => (
+                  <span key={label} className="flex items-center gap-1.5">
+                    <span className="h-3.5 w-1.5 rounded-full" style={{ backgroundColor: color }} />
+                    <span>{label}</span>
+                  </span>
+                ));
+              })()}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Model Strengths Section */}
+      <div className="card bg-surface p-5 sm:p-7 rounded-2xl border border-line shadow-xs space-y-4">
+        <div className="border-b border-line pb-3">
+          <h2 className="text-base sm:text-lg font-black text-ink tracking-tight">
+            معاملات قوة النماذج الأوتوماتيكية
+          </h2>
+          <p className="text-xs text-muted font-medium">
+            مقارنة النماذج لقوة التصنيف التراكمي Elo، الأداء الهجومي، والصلابة الدفاعية.
+          </p>
+        </div>
+
         {strengths.length === 0 ? (
-          <p className="text-sm text-muted">
-            لا معاملات قوة لهذا الدوري بعد — تظهر بعد أول جولة مكتملة.
+          <p className="text-xs text-muted">
+            لا تتوفر معاملات قوة كافية لهذا الدوري بعد.
           </p>
         ) : (
-          <RevealOnView className="grid gap-x-6 gap-y-6 sm:grid-cols-2 lg:grid-cols-3">
-            <RankedList title="تقييم Elo" hint="الأعلى أولاً">
+          <RevealOnView className="grid gap-4 sm:grid-cols-3">
+            <RankedList title="تقييم Elo التراكمي" hint="الأعلى أولاً" icon="📈">
               {byElo.map((t, i) => (
                 <MeterRow
                   key={t.id}
@@ -402,7 +568,7 @@ export default async function LeaguePage({
               ))}
             </RankedList>
 
-            <RankedList title="الهجوم" hint="الأخطر أولاً">
+            <RankedList title="القوة الهجومية" hint="الأخطر أولاً" icon="⚔️">
               {byAttack.map((t, i) => (
                 <MeterRow
                   key={t.id}
@@ -418,7 +584,7 @@ export default async function LeaguePage({
               ))}
             </RankedList>
 
-            <RankedList title="الدفاع" hint="الأقرب للصفر أولاً">
+            <RankedList title="الصلابة الدفاعية" hint="الأقرب للصفر أولاً" icon="🛡️">
               {byDefense.map((t, i) => (
                 <MeterRow
                   key={t.id}
@@ -435,18 +601,27 @@ export default async function LeaguePage({
             </RankedList>
           </RevealOnView>
         )}
-      </SectionCard>
+      </div>
 
-      <SectionCard
-        title="مباريات الدوري"
-        subtitle="أقرب 40 موعداً ثم آخر 20 نتيجة"
-        leagueId={league.id}
-        flush
-      >
+      {/* Banker Picks Section */}
+      <BankerPicksWidget title={`أأمن 4 توقعات لـ ${league.name_ar}`} />
+
+      {/* League Matches Section */}
+      <div className="card bg-surface p-5 sm:p-7 rounded-2xl border border-line shadow-xs space-y-4">
+
+        <div className="border-b border-line pb-3">
+          <h2 className="text-base sm:text-lg font-black text-ink tracking-tight">
+            جدول ومواعيد مباريات الدوري
+          </h2>
+          <p className="text-xs text-muted font-medium">
+            أقرب المواعيد القادمة وآخر نتائج المباريات المكتملة
+          </p>
+        </div>
+
         {matches.length === 0 ? (
           <EmptyState
-            title="لا مباريات بعد"
-            body="عند نشر جدول الجولة القادمة أو نتائج حديثة تظهر هنا."
+            title="لا توجد مباريات مسجلة"
+            body="عند نشر جدول الجولة القادمة يظهر هنا تلقائياً."
           />
         ) : (
           <MatchList
@@ -456,7 +631,7 @@ export default async function LeaguePage({
             groupDays
           />
         )}
-      </SectionCard>
+      </div>
 
       <BackBar
         links={[

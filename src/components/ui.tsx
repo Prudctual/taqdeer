@@ -177,21 +177,23 @@ export function SectionCard({
   return (
     <section className="card overflow-hidden" data-league={tone}>
       {(title || headerRight) && (
-        <div className="card-head relative flex items-center justify-center text-center">
-          <div className="min-w-0 text-center">
+        <div className="card-head relative flex flex-col items-center justify-center text-center p-4 sm:p-5 border-b border-line">
+          <div className="min-w-0 text-center max-w-2xl mx-auto space-y-0.5">
             {title ? (
               <h2
                 className={
                   quiet
-                    ? "text-sm font-medium text-muted"
-                    : "type-section text-ink"
+                    ? "text-sm sm:text-base font-extrabold text-ink tracking-tight"
+                    : "text-base sm:text-lg font-black text-ink tracking-tight"
                 }
               >
                 {title}
               </h2>
             ) : null}
             {subtitle ? (
-              <p className="card-head-sub mx-auto">{subtitle}</p>
+              <p className="text-xs font-semibold text-muted max-w-xl mx-auto leading-relaxed">
+                {subtitle}
+              </p>
             ) : null}
           </div>
           {headerRight ? <div className="absolute left-4 shrink-0">{headerRight}</div> : null}

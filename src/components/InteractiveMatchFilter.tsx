@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { TargetIcon, ZapIcon, FlameIcon } from "./Icons";
 
 export type FilterSortOption = "all" | "confidence" | "sharp" | "elo";
 
@@ -23,34 +24,34 @@ export function InteractiveMatchFilter({ onFilterChange }: MatchFilterProps) {
   }
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line/80 bg-panel/90 p-3 shadow-sm">
+    <div className="bg-surface p-4 rounded-2xl border border-line shadow-xs flex flex-wrap items-center justify-between gap-3">
       {/* Search Input */}
       <div className="relative min-w-[14rem] flex-1">
         <input
           type="text"
-          placeholder="ابحث باسم الفريق (مثل: بايرن، أولسان...)"
+          placeholder="ابحث باسم الفريق (مثل: بايرن، ريال مدريد...)"
           value={searchQuery}
           onChange={(e) => handleSearchChange(e.target.value)}
-          className="w-full rounded-lg border border-line bg-zinc-950 px-3 py-1.5 pr-8 text-xs text-ink placeholder-muted transition-colors duration-150 ease-out focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          className="w-full rounded-xl border border-line bg-panel px-4 py-2 ps-9 text-xs font-bold text-ink placeholder-faint transition-all duration-140 focus:border-accent focus:bg-surface focus:outline-none focus:ring-2 focus:ring-accent-dim"
         />
         <svg
-          className="absolute right-2.5 top-2.5 h-3.5 w-3.5 text-muted pointer-events-none"
+          className="absolute start-3 top-2.5 h-4 w-4 text-faint pointer-events-none"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
         >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
         </svg>
       </div>
 
       {/* Filter Options */}
-      <div className="flex flex-wrap items-center gap-1.5">
+      <div className="flex flex-wrap items-center gap-2">
         <button
           onClick={() => handleSortSelect("all")}
-          className={`rounded-full px-3 py-1 text-xs font-bold transition-all duration-150 ease-out active:scale-95 ${
+          className={`flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-black transition-all duration-140 active:scale-[0.97] cursor-pointer ${
             selectedSort === "all"
-              ? "bg-blue-600 text-white shadow-sm ring-1 ring-blue-400"
-              : "bg-zinc-900 text-zinc-400 border border-zinc-800 hover:text-white"
+              ? "bg-accent text-white shadow-xs border-0"
+              : "bg-panel text-muted hover:bg-surface hover:text-ink border border-line"
           }`}
         >
           جميع المواعيد
@@ -58,35 +59,38 @@ export function InteractiveMatchFilter({ onFilterChange }: MatchFilterProps) {
 
         <button
           onClick={() => handleSortSelect("confidence")}
-          className={`rounded-full px-3 py-1 text-xs font-bold transition-all duration-150 ease-out active:scale-95 ${
+          className={`flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-black transition-all duration-140 active:scale-[0.97] cursor-pointer ${
             selectedSort === "confidence"
-              ? "bg-blue-600 text-white shadow-sm ring-1 ring-blue-400"
-              : "bg-zinc-900 text-zinc-400 border border-zinc-800 hover:text-white"
+              ? "bg-accent text-white shadow-xs border-0"
+              : "bg-panel text-muted hover:bg-surface hover:text-ink border border-line"
           }`}
         >
-          🎯 أعلى نسبة ثقة
+          <TargetIcon size={14} />
+          <span>أعلى نسبة ثقة</span>
         </button>
 
         <button
           onClick={() => handleSortSelect("sharp")}
-          className={`rounded-full px-3 py-1 text-xs font-bold transition-all duration-150 ease-out active:scale-95 ${
+          className={`flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-black transition-all duration-140 active:scale-[0.97] cursor-pointer ${
             selectedSort === "sharp"
-              ? "bg-blue-600 text-white shadow-sm ring-1 ring-blue-400"
-              : "bg-zinc-900 text-zinc-400 border border-zinc-800 hover:text-white"
+              ? "bg-accent text-white shadow-xs border-0"
+              : "bg-panel text-muted hover:bg-surface hover:text-ink border border-line"
           }`}
         >
-          ⚡ حراك الأسواق
+          <ZapIcon size={14} />
+          <span>حراك الأسواق</span>
         </button>
 
         <button
           onClick={() => handleSortSelect("elo")}
-          className={`rounded-full px-3 py-1 text-xs font-bold transition-all duration-150 ease-out active:scale-95 ${
+          className={`flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-black transition-all duration-140 active:scale-[0.97] cursor-pointer ${
             selectedSort === "elo"
-              ? "bg-blue-600 text-white shadow-sm ring-1 ring-blue-400"
-              : "bg-zinc-900 text-zinc-400 border border-zinc-800 hover:text-white"
+              ? "bg-accent text-white shadow-xs border-0"
+              : "bg-panel text-muted hover:bg-surface hover:text-ink border border-line"
           }`}
         >
-          🔥 أقوى المواجهات Elo
+          <FlameIcon size={14} />
+          <span>أقوى المواجهات Elo</span>
         </button>
       </div>
     </div>

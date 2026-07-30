@@ -100,7 +100,7 @@ function getSubscribedChatIds(): string[] {
   try {
     const rows = db.query(`SELECT chat_id FROM telegram_subscribers`).all() as { chat_id: number }[];
     return rows.map((r) => String(r.chat_id));
-  } catch (e) {
+  } catch {
     return [];
   }
 }

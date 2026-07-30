@@ -38,10 +38,10 @@ export function MatchListHeader({
     >
       <span className="text-center">الموعد</span>
 
-      <span className="grid grid-cols-[1fr_2.25rem_2rem_2.25rem_1fr] items-center gap-1 sm:gap-2 text-center">
-        <span className="text-end">مضيف</span>
-        <span className="col-span-3 text-center text-faint">المباراة</span>
-        <span className="text-start">ضيف</span>
+      <span className="grid grid-cols-[1fr_3.5rem_1fr] items-center gap-2 text-center font-bold">
+        <span className="text-start">المضيف</span>
+        <span className="text-center text-faint">VS</span>
+        <span className="text-end">الضيف</span>
       </span>
 
       <span className="text-center">احتمال 1X2</span>

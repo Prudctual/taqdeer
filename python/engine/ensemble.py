@@ -15,8 +15,12 @@ from .dixon_coles import (
 )
 from .elo import elo_outcome_probs
 from .form import TeamForm, form_lambda_adjust
+from .logistics_engine import evaluate_logistics_and_external_factors
 from .pi_ratings import PiState, pi_expected_goals
 from .player_impact import apply_rapm_to_xg
+from .strengths_weaknesses import analyze_team_strengths_weaknesses
+from .tactical_matchup import evaluate_tactical_matchup
+
 
 Prob3 = Tuple[float, float, float]
 
@@ -202,6 +206,40 @@ def predict_match(
     if home_missing or away_missing:
         lam, mu = apply_rapm_to_xg(lam, mu, home_missing, away_missing)
 
+    # Tactical Style Clash & Compatibility Adjustment
+    tactics = evaluate_tactical_matchup(home, away)
+    lam *= float(tactics["home_lambda_mult"])
+    mu *= float(tactics["away_lambda_mult"])
+
+    # Logistics & External Travel Adjustments
+    logistics = evaluate_logistics_and_external_factors(home_team=home, away_team=away)
+    lam *= float(logistics["home_lambda_mult"])
+    mu *= float(logistics["away_lambda_mult"])
+
+    # Opponent Strengths & Weaknesses Analysis
+    sw_home = analyze_team_strengths_weaknesses(
+        team_name=home,
+        gf_avg=form_home.gf,
+        ga_avg=form_home.ga,
+        xg_avg=lam,
+        xga_avg=mu,
+        home_win_rate=0.55 if elo_home > elo_away else 0.40,
+        away_win_rate=0.35,
+        clean_sheets_pct=0.35 if form_home.ga <= 1.0 else 0.20,
+        rest_days=form_home.rest_days,
+    )
+    sw_away = analyze_team_strengths_weaknesses(
+        team_name=away,
+        gf_avg=form_away.gf,
+        ga_avg=form_away.ga,
+        xg_avg=mu,
+        xga_avg=lam,
+        home_win_rate=0.50,
+        away_win_rate=0.45 if elo_away > elo_home else 0.25,
+        clean_sheets_pct=0.35 if form_away.ga <= 1.0 else 0.20,
+        rest_days=form_away.rest_days,
+    )
+
     # Tight contest detection: close Elo ratings & low goal disparity
     elo_diff = abs(elo_home - elo_away)
     is_tight = elo_diff < 55 or abs(lam - mu) < 0.25
@@ -211,6 +249,7 @@ def predict_match(
         mu *= 0.95
 
     mat = score_matrix(lam, mu, dc.rho)
+
     mk = markets_from_matrix(mat)
     dc_p = (mk["p_home"], mk["p_draw"], mk["p_away"])
 
@@ -297,6 +336,10 @@ def predict_match(
             },
             "market": {"p": market_p, "odds": market_odds},
             "shots_dc": {"lambda": [lam_sh, mu_sh]} if lam_sh is not None else None,
+            "tactics": tactics,
+            "logistics": logistics,
+            "home_sw": sw_home,
+            "away_sw": sw_away,
             "blended_pre_cal": blended,
             "temperature": temperature,
         },
@@ -304,3 +347,4 @@ def predict_match(
         "value": value,
         "weights": w,
     }
+

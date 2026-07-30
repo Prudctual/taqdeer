@@ -1,4 +1,4 @@
-"use client";
+import Image from "next/image";
 
 interface Player {
   name: string;
@@ -63,9 +63,11 @@ export function PlayerCascadeStack() {
             }}
           >
             {/* Player SVG Image */}
-            <img
+            <Image
               src={p.photoUrl}
               alt={p.name}
+              width={64}
+              height={64}
               className="h-full w-full rounded-full object-cover transition-transform duration-300 group-hover:scale-105"
             />
           </div>

@@ -47,31 +47,41 @@ export function formatRelativeDay(iso: string, now = new Date()): string | null 
   return null;
 }
 
+export function cleanSpace(str: string): string {
+  return str.replace(/[\u00a0\u202f\u2007\u200b]/g, " ").replace(/\s+/g, " ").trim();
+}
+
 export function formatMatchTime(iso: string): string {
-  return new Intl.DateTimeFormat("ar", {
-    timeZone: DISPLAY_TZ,
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(parseDate(iso));
+  return cleanSpace(
+    new Intl.DateTimeFormat("ar", {
+      timeZone: DISPLAY_TZ,
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(parseDate(iso))
+  );
 }
 
 /** يوم مختصر: ١٥ أغسطس */
 export function formatShortDate(iso: string): string {
-  return new Intl.DateTimeFormat("ar", {
-    timeZone: DISPLAY_TZ,
-    day: "numeric",
-    month: "short",
-  }).format(parseDate(iso));
+  return cleanSpace(
+    new Intl.DateTimeFormat("ar", {
+      timeZone: DISPLAY_TZ,
+      day: "numeric",
+      month: "short",
+    }).format(parseDate(iso))
+  );
 }
 
 /** يوم كامل بدون وقت: السبت ١٥ أغسطس */
 export function formatLongDate(iso: string): string {
-  return new Intl.DateTimeFormat("ar", {
-    timeZone: DISPLAY_TZ,
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-  }).format(parseDate(iso));
+  return cleanSpace(
+    new Intl.DateTimeFormat("ar", {
+      timeZone: DISPLAY_TZ,
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+    }).format(parseDate(iso))
+  );
 }
 
 /** عنوان سكة الأيام: اليوم · السبت ١٥ أغسطس */
@@ -91,11 +101,13 @@ export function formatMatchDate(iso: string, now = new Date()): string {
 
 /** ختم زمني للميتا (آخر تدريب) */
 export function formatMetaStamp(iso: string): string {
-  return new Intl.DateTimeFormat("ar", {
-    timeZone: DISPLAY_TZ,
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(parseDate(iso));
+  return cleanSpace(
+    new Intl.DateTimeFormat("ar", {
+      timeZone: DISPLAY_TZ,
+      dateStyle: "medium",
+      timeStyle: "short",
+    }).format(parseDate(iso))
+  );
 }
 
 function pluralAr(
@@ -228,3 +240,6 @@ export function actualOutcome(
   if (awayGoals > homeGoals) return "A";
   return "D";
 }
+
+
+

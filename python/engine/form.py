@@ -109,6 +109,72 @@ def rolling_form(
     return out
 
 
+def multi_window_form(
+    matches: List[FormMatch], windows: Tuple[int, ...] = (3, 5, 10)
+) -> Dict[str, Dict[int, TeamForm]]:
+    """Return rolling form across multiple match windows (e.g. 3, 5, 10 matches)."""
+    result: Dict[str, Dict[int, TeamForm]] = defaultdict(dict)
+    for w in windows:
+        f_w = rolling_form(matches, window=w)
+        for tid, tf in f_w.items():
+            result[tid][w] = tf
+    return result
+
+
+def tiered_form(
+    matches: List[FormMatch], elo_map: Dict[str, float]
+) -> Dict[str, Dict[str, Dict[str, float]]]:
+    """
+    Calculate team performance split by opponent strength tier:
+    - vs_strong: Opponent Elo >= 1650
+    - vs_mid: Opponent Elo 1500 - 1649
+    - vs_weak: Opponent Elo < 1500
+    """
+    stats: Dict[str, Dict[str, Dict[str, float]]] = defaultdict(
+        lambda: {
+            "vs_strong": {"played": 0, "pts": 0, "gf": 0, "ga": 0},
+            "vs_mid": {"played": 0, "pts": 0, "gf": 0, "ga": 0},
+            "vs_weak": {"played": 0, "pts": 0, "gf": 0, "ga": 0},
+        }
+    )
+
+    for m in matches:
+        home_elo = elo_map.get(m.home, 1500.0)
+        away_elo = elo_map.get(m.away, 1500.0)
+
+        # Home team vs Away team tier
+        tier_for_home = "vs_strong" if away_elo >= 1650 else "vs_mid" if away_elo >= 1500 else "vs_weak"
+        hp = 3 if m.home_goals > m.away_goals else 1 if m.home_goals == m.away_goals else 0
+        stats[m.home][tier_for_home]["played"] += 1
+        stats[m.home][tier_for_home]["pts"] += hp
+        stats[m.home][tier_for_home]["gf"] += m.home_goals
+        stats[m.home][tier_for_home]["ga"] += m.away_goals
+
+        # Away team vs Home team tier
+        tier_for_away = "vs_strong" if home_elo >= 1650 else "vs_mid" if home_elo >= 1500 else "vs_weak"
+        ap = 3 if m.away_goals > m.home_goals else 1 if m.home_goals == m.away_goals else 0
+        stats[m.away][tier_for_away]["played"] += 1
+        stats[m.away][tier_for_away]["pts"] += ap
+        stats[m.away][tier_for_away]["gf"] += m.away_goals
+        stats[m.away][tier_for_away]["ga"] += m.home_goals
+
+    # Compute averages per tier
+    out: Dict[str, Dict[str, Dict[str, float]]] = {}
+    for tid, tdict in stats.items():
+        out[tid] = {}
+        for tier_key, data in tdict.items():
+            n = max(1, int(data["played"]))
+            out[tid][tier_key] = {
+                "played": data["played"],
+                "ppm": round(data["pts"] / n, 2),
+                "gf_avg": round(data["gf"] / n, 2),
+                "ga_avg": round(data["ga"] / n, 2),
+                "win_rate": round(data["pts"] / (3.0 * n), 2) if data["played"] > 0 else 0.0,
+            }
+
+    return out
+
+
 def form_lambda_adjust(form_home: TeamForm, form_away: TeamForm) -> Tuple[float, float]:
     """
     Multiplicative adjustment to expected goals from recent form.
@@ -130,4 +196,5 @@ def form_lambda_adjust(form_home: TeamForm, form_away: TeamForm) -> Tuple[float,
         mu_mult *= 0.95
 
     return float(min(max(lam_mult, 0.70), 1.35)), float(min(max(mu_mult, 0.70), 1.35))
+
 

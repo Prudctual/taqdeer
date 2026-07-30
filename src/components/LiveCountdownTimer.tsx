@@ -40,50 +40,53 @@ export function LiveCountdownTimer({ targetDate, className = "", showBadge = tru
 
   if (timeLeft.isPast) {
     return (
-      <div className={`inline-flex items-center gap-2 rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-bold text-emerald-400 border border-emerald-500/20 ${className}`}>
-        <span className="relative flex h-2 w-2">
+      <div className={`inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3.5 py-1 text-xs font-black text-emerald-700 border border-emerald-200/80 shadow-2xs ${className}`}>
+        <span className="relative flex h-2.5 w-2.5">
           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-          <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+          <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-600"></span>
         </span>
-        مباراة جارية أو منتهية حديثاً
+        مباراة جارية أو منتهية
       </div>
     );
   }
 
   return (
-    <div className={`flex flex-wrap items-center gap-3 ${className}`}>
+    <div className={`flex flex-wrap items-center gap-2.5 ${className}`}>
       {showBadge ? (
-        <div className="inline-flex items-center gap-1.5 rounded-full bg-blue-500/10 px-2.5 py-1 text-[11px] font-bold text-blue-400 border border-blue-500/20">
-          <span className="h-1.5 w-1.5 rounded-full bg-blue-400 animate-pulse" />
-          عدّاد تنازلي حقيقي
+        <div className="inline-flex items-center gap-2 rounded-full bg-rose-50 px-3.5 py-1 text-xs font-black text-accent border border-rose-200/60 shadow-2xs">
+          <span className="relative flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75" />
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-accent" />
+          </span>
+          ينطلق خلال:
         </div>
       ) : null}
 
       <div className="flex items-center gap-1.5 dir-ltr font-mono text-xs font-bold">
         {timeLeft.days > 0 ? (
-          <div className="flex items-center gap-1 rounded-md bg-zinc-900 px-2 py-1 border border-zinc-800 text-zinc-200">
-            <span>{timeLeft.days}</span>
-            <span className="text-[10px] text-zinc-500 font-sans">يوم</span>
+          <div className="flex items-center gap-1 rounded-xl bg-slate-100 px-2.5 py-1 border border-slate-200/80 text-slate-900 shadow-2xs">
+            <span className="font-extrabold">{timeLeft.days}</span>
+            <span className="text-[11px] text-slate-500 font-sans font-bold">يوم</span>
           </div>
         ) : null}
 
-        <div className="flex items-center gap-1 rounded-md bg-zinc-900 px-2 py-1 border border-zinc-800 text-zinc-200">
-          <span>{String(timeLeft.hours).padStart(2, "0")}</span>
-          <span className="text-[10px] text-zinc-500 font-sans">س</span>
+        <div className="flex items-center gap-1 rounded-xl bg-slate-100 px-2.5 py-1 border border-slate-200/80 text-slate-900 shadow-2xs">
+          <span className="font-extrabold">{String(timeLeft.hours).padStart(2, "0")}</span>
+          <span className="text-[11px] text-slate-500 font-sans font-bold">س</span>
         </div>
 
-        <span className="text-zinc-600">:</span>
+        <span className="text-slate-400 font-bold">:</span>
 
-        <div className="flex items-center gap-1 rounded-md bg-zinc-900 px-2 py-1 border border-zinc-800 text-zinc-200">
-          <span>{String(timeLeft.minutes).padStart(2, "0")}</span>
-          <span className="text-[10px] text-zinc-500 font-sans">د</span>
+        <div className="flex items-center gap-1 rounded-xl bg-slate-100 px-2.5 py-1 border border-slate-200/80 text-slate-900 shadow-2xs">
+          <span className="font-extrabold">{String(timeLeft.minutes).padStart(2, "0")}</span>
+          <span className="text-[11px] text-slate-500 font-sans font-bold">د</span>
         </div>
 
-        <span className="text-zinc-600">:</span>
+        <span className="text-slate-400 font-bold">:</span>
 
-        <div className="flex items-center gap-1 rounded-md bg-zinc-900 px-2 py-1 border border-blue-500/40 text-blue-400 bg-blue-500/5">
-          <span>{String(timeLeft.seconds).padStart(2, "0")}</span>
-          <span className="text-[10px] text-blue-500/70 font-sans">ث</span>
+        <div className="flex items-center gap-1 rounded-xl bg-rose-600 px-2.5 py-1 text-white shadow-xs transition-transform duration-200 active:scale-95">
+          <span className="font-black animate-pulse">{String(timeLeft.seconds).padStart(2, "0")}</span>
+          <span className="text-[11px] text-rose-100 font-sans font-bold">ث</span>
         </div>
       </div>
     </div>

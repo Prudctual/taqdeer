@@ -1,12 +1,8 @@
 import { RevealOnView } from "./RevealOnView";
 import { confidenceLabel, pct, pctCss } from "@/lib/format";
+import { FlameIcon } from "./Icons";
 
-const GLYPH = { H: "1", D: "X", A: "2" } as const;
-const TONE = {
-  H: "var(--home)",
-  D: "var(--draw)",
-  A: "var(--away)",
-} as const;
+
 
 /** سطر ثقة هادئ تحت شريط الاحتمال */
 export function ConfidenceMeter({
@@ -78,59 +74,66 @@ export function LambdaCompare({
   const delta = home - away;
   const lead =
     Math.abs(delta) < 0.08
-      ? "تكافؤ هجومي متوقع"
+      ? "تكافؤ هجومي متوقع بين الطرفين"
       : delta > 0
-        ? `${homeName ?? "المضيف"} أعلى بـ ${delta.toFixed(2)} λ`
-        : `${awayName ?? "الضيف"} أعلى بـ ${Math.abs(delta).toFixed(2)} λ`;
+        ? `${homeName ?? "المضيف"} أعلى بـ ${delta.toFixed(2)} هدف`
+        : `${awayName ?? "الضيف"} أعلى بـ ${Math.abs(delta).toFixed(2)} هدف`;
 
   const sides = [
     {
       key: "H" as const,
       name: homeName ?? "مضيف",
       value: home,
+      color: "#2563eb",
+      badge: "المضيف",
     },
     {
       key: "A" as const,
       name: awayName ?? "ضيف",
       value: away,
+      color: "#e11d48",
+      badge: "الضيف",
     },
   ];
 
   return (
-    <RevealOnView className="min-w-0 space-y-3.5">
-      <div>
-        <p className="type-label">أهداف متوقعة λ</p>
-        <p className="mt-1 text-sm font-medium text-ink">{lead}</p>
-        <p className="mt-0.5 text-[11px] text-muted">نسبي لأقوى λ في المواجهة</p>
+    <RevealOnView className="min-w-0 space-y-4 p-4 sm:p-5">
+      {/* Lead Banner */}
+      <div className="rounded-xl border border-line bg-panel p-3.5 text-center space-y-0.5">
+        <span className="text-[10px] font-bold text-muted block uppercase">مستخلص المقارنة التهديفية</span>
+        <p className="text-sm sm:text-base font-black text-ink">{lead}</p>
       </div>
-      <dl className="space-y-2.5">
-        {sides.map((s) => (
-          <div key={s.key} className="flex items-center gap-2.5">
-            <dt
-              className="flex w-[5.5rem] shrink-0 items-center gap-1.5 text-[11px] text-muted"
-              title={s.name}
-            >
-              <span className="tabular font-medium text-ink">
-                {GLYPH[s.key]}
-              </span>
-              <span className="min-w-0 truncate">{s.name}</span>
-            </dt>
-            <dd className="flex min-w-0 flex-1 items-center gap-2.5">
-              <div className="prob-track h-1.5 flex-1">
+
+      {/* Bars */}
+      <dl className="space-y-3.5">
+        {sides.map((s) => {
+          const isHome = s.key === "H";
+          return (
+            <div key={s.key} className="space-y-1.5">
+              <div className="flex items-center justify-between text-xs">
+                <dt className="flex items-center gap-2">
+                  <span className={`h-2 w-2 rounded-full ${isHome ? "bg-blue-600" : "bg-rose-600"}`} />
+                  <span className={`font-black ${isHome ? "text-blue-600 dark:text-blue-400" : "text-rose-600 dark:text-rose-400"}`}>
+                    {s.name}
+                  </span>
+                </dt>
+                <dd className="font-mono font-black text-ink text-sm tabular">
+                  {s.value.toFixed(2)} هدف
+                </dd>
+              </div>
+
+              <div className="h-2.5 w-full rounded-full bg-panel overflow-hidden border border-line">
                 <div
-                  className="meter-fill h-full"
+                  className="meter-fill h-full rounded-full transition-all duration-500"
                   style={{
                     width: pctCss(s.value / max),
-                    background: TONE[s.key],
+                    background: s.color,
                   }}
                 />
               </div>
-              <span className="w-10 text-end text-xs font-semibold tabular text-ink">
-                {s.value.toFixed(2)}
-              </span>
-            </dd>
-          </div>
-        ))}
+            </div>
+          );
+        })}
       </dl>
     </RevealOnView>
   );
@@ -148,7 +151,6 @@ export function FormBars({
   awayPts?: number;
   homeGd?: number;
   awayGd?: number;
-  /** قراءة المزيج — مفتاح متفق / خالف مع اتجاه الفورم */
   pickKey?: "H" | "D" | "A";
 }) {
   if (homePts == null && awayPts == null) return null;
@@ -156,46 +158,42 @@ export function FormBars({
   const a = awayPts ?? 0;
   const close = Math.abs(h - a) < 0.05;
   const formLead = close
-    ? "فورم متقارب"
+    ? "مستوى وتألق الفريقين متقارب جداً في المباريات الأخيرة"
     : h > a
-      ? "فورم المضيف أقوى"
-      : "فورم الضيف أقوى";
+    ? "الفريق المضيف يعيش فترة تألق واستقرار أفضل"
+    : "الفريق الضيف يعيش فترة تألق واستقرار أفضل";
   const formSide: "H" | "D" | "A" = close ? "D" : h > a ? "H" : "A";
   const agrees = pickKey != null && formSide === pickKey;
 
   return (
-    <div className="border-t border-line px-4 py-3.5 sm:px-5">
-      <p className="text-[11px] text-muted">
-        <span className="font-medium text-ink">{formLead}</span>
-        <span className="mx-1.5 text-line" aria-hidden>
-          ·
-        </span>
-        <span>متوسط نقاط آخر المباريات</span>
-        {pickKey != null ? (
-          <>
-            <span className="mx-1.5 text-line" aria-hidden>
-              ·
-            </span>
-            <span
-              className={`verdict-chip ${
-                agrees ? "verdict-chip-hit" : "verdict-chip-miss"
-              }`}
-            >
-              {agrees ? "متفق" : "خالف"}
-            </span>
-            <span> مع القراءة</span>
-          </>
-        ) : null}
-      </p>
-      <dl className="mt-3 grid gap-3 sm:grid-cols-2 sm:gap-6">
-        <FormSide label="فورم المضيف" pts={h} gd={homeGd} side="H" />
-        <FormSide label="فورم الضيف" pts={a} gd={awayGd} side="A" />
-      </dl>
+    <div className="border-t border-line/60 p-4 sm:p-5 space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <span className="p-1 bg-panel rounded text-ink">
+            <FlameIcon size={16} />
+          </span>
+          <span className="text-xs font-black text-ink">{formLead}</span>
+        </div>
+        {pickKey != null && (
+          <span
+            className={`text-xs font-black px-3 py-1 rounded-full border-0 ${
+              agrees ? "bg-accent-dim text-accent" : "bg-panel text-muted"
+            }`}
+          >
+            {agrees ? "متفق مع التوقعات" : "مختلف قليلاً"}
+          </span>
+        )}
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <FormCard label="أداء المضيف (المباريات الأخيرة)" pts={h} gd={homeGd} side="H" />
+        <FormCard label="أداء الضيف (المباريات الأخيرة)" pts={a} gd={awayGd} side="A" />
+      </div>
     </div>
   );
 }
 
-function FormSide({
+function FormCard({
   label,
   pts,
   gd,
@@ -206,80 +204,31 @@ function FormSide({
   gd?: number;
   side: "H" | "A";
 }) {
-  const filled = Math.round(Math.min(3, Math.max(0, pts)) * (5 / 3));
+  const ratingText = pts >= 2.0 ? "ممتاز جداً" : pts >= 1.2 ? "جيد ومستقر" : "ضعيف ومتراجع";
+  const isHome = side === "H";
   return (
-    <div className="flex min-w-0 flex-wrap items-baseline justify-between gap-x-2 gap-y-1.5 text-[11px]">
-      <dt className="flex min-w-0 items-center gap-1.5 text-muted">
-        <span className="tabular font-medium text-ink">{GLYPH[side]}</span>
-        <span className="truncate">{label}</span>
-      </dt>
-      <dd className="tabular text-ink">
-        {pts.toFixed(2)} نق/م
-        {gd != null ? ` · GD ${gd.toFixed(1)}` : ""}
-      </dd>
-      <dd className="flex w-full gap-1" aria-hidden>
-        {Array.from({ length: 5 }, (_, i) => (
-          <span
-            key={i}
-            className="h-1.5 flex-1 rounded-[2px]"
-            style={{
-              background: i < filled ? TONE[side] : "var(--panel)",
-            }}
-          />
-        ))}
-      </dd>
-    </div>
-  );
-}
-
-/** سطر القراءة الأرجح أعلى ورقة الاحتمالات */
-export function VerdictBanner({
-  pickLabel,
-  pickPct,
-  pickKey,
-  confidence,
-  homeName,
-  awayName,
-}: {
-  pickLabel: string;
-  pickPct: number;
-  pickKey: "H" | "D" | "A";
-  confidence: number;
-  homeName: string;
-  awayName: string;
-}) {
-  const who =
-    pickKey === "H" ? homeName : pickKey === "A" ? awayName : "التعادل";
-
-  return (
-    <div className="flex flex-col gap-2 px-4 py-3.5 sm:flex-row sm:items-baseline sm:justify-between sm:gap-6 sm:px-5">
-      <div className="min-w-0">
-        <p className="type-label">القراءة الأرجح</p>
-        <p className="mt-1.5 flex flex-wrap items-baseline gap-x-2 gap-y-1">
-          <span
-            className="pick-chip self-center"
-            style={{ background: TONE[pickKey] }}
-          >
-            {GLYPH[pickKey]}
-          </span>
-          <span className="text-base font-semibold text-ink">{pickLabel}</span>
-          <span
-            className="text-base font-semibold tabular"
-            style={{ color: TONE[pickKey] }}
-          >
-            {pct(pickPct)}
-          </span>
-          <span className="text-line" aria-hidden>
-            ·
-          </span>
-          <span className="min-w-0 truncate text-sm text-muted" title={who}>
-            {who}
-          </span>
-        </p>
+    <div className={`rounded-xl p-4 space-y-2 border shadow-2xs transition-all ${
+      isHome 
+        ? "bg-surface border-blue-500/20" 
+        : "bg-surface border-rose-500/20"
+    }`}>
+      <div className="flex items-center justify-between text-xs">
+        <span className={`font-black ${isHome ? "text-blue-600 dark:text-blue-400" : "text-rose-600 dark:text-rose-400"}`}>
+          {label}
+        </span>
+        <span className="font-mono font-extrabold text-ink">{pts.toFixed(2)} / 3</span>
       </div>
-      <p className="shrink-0 text-[11px] text-muted sm:text-end">
-        {confidenceLabel(confidence)}
-      </p>
+
+      <div className="flex items-center justify-between text-[11px]">
+        <span className="font-bold text-muted">
+          تقييم النسبة: <strong className="text-ink">{ratingText}</strong>
+        </span>
+        {gd != null && (
+          <span className="font-mono text-muted font-medium">
+            الفارق: {gd > 0 ? `+${gd}` : gd}
+          </span>
+        )}
+      </div>
     </div>
   );
 }

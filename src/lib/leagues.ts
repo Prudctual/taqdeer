@@ -106,6 +106,22 @@ export function leagueEmblemUrl(code: string) {
   return `https://crests.football-data.org/${upper}.png`;
 }
 
+export type TournamentType = "ucl" | "uel" | "acl_elite" | "acl_2";
+
+/** شعار البطولة المعتمدة (دوري الأبطال والدوري الأوروبي ودوري أبطال آسيا) */
+export function tournamentEmblemUrl(type: TournamentType) {
+  if (type === "ucl") {
+    return "https://crests.football-data.org/CL.png";
+  }
+  if (type === "uel") {
+    return "https://crests.football-data.org/EL.png";
+  }
+  if (type === "acl_elite") {
+    return "https://upload.wikimedia.org/wikipedia/commons/thumb/6/69/AFC_Champions_League_Elite_logo.svg/120px-AFC_Champions_League_Elite_logo.svg.png";
+  }
+  return "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/AFC_Champions_League_Two_logo.svg/120px-AFC_Champions_League_Two_logo.svg.png";
+}
+
 /** football-data.co.uk season path segment, e.g. 2324 for 2023-24 */
 export function ukSeasonPath(startYear: number): string {
   const a = String(startYear).slice(2);

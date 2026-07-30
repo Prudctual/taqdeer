@@ -31,9 +31,11 @@ from engine.ensemble import (  # noqa: E402
 from engine.evaluate import summarize  # noqa: E402
 from engine.form import FormMatch, TeamForm, rolling_form  # noqa: E402
 from engine.pi_ratings import PiMatch, update_pi  # noqa: E402
+from engine.player_provider import get_missing_players  # noqa: E402
 from engine.referee_engine import predict_referee_impact  # noqa: E402
 from engine.sharp_market import evaluate_sharp_value_alignment  # noqa: E402
 from engine.xg_engine import compute_advanced_metrics  # noqa: E402
+
 
 DB_PATH = ROOT / "data" / "taqdeer.db"
 
@@ -682,7 +684,10 @@ def main() -> None:
                 temperature=temp,
                 weights=fitted_w,
                 dc_shots=model_shots,
+                home_missing=get_missing_players(t["home_team_id"]),
+                away_missing=get_missing_players(t["away_team_id"]),
             )
+
             write_prediction(
                 t["id"],
                 pred,

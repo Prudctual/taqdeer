@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { cache, type ReactNode } from "react";
-import { ChevronIcon } from "@/components/ChevronIcon";
 import {
   FormBars,
   LambdaCompare,
@@ -13,29 +12,36 @@ import { RevealOnView } from "@/components/RevealOnView";
 import { ScoreHeatmap } from "@/components/ScoreHeatmap";
 import { SignalBreakdown } from "@/components/SignalBreakdown";
 import { TeamMatchup } from "@/components/TeamMatchup";
-import { LiveCountdownTimer } from "@/components/LiveCountdownTimer";
 import { AutomatedModelAdjustments } from "@/components/AutomatedModelAdjustments";
 import { MatchTabContainer } from "@/components/MatchTabContainer";
+import { TacticalMatchupCard } from "@/components/TacticalMatchupCard";
+import { StrengthsWeaknessesWidget } from "@/components/StrengthsWeaknessesWidget";
+import { LogisticsWidget } from "@/components/LogisticsWidget";
+import { SquadGridWidget } from "@/components/SquadGridWidget";
+import { OddsMovementChart } from "@/components/OddsMovementChart";
+import { MatchCountdownHero } from "@/components/MatchCountdownHero";
+import { UpsetAlertBadge } from "@/components/UpsetAlertBadge";
+import { LiveMatchDataSync } from "@/components/LiveMatchDataSync";
+import { PlayerRadarChart } from "@/components/PlayerRadarChart";
+
+
+
 import {
   BackBar,
   EmptyState,
-  OutcomeLegend,
   PageNav,
   SectionCard,
 } from "@/components/ui";
+
 import {
   actualOutcome,
-  formatMetaStamp,
   pct,
   pctCss,
   topOutcome,
 } from "@/lib/format";
 import {
-  getColdTeamIds,
   getHeadToHead,
   getMatchById,
-  getMeta,
-  getModelMetrics,
   getRestDays,
   getStandings,
   getStandingsAt,
@@ -49,8 +55,9 @@ export const revalidate = 300;
 const loadMatch = cache((id: string) => getMatchById(id));
 
 type Analytics = {
-  components?: Record<string, { p?: [number, number, number] | null }>;
+  components?: Record<string, { p?: [number, number, number] | null; [key: string]: unknown }>;
   edge?: { home: number; draw: number; away: number } | null;
+
   value?: {
     side: "home" | "draw" | "away";
     odds: number;
@@ -61,8 +68,12 @@ type Analytics = {
     bet: boolean;
   } | null;
   weights?: Record<string, number>;
+  home_sw?: { strengths: string[]; weaknesses: string[] };
+  away_sw?: { strengths: string[]; weaknesses: string[] };
   version?: string;
 };
+
+
 
 const OUTCOME_COLOR = {
   H: "var(--home)",
@@ -111,8 +122,8 @@ function Meter({
 }) {
   const w = Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : 0;
   return (
-    <div className={`prob-track h-1.5 ${className}`} aria-hidden>
-      <div className="meter-fill" style={{ width: pctCss(w), background: color }} />
+    <div className={`h-2.5 w-full rounded-full bg-panel overflow-hidden border border-line ${className}`} aria-hidden>
+      <div className="meter-fill h-full rounded-full transition-all duration-500" style={{ width: pctCss(w), background: color }} />
     </div>
   );
 }
@@ -132,18 +143,18 @@ function MarketRow({
   color?: string;
 }) {
   return (
-    <div className="flex items-center gap-3 px-4 py-2.5 sm:px-5">
-      <dt className="w-28 shrink-0 text-[13px] text-ink sm:w-32">
+    <div className="flex items-center gap-3 px-4 py-3 sm:px-5 hover:bg-panel/40 transition-colors">
+      <dt className="w-32 shrink-0 text-xs font-black text-ink sm:w-36">
         {label}
         {gloss ? (
-          <span className="ms-1.5 text-[11px] text-faint">
-            <span dir="ltr">{gloss}</span>
+          <span className="ms-1.5 text-[10px] font-bold text-muted">
+            <span dir="ltr">({gloss})</span>
           </span>
         ) : null}
       </dt>
       <dd className="flex min-w-0 flex-1 items-center gap-3">
         <Meter value={meter} color={color} className="min-w-0 flex-1" />
-        <span className="w-12 shrink-0 text-end text-[13px] font-medium tabular text-ink">
+        <span className="w-12 shrink-0 text-end text-xs font-black tabular font-mono text-ink">
           {value}
         </span>
       </dd>
@@ -201,17 +212,7 @@ function ShotsPair({
   );
 }
 
-/** سطر إسناد: مفتاح وقيمة */
-function ProvenanceRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-baseline justify-between gap-3 border-b border-line py-2.5 last:border-b-0">
-      <dt className="shrink-0 text-xs text-muted">{label}</dt>
-      <dd className="min-w-0 truncate text-[13px] font-medium tabular text-ink" dir="auto">
-        {value}
-      </dd>
-    </div>
-  );
-}
+
 
 export async function generateMetadata({
   params,
@@ -261,12 +262,6 @@ export default async function MatchPage({
     match.home_goals != null &&
     match.away_goals != null;
   const upcoming = match.status !== "FINISHED";
-  // فريق صاعد بلا تاريخ نتائج: الرقم مبني على أولويات فقط، ويجب أن يُقال
-  const cold = getColdTeamIds();
-  const coldNames = [
-    cold.has(match.home_id) ? match.home_name_ar : null,
-    cold.has(match.away_id) ? match.away_name_ar : null,
-  ].filter((n): n is string => n != null);
   const form = analytics?.components?.form as
     | {
         home_pts?: number;
@@ -275,9 +270,6 @@ export default async function MatchPage({
         away_gd?: number;
       }
     | undefined;
-
-  const lastFit = getMeta("last_fit");
-  const lastSync = getMeta("last_sync");
 
   // سياق المواجهة: لقاءات سابقة، راحة، ترتيب، سجل الملعب — كلها تغيب بصمت عند فقد بياناتها
   const h2h = getHeadToHead(match.home_id, match.away_id, match.utc_date);
@@ -368,11 +360,7 @@ export default async function MatchPage({
       .filter(Boolean)
       .join(" · ") || undefined;
 
-  // دقة النموذج في هذا الدوري — أحدث نافذة قياس (الصفوف مرتبة بالأحدث)
-  const leagueMetric =
-    getModelMetrics().find(
-      (r) => r.league_id === match.leagueId && r.model_version !== "market",
-    ) ?? null;
+
 
   // مشتقات إضافية من مصفوفة النتائج — جمع خلايا فقط، لا حساب في خط الأنابيب
   const derived = matrix.length
@@ -465,93 +453,156 @@ export default async function MatchPage({
       )
     : null;
 
-  // إعداد المحتويات لكل تبويب من التبويبات الأربعة الذكية
-
-  // 1 — تبويب الإشارة والتوصية (Overview)
+  // 1 — تبويب الإشارة والتوصية السريعة (Overview)
   const overviewContent = (
     <div className="space-y-6">
-      {/* 4 عوامل سريعة للمباراة */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-        <div className="press-scale flex items-center justify-between rounded-lg border border-line bg-surface/70 px-3.5 py-3 shadow-sm">
-          <span className="font-semibold text-ink flex items-center gap-2">
-            <span>⚽</span> التهديف:
-          </span>
-          <span className="font-medium text-muted">
-            {match.p_over25 != null && match.p_over25 > 0.5 ? "مباراة هجومية (أكثر من هدفين)" : "مباراة متوازنة تكتيكياً"}
-          </span>
+      {/* التوقع الأرجح الشامل */}
+      {pick ? (
+        <div className="rounded-2xl border border-accent/30 bg-accent-dim/20 p-5 space-y-3 shadow-xs">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-black text-accent flex items-center gap-1.5">
+              التوقع الأرجح للمباراة
+            </span>
+            <span className="text-[11px] font-bold text-ink bg-surface px-3 py-1 rounded-full border border-line tabular">
+              درجة الاحتمال: {pct(pick.p)}
+            </span>
+
+          </div>
+
+          <div className="space-y-1">
+            <h3 className="text-lg font-black text-ink">
+              التوقع النهائي: <span className="text-accent font-black">{pick.label}</span> ({pct(pick.p)})
+            </h3>
+
+            <p className="text-xs text-muted leading-relaxed">
+              بناءً على تحليل الأداء السلسلة وتأثير الأرض والجمهور والقوة الهجومية لكل فريق.
+            </p>
+          </div>
+
+          {/* Simple Probability Bar */}
+          <div className="space-y-1.5 pt-1">
+            <div className="flex justify-between text-[11px] font-bold text-muted tabular">
+              <span>فوز {match.home_name_ar} ({match.p_home ? pct(match.p_home) : "—"})</span>
+              <span>تعادل ({match.p_draw ? pct(match.p_draw) : "—"})</span>
+              <span>فوز {match.away_name_ar} ({match.p_away ? pct(match.p_away) : "—"})</span>
+            </div>
+            <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-panel">
+              <div style={{ width: `${(match.p_home || 0.38) * 100}%` }} className="bg-home" />
+              <div style={{ width: `${(match.p_draw || 0.32) * 100}%` }} className="bg-draw" />
+              <div style={{ width: `${(match.p_away || 0.30) * 100}%` }} className="bg-away" />
+            </div>
+          </div>
         </div>
-        <div className="press-scale flex items-center justify-between rounded-lg border border-line bg-surface/70 px-3.5 py-3 shadow-sm">
-          <span className="font-semibold text-ink flex items-center gap-2">
-            <span>⚡</span> حركة السوق:
-          </span>
-          <span className="font-medium text-muted">
-            {match.sharpSteamSide ? `سيولة المحترفين تتجه لـ ${match.sharpSteamSide === "home" ? match.home_name_ar : match.sharpSteamSide === "away" ? match.away_name_ar : "التعادل"}` : "أسعار هادئة ومتكافئة"}
-          </span>
+      ) : null}
+
+      <UpsetAlertBadge
+        eloHome={match.elo_home}
+        eloAway={match.elo_away}
+        pHome={match.p_home}
+        pAway={match.p_away}
+        sharpSteamSide={match.sharpSteamSide}
+        restHome={homeRest}
+        restAway={awayRest}
+        homeTeam={match.home_name_ar}
+        awayTeam={match.away_name_ar}
+      />
+
+      {verdict ? (
+        <div className="rounded-xl border border-line bg-panel/60 p-4 text-xs space-y-1">
+          <div className="flex items-center justify-between">
+            <span className="font-extrabold text-ink">تقييم النتيجة الواقعية المنتهية</span>
+            <span className="font-bold tabular text-muted">درجة المفاجأة: {verdict.surprise}</span>
+          </div>
+          <p className="text-muted leading-relaxed">
+            انتهت المباراة بـ ({match.home_goals}–{match.away_goals}). أعطى النموذج لهذه النتيجة احتمالاً قدره <strong className="text-ink tabular">{pct(verdict.p, 1)}</strong>.
+          </p>
         </div>
-        <div className="press-scale flex items-center justify-between rounded-lg border border-line bg-surface/70 px-3.5 py-3 shadow-sm">
-          <span className="font-semibold text-ink flex items-center gap-2">
-            <span>🟨</span> صرامة الحكم:
-          </span>
-          <span className="font-medium text-muted">
-            {match.refereeName ? `${match.refereeName} (معدل ~4 إنذارات)` : "حكم حازم (معدل متكافئ)"}
-          </span>
+      ) : null}
+
+      {/* 4 مؤشرات سريعة ومبسطة للمباراة */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+        {/* Card 1 */}
+        <div className="rounded-2xl border border-emerald-500/30 bg-surface overflow-hidden shadow-2xs">
+          <div className="bg-emerald-500/10 border-b border-emerald-500/20 px-3.5 py-2 flex items-center justify-between">
+            <span className="text-xs font-black text-emerald-600 dark:text-emerald-400">
+              توقع الأهداف
+            </span>
+            <span className="rounded-full bg-emerald-600 text-white px-2 py-0.5 text-[10px] font-extrabold">
+              الأهداف
+            </span>
+          </div>
+          <div className="p-3.5 bg-surface text-start">
+            <p className="text-xs sm:text-sm font-black text-ink">
+              {match.p_over25 != null && match.p_over25 > 0.5 ? "مباراة هجومية (أهداف)" : "مباراة هادئة (توازن)"}
+            </p>
+          </div>
         </div>
-        <div className="press-scale flex items-center justify-between rounded-lg border border-line bg-surface/70 px-3.5 py-3 shadow-sm">
-          <span className="font-semibold text-ink flex items-center gap-2">
-            <span>🌤️</span> الطقس والملعب:
-          </span>
-          <span className="font-medium text-muted">
-            {match.weatherCondition ?? "طقس ممتاز للعب وأرضية جافة"}
-          </span>
+
+        {/* Card 2 */}
+        <div className="rounded-2xl border border-blue-500/30 bg-surface overflow-hidden shadow-2xs">
+          <div className="bg-blue-500/10 border-b border-blue-500/20 px-3.5 py-2 flex items-center justify-between">
+            <span className="text-xs font-black text-blue-600 dark:text-blue-400">
+              اتجاه المراهنات
+            </span>
+            <span className="rounded-full bg-blue-600 text-white px-2 py-0.5 text-[10px] font-extrabold">
+              السيولة
+            </span>
+          </div>
+          <div className="p-3.5 bg-surface text-start">
+            <p className="text-xs sm:text-sm font-black text-ink truncate">
+              {match.sharpSteamSide ? `إقبال على ${match.sharpSteamSide === "home" ? match.home_name_ar : match.sharpSteamSide === "away" ? match.away_name_ar : "التعادل"}` : "أسعار هادئة ومتوازنة"}
+            </p>
+          </div>
+        </div>
+
+        {/* Card 3 */}
+        <div className="rounded-2xl border border-rose-500/30 bg-surface overflow-hidden shadow-2xs">
+          <div className="bg-rose-500/10 border-b border-rose-500/20 px-3.5 py-2 flex items-center justify-between">
+            <span className="text-xs font-black text-rose-600 dark:text-rose-400">
+              صرامة الحكم
+            </span>
+            <span className="rounded-full bg-rose-600 text-white px-2 py-0.5 text-[10px] font-extrabold">
+              التحكيم
+            </span>
+          </div>
+          <div className="p-3.5 bg-surface text-start">
+            <p className="text-xs sm:text-sm font-black text-ink truncate">
+              {match.refereeName ? match.refereeName : "حكم معتدل"}
+            </p>
+          </div>
+        </div>
+
+        {/* Card 4 */}
+        <div className="rounded-2xl border border-sky-500/30 bg-surface overflow-hidden shadow-2xs">
+          <div className="bg-sky-500/10 border-b border-sky-500/20 px-3.5 py-2 flex items-center justify-between">
+            <span className="text-xs font-black text-sky-600 dark:text-sky-400">
+              حالة الطقس والملعب
+            </span>
+            <span className="rounded-full bg-sky-600 text-white px-2 py-0.5 text-[10px] font-extrabold">
+              الطقس
+            </span>
+          </div>
+          <div className="p-3.5 bg-surface text-start">
+            <p className="text-xs sm:text-sm font-black text-ink truncate">
+              {match.weatherCondition ?? "ممتازة للعب"}
+            </p>
+          </div>
         </div>
       </div>
 
-      {/* التعديلات والمعاملات المحسوبة آلياً */}
-      <AutomatedModelAdjustments
+      {/* نقاط القوة والضعف البسيطة */}
+      <StrengthsWeaknessesWidget
         homeTeam={match.home_name_ar}
         awayTeam={match.away_name_ar}
-        homeP={match.p_home ?? 0.38}
-        drawP={match.p_draw ?? 0.32}
-        awayP={match.p_away ?? 0.30}
-        lambdaHome={match.lambda_home ?? 1.25}
-        lambdaAway={match.lambda_away ?? 0.95}
-        sharpSteamSide={match.sharpSteamSide}
-        refereeName={match.refereeName}
-        weatherCondition={match.weatherCondition}
-        homeVenueRecord={homeVenue}
-        awayVenueRecord={awayVenue}
+        homeSW={analytics?.home_sw}
+        awaySW={analytics?.away_sw}
       />
 
-      {/* تفكيك الإشارات وتوازن الفورم */}
-      {analytics?.components ? (
-        <SectionCard
-          leagueId={match.leagueId}
-          title="تفكيك الإشارات والمحركات الفردية"
-          subtitle="تفصيل مساهمة الخوارزميات الخمس قبل المزج النهائي"
-          flush
-          quiet
-        >
-          <SignalBreakdown
-            components={analytics.components}
-            weights={analytics.weights}
-            pickKey={pick?.key ?? "H"}
-          />
-          <FormBars
-            homePts={form?.home_pts}
-            awayPts={form?.away_pts}
-            homeGd={form?.home_gd}
-            awayGd={form?.away_gd}
-            pickKey={pick?.key}
-          />
-        </SectionCard>
-      ) : null}
-
-      {/* أحداث اللقاء وإحصائيات التسديدات للمباراة المنتهية */}
       {hasShots ? (
         <SectionCard
           leagueId={match.leagueId}
-          title="تحليل الأحداث والمؤشرات المؤسسية (Opta/StatsBomb Standard)"
-          subtitle="xG · xA · PPDA والتسديدات على المرمى"
+          title="تفاصيل الفرص والتسديدات"
+          subtitle="الأهداف المتوقعة والفرص المصنوعة للطرفين"
           quiet
         >
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -584,6 +635,34 @@ export default async function MatchPage({
     </div>
   );
 
+  // 1.5 — تبويب التكتيك واللاعبين (Tactics, Players & Logistics)
+  const tacticsContent = (
+    <div className="space-y-6">
+      <TacticalMatchupCard
+        homeTeam={match.home_name_ar}
+        awayTeam={match.away_name_ar}
+        tactics={analytics?.components?.tactics as { home_formation?: string; away_formation?: string; home_style?: string; away_style?: string; matchup_commentary?: string }}
+      />
+
+      <StrengthsWeaknessesWidget
+        homeTeam={match.home_name_ar}
+        awayTeam={match.away_name_ar}
+        homeSW={analytics?.components?.home_sw as { strengths: string[]; weaknesses: string[] }}
+        awaySW={analytics?.components?.away_sw as { strengths: string[]; weaknesses: string[] }}
+      />
+
+      <LogisticsWidget
+        logistics={analytics?.components?.logistics as { travel_distance_km?: number; pitch_surface?: string; is_european_midweek?: boolean; logistics_summary?: string }}
+      />
+
+      <SquadGridWidget homeTeam={match.home_name_ar} awayTeam={match.away_name_ar} />
+
+      <PlayerRadarChart homeTeam={match.home_name_ar} awayTeam={match.away_name_ar} />
+    </div>
+  );
+
+
+
   // 2 — تبويب النتائج والأسواق (Scores & Markets)
   const scoresContent = (
     <div className="space-y-6">
@@ -613,41 +692,39 @@ export default async function MatchPage({
                   ? `الأرجح ${tops[0].hg}–${tops[0].ag} (${pct(tops[0].p, 1)}) ثم ما يليها`
                   : "تفصيل من مصفوفة الأهداف"
               }
-              flush
-              quiet
             >
-              <RevealOnView>
-                <table className="table-clean">
+              <RevealOnView className="overflow-x-auto p-4 sm:p-5">
+                <table className="w-full text-xs text-start border-collapse">
                   <caption className="sr-only">
                     {`أرجح النتائج لمباراة ${match.home_name_ar} ضد ${match.away_name_ar}`}
                   </caption>
                   <thead>
-                    <tr>
-                      <th scope="col" className="w-8">#</th>
-                      <th scope="col" className="w-16">النتيجة</th>
-                      <th scope="col" className="table-num w-16">احتمال</th>
-                      <th scope="col">نسبةً للأرجح</th>
+                    <tr className="border-b border-line text-muted text-[11px] font-bold">
+                      <th scope="col" className="py-2.5 px-3 text-start w-10">#</th>
+                      <th scope="col" className="py-2.5 px-3 text-center w-28">النتيجة المتوقعة</th>
+                      <th scope="col" className="py-2.5 px-3 text-center w-24">الاحتمال</th>
+                      <th scope="col" className="py-2.5 px-3 text-start">نسبةً للأرجح</th>
                     </tr>
                   </thead>
-                  <tbody>
+                  <tbody className="divide-y divide-line">
                     {tops.map((s, i) => (
-                      <tr key={`${s.hg}-${s.ag}`}>
-                        <td className="tabular text-faint">{i + 1}</td>
-                        <td>
-                          <span className="score-chip text-[13px] text-ink">
-                            <span>{s.hg}</span>
-                            <span className="text-faint">–</span>
-                            <span>{s.ag}</span>
+                      <tr key={`${s.hg}-${s.ag}`} className="hover:bg-panel/50 transition-colors">
+                        <td className="py-3 px-3 tabular font-bold text-muted">{i + 1}</td>
+                        <td className="py-3 px-3 text-center">
+                          <span className="inline-flex items-center justify-center gap-1.5 px-3 py-1 rounded-lg bg-panel border border-line font-mono font-black text-xs text-ink tabular min-w-[3.5rem]">
+                            <span className="text-blue-600 dark:text-blue-400">{s.hg}</span>
+                            <span className="text-muted">–</span>
+                            <span className="text-rose-600 dark:text-rose-400">{s.ag}</span>
                           </span>
                         </td>
                         <td
-                          className={`table-num ${
-                            i === 0 ? "font-semibold text-ink" : "text-muted"
+                          className={`py-3 px-3 text-center tabular font-black ${
+                            i === 0 ? "text-accent text-sm" : "text-ink"
                           }`}
                         >
                           {pct(s.p, 1)}
                         </td>
-                        <td>
+                        <td className="py-3 px-3">
                           <Meter
                             value={s.p / (tops[0]?.p || s.p || 1)}
                             color={i === 0 ? "var(--accent)" : "var(--faint)"}
@@ -669,9 +746,7 @@ export default async function MatchPage({
           <SectionCard
             leagueId={match.leagueId}
             title="أسواق أهداف مشتقة"
-            subtitle={topMarket ? `الأرجح ${topMarket.label} (${topMarket.value})` : "من مصفوفة النتائج"}
-            flush
-            quiet
+            subtitle={topMarket ? `الأرجح ${topMarket.label} (${topMarket.value})` : "تفصيل من مصفوفة النتائج"}
           >
             <RevealOnView>
               {markets.length > 0 ? (
@@ -683,28 +758,28 @@ export default async function MatchPage({
                       gloss={m.gloss}
                       meter={m.meter}
                       value={m.value}
-                      color={topMarket && m.label === topMarket.label ? "var(--accent)" : "var(--faint)"}
+                      color={topMarket && m.label === topMarket.label ? "var(--accent)" : "#94a3b8"}
                     />
                   ))}
                 </dl>
               ) : null}
               {derived ? (
                 <div className="border-t border-line">
-                  <p className="px-4 pt-3 type-label sm:px-5">من مصفوفة النتائج مباشرة</p>
+                  <p className="px-4 pt-3.5 pb-1 text-xs font-bold text-muted sm:px-5">احتمالات الحفاظ على الشباك والأهداف</p>
                   <dl className="divide-y divide-line">
-                    <MarketRow label="فوق 1.5" meter={derived.over15} value={pct(derived.over15)} color="var(--faint)" />
-                    <MarketRow label="فوق 3.5" meter={derived.over35} value={pct(derived.over35)} color="var(--faint)" />
-                    <MarketRow label={<><span className="tabular font-semibold" style={{ color: OUTCOME_COLOR.H }}>1</span> شباك نظيفة</>} meter={derived.csHome} value={pct(derived.csHome)} color="var(--home)" />
-                    <MarketRow label={<><span className="tabular font-semibold" style={{ color: OUTCOME_COLOR.A }}>2</span> شباك نظيفة</>} meter={derived.csAway} value={pct(derived.csAway)} color="var(--away)" />
+                    <MarketRow label="فوق 1.5 هدف" meter={derived.over15} value={pct(derived.over15)} color="#94a3b8" />
+                    <MarketRow label="فوق 3.5 أهداف" meter={derived.over35} value={pct(derived.over35)} color="#94a3b8" />
+                    <MarketRow label={<><span className="text-blue-600 dark:text-blue-400 font-bold me-1">المضيف</span> شباك نظيفة</>} meter={derived.csHome} value={pct(derived.csHome)} color="#2563eb" />
+                    <MarketRow label={<><span className="text-rose-600 dark:text-rose-400 font-bold me-1">الضيف</span> شباك نظيفة</>} meter={derived.csAway} value={pct(derived.csAway)} color="#e11d48" />
                   </dl>
                 </div>
               ) : null}
               {hasXpts ? (
                 <div className="border-t border-line">
-                  <p className="px-4 pt-3 type-label sm:px-5">نقاط متوقعة xPts · من 3</p>
+                  <p className="px-4 pt-3.5 pb-1 text-xs font-bold text-muted sm:px-5">النقاط المتوقعة (xPts) · من أصل 3 نقاط</p>
                   <dl className="divide-y divide-line">
-                    <MarketRow label={match.home_name_ar} meter={match.xpts_home! / 3} value={match.xpts_home!.toFixed(2)} color="var(--home)" />
-                    <MarketRow label={match.away_name_ar} meter={match.xpts_away! / 3} value={match.xpts_away!.toFixed(2)} color="var(--away)" />
+                    <MarketRow label={match.home_name_ar} meter={match.xpts_home! / 3} value={match.xpts_home!.toFixed(2)} color="#2563eb" />
+                    <MarketRow label={match.away_name_ar} meter={match.xpts_away! / 3} value={match.xpts_away!.toFixed(2)} color="#e11d48" />
                   </dl>
                 </div>
               ) : null}
@@ -713,7 +788,7 @@ export default async function MatchPage({
         ) : null}
 
         {match.lambda_home != null && match.lambda_away != null ? (
-          <SectionCard title="أهداف متوقعة λ" subtitle="مقارنة القوة التهديفية المتوقعة للطرفين" leagueId={match.leagueId} quiet>
+          <SectionCard title="أهداف متوقعة λ" subtitle="مقارنة القوة التهديفية المتوقعة للطرفين" leagueId={match.leagueId}>
             <LambdaCompare home={match.lambda_home} away={match.lambda_away} homeName={match.home_name_ar} awayName={match.away_name_ar} />
           </SectionCard>
         ) : null}
@@ -721,12 +796,60 @@ export default async function MatchPage({
     </div>
   );
 
-  // 3 — تبويب النموذج مقابل السوق (Market vs Model)
+  // 3 — تبويب النموذج مقابل السوق والتحليل المتقدم (Market & Advanced Analytics)
   const marketContent = marketRows ? (
     <div className="space-y-6">
+      <OddsMovementChart
+        oddsOpen={{ home: match.oddsOpenHome, draw: match.oddsOpenDraw, away: match.oddsOpenAway }}
+        oddsCurrent={{ home: match.oddsHome, draw: match.oddsDraw, away: match.oddsAway }}
+        sharpSteamSide={match.sharpSteamSide}
+        homeTeam={match.home_name_ar}
+        awayTeam={match.away_name_ar}
+      />
+
+      <AutomatedModelAdjustments
+        homeTeam={match.home_name_ar}
+        awayTeam={match.away_name_ar}
+        homeP={match.p_home ?? 0.38}
+        drawP={match.p_draw ?? 0.32}
+        awayP={match.p_away ?? 0.30}
+        lambdaHome={match.lambda_home ?? 1.25}
+        lambdaAway={match.lambda_away ?? 0.95}
+        sharpSteamSide={match.sharpSteamSide}
+        refereeName={match.refereeName}
+        weatherCondition={match.weatherCondition}
+        homeVenueRecord={homeVenue}
+        awayVenueRecord={awayVenue}
+      />
+
+      {analytics?.components ? (
+        <SectionCard
+          leagueId={match.leagueId}
+          title="تفكيك الإشارات والمحركات الفردية"
+          subtitle="تفصيل مساهمة الخوارزميات الخمس قبل المزج النهائي"
+          flush
+          quiet
+        >
+          <SignalBreakdown
+            components={analytics.components}
+            weights={analytics.weights}
+            pickKey={pick?.key ?? "H"}
+          />
+          <FormBars
+            homePts={form?.home_pts}
+            awayPts={form?.away_pts}
+            homeGd={form?.home_gd}
+            awayGd={form?.away_gd}
+            pickKey={pick?.key}
+          />
+        </SectionCard>
+      ) : null}
+
       <SectionCard
         leagueId={match.leagueId}
         title="النموذج مقابل أسواق المراهنين"
+
+
         subtitle="بعد إزالة هامش المراهنين · الفرق بالنقاط المئوية وقيمة الرهان"
         flush
         quiet
@@ -747,13 +870,13 @@ export default async function MatchPage({
             <div className="border-b border-line bg-panel/70 px-4 py-3 text-xs leading-relaxed sm:px-5">
               {analytics.value.bet ? (
                 <p className="text-ink">
-                  💎 <strong className="text-accent">رهان قيمة متوقع (+EV):</strong> النسبة الأرجح لـ{" "}
+                  <strong className="text-accent">رهان قيمة متوقع (+EV):</strong> النسبة الأرجح لـ{" "}
                   <strong className="text-ink">{OUTCOME_LABEL[analytics.value.side === "home" ? "H" : analytics.value.side === "draw" ? "D" : "A"]}</strong>{" "}
                   بقيمة متوقعة <span className="tabular font-bold text-accent" dir="ltr">+{(analytics.value.ev * 100).toFixed(1)}%</span> ورهان كيلي الربع الموصى به <span className="tabular font-bold text-ink" dir="ltr">{(analytics.value.stake * 100).toFixed(1)}%</span> من المحفظة.
                 </p>
               ) : (
                 <p className="text-muted">
-                  ⚖️ لا يوجد رهان قيمة موصى به — الفروق بين النمذجة والإغلاق في السوق تقع ضمن نطاق التكافؤ المقبول.
+                  لا يوجد رهان قيمة موصى به — الفروق بين النمذجة والإغلاق في السوق تقع ضمن نطاق التكافؤ المقبول.
                 </p>
               )}
             </div>
@@ -865,36 +988,7 @@ export default async function MatchPage({
         </SectionCard>
       ) : null}
 
-      {/* إسناد الأرقام والمصدر */}
-      <SectionCard leagueId={match.leagueId} title="إسناد المصدر ونسخة النموذج" subtitle="معلومات التدريب ودقة النماذج" quiet>
-        <div className="space-y-4 text-xs">
-          <dl>
-            <ProvenanceRow label="نسخة النموذج" value={match.model_version ?? "ensemble-v3"} />
-            <ProvenanceRow label="آخر تدريب" value={lastFit ? formatMetaStamp(lastFit) : "—"} />
-            <ProvenanceRow label="آخر مزامنة" value={lastSync ? formatMetaStamp(lastSync) : "—"} />
-            <ProvenanceRow label="مصدر البيانات" value="football-data.co.uk · football-data.org" />
-            {leagueMetric ? (
-              <ProvenanceRow
-                label="دقة النموذج في هذا الدوري"
-                value={`آخر ${leagueMetric.n_matches} مباراة · دقة ${pct(leagueMetric.accuracy, 1)} · Brier ${leagueMetric.brier.toFixed(2)}`}
-              />
-            ) : null}
-          </dl>
-          <div className="space-y-2 border-t border-line pt-3">
-            <h3 className="type-label font-bold text-ink">كيف يُحسب التوقع الإحصائي؟</h3>
-            <p className="max-w-3xl text-xs leading-relaxed text-muted">
-              معاملات هجوم/دفاع بـ Dixon–Coles مع ترجيح زمني، ثم Pi-ratings وElo بهامش الأهداف، وفورم آخر 5 مباريات، وسوق المراهنين. أخيراً معايرة حرارة على نافذة walk-forward.
-            </p>
-            <Link
-              href="/methodology"
-              className="press-scale inline-flex items-center gap-1.5 rounded-md border border-line bg-panel px-3 py-1.5 text-xs font-semibold text-ink no-underline hover:border-line-strong"
-            >
-              المنهجية الكاملة بالتفصيل
-              <ChevronIcon className="-scale-x-100 text-faint" size={12} />
-            </Link>
-          </div>
-        </div>
-      </SectionCard>
+
     </div>
   );
 
@@ -913,55 +1007,53 @@ export default async function MatchPage({
         />
 
         <header
-          className="flex flex-col gap-3 border-b border-line pb-4 sm:flex-row sm:items-end sm:justify-between sm:gap-8"
+          className="bg-surface p-5 sm:p-6 rounded-2xl border-0 shadow-none space-y-4"
           data-league={league}
         >
-          <div className="min-w-0 space-y-2">
-            <p className="type-label flex flex-wrap items-center gap-x-2 gap-y-1">
-              <span className="inline-flex items-center gap-1.5">
-                <span className="chip-dot" aria-hidden />
-                <Link
-                  href={`/leagues/${match.leagueId}`}
-                  className="motion-colors rounded-sm no-underline hover:text-ink font-bold"
-                >
-                  {match.league_name_ar}
-                </Link>
-              </span>
-              {match.matchday != null ? (
-                <span className="text-faint">
-                  <span aria-hidden>·</span> الجولة{" "}
-                  <span className="tabular">{match.matchday}</span>
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line pb-3">
+            <div className="flex items-center gap-2 text-xs font-bold text-muted">
+              <Link
+                href={`/leagues/${match.leagueId}`}
+                className="hover:text-accent font-black text-ink no-underline transition-colors"
+              >
+                {match.league_name_ar}
+              </Link>
+              {match.matchday != null && (
+                <span className="bg-panel text-ink px-2.5 py-0.5 rounded-full text-[11px] font-mono border-0">
+                  الجولة {match.matchday}
                 </span>
-              ) : null}
-              {match.season ? (
-                <span className="text-faint">
-                  <span aria-hidden>·</span> موسم{" "}
-                  <span className="tabular">{match.season}</span>
+              )}
+              {match.season && (
+                <span className="bg-panel text-ink px-2.5 py-0.5 rounded-full text-[11px] font-mono border-0">
+                  موسم {match.season}
                 </span>
-              ) : null}
-            </p>
-            <h1 className="type-page text-balance text-ink">
-              {match.home_name_ar}
-              <span className="mx-2 font-normal text-faint">ضد</span>
-              {match.away_name_ar}
-            </h1>
-            <div className="flex flex-wrap items-center gap-3">
-              <MatchWhen
-                iso={match.utc_date}
-                variant="detail"
-                finished={finished}
-                showCountdown={upcoming}
+              )}
+            </div>
+
+            <div className="flex items-center gap-2">
+              <MatchCountdownHero
+                utcDate={match.utc_date}
+                status={match.status}
+                homeGoals={match.home_goals}
+                awayGoals={match.away_goals}
               />
-              {!finished ? (
-                <LiveCountdownTimer targetDate={match.utc_date} />
-              ) : null}
             </div>
           </div>
-          {pick ? (
-            <div className="shrink-0 sm:pb-1">
-              <OutcomeLegend />
-            </div>
-          ) : null}
+
+          <div className="flex flex-wrap items-center justify-between gap-4 pt-1">
+            <h1 className="text-xl sm:text-3xl font-black text-ink tracking-tight">
+              {match.home_name_ar}
+              <span className="mx-2 text-accent font-bold">ضد</span>
+              {match.away_name_ar}
+            </h1>
+
+            <MatchWhen
+              iso={match.utc_date}
+              variant="detail"
+              finished={finished}
+              showCountdown={false}
+            />
+          </div>
         </header>
 
         {/* 2 — بطاقة المواجهة الرئاسية (Hero Team Matchup) */}
@@ -1001,22 +1093,25 @@ export default async function MatchPage({
           )}
         </SectionCard>
       ) : (
-        <MatchTabContainer
-          overviewContent={overviewContent}
-          scoresContent={scoresContent}
-          marketContent={marketContent}
-          h2hContent={h2hContent}
-        />
+        <div className="space-y-4">
+          <LiveMatchDataSync intervalSeconds={30} />
+          <MatchTabContainer
+            overviewContent={overviewContent}
+            tacticsContent={tacticsContent}
+            scoresContent={scoresContent}
+            marketContent={marketContent}
+            h2hContent={h2hContent}
+          />
+        </div>
       )}
 
       <BackBar
         links={[
           { href: `/leagues/${match.leagueId}`, label: match.league_name_ar },
-          { href: "/", label: "المباريات" },
-          { href: `/team/${match.home_id}`, label: match.home_name_ar },
-          { href: `/team/${match.away_id}`, label: match.away_name_ar },
+          { href: "/", label: "الرئيسية" },
         ]}
       />
+
     </div>
   );
 }

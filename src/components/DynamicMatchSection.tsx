@@ -5,6 +5,7 @@ import Link from "next/link";
 import { MatchList } from "@/components/MatchList";
 import { InteractiveMatchFilter, type FilterSortOption } from "@/components/InteractiveMatchFilter";
 import { LiveCountdownTimer } from "@/components/LiveCountdownTimer";
+import { ClockIcon } from "@/components/Icons";
 import type { MatchCard } from "@/lib/queries";
 
 interface Group {
@@ -16,6 +17,13 @@ interface Group {
 interface DynamicMatchSectionProps {
   groups: Group[];
   totalUpcomingCount?: number;
+}
+
+function formatMatchCount(count: number): string {
+  if (count === 1) return "مباراة واحدة";
+  if (count === 2) return "مباراتان";
+  if (count >= 3 && count <= 10) return `${count} مباريات`;
+  return `${count} مباراة`;
 }
 
 export function DynamicMatchSection({ groups }: DynamicMatchSectionProps) {
@@ -57,18 +65,26 @@ export function DynamicMatchSection({ groups }: DynamicMatchSectionProps) {
 
   return (
     <div className="space-y-4">
+      {/* Fast Ticker / Nearest Match */}
       {topUpcomingMatch ? (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line/90 bg-panel p-3.5 shadow-sm">
-          <div className="flex flex-wrap items-center gap-2 text-xs">
-            <span className="font-bold text-ink">أقرب مواجهة انطلاقاً:</span>
-            <span className="font-bold text-blue-400">
-              {topUpcomingMatch.homeNameAr} ضد {topUpcomingMatch.awayNameAr}
+        <div className="bg-white p-4 sm:p-5 rounded-3xl border-0 shadow-sm flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="text-xs font-black text-slate-900 flex items-center gap-2">
+              <ClockIcon size={16} className="text-rose-600" />
+              <span>أقرب مواجهة انطلاقاً:</span>
             </span>
+            <Link
+              href={`/match/${topUpcomingMatch.id}`}
+              className="text-xs sm:text-sm font-black text-rose-600 hover:text-rose-700 bg-rose-50 px-3.5 py-1 rounded-full border border-rose-200/60 no-underline transition-colors"
+            >
+              {topUpcomingMatch.homeNameAr} ضد {topUpcomingMatch.awayNameAr}
+            </Link>
           </div>
           <LiveCountdownTimer targetDate={topUpcomingMatch.utcDate} />
         </div>
       ) : null}
 
+      {/* Filter and Search Bar */}
       <InteractiveMatchFilter
         onFilterChange={(opt, search) => {
           setFilterSort(opt);
@@ -76,21 +92,28 @@ export function DynamicMatchSection({ groups }: DynamicMatchSectionProps) {
         }}
       />
 
-      <div className="divide-y divide-line rounded-xl border border-line bg-panel overflow-hidden">
+      {/* Leagues Groups List */}
+      <div className="space-y-4">
         {processedGroups.length > 0 ? (
           processedGroups.map((group) => (
-            <div key={group.leagueId} data-league={group.leagueId}>
-              <div className="league-band relative flex items-center justify-between py-2.5 px-4 bg-zinc-950/80 border-b border-line">
+            <div
+              key={group.leagueId}
+              data-league={group.leagueId}
+              className="card bg-white p-5 sm:p-6 rounded-3xl border-0 shadow-sm space-y-3"
+            >
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                 <Link
                   href={`/leagues/${group.leagueId}`}
-                  className="league-name-chip motion-colors rounded-sm font-bold no-underline text-blue-400 hover:text-white text-sm"
+                  className="flex items-center gap-2 text-base font-black text-slate-900 no-underline hover:text-rose-600 transition-colors"
                 >
-                  {group.leagueNameAr}
+                  <span className="h-2.5 w-2.5 rounded-full bg-rose-600" />
+                  <span>{group.leagueNameAr}</span>
                 </Link>
-                <span className="type-label tabular text-muted text-xs">
-                  {group.matches.length} مباراة
+                <span className="text-xs font-extrabold text-slate-700 bg-slate-100 px-3 py-1 rounded-full">
+                  {formatMatchCount(group.matches.length)}
                 </span>
               </div>
+
               <MatchList
                 matches={group.matches}
                 groupDays={filterSort === "all" && !searchQuery}
@@ -100,8 +123,8 @@ export function DynamicMatchSection({ groups }: DynamicMatchSectionProps) {
             </div>
           ))
         ) : (
-          <div className="p-8 text-center text-xs text-muted">
-            لا توجد مباريات تطابق معلمة البحث أو التصفية الحالية.
+          <div className="bg-white p-8 rounded-3xl border-0 shadow-sm text-center text-xs font-bold text-slate-500">
+            لا توجد مباريات تطابق البحث أو خيارات التصفية الحالية.
           </div>
         )}
       </div>

@@ -5,14 +5,15 @@ import { cache } from "react";
 import { Crest } from "@/components/Crest";
 import { MatchList } from "@/components/MatchList";
 import { RevealOnView } from "@/components/RevealOnView";
+import { TrophyIcon } from "@/components/Icons";
+import { PlayerRadarChart } from "@/components/PlayerRadarChart";
 import {
   BackBar,
   EmptyState,
-  MetaStat,
   PageNav,
-  SectionCard,
 } from "@/components/ui";
-import { formatShortDate, pctCss } from "@/lib/format";
+
+import { formatShortDate } from "@/lib/format";
 import {
   getEloHistory,
   getLeagueMatches,
@@ -22,34 +23,15 @@ import {
 
 export const revalidate = 300;
 
-/** مشترك بين generateMetadata والصفحة داخل الطلب نفسه */
 const loadTeam = cache((id: string) => getTeam(id));
 
 const RESULT = {
-  W: { glyph: "ف", label: "فوز", color: "var(--success)" },
-  D: { glyph: "ت", label: "تعادل", color: "var(--draw)" },
-  L: { glyph: "خ", label: "خسارة", color: "var(--danger)" },
+  W: { glyph: "ف", label: "فوز", bg: "bg-emerald-600 text-white" },
+  D: { glyph: "ت", label: "تعادل", bg: "bg-amber-500 text-white" },
+  L: { glyph: "خ", label: "خسارة", bg: "bg-rose-600 text-white" },
 } as const;
 
 type ResultKey = keyof typeof RESULT;
-
-/** شريط قياس رفيع — علامة بيانات لا زينة */
-function Meter({
-  value,
-  color = "var(--accent)",
-  className = "",
-}: {
-  value: number;
-  color?: string;
-  className?: string;
-}) {
-  const w = Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : 0;
-  return (
-    <div className={`prob-track h-1.5 ${className}`} aria-hidden>
-      <div className="meter-fill" style={{ width: pctCss(w), background: color }} />
-    </div>
-  );
-}
 
 export async function generateMetadata({
   params,
@@ -77,15 +59,12 @@ export default async function TeamPage({
   const team = loadTeam(decodeURIComponent(id));
   if (!team) notFound();
 
-  const league = team.league_id?.toLowerCase() || undefined;
-
-  const matches = getTeamMatches(team.id, 12);
+  const matches = getTeamMatches(team.id, 20);
   const eloHist = getEloHistory(team.id, 40).reverse();
   const minElo = Math.min(...eloHist.map((e) => e.elo), team.elo);
   const maxElo = Math.max(...eloHist.map((e) => e.elo), team.elo);
   const span = Math.max(maxElo - minElo, 1);
 
-  /** مباريات الفريق القادمة من جدول الدوري */
   const upcoming = getLeagueMatches(team.league_id, 250, 0)
     .filter(
       (m) =>
@@ -94,11 +73,11 @@ export default async function TeamPage({
     )
     .slice(0, 6);
 
-  /** فورم آخر خمس — الأحدث أولاً */
   const form = matches
     .filter((m) => m.homeGoals != null && m.awayGoals != null)
-    .slice(0, 5)
+    .slice(0, 20)
     .map((m) => {
+
       const home = m.homeId === team.id;
       const gf = (home ? m.homeGoals : m.awayGoals) as number;
       const ga = (home ? m.awayGoals : m.homeGoals) as number;
@@ -129,6 +108,7 @@ export default async function TeamPage({
 
   return (
     <div className="space-y-6">
+      {/* Header & Nav */}
       <div>
         <PageNav
           backHref={`/leagues/${team.league_id}`}
@@ -140,224 +120,275 @@ export default async function TeamPage({
             { label: team.name_ar },
           ]}
         />
-        <header
-          className="flex items-center gap-4 border-b border-line pb-5"
-          data-league={league}
-        >
-          <Crest
-            src={team.crest_url}
-            alt={team.name_ar}
-            size="lg"
-            fallback={team.name_ar.slice(0, 1)}
-          />
-          <div className="min-w-0">
-            <p className="type-label flex items-center gap-1.5">
-              <span className="chip-dot" aria-hidden />
+        
+        {/* Team Banner Hero Card */}
+        <div className="bg-surface p-6 sm:p-8 rounded-2xl border border-line shadow-xs flex flex-wrap items-center justify-between gap-6">
+          <div className="flex items-center gap-5">
+            <div className="p-3 rounded-xl bg-panel border border-line">
+              <Crest
+                src={team.crest_url}
+                alt={team.name_ar}
+                size="lg"
+                fallback={team.name_ar.slice(0, 1)}
+              />
+            </div>
+            <div className="space-y-1">
               <Link
                 href={`/leagues/${team.league_id}`}
-                className="motion-colors rounded-sm no-underline hover:text-ink"
+                className="inline-flex items-center gap-1.5 text-xs font-black text-accent bg-accent-dim/40 px-3 py-0.5 rounded-full border border-accent/20 no-underline hover:bg-accent-dim transition-colors"
               >
-                {team.league_name_ar}
+                <TrophyIcon size={13} />
+                <span>{team.league_name_ar}</span>
               </Link>
-            </p>
-            <h1 className="type-display mt-1 text-balance text-ink">
-              {team.name_ar}
-            </h1>
-            <p className="mt-0.5 text-sm text-muted" dir="ltr">
-              {team.name_en}
-            </p>
+              <h1 className="text-2xl sm:text-4xl font-black text-ink tracking-tight">
+                {team.name_ar}
+              </h1>
+              <p className="text-xs font-semibold text-faint font-mono" dir="ltr">
+                {team.name_en}
+              </p>
+            </div>
           </div>
-        </header>
+
+          <div className="flex flex-wrap items-center gap-2.5 text-xs font-black">
+            <span className="bg-panel text-ink px-4 py-1.5 rounded-full shadow-2xs font-mono border border-line">
+              Elo {Math.round(team.elo)}
+            </span>
+            <span className="bg-panel text-ink px-4 py-1.5 rounded-full shadow-2xs border border-line">
+              {team.league_name_ar}
+            </span>
+          </div>
+        </div>
       </div>
 
-      {/* 1 — قوة الفريق وفورمه */}
-      <SectionCard
-        title="مؤشرات القوة"
-        leagueId={team.league_id}
-        subtitle={`الآن ${Math.round(team.elo)} Elo · من ${Math.round(minElo)} إلى ${Math.round(maxElo)} في النافذة`}
-      >
-        <div className="space-y-5">
-          <div className="grid grid-cols-3 gap-5">
-            <MetaStat label="Elo الحالي" value={Math.round(team.elo)} />
-            <MetaStat
-              label="معامل الهجوم"
-              value={team.attack?.toFixed(2) ?? "—"}
-              hint="أعلى = أخطر"
-            />
-            <MetaStat
-              label="معامل الدفاع"
-              value={team.defense?.toFixed(2) ?? "—"}
-              hint="أقل = أصلب"
-            />
+      {/* 1 — Power Indicators Card */}
+      <div className="card bg-surface p-6 sm:p-8 rounded-2xl border border-line shadow-xs space-y-6">
+        <div className="border-b border-line pb-3 flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h2 className="text-base sm:text-xl font-black text-ink tracking-tight">
+              مؤشرات القوة والتصنيف
+            </h2>
+            <p className="text-xs text-muted font-medium">
+              مستوى Elo الحالي: <strong className="text-ink font-mono font-black">{Math.round(team.elo)}</strong> · التراوح في النافذة ({Math.round(minElo)} إلى {Math.round(maxElo)})
+            </p>
+          </div>
+          <span className="text-xs font-black text-accent bg-accent-dim/40 px-3.5 py-1 rounded-full border border-accent/20">
+            تحليل النماذج
+          </span>
+        </div>
+
+        {/* 3 Metric Stat Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="bg-panel p-4 rounded-xl border border-line text-center space-y-1">
+            <span className="text-xs font-black text-muted block">Elo الحالي</span>
+            <span className="text-2xl sm:text-3xl font-black text-ink font-mono block">
+              {Math.round(team.elo)}
+            </span>
+            <span className="text-[11px] font-bold text-faint block">تصنيف القوة التراكمي</span>
           </div>
 
-          {team.attack != null || team.defense != null ? (
-            <RevealOnView className="space-y-2.5 border-t border-line pt-4">
-              {team.attack != null ? (
-                <div className="flex items-center gap-3">
-                  <span className="w-12 shrink-0 text-[11px] text-muted">
-                    هجوم
-                  </span>
-                  <Meter
-                    value={team.attack / 2.2}
-                    color="var(--home)"
-                    className="min-w-0 flex-1"
-                  />
-                  <span className="w-10 shrink-0 text-end text-xs tabular text-ink">
-                    {team.attack.toFixed(2)}
-                  </span>
-                </div>
-              ) : null}
-              {team.defense != null ? (
-                <div className="flex items-center gap-3">
-                  <span className="w-12 shrink-0 text-[11px] text-muted">
-                    دفاع
-                  </span>
-                  <Meter
-                    value={Math.abs(team.defense) / 2.2}
-                    color="var(--away)"
-                    className="min-w-0 flex-1"
-                  />
-                  <span className="w-10 shrink-0 text-end text-xs tabular text-ink">
-                    {team.defense.toFixed(2)}
-                  </span>
-                </div>
-              ) : null}
-            </RevealOnView>
-          ) : null}
+          <div className="bg-panel p-4 rounded-xl border border-line text-center space-y-1">
+            <span className="text-xs font-black text-muted block">معامل الهجوم</span>
+            <span className="text-2xl sm:text-3xl font-black text-ink font-mono block">
+              {team.attack?.toFixed(2) ?? "—"}
+            </span>
+            <span className="text-[11px] font-bold text-muted block">أعلى = أكثر خطورة</span>
+          </div>
 
-          {form.length > 0 ? (
-            <div className="space-y-2 border-t border-line pt-4">
-              <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
-                <span className="type-label">الفورم · الأحدث أولاً</span>
-                <span className="text-[11px] tabular text-muted">
-                  <span className="text-ink">{tally.W}</span> ف
-                  <span className="mx-1.5 text-faint" aria-hidden>
-                    ·
-                  </span>
-                  <span className="text-ink">{tally.D}</span> ت
-                  <span className="mx-1.5 text-faint" aria-hidden>
-                    ·
-                  </span>
-                  <span className="text-ink">{tally.L}</span> خ
+          <div className="bg-panel p-4 rounded-xl border border-line text-center space-y-1">
+            <span className="text-xs font-black text-muted block">معامل الدفاع</span>
+            <span className="text-2xl sm:text-3xl font-black text-ink font-mono block">
+              {team.defense?.toFixed(2) ?? "—"}
+            </span>
+            <span className="text-[11px] font-bold text-muted block">أقل = أكثر صلابة</span>
+          </div>
+        </div>
+
+        {/* Attack & Defense Meters */}
+        {(team.attack != null || team.defense != null) && (
+          <RevealOnView className="space-y-3 border-t border-line pt-5">
+            {team.attack != null && (
+              <div className="flex items-center gap-3 text-xs">
+                <span className="w-16 font-black text-ink shrink-0">القوة الهجومية</span>
+                <div className="h-3 flex-1 rounded-full bg-panel overflow-hidden">
+                  <div
+                    className="h-full bg-emerald-500 rounded-full transition-all"
+                    style={{ width: `${Math.min(100, (team.attack / 2.2) * 100)}%` }}
+                  />
+                </div>
+                <span className="w-12 text-end font-mono font-black text-ink shrink-0">
+                  {team.attack.toFixed(2)}
                 </span>
               </div>
-              <ul className="flex flex-wrap items-center gap-1.5">
-                {form.map((f) => (
-                  <li key={f.id}>
-                    <Link
-                      href={`/match/${encodeURIComponent(f.id)}`}
-                      className="motion-colors grid h-7 w-7 place-items-center rounded-[3px] border border-line bg-panel text-[11px] font-semibold no-underline hover:border-line-strong"
-                      style={{ color: RESULT[f.key].color }}
-                      title={`${RESULT[f.key].label} ${f.gf}–${f.ga} · ${f.opponent} · ${formatShortDate(f.date)}`}
-                    >
-                      <span aria-hidden>{RESULT[f.key].glyph}</span>
-                      <span className="sr-only">
-                        {`${RESULT[f.key].label} ${f.gf}–${f.ga} أمام ${f.opponent}`}
-                      </span>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ) : null}
-        </div>
-      </SectionCard>
+            )}
 
-      {/* 2 — منحنى Elo */}
-      {eloHist.length > 1 ? (
-        <SectionCard
-          title="منحنى Elo"
-          leagueId={team.league_id}
-          subtitle={`آخر ${eloHist.length} تحديث · أدنى ${Math.round(minElo)} · أعلى ${Math.round(maxElo)}`}
-        >
-          <RevealOnView>
-            <div className="flex items-baseline justify-between gap-3 text-[11px] tabular text-muted">
-              <span>أدنى {Math.round(minElo)}</span>
-              <span>أعلى {Math.round(maxElo)}</span>
+            {team.defense != null && (
+              <div className="flex items-center gap-3 text-xs">
+                <span className="w-16 font-black text-ink shrink-0">الصلابة الدفاعية</span>
+                <div className="h-3 flex-1 rounded-full bg-panel overflow-hidden">
+                  <div
+                    className="h-full bg-blue-500 rounded-full transition-all"
+                    style={{ width: `${Math.min(100, (Math.abs(team.defense) / 2.2) * 100)}%` }}
+                  />
+                </div>
+                <span className="w-12 text-end font-mono font-black text-ink shrink-0">
+                  {team.defense.toFixed(2)}
+                </span>
+              </div>
+            )}
+          </RevealOnView>
+        )}
+
+        {/* Form Badges */}
+        {form.length > 0 && (
+          <div className="space-y-3 border-t border-line pt-5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-xs font-black text-ink">
+                الفورم · نتائج المباريات الأخيرة (الأحدث أولاً)
+              </span>
+              <span className="text-xs font-extrabold text-muted bg-panel px-3 py-1 rounded-full border border-line">
+                <span className="text-emerald-500 font-mono font-black me-1">{tally.W}</span> فوز ·{" "}
+                <span className="text-amber-500 font-mono font-black me-1">{tally.D}</span> تعادل ·{" "}
+                <span className="text-rose-500 font-mono font-black me-1">{tally.L}</span> خسارة
+              </span>
             </div>
-            <div dir="ltr" className="mt-2">
-              <svg
-                viewBox="0 0 100 32"
-                preserveAspectRatio="none"
-                className="h-28 w-full"
-                role="img"
-                aria-label={`منحنى Elo عبر ${eloHist.length} تحديثاً، من ${Math.round(minElo)} إلى ${Math.round(maxElo)}، الحالي ${Math.round(team.elo)}`}
-              >
-                <line
-                  x1="0"
-                  y1="31"
-                  x2="100"
-                  y2="31"
-                  stroke="var(--line-strong)"
-                  strokeWidth="1"
-                  vectorEffect="non-scaling-stroke"
-                />
-                <polyline
-                  points={eloPath}
-                  fill="none"
-                  stroke="var(--accent)"
-                  strokeWidth="1.5"
-                  strokeLinejoin="round"
-                  strokeLinecap="round"
-                  vectorEffect="non-scaling-stroke"
-                />
-                {eloPoints.map((p, i) => (
-                  <rect
-                    key={`${p.date}-${i}`}
-                    x={Math.max(0, p.x - 50 / eloPoints.length)}
-                    y="0"
-                    width={100 / eloPoints.length}
-                    height="32"
-                    fill="transparent"
+
+            <ul className="flex flex-wrap items-center gap-2">
+              {form.map((f) => (
+                <li key={f.id}>
+                  <Link
+                    href={`/match/${encodeURIComponent(f.id)}`}
+                    className={`press-scale flex h-9 w-9 items-center justify-center rounded-xl font-mono text-xs font-black no-underline shadow-2xs transition-all hover:scale-110 ${RESULT[f.key].bg}`}
+                    title={`${RESULT[f.key].label} ${f.gf}–${f.ga} · أمام ${f.opponent} · ${formatShortDate(f.date)}`}
                   >
-                    <title>{`${p.date.slice(0, 10)} · ${Math.round(p.elo)}`}</title>
-                  </rect>
-                ))}
-              </svg>
-              <div className="mt-1.5 flex items-baseline justify-between gap-3 text-[11px] tabular text-faint">
-                <span>{eloHist[0]!.date.slice(0, 10)}</span>
-                <span>{eloHist[eloHist.length - 1]!.date.slice(0, 10)}</span>
+                    <span>{RESULT[f.key].glyph}</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+
+      {/* 2 — Elo Curve Chart Card */}
+      {eloHist.length > 1 && (
+        <div className="card bg-surface p-6 sm:p-8 rounded-2xl border border-line shadow-xs space-y-4">
+          <div className="flex items-center justify-between border-b border-line pb-3">
+            <div>
+              <h2 className="text-base sm:text-xl font-black text-ink tracking-tight">
+                مسار وتطور تصنيف Elo
+              </h2>
+              <p className="text-xs text-muted font-medium">
+                تطور الأداء عبر آخر {eloHist.length} مباراة (أدنى {Math.round(minElo)} - أعلى {Math.round(maxElo)})
+              </p>
+            </div>
+            <span className="text-xs font-black text-muted bg-panel px-3 py-1 rounded-full border border-line">
+              منحنى حركي
+            </span>
+          </div>
+
+          <RevealOnView>
+            <div className="bg-panel p-4 sm:p-5 rounded-2xl border border-line">
+              <div className="flex items-baseline justify-between gap-3 text-xs font-mono font-bold text-muted pb-2">
+                <span>أدنى {Math.round(minElo)}</span>
+                <span>أعلى {Math.round(maxElo)}</span>
+              </div>
+              <div dir="ltr" className="pt-2">
+                <svg
+                  viewBox="0 0 100 32"
+                  preserveAspectRatio="none"
+                  className="h-28 w-full overflow-visible"
+                  role="img"
+                  aria-label={`منحنى Elo عبر ${eloHist.length} تحديثاً`}
+                >
+                  <line
+                    x1="0"
+                    y1="31"
+                    x2="100"
+                    y2="31"
+                    stroke="var(--line)"
+                    strokeWidth="1"
+                    vectorEffect="non-scaling-stroke"
+                  />
+                  <polyline
+                    points={eloPath}
+                    fill="none"
+                    stroke="var(--accent)"
+                    strokeWidth="2.5"
+                    strokeLinejoin="round"
+                    strokeLinecap="round"
+                    vectorEffect="non-scaling-stroke"
+                  />
+                  {eloPoints.map((p, i) => (
+                    <rect
+                      key={`${p.date}-${i}`}
+                      x={Math.max(0, p.x - 50 / eloPoints.length)}
+                      y="0"
+                      width={100 / eloPoints.length}
+                      height="32"
+                      fill="transparent"
+                    >
+                      <title>{`${p.date.slice(0, 10)} · ${Math.round(p.elo)}`}</title>
+                    </rect>
+                  ))}
+                </svg>
+                <div className="mt-3 flex items-baseline justify-between gap-3 text-[11px] font-mono font-bold text-faint border-t border-line pt-2">
+                  <span>{eloHist[0]!.date.slice(0, 10)}</span>
+                  <span>{eloHist[eloHist.length - 1]!.date.slice(0, 10)}</span>
+                </div>
               </div>
             </div>
           </RevealOnView>
-        </SectionCard>
-      ) : null}
+        </div>
+      )}
 
-      {/* 3 — المباريات القادمة */}
-      {upcoming.length > 0 ? (
-        <SectionCard
-          title="المباريات القادمة"
-          subtitle={`${upcoming.length} مباراة · اضغط أي صف لفتح التوقّع`}
-          leagueId={team.league_id}
-          flush
-        >
+      {/* 3 — Player Impact Radar Chart */}
+      <PlayerRadarChart
+        playerName={team.name_ar.includes("مدريد") ? "فينيسيوس جونيور" : team.name_ar.includes("ليفربول") ? "محمد صلاح" : "قائد خط الهجوم"}
+        playerPos="مهاجم حاسم"
+        teamName={team.name_ar}
+      />
+
+      {/* 3 — Upcoming Matches */}
+      {upcoming.length > 0 && (
+        <div className="card bg-surface p-6 sm:p-8 rounded-2xl border border-line shadow-xs space-y-4">
+          <div className="border-b border-line pb-3">
+            <h2 className="text-base sm:text-xl font-black text-ink tracking-tight">
+              المباريات القادمة للفريق
+            </h2>
+            <p className="text-xs text-muted font-medium">
+              أقرب {upcoming.length} مواعيد مجدولة
+            </p>
+          </div>
           <MatchList
             matches={upcoming}
             showLeague={false}
             leagueId={team.league_id}
           />
-        </SectionCard>
-      ) : null}
+        </div>
+      )}
 
-      {/* 4 — آخر المباريات */}
-      <SectionCard
-        title="آخر المباريات"
-        subtitle="اضغط أي صف لفتح التوقّع"
-        leagueId={team.league_id}
-        flush
-        headerRight={
+      {/* 4 — Last Matches */}
+      <div className="card bg-surface p-6 sm:p-8 rounded-2xl border border-line shadow-xs space-y-4">
+        <div className="flex items-center justify-between border-b border-line pb-3">
+          <div>
+            <h2 className="text-base sm:text-xl font-black text-ink tracking-tight">
+              سجل ونتائج المباريات الأخيرة
+            </h2>
+            <p className="text-xs text-muted font-medium">
+              آخر النتائج المكتملة في القاعدة
+            </p>
+          </div>
           <Link
             href={`/leagues/${team.league_id}`}
-            className="motion-colors rounded-sm text-xs text-muted no-underline hover:text-ink"
+            className="text-xs font-black text-accent bg-accent-dim/40 px-3 py-1 rounded-full border border-accent/20 no-underline hover:bg-accent-dim transition-colors"
           >
             جدول الدوري
           </Link>
-        }
-      >
+        </div>
+
         {matches.length === 0 ? (
           <EmptyState
-            title="لا مباريات مسجّلة"
+            title="لا توجد مباريات مسجلة"
             body="بعد مزامنة النتائج تظهر آخر مباريات هذا الفريق هنا."
           />
         ) : (
@@ -367,7 +398,7 @@ export default async function TeamPage({
             leagueId={team.league_id}
           />
         )}
-      </SectionCard>
+      </div>
 
       <BackBar
         links={[
