@@ -42,6 +42,27 @@ interface MatchRow {
   odds_away: number | null;
 }
 
+function formatMatchDateLabel(utcDate: string): string {
+  const dateObj = new Date(utcDate);
+  const now = new Date();
+
+  const matchDay = new Date(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate());
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const diffDays = Math.round((matchDay.getTime() - today.getTime()) / (1000 * 3600 * 24));
+
+  const timeStr = dateObj.toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" });
+
+  if (diffDays === 0) {
+    return `اليوم · ${timeStr}`;
+  } else if (diffDays === 1) {
+    return `غداً · ${timeStr}`;
+  } else {
+    const dayName = dateObj.toLocaleDateString("ar-EG", { weekday: "short" });
+    const dateStr = dateObj.toLocaleDateString("ar-EG", { day: "numeric", month: "short" });
+    return `${dayName}، ${dateStr} · ${timeStr}`;
+  }
+}
+
 function getTodayMatches(): MatchRow[] {
   const query = `
     SELECT m.id, m.utc_date, m.status,
@@ -56,16 +77,14 @@ function getTodayMatches(): MatchRow[] {
     JOIN teams ht ON ht.id = m.home_team_id
     JOIN teams at ON at.id = m.away_team_id
     LEFT JOIN predictions p ON p.match_id = m.id
-    WHERE m.utc_date >= date('now', '-1 day') AND m.utc_date <= date('now', '+2 days')
-    ORDER BY m.utc_date ASC
-    LIMIT 15;
+    WHERE m.utc_date >= date('now', 'start of day')
+      AND m.utc_date < date('now', '+1 day', 'start of day')
+    ORDER BY m.utc_date ASC;
   `;
-  const matches = db.query(query).all() as MatchRow[];
-  if (matches.length > 0) return matches;
-  return getUpcomingMatches();
+  return db.query(query).all() as MatchRow[];
 }
 
-function getUpcomingMatches(): MatchRow[] {
+function getUpcomingMatches(limit: number = 8): MatchRow[] {
   const query = `
     SELECT m.id, m.utc_date, m.status,
            ht.name_ar as home_team, at.name_ar as away_team,
@@ -80,11 +99,11 @@ function getUpcomingMatches(): MatchRow[] {
     JOIN teams at ON at.id = m.away_team_id
     LEFT JOIN predictions p ON p.match_id = m.id
     WHERE (m.status = 'TIMED' OR m.status = 'SCHEDULED')
-      AND m.utc_date >= datetime('now', '-1 day')
+      AND m.utc_date >= datetime('now')
     ORDER BY m.utc_date ASC
-    LIMIT 10;
+    LIMIT ?;
   `;
-  return db.query(query).all() as MatchRow[];
+  return db.query(query).all(limit) as MatchRow[];
 }
 
 function searchMatchesByTeam(term: string): MatchRow[] {
@@ -110,12 +129,10 @@ function searchMatchesByTeam(term: string): MatchRow[] {
 }
 
 function formatMatchCard(m: MatchRow): string {
-  const dateObj = new Date(m.utc_date);
-  const timeStr = dateObj.toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" });
-  const dateStr = dateObj.toLocaleDateString("ar-EG", { day: "numeric", month: "short" });
+  const dateLabel = formatMatchDateLabel(m.utc_date);
 
   let text = `<b>${m.home_team} × ${m.away_team}</b>\n`;
-  text += `<i>${m.league_name}</i> · ${dateStr} ${timeStr}\n`;
+  text += `<i>${m.league_name}</i> · ${dateLabel}\n`;
 
   if (m.status === "FINISHED" && m.home_goals !== null) {
     text += `النتيجة النهائية: <b>${m.home_goals} - ${m.away_goals}</b>\n`;
@@ -149,32 +166,14 @@ function formatMatchCard(m: MatchRow): string {
 }
 
 function getConciseHighlights(): string {
-  const query = `
-    SELECT m.id, m.utc_date, m.status,
-           ht.name_ar as home_team, at.name_ar as away_team,
-           l.name_ar as league_name,
-           p.p_home, p.p_draw, p.p_away, p.confidence
-    FROM matches m
-    JOIN leagues l ON l.id = m.league_id
-    JOIN teams ht ON ht.id = m.home_team_id
-    JOIN teams at ON at.id = m.away_team_id
-    JOIN predictions p ON p.match_id = m.id
-    WHERE m.status IN ('TIMED', 'SCHEDULED')
-      AND m.utc_date >= datetime('now')
-      AND m.utc_date <= datetime('now', '+36 hours')
-    ORDER BY p.confidence DESC, m.utc_date ASC
-    LIMIT 4;
-  `;
-
-  const topMatches = db.query(query).all() as MatchRow[];
+  const upcoming = getUpcomingMatches(4);
 
   let text = `<b>تحديث «تقدير» الدوري والتحليلات</b>\n\n`;
 
-  if (topMatches.length > 0) {
+  if (upcoming.length > 0) {
     text += `أبرز المواجهات القادمة وأعلى الإشارات:\n\n`;
-    for (const m of topMatches) {
-      const dateObj = new Date(m.utc_date);
-      const timeStr = dateObj.toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" });
+    for (const m of upcoming) {
+      const dateLabel = formatMatchDateLabel(m.utc_date);
       const pH = Math.round((m.p_home || 0) * 100);
       const pD = Math.round((m.p_draw || 0) * 100);
       const pA = Math.round((m.p_away || 0) * 100);
@@ -185,7 +184,7 @@ function getConciseHighlights(): string {
       if (pD > pH && pD > pA) pick = "التعادل";
 
       text += `• <b>${m.home_team} × ${m.away_team}</b> (${m.league_name})\n`;
-      text += `  الموعد: ${timeStr} | التوقع: <b>${pick}</b> (${conf}% ثقة)\n`;
+      text += `  الموعد: ${dateLabel} | التوقع: <b>${pick}</b> (${conf}% ثقة)\n`;
       text += `  الاحتمالات: ${pH}% / ${pD}% / ${pA}%\n\n`;
     }
   } else {
@@ -296,40 +295,50 @@ async function handleUpdate(update: TelegramUpdate) {
     saveSubscriber(chatId, user.username, user.first_name);
   }
 
+  const todayStr = new Date().toLocaleDateString("ar-EG", { day: "numeric", month: "short" });
+
   if (update.message) {
     const msg = update.message;
     const chatId = msg.chat.id;
     const text = (msg.text || "").trim();
 
     if (text.startsWith("/start") || text.startsWith("/help")) {
-      const welcome = `<b>مرحباً بك في منصة «تقدير» ⚽</b>\n\nتم تفعيل اشتراكك لتلقي التحديثات التلقائية المختصرة كل 30 دقيقة لأبرز المباريات والتوقعات.\n\nإليك التوقعات لمباريات اليوم:`;
+      const welcome = `<b>مرحباً بك في منصة «تقدير» ⚽</b>\n\nتم تفعيل اشتراكك لتلقي التحديثات التلقائية المختصرة كل 30 دقيقة لأبرز المباريات والتوقعات.`;
       await sendMessage(chatId, welcome, MAIN_KEYBOARD);
 
-      const matches = getTodayMatches();
-      if (matches.length) {
-        let reply = `<b>التوقعات الخوارزمية لمباريات اليوم:</b>\n\n`;
-        reply += matches.map((m) => formatMatchCard(m)).join("\n──────────────\n");
+      const todayMatches = getTodayMatches();
+      if (todayMatches.length) {
+        let reply = `<b>توقعات مباريات اليوم (${todayStr}):</b>\n\n`;
+        reply += todayMatches.map((m) => formatMatchCard(m)).join("\n──────────────\n");
+        await sendMessage(chatId, reply, MAIN_KEYBOARD);
+      } else {
+        const upcoming = getUpcomingMatches(5);
+        let reply = `لا تتوفر مباريات رسمية تجري اليوم (${todayStr}).\n\n<b>أقرب المباريات القادمة المجدولة:</b>\n\n`;
+        reply += upcoming.map((m) => formatMatchCard(m)).join("\n──────────────\n");
         await sendMessage(chatId, reply, MAIN_KEYBOARD);
       }
       return;
     }
 
     if (text.startsWith("/today") || text.startsWith("/matches") || text === "المباريات") {
-      const matches = getTodayMatches();
-      if (!matches.length) {
-        await sendMessage(chatId, "لا تتوفر مباريات مسجلة لهذا اليوم حالياً.", MAIN_KEYBOARD);
+      const todayMatches = getTodayMatches();
+      if (!todayMatches.length) {
+        const upcoming = getUpcomingMatches(5);
+        let reply = `لا تتوفر مباريات رسمية تجري اليوم (${todayStr}).\n\n<b>أقرب المباريات القادمة المجدولة:</b>\n\n`;
+        reply += upcoming.map((m) => formatMatchCard(m)).join("\n──────────────\n");
+        await sendMessage(chatId, reply, MAIN_KEYBOARD);
         return;
       }
-      let reply = `<b>مباريات اليوم والتوقعات:</b>\n\n`;
-      reply += matches.map((m) => formatMatchCard(m)).join("\n──────────────\n");
+      let reply = `<b>مباريات اليوم (${todayStr}):</b>\n\n`;
+      reply += todayMatches.map((m) => formatMatchCard(m)).join("\n──────────────\n");
       await sendMessage(chatId, reply, MAIN_KEYBOARD);
       return;
     }
 
     if (text.startsWith("/upcoming") || text === "القادمة") {
-      const matches = getUpcomingMatches();
+      const matches = getUpcomingMatches(8);
       if (!matches.length) {
-        await sendMessage(chatId, "لا تتوفر مباريات قادمة مسجلة.", MAIN_KEYBOARD);
+        await sendMessage(chatId, "لا تتوفر مباريات قادمة مسجلة حالياً.", MAIN_KEYBOARD);
         return;
       }
       let reply = `<b>المباريات القادمة المجدولة:</b>\n\n`;
@@ -358,12 +367,19 @@ async function handleUpdate(update: TelegramUpdate) {
     const data = cb.data;
 
     if (data === "cmd_today") {
-      const matches = getTodayMatches();
-      let reply = `<b>مباريات اليوم والتوقعات:</b>\n\n`;
-      reply += matches.length ? matches.map((m) => formatMatchCard(m)).join("\n──────────────\n") : "لا تتوفر مباريات اليوم حالياً.";
-      await sendMessage(chatId, reply, MAIN_KEYBOARD);
+      const todayMatches = getTodayMatches();
+      if (todayMatches.length) {
+        let reply = `<b>مباريات اليوم (${todayStr}):</b>\n\n`;
+        reply += todayMatches.map((m) => formatMatchCard(m)).join("\n──────────────\n");
+        await sendMessage(chatId, reply, MAIN_KEYBOARD);
+      } else {
+        const upcoming = getUpcomingMatches(5);
+        let reply = `لا تتوفر مباريات رسمية تجري اليوم (${todayStr}).\n\n<b>أقرب المباريات القادمة المجدولة:</b>\n\n`;
+        reply += upcoming.map((m) => formatMatchCard(m)).join("\n──────────────\n");
+        await sendMessage(chatId, reply, MAIN_KEYBOARD);
+      }
     } else if (data === "cmd_upcoming") {
-      const matches = getUpcomingMatches();
+      const matches = getUpcomingMatches(8);
       let reply = `<b>المباريات القادمة المجدولة:</b>\n\n`;
       reply += matches.length ? matches.map((m) => formatMatchCard(m)).join("\n──────────────\n") : "لا تتوفر مباريات قادمة.";
       await sendMessage(chatId, reply, MAIN_KEYBOARD);
