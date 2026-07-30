@@ -67,7 +67,7 @@ async function sendNotification(targetChatId: string, customMessage?: string) {
       messageText += `لا تتوفر توقعات جديدة حالياً.\n`;
     }
 
-    messageText += `المزيد عبر المنصة: https://taqdeer.app`;
+    messageText += `المزيد عبر المنصة: http://13.53.56.196`;
   }
 
   console.log(`📤 Sending Telegram Notification to Chat ID: ${targetChatId}...`);
@@ -81,7 +81,7 @@ async function sendNotification(targetChatId: string, customMessage?: string) {
       parse_mode: "HTML",
       reply_markup: {
         inline_keyboard: [
-          [{ text: "🌐 فتح منصة تقدير", url: "https://taqdeer.app" }],
+          [{ text: "🌐 فتح منصة تقدير", url: "http://13.53.56.196" }],
         ],
       },
     }),

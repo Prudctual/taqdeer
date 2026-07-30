@@ -191,7 +191,7 @@ function getConciseHighlights(): string {
     text += `لا تتوفر مباريات مجدولة خلال الساعات القادمة.\nيمكنك متابعة جداول الترتيب والتحليلات عبر المنصة.\n\n`;
   }
 
-  text += `المزيد عبر المنصة: https://taqdeer.app`;
+  text += `المزيد عبر المنصة: http://13.53.56.196`;
   return text;
 }
 
@@ -203,7 +203,7 @@ async function broadcastToAllSubscribers() {
     const message = getConciseHighlights();
     const keyboard = {
       inline_keyboard: [
-        [{ text: "فتح منصة تقدير", url: "https://taqdeer.app" }],
+        [{ text: "فتح منصة تقدير", url: "http://13.53.56.196" }],
       ],
     };
 
@@ -243,7 +243,7 @@ const MAIN_KEYBOARD = {
     ],
     [
       { text: "المنهجية الحسابية", callback_data: "cmd_methodology" },
-      { text: "منصة «تقدير»", url: "https://taqdeer.app" },
+      { text: "منصة «تقدير»", url: "http://13.53.56.196" },
     ],
   ],
 };
