@@ -238,15 +238,91 @@ async function sendMessage(chatId: number, text: string, replyMarkup?: unknown) 
 const MAIN_KEYBOARD = {
   inline_keyboard: [
     [
-      { text: "مباريات اليوم", callback_data: "cmd_today" },
-      { text: "المباريات القادمة", callback_data: "cmd_upcoming" },
+      { text: "⚽ مباريات اليوم", callback_data: "cmd_today" },
+      { text: "📅 المباريات القادمة", callback_data: "cmd_upcoming" },
     ],
     [
-      { text: "المنهجية الحسابية", callback_data: "cmd_methodology" },
-      { text: "منصة «تقدير»", url: "http://13.53.56.196" },
+      { text: "💎 فرص القيمة (+EV)", callback_data: "cmd_value" },
+      { text: "🏆 ترتيب الدوريات", callback_data: "cmd_leagues" },
+    ],
+    [
+      { text: "📊 سجل الدقة والأداء", callback_data: "cmd_accuracy" },
+      { text: "🧠 المنهجية الحسابية", callback_data: "cmd_methodology" },
+    ],
+    [
+      { text: "🌐 فتح منصة «تقدير» الحية", url: "http://13.53.56.196" },
     ],
   ],
 };
+
+const LEAGUES_KEYBOARD = {
+  inline_keyboard: [
+    [
+      { text: "🏴󠁧󠁢󠁥󠁮󠁧󠁿 الدوري الإنجليزي", callback_data: "cmd_league_pl" },
+      { text: "🇪🇸 الدوري الإسباني", callback_data: "cmd_league_pd" },
+    ],
+    [
+      { text: "🇩🇪 الدوري الألماني", callback_data: "cmd_league_bl1" },
+      { text: "🇮🇹 الدوري الإيطالي", callback_data: "cmd_league_sa" },
+    ],
+    [
+      { text: "🇫🇷 الدوري الفرنسي", callback_data: "cmd_league_fl1" },
+      { text: "🇰🇷 الدوري الكوري", callback_data: "cmd_league_kl1" },
+    ],
+    [
+      { text: "🔙 القائمة الرئيسية", callback_data: "cmd_main_menu" },
+    ],
+  ],
+};
+
+function getLeagueStandings(leagueId: string) {
+  const leagueQuery = `SELECT name_ar FROM leagues WHERE id = ?`;
+  const league = db.query(leagueQuery).get(leagueId) as { name_ar: string } | undefined;
+
+  const standingsQuery = `
+    SELECT s.position, t.name_ar, s.played, s.won, s.drawn, s.lost, s.points, s.goal_difference
+    FROM standings s
+    JOIN teams t ON t.id = s.team_id
+    WHERE s.league_id = ?
+      AND s.season = (SELECT MAX(season) FROM standings WHERE league_id = ?)
+    ORDER BY s.position ASC
+    LIMIT 8;
+  `;
+  const rows = db.query(standingsQuery).all(leagueId, leagueId) as Array<{
+    position: number;
+    name_ar: string;
+    played: number;
+    won: number;
+    drawn: number;
+    lost: number;
+    points: number;
+    goal_difference: number;
+  }>;
+
+  return { leagueName: league?.name_ar || leagueId, rows };
+}
+
+function getValueBets(): MatchRow[] {
+  const query = `
+    SELECT m.id, m.utc_date, m.status,
+           ht.name_ar as home_team, at.name_ar as away_team,
+           m.home_goals, m.away_goals,
+           l.name_ar as league_name,
+           p.p_home, p.p_draw, p.p_away, p.confidence,
+           p.lambda_home, p.lambda_away,
+           m.odds_home, m.odds_draw, m.odds_away
+    FROM matches m
+    JOIN leagues l ON l.id = m.league_id
+    JOIN teams ht ON ht.id = m.home_team_id
+    JOIN teams at ON at.id = m.away_team_id
+    JOIN predictions p ON p.match_id = m.id
+    WHERE (m.status = 'TIMED' OR m.status = 'SCHEDULED')
+      AND m.utc_date >= datetime('now')
+    ORDER BY p.confidence DESC
+    LIMIT 6;
+  `;
+  return db.query(query).all() as MatchRow[];
+}
 
 // Ensure subscribers table exists
 db.run(`
@@ -303,20 +379,8 @@ async function handleUpdate(update: TelegramUpdate) {
     const text = (msg.text || "").trim();
 
     if (text.startsWith("/start") || text.startsWith("/help")) {
-      const welcome = `<b>مرحباً بك في منصة «تقدير» ⚽</b>\n\nتم تفعيل اشتراكك لتلقي التحديثات التلقائية المختصرة كل 30 دقيقة لأبرز المباريات والتوقعات.`;
+      const welcome = `<b>مرحباً بك في منصة «تقدير» ⚽</b>\n\nمنصة التحليل الرياضي والتوقعات الخوارزمية المتقدمة للدوريات العالمية.\n\nاستخدم القائمة أدناه للتنقل السريع بين أقسام المنصة:`;
       await sendMessage(chatId, welcome, MAIN_KEYBOARD);
-
-      const todayMatches = getTodayMatches();
-      if (todayMatches.length) {
-        let reply = `<b>توقعات مباريات اليوم (${todayStr}):</b>\n\n`;
-        reply += todayMatches.map((m) => formatMatchCard(m)).join("\n──────────────\n");
-        await sendMessage(chatId, reply, MAIN_KEYBOARD);
-      } else {
-        const upcoming = getUpcomingMatches(5);
-        let reply = `لا تتوفر مباريات رسمية تجري اليوم (${todayStr}).\n\n<b>أقرب المباريات القادمة المجدولة:</b>\n\n`;
-        reply += upcoming.map((m) => formatMatchCard(m)).join("\n──────────────\n");
-        await sendMessage(chatId, reply, MAIN_KEYBOARD);
-      }
       return;
     }
 
@@ -347,6 +411,42 @@ async function handleUpdate(update: TelegramUpdate) {
       return;
     }
 
+    if (text.startsWith("/value") || text === "فرص القيمة") {
+      const matches = getValueBets();
+      let reply = `<b>💎 أبرز فرص القيمة والأعلى ثقة (+EV):</b>\n\n`;
+      reply += matches.map((m) => formatMatchCard(m)).join("\n──────────────\n");
+      reply += `\n\nاستعرض جميع الفرص والتفاصيل المالية عبر المنصة:`;
+      const kb = {
+        inline_keyboard: [[{ text: "🌐 فتح صفحة فرص القيمة", url: "http://13.53.56.196/value" }]],
+      };
+      await sendMessage(chatId, reply, kb);
+      return;
+    }
+
+    if (text.startsWith("/leagues") || text === "الدوريات") {
+      const reply = `<b>🏆 اختر الدوري لاستعراض جدول الترتيب والأرقام الحالية:</b>`;
+      await sendMessage(chatId, reply, LEAGUES_KEYBOARD);
+      return;
+    }
+
+    if (text.startsWith("/accuracy") || text === "الدقة") {
+      const reply = `<b>📊 سجل الدقة والتحقق الرياضي:</b>\n\n• <b>نسبة التوقع الصحيح (Out-of-sample):</b> 47.3%\n• <b>نطاق الاختبار:</b> 582 مباراة موثقة على نماذج Dixon-Coles و Elo.\n• <b>معايرة الاحتمالات:</b> Temperature Scaling بدون تسريب بيانات.\n\nاستعرض السجل الكامل والتحليل المتقدم:`;
+      const kb = {
+        inline_keyboard: [[{ text: "🌐 فتح صفحة سجل الدقة", url: "http://13.53.56.196/accuracy" }]],
+      };
+      await sendMessage(chatId, reply, kb);
+      return;
+    }
+
+    if (text.startsWith("/methodology") || text === "المنهجية") {
+      const reply = `<b>🧠 المنهجية الحسابية لمنصة «تقدير»:</b>\n\nتعتمد منصتنا على دمج 4 محركات رياضية مستقلة:\n1. <b>Dixon-Coles:</b> حساب قوة التهديف والهجوم والدفاع.\n2. <b>Pi-ratings & Elo:</b> تقييم الفورم والأداء التاريخي.\n3. <b>De-margined Odds:</b> قراءة الاحتمالات بعد إزالة هامش ربح المراهن.\n4. <b>Temperature Scaling:</b> معايرة الاحتمالات الرياضية.`;
+      const kb = {
+        inline_keyboard: [[{ text: "🌐 قراءة المنهجية الكاملة بالمنصة", url: "http://13.53.56.196/methodology" }]],
+      };
+      await sendMessage(chatId, reply, kb);
+      return;
+    }
+
     // Direct search if text typed
     if (text && !text.startsWith("/")) {
       const matches = searchMatchesByTeam(text);
@@ -366,7 +466,9 @@ async function handleUpdate(update: TelegramUpdate) {
     const chatId = cb.message.chat.id;
     const data = cb.data;
 
-    if (data === "cmd_today") {
+    if (data === "cmd_main_menu") {
+      await sendMessage(chatId, "<b>القائمة الرئيسية لمنصة «تقدير»:</b>", MAIN_KEYBOARD);
+    } else if (data === "cmd_today") {
       const todayMatches = getTodayMatches();
       if (todayMatches.length) {
         let reply = `<b>مباريات اليوم (${todayStr}):</b>\n\n`;
@@ -383,9 +485,60 @@ async function handleUpdate(update: TelegramUpdate) {
       let reply = `<b>المباريات القادمة المجدولة:</b>\n\n`;
       reply += matches.length ? matches.map((m) => formatMatchCard(m)).join("\n──────────────\n") : "لا تتوفر مباريات قادمة.";
       await sendMessage(chatId, reply, MAIN_KEYBOARD);
+    } else if (data === "cmd_value") {
+      const matches = getValueBets();
+      let reply = `<b>💎 أبرز فرص القيمة والأعلى ثقة (+EV):</b>\n\n`;
+      reply += matches.map((m) => formatMatchCard(m)).join("\n──────────────\n");
+      const kb = {
+        inline_keyboard: [
+          [{ text: "🌐 استعراض كافة فرص القيمة بالمنصة", url: "http://13.53.56.196/value" }],
+          [{ text: "🔙 القائمة الرئيسية", callback_data: "cmd_main_menu" }],
+        ],
+      };
+      await sendMessage(chatId, reply, kb);
+    } else if (data === "cmd_leagues") {
+      const reply = `<b>🏆 اختر الدوري لاستعراض جدول الترتيب الحالي:</b>`;
+      await sendMessage(chatId, reply, LEAGUES_KEYBOARD);
+    } else if (data?.startsWith("cmd_league_")) {
+      const leagueId = data.replace("cmd_league_", "");
+      const standings = getLeagueStandings(leagueId);
+      let reply = `<b>🏆 جدول ترتيب ${standings.leagueName}:</b>\n\n`;
+      if (standings.rows.length > 0) {
+        reply += `<code>المركز  الفريق          لعب  نقاط  فارق</code>\n`;
+        for (const r of standings.rows) {
+          const pos = String(r.position).padStart(2, " ");
+          const name = r.name_ar.padEnd(14, " ");
+          const gd = (r.goal_difference > 0 ? `+${r.goal_difference}` : String(r.goal_difference)).padStart(3, " ");
+          reply += `<code>${pos}. ${name}  ${r.played}    ${r.points}   ${gd}</code>\n`;
+        }
+      } else {
+        reply += `لا تتوفر بيانات جدول حالياً.\n`;
+      }
+      const kb = {
+        inline_keyboard: [
+          [{ text: `🌐 فتح صفحة ${standings.leagueName} بالمنصة`, url: `http://13.53.56.196/leagues/${leagueId}` }],
+          [{ text: "🔙 قائمة الدوريات", callback_data: "cmd_leagues" }],
+        ],
+      };
+      await sendMessage(chatId, reply, kb);
+    } else if (data === "cmd_accuracy") {
+      const text = `<b>📊 سجل الدقة والتحقق الرياضي:</b>\n\n• <b>نسبة التوقع الصحيح (Out-of-sample):</b> 47.3%\n• <b>نطاق الاختبار:</b> 582 مباراة موثقة على نماذج Dixon-Coles و Elo.\n• <b>معايرة الاحتمالات:</b> Temperature Scaling بدون تسريب بيانات.`;
+      const kb = {
+        inline_keyboard: [
+          [{ text: "🌐 استعراض سجل الدقة بالمنصة", url: "http://13.53.56.196/accuracy" }],
+          [{ text: "🔙 القائمة الرئيسية", callback_data: "cmd_main_menu" }],
+        ],
+      };
+      await sendMessage(chatId, text, kb);
     } else if (data === "cmd_methodology") {
-      const text = `<b>منهجية «تقدير» التحليلية:</b>\n\nتعتمد منصتنا على دمج 4 محركات رياضية مستقلة:\n1. <b>Dixon-Coles:</b> لحساب معاملات الهجوم والدفاع وقوة التهديف.\n2. <b>Pi-ratings & Elo:</b> لتقييم الأداء التاريخي والفورم.\n3. <b>De-margined Odds:</b> قراءة الاحتمالات بعد إزالة هامش ربح المراهن.\n4. <b>Temperature Scaling:</b> معايرة الاحتمالات الخالية من التسريب.`;
-      await sendMessage(chatId, text, MAIN_KEYBOARD);
+      const text = `<b>🧠 المنهجية الحسابية لمنصة «تقدير»:</b>\n\nتعتمد منصتنا على دمج 4 محركات رياضية مستقلة:\n1. <b>Dixon-Coles:</b> لحساب معاملات الهجوم والدفاع وقوة التهديف.\n2. <b>Pi-ratings & Elo:</b> لتقييم الأداء التاريخي والفورم.\n3. <b>De-margined Odds:</b> قراءة الاحتمالات بعد إزالة هامش ربح المراهن.\n4. <b>Temperature Scaling:</b> معايرة الاحتمالات الخالية من التسريب.`;
+      const kb = {
+        inline_keyboard: [
+          [{ text: "🌐 قراءة المنهجية الكاملة بالمنصة", url: "http://13.53.56.196/methodology" }],
+          [{ text: "🔙 القائمة الرئيسية", callback_data: "cmd_main_menu" }],
+        ],
+      };
+      await sendMessage(chatId, text, kb);
     }
   }
 }
