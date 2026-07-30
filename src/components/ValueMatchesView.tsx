@@ -74,67 +74,67 @@ export function ValueMatchesView({ matches }: { matches: ValueMatchItem[] }) {
   }, [matches, selectedLeague, searchQuery]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* 1. Hero Header & Overview Metrics */}
-      <div className="rounded-2xl border border-emerald-500/30 bg-panel p-6 sm:p-8 space-y-5 shadow-2xs">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <span className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/25 text-emerald-600 dark:text-emerald-400 font-black text-xs">
-            <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+      <div className="rounded-2xl border border-emerald-500/30 bg-panel p-4 sm:p-5 space-y-4 shadow-2xs">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/25 text-emerald-600 dark:text-emerald-400 font-black text-[11px]">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
             تحليل فرص القيمة والسيولة (+EV)
           </span>
 
-          <span className="text-xs font-bold text-muted bg-surface px-3.5 py-1 rounded-full border border-line">
+          <span className="text-[11px] font-bold text-muted bg-surface px-3 py-0.5 rounded-full border border-line">
             حاسبة كيلي الربع (Quarter Kelly 25%)
           </span>
         </div>
 
-        <div className="space-y-2">
-          <h1 className="text-2xl sm:text-4xl font-black text-ink tracking-tight leading-tight">
+        <div className="space-y-1">
+          <h1 className="text-xl sm:text-3xl font-black text-ink tracking-tight leading-tight">
             المباريات ذات القيمة (+EV Value Bets)
           </h1>
-          <p className="text-xs sm:text-sm font-semibold text-muted leading-relaxed max-w-3xl">
+          <p className="text-xs font-semibold text-muted leading-relaxed max-w-3xl">
             يستعرض هذا القسم جميع المباريات المجدولة التي يُظهر فيها نموذج التحليل انحرافاً إيجابياً ومزايا رياضية (+EV ≥ 3%) مقارنة بأسعار إغلاق سوق المراهنين، مع حساب حصة رهان كيلي الربع الموصى بها.
           </p>
         </div>
 
         {/* Overview Stat Cards */}
         {matches.length > 0 && (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-3 border-t border-line">
-            <div className="rounded-xl border border-line bg-surface p-3.5 space-y-1">
-              <span className="text-[11px] font-bold text-muted block">عدد الفرص المتاحة</span>
-              <span className="text-2xl font-black text-emerald-600 dark:text-emerald-400 font-mono tabular">{matches.length}</span>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-2.5 border-t border-line">
+            <div className="rounded-xl border border-line bg-surface p-2.5 space-y-0.5">
+              <span className="text-[10px] font-bold text-muted block">عدد الفرص المتاحة</span>
+              <span className="text-xl font-black text-emerald-600 dark:text-emerald-400 font-mono tabular">{matches.length}</span>
             </div>
-            <div className="rounded-xl border border-line bg-surface p-3.5 space-y-1">
-              <span className="text-[11px] font-bold text-muted block">أعلى عائد (+EV)</span>
-              <span className="text-2xl font-black text-blue-600 dark:text-blue-400 font-mono tabular">+{(maxEv * 100).toFixed(1)}%</span>
+            <div className="rounded-xl border border-line bg-surface p-2.5 space-y-0.5">
+              <span className="text-[10px] font-bold text-muted block">أعلى عائد (+EV)</span>
+              <span className="text-xl font-black text-blue-600 dark:text-blue-400 font-mono tabular">+{(maxEv * 100).toFixed(1)}%</span>
             </div>
-            <div className="rounded-xl border border-line bg-surface p-3.5 space-y-1">
-              <span className="text-[11px] font-bold text-muted block">متوسط الفائدة</span>
-              <span className="text-2xl font-black text-purple-600 dark:text-purple-400 font-mono tabular">+{(avgEv * 100).toFixed(1)}%</span>
+            <div className="rounded-xl border border-line bg-surface p-2.5 space-y-0.5">
+              <span className="text-[10px] font-bold text-muted block">متوسط الفائدة</span>
+              <span className="text-xl font-black text-purple-600 dark:text-purple-400 font-mono tabular">+{(avgEv * 100).toFixed(1)}%</span>
             </div>
-            <div className="rounded-xl border border-line bg-surface p-3.5 space-y-1">
-              <span className="text-[11px] font-bold text-muted block">مخاطرة المحفظة</span>
-              <span className="text-sm font-black text-ink block pt-1.5">تحفّظ منضبط</span>
+            <div className="rounded-xl border border-line bg-surface p-2.5 space-y-0.5">
+              <span className="text-[10px] font-bold text-muted block">مخاطرة المحفظة</span>
+              <span className="text-xs font-black text-ink block pt-1">تحفّظ منضبط</span>
             </div>
           </div>
         )}
       </div>
 
       {/* 2. League Tabs Navigation Bar */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between gap-3">
-          <h2 className="text-sm font-black text-ink flex items-center gap-2">
+      <div className="space-y-2.5">
+        <div className="flex items-center justify-between gap-2 px-1">
+          <h2 className="text-xs sm:text-sm font-black text-ink flex items-center gap-1.5">
             <span>🏆</span>
             <span>تصنيف القيمة حسب الدوري</span>
           </h2>
-          <span className="text-xs font-bold text-muted">
+          <span className="text-[11px] font-bold text-muted">
             عرض ({filteredMatches.length}) مواجهة
           </span>
         </div>
 
-        {/* Scrollable League Tabs Pills Bar */}
-        <div className="w-full max-w-full overflow-x-auto scrollbar-none rounded-2xl bg-panel p-2 border border-line" dir="rtl">
-          <div className="flex items-center gap-2 min-w-max">
+        {/* Compact League Tabs Pills Bar */}
+        <div className="w-full max-w-full overflow-x-auto scrollbar-none rounded-xl bg-panel p-1.5 border border-line" dir="rtl">
+          <div className="flex items-center gap-1.5 min-w-max">
             {LEAGUES_CONFIG.map((league) => {
               const count = leagueCounts[league.id] || 0;
               const isActive = selectedLeague === league.id;
@@ -144,16 +144,16 @@ export function ValueMatchesView({ matches }: { matches: ValueMatchItem[] }) {
                   key={league.id}
                   type="button"
                   onClick={() => setSelectedLeague(league.id)}
-                  className={`shrink-0 press-scale flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+                  className={`shrink-0 press-scale flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap ${
                     isActive
-                      ? "bg-surface text-ink border border-emerald-500/60 shadow-xs font-black ring-1 ring-emerald-500/30"
+                      ? "bg-surface text-ink border border-emerald-500/60 shadow-2xs font-black ring-1 ring-emerald-500/30"
                       : "text-muted hover:text-ink hover:bg-surface/50 border border-transparent"
                   }`}
                 >
-                  <span className="text-sm shrink-0">{league.icon}</span>
+                  <span className="text-xs shrink-0">{league.icon}</span>
                   <span className="shrink-0">{league.name}</span>
                   <span
-                    className={`shrink-0 px-2 py-0.5 rounded-full text-[10px] font-mono font-black ${
+                    className={`shrink-0 px-1.5 py-0.2 rounded-full text-[9px] font-mono font-black ${
                       isActive
                         ? "bg-emerald-500 text-white"
                         : "bg-surface border border-line text-muted"
@@ -174,7 +174,7 @@ export function ValueMatchesView({ matches }: { matches: ValueMatchItem[] }) {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="🔍 ابحث باسم الفريق في فرص القيمة..."
-            className="w-full rounded-xl border border-line bg-surface px-4 py-2.5 text-xs font-semibold text-ink placeholder:text-muted focus:border-emerald-500 focus:outline-none transition-colors"
+            className="w-full rounded-xl border border-line bg-surface px-3.5 py-2 text-xs font-semibold text-ink placeholder:text-muted focus:border-emerald-500 focus:outline-none transition-colors"
           />
           {searchQuery && (
             <button
@@ -190,10 +190,10 @@ export function ValueMatchesView({ matches }: { matches: ValueMatchItem[] }) {
 
       {/* 3. Match Value Cards List */}
       {filteredMatches.length === 0 ? (
-        <div className="rounded-2xl border border-line bg-surface p-12 text-center space-y-3 shadow-2xs">
-          <span className="text-3xl block">🔍</span>
-          <h3 className="text-sm font-black text-ink">لا توجد مواجهات مطابقة للفلتر المحدد</h3>
-          <p className="text-xs text-muted max-w-md mx-auto">
+        <div className="rounded-2xl border border-line bg-surface p-8 text-center space-y-2 shadow-2xs">
+          <span className="text-2xl block">🔍</span>
+          <h3 className="text-xs font-black text-ink">لا توجد مواجهات مطابقة للفلتر المحدد</h3>
+          <p className="text-[11px] text-muted max-w-md mx-auto">
             جرّب اختيار تبويب دوري آخر أو إعادة ضبط نص البحث لاستعراض كافة فرص القيمة.
           </p>
           <button
@@ -202,13 +202,13 @@ export function ValueMatchesView({ matches }: { matches: ValueMatchItem[] }) {
               setSelectedLeague("ALL");
               setSearchQuery("");
             }}
-            className="press-scale inline-block px-4 py-2 rounded-xl bg-accent text-white font-bold text-xs shadow-xs"
+            className="press-scale inline-block px-3.5 py-1.5 rounded-xl bg-accent text-white font-bold text-xs shadow-xs"
           >
             عرض كافة فرص القيمة ({matches.length})
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-4">
+        <div className="grid grid-cols-1 gap-3">
           {filteredMatches.map((m) => {
             const analytics = m.analytics_json ? JSON.parse(m.analytics_json) : null;
             const val = analytics?.value;
@@ -229,36 +229,36 @@ export function ValueMatchesView({ matches }: { matches: ValueMatchItem[] }) {
             return (
               <div
                 key={m.id}
-                className="rounded-2xl border border-emerald-500/30 bg-surface p-5 space-y-4 shadow-2xs hover:border-emerald-500/60 transition-all"
+                className="rounded-xl border border-emerald-500/30 bg-surface p-3.5 sm:p-4 space-y-3 shadow-2xs hover:border-emerald-500/60 transition-all"
               >
                 {/* Card Top Pill & Date */}
-                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line pb-3">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line pb-2.5">
                   <div className="flex items-center gap-2">
-                    <span className="px-3 py-1 rounded-lg bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-black text-xs">
+                    <span className="px-2.5 py-0.5 rounded-md bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-black text-[11px]">
                       {m.league_name_ar}
                     </span>
-                    <span className="text-xs font-bold text-muted">
+                    <span className="text-[11px] font-bold text-muted">
                       {formatShortDate(m.utc_date)}
                     </span>
                   </div>
 
                   <Link
                     href={`/match/${encodeURIComponent(m.id)}`}
-                    className="press-scale inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-panel border border-line hover:border-emerald-500 text-ink hover:text-emerald-600 dark:hover:text-emerald-400 font-black text-xs no-underline transition-all shadow-2xs"
+                    className="press-scale inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-panel border border-line hover:border-emerald-500 text-ink hover:text-emerald-600 dark:hover:text-emerald-400 font-black text-xs no-underline transition-all shadow-2xs"
                   >
-                    <span>تحليل المباراة بالكامل</span>
+                    <span>تحليل المباراة</span>
                     <span>←</span>
                   </Link>
                 </div>
 
                 {/* Match Content Layout */}
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
                   {/* Teams & Probabilities */}
-                  <div className="space-y-2">
-                    <h3 className="text-base sm:text-xl font-black text-ink tracking-tight">
-                      {m.home_name_ar} <span className="text-muted font-normal me-1.5 ms-1.5">ضد</span> {m.away_name_ar}
+                  <div className="space-y-1">
+                    <h3 className="text-sm sm:text-base font-black text-ink tracking-tight">
+                      {m.home_name_ar} <span className="text-muted font-normal me-1 ms-1">ضد</span> {m.away_name_ar}
                     </h3>
-                    <div className="flex items-center gap-2 text-xs font-semibold text-muted">
+                    <div className="flex items-center gap-1.5 text-[11px] font-semibold text-muted">
                       <span>احتمال النموذج:</span>
                       <span className="font-bold text-ink">{(m.p_home * 100).toFixed(0)}% للمضيف</span>
                       <span>·</span>
@@ -270,25 +270,25 @@ export function ValueMatchesView({ matches }: { matches: ValueMatchItem[] }) {
 
                   {/* Value Key Metrics Grid */}
                   {val && (
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs shrink-0">
-                      <div className="rounded-xl border border-line bg-panel p-3 text-center space-y-0.5 shadow-2xs min-w-[5.5rem]">
-                        <span className="text-[10px] font-bold text-muted block">الجانب المرشح</span>
-                        <div className={`font-black truncate ${sideTextColor}`}>{sideLabel}</div>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs shrink-0">
+                      <div className="rounded-lg border border-line bg-panel p-2 text-center space-y-0.5 shadow-2xs min-w-[5rem]">
+                        <span className="text-[9px] font-bold text-muted block">الجانب المرشح</span>
+                        <div className={`font-black truncate text-xs ${sideTextColor}`}>{sideLabel}</div>
                       </div>
 
-                      <div className="rounded-xl border border-line bg-panel p-3 text-center space-y-0.5 shadow-2xs min-w-[5rem]">
-                        <span className="text-[10px] font-bold text-muted block">السعر المتاح</span>
-                        <div className="font-mono font-black text-ink text-sm tabular">{val.odds}</div>
+                      <div className="rounded-lg border border-line bg-panel p-2 text-center space-y-0.5 shadow-2xs min-w-[4.5rem]">
+                        <span className="text-[9px] font-bold text-muted block">السعر المتاح</span>
+                        <div className="font-mono font-black text-ink text-xs tabular">{val.odds}</div>
                       </div>
 
-                      <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-center space-y-0.5 shadow-2xs min-w-[5.5rem]">
-                        <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 block">الفائدة (+EV)</span>
-                        <div className="font-mono font-black text-emerald-600 dark:text-emerald-400 text-sm tabular">+{(val.ev * 100).toFixed(1)}%</div>
+                      <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-2 text-center space-y-0.5 shadow-2xs min-w-[5rem]">
+                        <span className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 block">الفائدة (+EV)</span>
+                        <div className="font-mono font-black text-emerald-600 dark:text-emerald-400 text-xs tabular">+{(val.ev * 100).toFixed(1)}%</div>
                       </div>
 
-                      <div className="rounded-xl border border-line bg-panel p-3 text-center space-y-0.5 shadow-2xs min-w-[5rem]">
-                        <span className="text-[10px] font-bold text-muted block">رهان كيلي الربع</span>
-                        <div className="font-mono font-black text-ink text-sm tabular">{(val.stake * 100).toFixed(1)}%</div>
+                      <div className="rounded-lg border border-line bg-panel p-2 text-center space-y-0.5 shadow-2xs min-w-[4.5rem]">
+                        <span className="text-[9px] font-bold text-muted block">رهان كيلي الربع</span>
+                        <div className="font-mono font-black text-ink text-xs tabular">{(val.stake * 100).toFixed(1)}%</div>
                       </div>
                     </div>
                   )}
