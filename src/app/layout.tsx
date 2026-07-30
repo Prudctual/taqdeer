@@ -6,7 +6,6 @@ import { SiteSidebar } from "@/components/SiteSidebar";
 import { ThemeProvider } from "@/components/ThemeContext";
 import { AdvancedModeProvider } from "@/components/AdvancedModeContext";
 import { CommandMenu } from "@/components/CommandMenu";
-import { StudioCustomizer } from "@/components/StudioCustomizer";
 import "./globals.css";
 
 const arabic = IBM_Plex_Sans_Arabic({
@@ -18,8 +17,8 @@ const arabic = IBM_Plex_Sans_Arabic({
 
 export const metadata: Metadata = {
   title: {
-    default: "تقدير — منصة واستوديو توقعات كرة القدم العالمية",
-    template: "%s · تقدير Studio",
+    default: "تقدير — منصة وتوقعات كرة القدم العالمية",
+    template: "%s · تقدير",
   },
   description:
     "احتمالات 1X2 وتوزيع النتائج للدوريات الأوروبية الخمس الكبرى بنماذج Dixon–Coles وElo معايرة على نتائج حقيقية.",
@@ -42,9 +41,6 @@ export default function RootLayout({
           <AdvancedModeProvider>
             {/* Command Menu Modal (Cmd+K) */}
             <CommandMenu />
-
-            {/* Floating Theme Customizer Panel */}
-            <StudioCustomizer />
 
             {/* Dashboard Shell */}
             <div className="flex h-full">
