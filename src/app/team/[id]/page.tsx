@@ -7,6 +7,8 @@ import { MatchList } from "@/components/MatchList";
 import { RevealOnView } from "@/components/RevealOnView";
 import { TrophyIcon } from "@/components/Icons";
 import { PlayerRadarChart } from "@/components/PlayerRadarChart";
+import { TeamTacticalSpotlight } from "@/components/TeamTacticalSpotlight";
+import { SquadGridWidget } from "@/components/SquadGridWidget";
 import {
   BackBar,
   EmptyState,
@@ -341,7 +343,20 @@ export default async function TeamPage({
         </div>
       )}
 
-      {/* 3 — Player Impact Radar Chart */}
+      {/* 3 — Comprehensive Tactical & Manager Analysis */}
+      <TeamTacticalSpotlight
+        teamName={team.name_ar}
+        leagueName={team.league_name_ar}
+        elo={team.elo}
+        attackRating={team.attack}
+        defenseRating={team.defense}
+        crestUrl={team.crest_url}
+      />
+
+      {/* 4 — Player Impact & Squad Grid */}
+      <SquadGridWidget homeTeam={team.name_ar} awayTeam="المنافس" />
+
+      {/* 5 — Player Impact Radar Chart */}
       <PlayerRadarChart
         playerName={team.name_ar.includes("مدريد") ? "فينيسيوس جونيور" : team.name_ar.includes("ليفربول") ? "محمد صلاح" : "قائد خط الهجوم"}
         playerPos="مهاجم حاسم"

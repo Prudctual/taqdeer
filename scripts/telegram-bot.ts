@@ -562,9 +562,9 @@ async function pollUpdates() {
   }
 }
 
-// ⏰ Start 30-minute recurring broadcast loop (1,800,000 ms)
-const THIRTY_MINUTES_MS = 30 * 60 * 1000;
-setInterval(broadcastToAllSubscribers, THIRTY_MINUTES_MS);
+// ⏰ Start 1-hour recurring broadcast loop (3,600,000 ms)
+const ONE_HOUR_MS = 60 * 60 * 1000;
+setInterval(broadcastToAllSubscribers, ONE_HOUR_MS);
 
 // Start polling
 pollUpdates();
