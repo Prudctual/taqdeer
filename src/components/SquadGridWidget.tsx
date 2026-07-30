@@ -1,3 +1,5 @@
+"use client";
+
 import { SectionCard } from "./ui";
 
 interface PlayerInfo {
