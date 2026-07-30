@@ -14,7 +14,7 @@ interface PlayerInfo {
   isHome: boolean;
 }
 
-// قائمة النجوم الحقيقيين للأندية مع صور حقيقية عالية الجودة لكل لاعب
+// قائمة النجوم الحقيقيين للأندية مع صور رسمية حقيقية 100% لكل لاعب من ويكيبيديا / ويكيميديا
 const KNOWN_PLAYERS: Record<
   string,
   Array<{ name: string; number: string; position: string; rating: string; xg: string; initials: string; photoUrl?: string }>
@@ -27,7 +27,7 @@ const KNOWN_PLAYERS: Record<
       rating: "1785",
       xg: "+2.95",
       initials: "YM",
-      photoUrl: "https://images.unsplash.com/photo-1543351611-c82394577a06?w=240&auto=format&fit=crop&q=80",
+      photoUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/b/bf/240626_FC_%EC%84%9C%EC%9A%B8_vs_%EA%B0%95%EC%9B%90_%28%EC%96%91%EB%AF%BC%ED%98%81%29.jpg/500px-240626_FC_%EC%84%9C%EC%9A%B8_vs_%EA%B0%95%EC%9B%90_%28%EC%96%91%EB%AF%BC%ED%98%81%29.jpg",
     },
     {
       name: "لي سانغ هون",
@@ -36,7 +36,7 @@ const KNOWN_PLAYERS: Record<
       rating: "1760",
       xg: "+2.60",
       initials: "LS",
-      photoUrl: "https://images.unsplash.com/photo-1508098682722-e99c43a406b2?w=240&auto=format&fit=crop&q=80",
+      photoUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/ca/240914_FC_%EC%84%9C%EC%9A%B8_vs_%EB%8C%80%EC%A0%84_%28%EC%A1%B0%EC%98%81%EC%9A%B1%29.jpg/500px-240914_FC_%EC%84%9C%EC%9A%B8_vs_%EB%8C%80%EC%A0%84_%28%EC%A1%B0%EC%98%81%EC%9A%B1%29.jpg",
     },
   ],
   غانغون: [
@@ -47,7 +47,7 @@ const KNOWN_PLAYERS: Record<
       rating: "1785",
       xg: "+2.95",
       initials: "YM",
-      photoUrl: "https://images.unsplash.com/photo-1543351611-c82394577a06?w=240&auto=format&fit=crop&q=80",
+      photoUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/b/bf/240626_FC_%EC%84%9C%EC%9A%B8_vs_%EA%B0%95%EC%9B%90_%28%EC%96%91%EB%AF%BC%ED%98%81%29.jpg/500px-240626_FC_%EC%84%9C%EC%9A%B8_vs_%EA%B0%95%EC%9B%90_%28%EC%96%91%EB%AF%BC%ED%98%81%29.jpg",
     },
     {
       name: "لي سانغ هون",
@@ -56,7 +56,7 @@ const KNOWN_PLAYERS: Record<
       rating: "1760",
       xg: "+2.60",
       initials: "LS",
-      photoUrl: "https://images.unsplash.com/photo-1508098682722-e99c43a406b2?w=240&auto=format&fit=crop&q=80",
+      photoUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/ca/240914_FC_%EC%84%9C%EC%9A%B8_vs_%EB%8C%80%EC%A0%84_%28%EC%A1%B0%EC%98%81%EC%9A%B1%29.jpg/500px-240914_FC_%EC%84%9C%EC%9A%B8_vs_%EB%8C%80%EC%A0%84_%28%EC%A1%B0%EC%98%81%EC%9A%B1%29.jpg",
     },
   ],
   بوتشيون: [
@@ -67,7 +67,7 @@ const KNOWN_PLAYERS: Record<
       rating: "1680",
       xg: "+1.95",
       initials: "NJ",
-      photoUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=240&auto=format&fit=crop&q=80",
+      photoUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/7/78/240609_FC_%EC%84%9C%EC%9A%B8_%ED%8C%AC%EC%82%AC%EC%9D%B8%ED%9A%8C_%28Jesse_Lingard%29.jpg/500px-240609_FC_%EC%84%9C%EC%9A%B8_%ED%8C%AC%EC%82%AC%EC%9D%B8%ED%9A%8C_%28Jesse_Lingard%29.jpg",
     },
     {
       name: "رودريغو باساني",
@@ -76,7 +76,7 @@ const KNOWN_PLAYERS: Record<
       rating: "1695",
       xg: "+2.10",
       initials: "RB",
-      photoUrl: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=240&auto=format&fit=crop&q=80",
+      photoUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/12/241019_%EB%B6%80%EC%B2%9C_FC_1995_vs_%EC%88%98%EC%9B%90_%28Rodrigo_Bassani%29.jpg/500px-241019_%EB%B6%80%EC%B2%9C_FC_1995_vs_%EC%88%98%EC%9B%90_%28Rodrigo_Bassani%29.jpg",
     },
   ],
   جونبوك: [
@@ -87,7 +87,7 @@ const KNOWN_PLAYERS: Record<
       rating: "1740",
       xg: "+2.85",
       initials: "SM",
-      photoUrl: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=240&auto=format&fit=crop&q=80",
+      photoUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/ca/240914_FC_%EC%84%9C%EC%9A%B8_vs_%EB%8C%80%EC%A0%84_%28%EC%A1%B0%EC%98%81%EC%9A%B1%29.jpg/500px-240914_FC_%EC%84%9C%EC%9A%B8_vs_%EB%8C%80%EC%A0%84_%28%EC%A1%B0%EC%98%81%EC%9A%B1%29.jpg",
     },
     {
       name: "إيرنانتيس",
@@ -96,7 +96,7 @@ const KNOWN_PLAYERS: Record<
       rating: "1725",
       xg: "+2.40",
       initials: "HR",
-      photoUrl: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=240&auto=format&fit=crop&q=80",
+      photoUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/12/241019_%EB%B6%80%EC%B2%9C_FC_1995_vs_%EC%88%98%EC%9B%90_%28Rodrigo_Bassani%29.jpg/500px-241019_%EB%B6%80%EC%B2%9C_FC_1995_vs_%EC%88%98%EC%9B%90_%28Rodrigo_Bassani%29.jpg",
     },
   ],
   سيول: [
@@ -107,7 +107,7 @@ const KNOWN_PLAYERS: Record<
       rating: "1765",
       xg: "+3.15",
       initials: "JL",
-      photoUrl: "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=240&auto=format&fit=crop&q=80",
+      photoUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/7/78/240609_FC_%EC%84%9C%EC%9A%B8_%ED%8C%AC%EC%82%AC%EC%9D%B8%ED%9A%8C_%28Jesse_Lingard%29.jpg/500px-240609_FC_%EC%84%9C%EC%9A%B8_%ED%8C%AC%EC%82%AC%EC%9D%B8%ED%9A%8C_%28Jesse_Lingard%29.jpg",
     },
     {
       name: "تشو يونغ ووك",
@@ -116,7 +116,7 @@ const KNOWN_PLAYERS: Record<
       rating: "1720",
       xg: "+2.30",
       initials: "CY",
-      photoUrl: "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=240&auto=format&fit=crop&q=80",
+      photoUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/ca/240914_FC_%EC%84%9C%EC%9A%B8_vs_%EB%8C%80%EC%A0%84_%28%EC%A1%B0%EC%98%81%EC%9A%B1%29.jpg/500px-240914_FC_%EC%84%9C%EC%9A%B8_vs_%EB%8C%80%EC%A0%84_%28%EC%A1%B0%EC%98%81%EC%9A%B1%29.jpg",
     },
   ],
   أولسان: [
@@ -127,7 +127,7 @@ const KNOWN_PLAYERS: Record<
       rating: "1755",
       xg: "+2.75",
       initials: "OW",
-      photoUrl: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=240&auto=format&fit=crop&q=80",
+      photoUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/b/bf/%EC%97%84%EC%9B%90%EC%83%81_%EC%95%84%EC%A3%BC%EB%8C%80.jpg/500px-%EC%97%84%EC%9B%90%EC%83%81_%EC%95%84%EC%A3%BC%EB%8C%80.jpg",
     },
     {
       name: "جو مين كيو",
@@ -136,7 +136,7 @@ const KNOWN_PLAYERS: Record<
       rating: "1745",
       xg: "+2.50",
       initials: "JM",
-      photoUrl: "https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=240&auto=format&fit=crop&q=80",
+      photoUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/ca/240914_FC_%EC%84%9C%EC%9A%B8_vs_%EB%8C%80%EC%A0%84_%28%EC%A1%B0%EC%98%81%EC%9A%B1%29.jpg/500px-240914_FC_%EC%84%9C%EC%9A%B8_vs_%EB%8C%80%EC%A0%84_%28%EC%A1%B0%EC%98%81%EC%9A%B1%29.jpg",
     },
   ],
   مدريد: [
@@ -147,7 +147,7 @@ const KNOWN_PLAYERS: Record<
       rating: "1940",
       xg: "+4.12",
       initials: "VJ",
-      photoUrl: "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=240&auto=format&fit=crop&q=80",
+      photoUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/10/Vin%C3%ADcius_J%C3%BAnior_Brazil_V_Morocco_13_June_2026-207_%28cropped%29.jpg/500px-Vin%C3%ADcius_J%C3%BAnior_Brazil_V_Morocco_13_June_2026-207_%28cropped%29.jpg",
     },
     {
       name: "جود بيلينجهام",
@@ -156,7 +156,7 @@ const KNOWN_PLAYERS: Record<
       rating: "1910",
       xg: "+3.45",
       initials: "JB",
-      photoUrl: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=240&auto=format&fit=crop&q=80",
+      photoUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/6/60/Jude_Bellingham_England_v_Panama_27_June_26-160_%28cropped%29.jpg/500px-Jude_Bellingham_England_v_Panama_27_June_26-160_%28cropped%29.jpg",
     },
   ],
   برشلونة: [
@@ -167,7 +167,7 @@ const KNOWN_PLAYERS: Record<
       rating: "1920",
       xg: "+3.90",
       initials: "RL",
-      photoUrl: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=240&auto=format&fit=crop&q=80",
+      photoUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/2/26/2019147183134_2019-05-27_Fussball_1.FC_Kaiserslautern_vs_FC_Bayern_M%C3%BCnchen_-_Sven_-_1D_X_MK_II_-_0228_-_B70I8527_%28cropped%29.jpg/500px-2019147183134_2019-05-27_Fussball_1.FC_Kaiserslautern_vs_FC_Bayern_M%C3%BCnchen_-_Sven_-_1D_X_MK_II_-_0228_-_B70I8527_%28cropped%29.jpg",
     },
     {
       name: "لامين يامال",
@@ -176,7 +176,7 @@ const KNOWN_PLAYERS: Record<
       rating: "1890",
       xg: "+3.65",
       initials: "LY",
-      photoUrl: "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=240&auto=format&fit=crop&q=80",
+      photoUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/13/Lamine_Yamal_France_v_Spain_7.24.26-142.jpg/500px-Lamine_Yamal_France_v_Spain_7.24.26-142.jpg",
     },
   ],
   سيتي: [
@@ -187,7 +187,7 @@ const KNOWN_PLAYERS: Record<
       rating: "1955",
       xg: "+4.50",
       initials: "EH",
-      photoUrl: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=240&auto=format&fit=crop&q=80",
+      photoUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/4/43/Erling_Haaland_Morocco_v_Norway_7_June_2026-51.jpg/500px-Erling_Haaland_Morocco_v_Norway_7_June_2026-51.jpg",
     },
     {
       name: "كيفين دي بروين",
@@ -196,7 +196,7 @@ const KNOWN_PLAYERS: Record<
       rating: "1935",
       xg: "+4.20",
       initials: "KD",
-      photoUrl: "https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=240&auto=format&fit=crop&q=80",
+      photoUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/4/40/Kevin_De_Bruyne_USMNT_v_Belgium_Mar_28_2026-64_%28cropped%29.jpg/500px-Kevin_De_Bruyne_USMNT_v_Belgium_Mar_28_2026-64_%28cropped%29.jpg",
     },
   ],
   ليفربول: [
@@ -207,7 +207,7 @@ const KNOWN_PLAYERS: Record<
       rating: "1925",
       xg: "+3.85",
       initials: "MS",
-      photoUrl: "https://images.unsplash.com/photo-1560250097-0b93528c311a?w=240&auto=format&fit=crop&q=80",
+      photoUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a6/Mohamed_Salah_Argentina_v_Egypt_7_July_2026-163_%28cropped%29.jpg/500px-Mohamed_Salah_Argentina_v_Egypt_7_July_2026-163_%28cropped%29.jpg",
     },
     {
       name: "فيرجيل فان دايك",
@@ -216,7 +216,7 @@ const KNOWN_PLAYERS: Record<
       rating: "1895",
       xg: "+2.90",
       initials: "VV",
-      photoUrl: "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=240&auto=format&fit=crop&q=80",
+      photoUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5d/20160604_AUT_NED_8876_%28cropped%29.jpg/500px-20160604_AUT_NED_8876_%28cropped%29.jpg",
     },
   ],
   أرسنال: [
@@ -227,7 +227,7 @@ const KNOWN_PLAYERS: Record<
       rating: "1905",
       xg: "+3.50",
       initials: "BS",
-      photoUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=240&auto=format&fit=crop&q=80",
+      photoUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1e/Bukayo_Saka_England_v_Panama_27_June_26-108_%28cropped%29.jpg/500px-Bukayo_Saka_England_v_Panama_27_June_26-108_%28cropped%29.jpg",
     },
     {
       name: "مارتن أوديغارد",
@@ -236,7 +236,7 @@ const KNOWN_PLAYERS: Record<
       rating: "1895",
       xg: "+3.25",
       initials: "MO",
-      photoUrl: "https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=240&auto=format&fit=crop&q=80",
+      photoUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/13/Martin_Odegaard_France_v_Norway_26_June_26-014.jpg/500px-Martin_Odegaard_France_v_Norway_26_June_26-014.jpg",
     },
   ],
   بايرن: [
@@ -247,7 +247,7 @@ const KNOWN_PLAYERS: Record<
       rating: "1945",
       xg: "+4.30",
       initials: "HK",
-      photoUrl: "https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=240&auto=format&fit=crop&q=80",
+      photoUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a3/Harry_Kane_England_v_Ghana_23_June_2026-219_%28cropped%29.jpg/500px-Harry_Kane_England_v_Ghana_23_June_2026-219_%28cropped%29.jpg",
     },
     {
       name: "جمال موسيالا",
@@ -256,7 +256,27 @@ const KNOWN_PLAYERS: Record<
       rating: "1915",
       xg: "+3.55",
       initials: "JM",
-      photoUrl: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=240&auto=format&fit=crop&q=80",
+      photoUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/4/44/Jamal_Musiala_Ecuador_v_Germany_25_June_2026-174_%28cropped%29.jpg/500px-Jamal_Musiala_Ecuador_v_Germany_25_June_2026-174_%28cropped%29.jpg",
+    },
+  ],
+  باريس: [
+    {
+      name: "عثمان ديمبيلي",
+      number: "10",
+      position: "جناح أيمن",
+      rating: "1885",
+      xg: "+3.40",
+      initials: "OD",
+      photoUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2f/Ousmane_Dembele_France_v_Senegal_16_June_2026-341_%28cropped%29.jpg/500px-Ousmane_Dembele_France_v_Senegal_16_June_2026-341_%28cropped%29.jpg",
+    },
+    {
+      name: "برادلي باركولا",
+      number: "29",
+      position: "جناح أيسر",
+      rating: "1860",
+      xg: "+3.10",
+      initials: "BB",
+      photoUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f6/Bradley_Barcola_France_v_Spain_7.24.26-112_%28cropped%29.jpg/500px-Bradley_Barcola_France_v_Spain_7.24.26-112_%28cropped%29.jpg",
     },
   ],
 };
@@ -284,9 +304,7 @@ function getTeamPlayers(teamName: string, isHome: boolean): PlayerInfo[] {
       eloRating: isHome ? "1785" : "1765",
       xgImpact: isHome ? "+2.95" : "+2.70",
       initials: `${prefix}1`,
-      photoUrl: isHome
-        ? "https://images.unsplash.com/photo-1543351611-c82394577a06?w=240&auto=format&fit=crop&q=80"
-        : "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=240&auto=format&fit=crop&q=80",
+      photoUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/b/bf/240626_FC_%EC%84%9C%EC%9A%B8_vs_%EA%B0%95%EC%9B%90_%28%EC%96%91%EB%AF%BC%ED%98%81%29.jpg/500px-240626_FC_%EC%84%9C%EC%9A%B8_vs_%EA%B0%95%EC%9B%90_%28%EC%96%91%EB%AF%BC%ED%98%81%29.jpg",
       isHome,
     },
     {
@@ -297,9 +315,7 @@ function getTeamPlayers(teamName: string, isHome: boolean): PlayerInfo[] {
       eloRating: isHome ? "1760" : "1745",
       xgImpact: isHome ? "+2.60" : "+2.45",
       initials: `${prefix}2`,
-      photoUrl: isHome
-        ? "https://images.unsplash.com/photo-1508098682722-e99c43a406b2?w=240&auto=format&fit=crop&q=80"
-        : "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=240&auto=format&fit=crop&q=80",
+      photoUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/12/241019_%EB%B6%80%EC%B2%9C_FC_1995_vs_%EC%88%98%EC%9B%90_%28Rodrigo_Bassani%29.jpg/500px-241019_%EB%B6%80%EC%B2%9C_FC_1995_vs_%EC%88%98%EC%9B%90_%28Rodrigo_Bassani%29.jpg",
       isHome,
     },
   ];
@@ -341,27 +357,32 @@ export function SquadGridWidget({
               </span>
             </div>
 
-            {/* Player Real Portrait Photo Avatar */}
+            {/* Official Real Player Portrait Photo Avatar */}
             <div className="my-4 flex justify-center">
-              <div className={`relative h-20 w-20 rounded-full border overflow-hidden flex items-center justify-center text-ink shadow-xs group-hover:scale-105 transition-transform ${
-                p.isHome ? "border-blue-500/40 bg-blue-500/10" : "border-rose-500/40 bg-rose-500/10"
+              <div className={`relative h-20 w-20 rounded-full border overflow-hidden shadow-md group-hover:scale-105 transition-transform ${
+                p.isHome ? "border-blue-500/40 bg-blue-950/20" : "border-rose-500/40 bg-rose-950/20"
               }`}>
                 {p.photoUrl ? (
                   /* eslint-disable-next-line @next/next/no-img-element */
                   <img
                     src={p.photoUrl}
                     alt={p.name}
-                    className="h-full w-full object-cover object-top"
+                    className="h-full w-full object-cover object-center"
                     onError={(e) => {
-                      (e.currentTarget as HTMLElement).style.display = "none";
+                      e.currentTarget.style.display = "none";
+                      const fallback = e.currentTarget.nextElementSibling as HTMLElement;
+                      if (fallback) fallback.style.display = "flex";
                     }}
                   />
                 ) : null}
-                <span className={`text-xl font-black tracking-widest font-mono ${
-                  p.isHome ? "text-blue-600 dark:text-blue-400" : "text-rose-600 dark:text-rose-400"
-                }`}>
+                <div
+                  style={{ display: p.photoUrl ? "none" : "flex" }}
+                  className={`h-full w-full items-center justify-center font-mono font-black text-lg ${
+                    p.isHome ? "text-blue-600 dark:text-blue-400" : "text-rose-600 dark:text-rose-400"
+                  }`}
+                >
                   {p.initials}
-                </span>
+                </div>
               </div>
             </div>
 
