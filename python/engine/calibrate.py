@@ -56,11 +56,30 @@ def apply_temperature(p: Prob3, temperature: float) -> Prob3:
 
 
 def odds_to_probs(oh: float, od: float, oa: float) -> Prob3 | None:
-    """Convert decimal odds to normalized implied probabilities (remove overround)."""
+    """
+    Convert decimal odds to un-biased implied probabilities using Power Method de-margining.
+    Removes bookmaker overround while correcting Favorite-Longshot Bias.
+    """
     if min(oh, od, oa) <= 1.01:
         return None
-    ih, id_, ia = 1.0 / oh, 1.0 / od, 1.0 / oa
-    s = ih + id_ + ia
+    invs = np.array([1.0 / oh, 1.0 / od, 1.0 / oa], dtype=float)
+    s = float(invs.sum())
     if s <= 0:
         return None
-    return ih / s, id_ / s, ia / s
+    if abs(s - 1.0) < 1e-4:
+        return float(invs[0]), float(invs[1]), float(invs[2])
+
+    try:
+        from scipy.optimize import brentq
+
+        def diff(k: float) -> float:
+            return float(np.sum(np.power(invs, k)) - 1.0)
+
+        k_opt = float(brentq(diff, 0.4, 4.0))
+        p = np.power(invs, k_opt)
+        p = p / p.sum()
+        return float(p[0]), float(p[1]), float(p[2])
+    except Exception:
+        # Fallback to standard normalization if numerical root solver fails
+        return float(invs[0] / s), float(invs[1] / s), float(invs[2] / s)
+

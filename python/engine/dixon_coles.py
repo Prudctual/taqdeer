@@ -57,9 +57,19 @@ def dc_probability(x: int, y: int, lam: float, mu: float, rho: float) -> float:
     return float(math.exp(logp))
 
 
-def make_weights(days_ago: Sequence[float], half_life_days: float = 150.0) -> np.ndarray:
+def make_weights(
+    days_ago: Sequence[float],
+    half_life_days: float = 150.0,
+    goal_margins: Sequence[int] | None = None,
+) -> np.ndarray:
     arr = np.asarray(days_ago, dtype=float)
-    return np.power(0.5, arr / half_life_days)
+    decay = np.power(0.5, arr / half_life_days)
+    if goal_margins is not None:
+        margins = np.asarray(goal_margins, dtype=float)
+        # Discount blowout matches (|margin| >= 3) to filter out garbage-time noise
+        blowout_mask = np.abs(margins) >= 3
+        decay[blowout_mask] *= 0.85
+    return decay
 
 
 def fit_dixon_coles(
@@ -74,7 +84,8 @@ def fit_dixon_coles(
     away_i = np.array([idx[m.away] for m in matches], dtype=int)
     xg = np.array([m.home_goals for m in matches], dtype=float)
     yg = np.array([m.away_goals for m in matches], dtype=float)
-    weights = make_weights([m.days_ago for m in matches], half_life_days)
+    margins = [m.home_goals - m.away_goals for m in matches]
+    weights = make_weights([m.days_ago for m in matches], half_life_days, margins)
 
     def unpack(theta: np.ndarray) -> Tuple[np.ndarray, np.ndarray, float, float, float]:
         attack = theta[:n].copy()
