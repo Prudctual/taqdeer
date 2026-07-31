@@ -253,6 +253,21 @@ async function sendMessage(chatId: number, text: string, replyMarkup?: unknown) 
   }
 }
 
+async function answerCallbackQuery(callbackQueryId: string, text?: string) {
+  try {
+    await fetch(`${API_URL}/answerCallbackQuery`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        callback_query_id: callbackQueryId,
+        text,
+      }),
+    });
+  } catch (err) {
+    console.error("Error answering callback query:", err);
+  }
+}
+
 const MAIN_KEYBOARD = {
   inline_keyboard: [
     [
@@ -341,6 +356,47 @@ function getValueBets(): MatchRow[] {
     LIMIT 6;
   `;
   return db.query(query).all() as MatchRow[];
+}
+
+function getBankerPicks(limit: number = 4): MatchRow[] {
+  const query = `
+    SELECT m.id, m.utc_date, m.status,
+           ht.name_ar as home_team, at.name_ar as away_team,
+           m.home_goals, m.away_goals,
+           l.name_ar as league_name,
+           p.p_home, p.p_draw, p.p_away, p.confidence,
+           p.lambda_home, p.lambda_away,
+           m.odds_home, m.odds_draw, m.odds_away
+    FROM matches m
+    JOIN leagues l ON l.id = m.league_id
+    JOIN teams ht ON ht.id = m.home_team_id
+    JOIN teams at ON at.id = m.away_team_id
+    JOIN predictions p ON p.match_id = m.id
+    WHERE (m.status IN ('SCHEDULED', 'TIMED') OR m.utc_date >= date('now'))
+      AND (p.p_home IS NOT NULL OR p.p_away IS NOT NULL)
+    ORDER BY m.utc_date ASC, MAX(COALESCE(p.p_home, 0), COALESCE(p.p_away, 0)) DESC
+    LIMIT ?;
+  `;
+  const rows = db.query(query).all(limit) as MatchRow[];
+  if (rows.length > 0) return rows;
+
+  const fallbackQuery = `
+    SELECT m.id, m.utc_date, m.status,
+           ht.name_ar as home_team, at.name_ar as away_team,
+           m.home_goals, m.away_goals,
+           l.name_ar as league_name,
+           p.p_home, p.p_draw, p.p_away, p.confidence,
+           p.lambda_home, p.lambda_away,
+           m.odds_home, m.odds_draw, m.odds_away
+    FROM matches m
+    JOIN leagues l ON l.id = m.league_id
+    JOIN teams ht ON ht.id = m.home_team_id
+    JOIN teams at ON at.id = m.away_team_id
+    JOIN predictions p ON p.match_id = m.id
+    ORDER BY p.confidence DESC
+    LIMIT ?;
+  `;
+  return db.query(fallbackQuery).all(limit) as MatchRow[];
 }
 
 // Ensure subscribers table exists
@@ -492,6 +548,8 @@ async function handleUpdate(update: TelegramUpdate) {
     const cb = update.callback_query;
     const chatId = cb.message.chat.id;
     const data = cb.data;
+
+    await answerCallbackQuery(cb.id);
 
     if (data === "cmd_main_menu") {
       await sendMessage(chatId, "<b>القائمة الرئيسية لمنصة «تقدير»:</b>", MAIN_KEYBOARD);
