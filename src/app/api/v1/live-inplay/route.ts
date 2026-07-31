@@ -1,6 +1,16 @@
 import { NextResponse } from "next/server";
+import {
+  checkRateLimit,
+  createRateLimitErrorResponse,
+  getSecureApiHeaders,
+} from "@/lib/rate-limit";
 
 export async function POST(request: Request) {
+  const rl = checkRateLimit(request);
+  if (!rl.allowed) {
+    return createRateLimitErrorResponse(rl);
+  }
+
   try {
     const body = await request.json();
     const {
@@ -17,18 +27,17 @@ export async function POST(request: Request) {
     const remainingMinutes = Math.max(0, 90 - Math.min(minute, 90));
     const r = remainingMinutes / 90.0;
 
-    // Red card penalty: ~25% degradation per red card on remaining expected goals
+    // Red card penalty
     const redHomeFactor = Math.pow(0.75, Math.max(0, home_red_cards));
     const redAwayFactor = Math.pow(0.75, Math.max(0, away_red_cards));
 
-    // Opponent advantage boost when playing against a reduced team (+15% boost per opponent red card)
+    // Opponent advantage boost
     const oppHomeBoost = Math.pow(1.15, Math.max(0, away_red_cards));
     const oppAwayBoost = Math.pow(1.15, Math.max(0, home_red_cards));
 
     const remLamHome = Math.max(0.01, lambda_home * r * redHomeFactor * oppHomeBoost);
     const remLamAway = Math.max(0.01, lambda_away * r * redAwayFactor * oppAwayBoost);
 
-    // Poisson probability function
     function poisson(k: number, lam: number): number {
       let fact = 1;
       for (let i = 1; i <= k; i++) fact *= i;
@@ -102,18 +111,14 @@ export async function POST(request: Request) {
         timestamp: new Date().toISOString(),
       },
       {
-        headers: {
-          "Access-Control-Allow-Origin": "*",
-          "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
-          "Access-Control-Allow-Headers": "Content-Type, Authorization",
-        },
+        headers: getSecureApiHeaders(rl),
       }
     );
   } catch (err: unknown) {
     const errorMsg = err instanceof Error ? err.message : String(err);
     return NextResponse.json(
       { success: false, error: errorMsg },
-      { status: 500 }
+      { status: 500, headers: getSecureApiHeaders(rl) }
     );
   }
 }
@@ -124,7 +129,7 @@ export async function OPTIONS() {
     headers: {
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization, X-API-Key",
     },
   });
 }
