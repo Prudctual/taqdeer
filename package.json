@@ -11,6 +11,7 @@
     "sync:crests": "tsx scripts/sync-data.ts --crests-only",
     "fit": ".venv/bin/python scripts/fit-and-predict.py",
     "pipeline": "bun run sync && bun run fit",
+    "mlops": ".venv/bin/python scripts/mlops_pipeline.py --once",
     "telegram": "bun scripts/telegram-bot.ts",
     "notify": "bun scripts/send-telegram-notification.ts",
     "check": "tsx scripts/selfcheck.ts && tsc --noEmit && eslint .",

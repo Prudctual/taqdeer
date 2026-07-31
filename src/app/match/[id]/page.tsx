@@ -23,6 +23,7 @@ import { MatchCountdownHero } from "@/components/MatchCountdownHero";
 import { UpsetAlertBadge } from "@/components/UpsetAlertBadge";
 import { LiveMatchDataSync } from "@/components/LiveMatchDataSync";
 import { PlayerRadarChart } from "@/components/PlayerRadarChart";
+import { LiveInPlaySimulator } from "@/components/LiveInPlaySimulator";
 import { getMatchDetailedInfo } from "@/lib/match-details";
 
 
@@ -606,6 +607,14 @@ export default async function MatchPage({
         awayTeam={match.away_name_ar}
         homeSW={analytics?.home_sw}
         awaySW={analytics?.away_sw}
+      />
+
+      {/* محاكي الأداء المباشر أثناء المباراة */}
+      <LiveInPlaySimulator
+        initialLambdaHome={match.lambda_home || 1.45}
+        initialLambdaAway={match.lambda_away || 1.15}
+        homeNameAr={match.home_name_ar}
+        awayNameAr={match.away_name_ar}
       />
 
       {hasShots ? (
