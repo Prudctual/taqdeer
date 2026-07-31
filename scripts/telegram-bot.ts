@@ -42,42 +42,75 @@ interface MatchRow {
   odds_away: number | null;
 }
 
-const TIMEZONE = "Asia/Baghdad";
+const BAGHDAD_UTC_OFFSET_MS = 3 * 3600 * 1000; // UTC+3 for Baghdad / Mecca timezone
 
-function formatMatchDateLabel(utcDate: string): string {
-  const dateObj = new Date(utcDate);
+function parseUtcDate(utcDateStr: string): Date {
+  let s = (utcDateStr || "").trim();
+  if (!s) return new Date();
+  if (!s.endsWith("Z") && !s.includes("+") && !s.includes("-", 10)) {
+    s = s.replace(" ", "T") + "Z";
+  }
+  return new Date(s);
+}
+
+function formatMatchTimeBaghdad(utcDateStr: string): string {
+  const d = parseUtcDate(utcDateStr);
+  if (isNaN(d.getTime())) return "15:00";
+
+  const baghdadMs = d.getTime() + BAGHDAD_UTC_OFFSET_MS;
+  const bDate = new Date(baghdadMs);
+
+  const hours24 = bDate.getUTCHours();
+  const minutes = bDate.getUTCMinutes().toString().padStart(2, "0");
+
+  const period = hours24 >= 12 ? "م" : "ص";
+  const hours12 = hours24 % 12 === 0 ? 12 : hours24 % 12;
+
+  const toArabicDigits = (num: number | string) =>
+    String(num).replace(/\d/g, (digit) => "٠١٢٣٤٥٦٧٨٩"[parseInt(digit, 10)]!);
+
+  return `${toArabicDigits(hours12)}:${toArabicDigits(minutes)} ${period}`;
+}
+
+function formatMatchDateLabel(utcDateStr: string): string {
+  const d = parseUtcDate(utcDateStr);
+  if (isNaN(d.getTime())) return "قريباً";
+
   const now = new Date();
 
-  const getDayStr = (d: Date) =>
-    d.toLocaleDateString("en-CA", { timeZone: TIMEZONE });
+  const baghdadMatchMs = d.getTime() + BAGHDAD_UTC_OFFSET_MS;
+  const baghdadNowMs = now.getTime() + BAGHDAD_UTC_OFFSET_MS;
 
-  const matchDayStr = getDayStr(dateObj);
-  const todayStr = getDayStr(now);
+  const bMatch = new Date(baghdadMatchMs);
+  const bNow = new Date(baghdadNowMs);
 
-  const tomorrowObj = new Date(now.getTime() + 24 * 3600 * 1000);
-  const tomorrowStr = getDayStr(tomorrowObj);
+  const getDayKey = (dt: Date) =>
+    `${dt.getUTCFullYear()}-${String(dt.getUTCMonth() + 1).padStart(2, "0")}-${String(dt.getUTCDate()).padStart(2, "0")}`;
 
-  const timeStr = dateObj.toLocaleTimeString("ar-EG", {
-    timeZone: TIMEZONE,
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  const matchDayKey = getDayKey(bMatch);
+  const todayDayKey = getDayKey(bNow);
 
-  if (matchDayStr === todayStr) {
+  const tomorrowDate = new Date(baghdadNowMs + 24 * 3600 * 1000);
+  const tomorrowDayKey = getDayKey(tomorrowDate);
+
+  const timeStr = formatMatchTimeBaghdad(utcDateStr);
+
+  if (matchDayKey === todayDayKey) {
     return `اليوم · ${timeStr}`;
-  } else if (matchDayStr === tomorrowStr) {
+  } else if (matchDayKey === tomorrowDayKey) {
     return `غداً · ${timeStr}`;
   } else {
-    const dayName = dateObj.toLocaleDateString("ar-EG", {
-      timeZone: TIMEZONE,
-      weekday: "short",
-    });
-    const dateStr = dateObj.toLocaleDateString("ar-EG", {
-      timeZone: TIMEZONE,
-      day: "numeric",
-      month: "short",
-    });
-    return `${dayName}، ${dateStr} · ${timeStr}`;
+    const dayNames = ["الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
+    const monthNames = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
+
+    const dayName = dayNames[bMatch.getUTCDay()] || "اليوم";
+    const dayNum = bMatch.getUTCDate();
+    const monthName = monthNames[bMatch.getUTCMonth()] || "";
+
+    const toArabicDigits = (num: number | string) =>
+      String(num).replace(/\d/g, (digit) => "٠١٢٣٤٥٦٧٨٩"[parseInt(digit, 10)]!);
+
+    return `${dayName}، ${toArabicDigits(dayNum)} ${monthName} · ${timeStr}`;
   }
 }
 
