@@ -1,4 +1,5 @@
 import { SectionCard } from "./ui";
+import { getTeamTactics } from "@/lib/team-tactics";
 
 interface StrengthsWeaknessesProps {
   homeTeam: string;
@@ -13,11 +14,14 @@ export function StrengthsWeaknessesWidget({
   homeSW,
   awaySW,
 }: StrengthsWeaknessesProps) {
-  const hStr = homeSW?.strengths || ["نجاعة هجومية عالية", "منظومة دفاعية صلبة"];
-  const hWeak = homeSW?.weaknesses || ["تراجع الأداء خارج الملعب"];
+  const hProf = getTeamTactics(homeTeam, true);
+  const aProf = getTeamTactics(awayTeam, false);
 
-  const aStr = awaySW?.strengths || ["ضغط عالي وارتداد سريع"];
-  const aWeak = awaySW?.weaknesses || ["استقبال أهداف في الأشواط الثانية"];
+  const hStr = homeSW?.strengths || hProf.strengths;
+  const hWeak = homeSW?.weaknesses || hProf.weaknesses;
+
+  const aStr = awaySW?.strengths || aProf.strengths;
+  const aWeak = awaySW?.weaknesses || aProf.weaknesses;
 
   return (
     <SectionCard

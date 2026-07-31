@@ -653,6 +653,11 @@ export default async function MatchPage({
       />
 
       <LogisticsWidget
+        matchId={match.id}
+        leagueId={match.leagueId}
+        homeTeamId={match.home_id}
+        homeTeamNameAr={match.home_name_ar}
+        refereeName={match.refereeName}
         logistics={analytics?.components?.logistics as { travel_distance_km?: number; pitch_surface?: string; is_european_midweek?: boolean; logistics_summary?: string }}
       />
 

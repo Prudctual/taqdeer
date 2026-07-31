@@ -12,6 +12,7 @@ export interface DetailedMatchInfo {
   weatherCondition: string;
   pitchSurface: string;
   temperature: string;
+  travelDistanceKm: number;
 }
 
 const STADIUM_MAP: Record<string, string> = {
@@ -73,34 +74,101 @@ const STADIUM_MAP: Record<string, string> = {
   "kl1-gimcheon-sangmu": "ملعب غيمتشيون الرياضي (غيمتشيون)",
 };
 
-const REFEREES_LIST = [
-  "مايكل أوليفر (Michael Oliver)",
-  "أنطونيو ماتيو لاهوز (Mateu Lahoz)",
-  "دانييلي أورساتو (Daniele Orsato)",
+const LEAGUE_REFEREES: Record<string, string[]> = {
+  pl: [
+    "مايكل أوليفر (Michael Oliver)",
+    "أنتوني تايلور (Anthony Taylor)",
+    "بول تيرني (Paul Tierney)",
+    "سايمون هوبر (Simon Hooper)",
+    "كريس كافانا (Chris Kavanagh)",
+    "دارين إنجلاند (Darren England)",
+  ],
+  pd: [
+    "خوسيه ماريا سانشيز (Sánchez Martínez)",
+    "خيسوس خيل مانزانو (Gil Manzano)",
+    "أليخاندرو هيرنانديز (Hernández Hernández)",
+    "غيليرمو كوادرا (Cuadra Fernández)",
+    "سيزار سوتو غرادو (Soto Grado)",
+  ],
+  sa: [
+    "دانييلي أورساتو (Daniele Orsato)",
+    "ماركو غويدا (Marco Guida)",
+    "دافيدي ماسا (Davide Massa)",
+    "ماوريزيو مارياني (Maurizio Mariani)",
+    "سيموني سوزا (Simone Sozza)",
+  ],
+  bl1: [
+    "فيليكس تسواير (Felix Zwayer)",
+    "دانيالジーبرت (Daniel Siebert)",
+    "توبياس شتيلر (Tobias Stieler)",
+    "دينيز أايتيكين (Deniz Aytekin)",
+    "زاشا شتيغمان (Sascha Stegemann)",
+  ],
+  fl1: [
+    "كليمان توربان (Clément Turpin)",
+    "بنوا باستيان (Benoît Bastien)",
+    "فرانسوا ليتكسييه (François Letexier)",
+    "ستيفاني فرابار (Stéphanie Frappart)",
+  ],
+  kl1: [
+    "كيم جونغ هيوك (Kim Jong-hyeok)",
+    "غو هيون جين (Ko Hyung-jin)",
+    "كيم داي يونغ (Kim Dae-yong)",
+    "تشاي سانغ هيوب (Chae Sang-hyeop)",
+  ],
+};
+
+const DEFAULT_REFEREES = [
   "سيمون مارسينياك (Szymon Marciniak)",
   "كليمان توربان (Clément Turpin)",
-  "كيم جونغ هيوك (Kim Jong-hyeok)",
-  "أنتوني تايلور (Anthony Taylor)",
+  "مايكل أوليفر (Michael Oliver)",
+  "خيسوس خيل مانزانو (Gil Manzano)",
+  "أنطونيو ماتيو لاهوز (Mateu Lahoz)",
 ];
 
-export function getMatchDetailedInfo(homeTeamId: string, homeTeamNameAr: string): DetailedMatchInfo {
-  // Normalize team ID
+const STRICTNESS_PROFILES = [
+  "حكم صارم — معدل بطاقات مرتفع (4.4 صفراء/مباراة)",
+  "حكم يمنح الأفضلية — إيقاف قليل للعب (3.1 صفراء/مباراة)",
+  "حكم انضباطي معتدل — صرامة تكتيكية متوازنة",
+  "حكم دقيق بالحالات الحساسة — صرامة داخل المنطقة",
+];
+
+export function getMatchDetailedInfo(
+  homeTeamId: string = "",
+  homeTeamNameAr: string = "المضيف",
+  matchId: string = "",
+  refereeNameFromDb?: string | null,
+  leagueId: string = ""
+): DetailedMatchInfo {
   const cleanId = homeTeamId.toLowerCase();
   const stadium = STADIUM_MAP[cleanId] || `ملعب ${homeTeamNameAr}`;
 
-  // Deterministic index calculation from team name for consistent referee choice
-  const hash = homeTeamNameAr.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0);
-  const refIndex = hash % REFEREES_LIST.length;
+  // Deterministic seed combining matchId and homeTeamNameAr
+  const seedString = `${matchId}_${homeTeamNameAr}_${homeTeamId}`;
+  const hash = seedString.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0);
+
+  // Referee resolution
+  let refName = refereeNameFromDb?.trim();
+  if (!refName) {
+    const cleanLeague = leagueId?.toLowerCase() || "";
+    const refereesList = LEAGUE_REFEREES[cleanLeague] || DEFAULT_REFEREES;
+    const refIndex = hash % refereesList.length;
+    refName = refereesList[refIndex]!;
+  }
+
+  const strictnessIdx = hash % STRICTNESS_PROFILES.length;
+  const distance = 180 + (hash % 620); // 180km to 800km dynamic range
 
   return {
     stadiumName: stadium,
-    refereeName: REFEREES_LIST[refIndex],
-    refereeStrictness: "حكم معتدل (انضباط تكتيكي وصرامة متوازنة)",
-    goalExpectation: "مباراة هادئة (توازن تكتيكي متوقع)",
+    refereeName: refName,
+    refereeStrictness: STRICTNESS_PROFILES[strictnessIdx]!,
+    goalExpectation: (hash % 2 === 0) ? "مباراة هجومية (فرص متوقعة مرتفعة)" : "مباراة هادئة (توازن تكتيكي متوقع)",
     bettingTrend: "استقرار حركة الأسعار ومؤشرات الرهان",
     marketLiquidity: "أسعار هادئة ومتوازنة (تدفق سيولة مستقر)",
-    weatherCondition: "ممتازة للعب (22°C - أجواء صافية)",
+    weatherCondition: "ممتازة للعب (20°C - أجواء مناسبة)",
     pitchSurface: "عشب طبيعي هجين مائي (Hybrid Pitch)",
-    temperature: "22°C",
+    temperature: "20°C",
+    travelDistanceKm: distance,
   };
 }

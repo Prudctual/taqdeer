@@ -1,4 +1,5 @@
 import { SectionCard } from "./ui";
+import { getTeamTactics } from "@/lib/team-tactics";
 
 interface PlayerRadarProps {
   playerName?: string;
@@ -37,11 +38,13 @@ export function PlayerRadarChart(props: PlayerRadarProps) {
     const radius = 72;
     const angleStep = (2 * Math.PI) / 5;
 
-    const points = values.map((val, i) => {
-      const angle = i * angleStep - Math.PI / 2;
-      const r = (val / 100) * radius;
-      return `${(center + r * Math.cos(angle)).toFixed(1)},${(center + r * Math.sin(angle)).toFixed(1)}`;
-    }).join(" ");
+    const points = values
+      .map((val, i) => {
+        const angle = i * angleStep - Math.PI / 2;
+        const r = (val / 100) * radius;
+        return `${(center + r * Math.cos(angle)).toFixed(1)},${(center + r * Math.sin(angle)).toFixed(1)}`;
+      })
+      .join(" ");
 
     return (
       <SectionCard
@@ -55,11 +58,13 @@ export function PlayerRadarChart(props: PlayerRadarProps) {
                 {[0.4, 0.7, 1.0].map((lvl, idx) => (
                   <polygon
                     key={idx}
-                    points={Array.from({ length: 5 }).map((_, i) => {
-                      const angle = i * angleStep - Math.PI / 2;
-                      const r = radius * lvl;
-                      return `${(center + r * Math.cos(angle)).toFixed(1)},${(center + r * Math.sin(angle)).toFixed(1)}`;
-                    }).join(" ")}
+                    points={Array.from({ length: 5 })
+                      .map((_, i) => {
+                        const angle = i * angleStep - Math.PI / 2;
+                        const r = radius * lvl;
+                        return `${(center + r * Math.cos(angle)).toFixed(1)},${(center + r * Math.sin(angle)).toFixed(1)}`;
+                      })
+                      .join(" ")}
                     fill="none"
                     stroke="var(--line)"
                     strokeDasharray="2 2"
@@ -117,11 +122,15 @@ export function PlayerRadarChart(props: PlayerRadarProps) {
   // وضع المقارنة التكتيكية بين نجمي الفريقين (صفحة المباراة)
   const homeTeam = props.homeTeam || "المضيف";
   const awayTeam = props.awayTeam || "الضيف";
-  const homeStarName = props.homeStarName || "مهاجم الفريق";
-  const awayStarName = props.awayStarName || "صانع الألعاب";
 
-  const homeMetrics = { scoring: 88, playmaking: 76, pressing: 84, control: 82, fitness: 90 };
-  const awayMetrics = { scoring: 82, playmaking: 91, pressing: 70, control: 89, fitness: 86 };
+  const homeProf = getTeamTactics(homeTeam, true);
+  const awayProf = getTeamTactics(awayTeam, false);
+
+  const homeStarName = props.homeStarName || homeProf.starPlayers[0]?.name || "نجم المضيف";
+  const awayStarName = props.awayStarName || awayProf.starPlayers[0]?.name || "نجم الضيف";
+
+  const homeMetrics = homeProf.starPlayers[0]?.metrics || { scoring: 88, playmaking: 76, pressing: 84, control: 82, fitness: 90 };
+  const awayMetrics = awayProf.starPlayers[0]?.metrics || { scoring: 82, playmaking: 91, pressing: 70, control: 89, fitness: 86 };
 
   const labels = ["التهديف xG", "الصناعة xA", "الضغط", "السيطرة", "اللياقة"];
   const homeValues = [homeMetrics.scoring, homeMetrics.playmaking, homeMetrics.pressing, homeMetrics.control, homeMetrics.fitness];

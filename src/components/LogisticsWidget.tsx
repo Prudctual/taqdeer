@@ -2,8 +2,11 @@ import { SectionCard } from "./ui";
 import { getMatchDetailedInfo } from "@/lib/match-details";
 
 interface LogisticsWidgetProps {
+  matchId?: string;
+  leagueId?: string;
   homeTeamId?: string;
   homeTeamNameAr?: string;
+  refereeName?: string | null;
   logistics?: {
     travel_distance_km?: number;
     pitch_surface?: string;
@@ -13,15 +16,24 @@ interface LogisticsWidgetProps {
 }
 
 export function LogisticsWidget({
+  matchId = "",
+  leagueId = "",
   homeTeamId = "",
   homeTeamNameAr = "المضيف",
+  refereeName,
   logistics,
 }: LogisticsWidgetProps) {
-  const info = getMatchDetailedInfo(homeTeamId, homeTeamNameAr);
-  const distance = logistics?.travel_distance_km ?? 320;
+  const info = getMatchDetailedInfo(
+    homeTeamId,
+    homeTeamNameAr,
+    matchId,
+    refereeName,
+    leagueId
+  );
+  const distance = logistics?.travel_distance_km ?? info.travelDistanceKm;
   const summary =
     logistics?.logistics_summary ??
-    "ظروف مباراة مثالية، تحكيم معتدل، وأسعار هادئة ومتوازنة بالسوق";
+    `ظروف مباراة جديدة في ${info.stadiumName} بقيادة ${info.refereeName}.`;
 
   return (
     <SectionCard
@@ -65,8 +77,8 @@ export function LogisticsWidget({
             <div className="text-sm font-black text-ink truncate">
               {info.refereeName}
             </div>
-            <p className="text-[11px] font-bold text-purple-600 dark:text-purple-400">
-              صرامة الحكم: <strong className="font-black text-purple-600 dark:text-purple-400">حكم معتدل</strong>
+            <p className="text-[11px] font-bold text-purple-600 dark:text-purple-400 truncate">
+              {info.refereeStrictness}
             </p>
           </div>
         </div>
@@ -84,10 +96,10 @@ export function LogisticsWidget({
           </div>
           <div className="p-3.5 space-y-1 bg-surface text-start">
             <div className="text-xs font-black text-emerald-600 dark:text-emerald-400">
-              توقع الأهداف: <strong className="text-ink font-black">مباراة هادئة (توازن)</strong>
+              توقع الأهداف: <strong className="text-ink font-black">{info.goalExpectation}</strong>
             </div>
             <p className="text-[11px] font-semibold text-muted">
-              اتجاه المراهنات: <strong className="text-ink font-bold">أسعار هادئة ومتوازنة</strong>
+              اتجاه المراهنات: <strong className="text-ink font-bold">{info.bettingTrend}</strong>
             </p>
           </div>
         </div>
@@ -105,7 +117,7 @@ export function LogisticsWidget({
           </div>
           <div className="p-3.5 space-y-1 bg-surface text-start">
             <div className="text-xs font-black text-amber-600 dark:text-amber-400">
-              الطقس: <strong className="text-ink font-black">ممتازة للعب (22°C)</strong>
+              الطقس: <strong className="text-ink font-black">{info.weatherCondition}</strong>
             </div>
             <p className="text-[11px] font-semibold text-muted truncate">
               {info.pitchSurface}

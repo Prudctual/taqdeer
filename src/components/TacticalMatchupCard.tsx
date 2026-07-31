@@ -1,4 +1,5 @@
 import { SectionCard } from "./ui";
+import { getTeamTactics } from "@/lib/team-tactics";
 
 interface TacticalMatchupProps {
   homeTeam: string;
@@ -17,13 +18,17 @@ export function TacticalMatchupCard({
   awayTeam,
   tactics,
 }: TacticalMatchupProps) {
-  const hForm = tactics?.home_formation || "4-3-3";
-  const aForm = tactics?.away_formation || "4-3-3";
-  const hStyle = tactics?.home_style || "أسلوب متوازن بين الاستحواذ والتراجع";
-  const aStyle = tactics?.away_style || "أسلوب متوازن بين الاستحواذ والتراجع";
+  const hProf = getTeamTactics(homeTeam, true);
+  const aProf = getTeamTactics(awayTeam, false);
+
+  const hForm = tactics?.home_formation || hProf.formation;
+  const aForm = tactics?.away_formation || aProf.formation;
+  const hStyle = tactics?.home_style || hProf.style;
+  const aStyle = tactics?.away_style || aProf.style;
+
   const commentary =
     tactics?.matchup_commentary ||
-    "صراع تكتيكي متوازن في خط الوسط والأطراف مع تكافؤ في البناء التكتيكي.";
+    `صراع تكتيكي بين أسلوب ${hForm} لـ ${homeTeam} (${hStyle}) وأسلوب ${aForm} لـ ${awayTeam} (${aStyle}).`;
 
   return (
     <SectionCard
@@ -94,7 +99,7 @@ export function TacticalMatchupCard({
           </div>
         </div>
 
-        {/* Tactical Matchup Commentary Banner - Emoji Free */}
+        {/* Tactical Matchup Commentary Banner */}
         <div className="rounded-2xl border border-line bg-panel/70 p-4 sm:p-5 space-y-1.5 shadow-2xs">
           <div className="flex items-center gap-2">
             <span className="h-2 w-2 rounded-full bg-accent" />
