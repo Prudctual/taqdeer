@@ -890,18 +890,19 @@ export function getBankerPicks(limit = 4, leagueId?: string): BankerPick[] {
     const leagueFilter = leagueId ? "AND m.league_id = ?" : "";
     const params: unknown[] = leagueId ? [leagueId, limit] : [limit];
 
-    const rows = db.prepare(`
+    let rows = db.prepare(`
       SELECT m.id as matchId, l.name_ar as leagueName,
              ht.name_ar as homeTeam, at.name_ar as awayTeam,
-             p.p_home, p.p_draw, p.p_away, p.confidence
-      FROM predictions p
-      JOIN matches m ON m.id = p.match_id
+             p.p_home, p.p_draw, p.p_away, p.confidence, m.utc_date
+      FROM matches m
       JOIN leagues l ON l.id = m.league_id
       JOIN teams ht ON ht.id = m.home_team_id
       JOIN teams at ON at.id = m.away_team_id
-      WHERE (p.p_home IS NOT NULL OR p.p_away IS NOT NULL)
+      JOIN predictions p ON p.match_id = m.id
+      WHERE (m.status IN ('SCHEDULED', 'TIMED') OR m.utc_date >= date('now'))
+        AND (p.p_home IS NOT NULL OR p.p_away IS NOT NULL)
       ${leagueFilter}
-      ORDER BY MAX(COALESCE(p.p_home, 0), COALESCE(p.p_away, 0)) DESC, m.utc_date DESC
+      ORDER BY m.utc_date ASC, MAX(COALESCE(p.p_home, 0), COALESCE(p.p_away, 0)) DESC
       LIMIT ?
     `).all(...params) as Array<{
       matchId: string;
@@ -912,7 +913,25 @@ export function getBankerPicks(limit = 4, leagueId?: string): BankerPick[] {
       p_draw: number | null;
       p_away: number | null;
       confidence: number | null;
+      utc_date: string;
     }>;
+
+    if (rows.length === 0) {
+      rows = db.prepare(`
+        SELECT m.id as matchId, l.name_ar as leagueName,
+               ht.name_ar as homeTeam, at.name_ar as awayTeam,
+               p.p_home, p.p_draw, p.p_away, p.confidence, m.utc_date
+        FROM matches m
+        JOIN leagues l ON l.id = m.league_id
+        JOIN teams ht ON ht.id = m.home_team_id
+        JOIN teams at ON at.id = m.away_team_id
+        JOIN predictions p ON p.match_id = m.id
+        WHERE (p.p_home IS NOT NULL OR p.p_away IS NOT NULL)
+        ${leagueFilter}
+        ORDER BY m.utc_date DESC
+        LIMIT ?
+      `).all(...params) as typeof rows;
+    }
 
     return rows.map((r) => {
       const pH = r.p_home ?? 0.5;
