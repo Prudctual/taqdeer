@@ -874,3 +874,68 @@ export function getValueMatches(): Array<{
   }
 }
 
+export type BankerPick = {
+  matchId: string;
+  homeTeam: string;
+  awayTeam: string;
+  leagueName: string;
+  pickLabel: string;
+  probability: number;
+  confidence: number;
+};
+
+export function getBankerPicks(limit = 4, leagueId?: string): BankerPick[] {
+  try {
+    const db = getDb();
+    const leagueFilter = leagueId ? "AND m.league_id = ?" : "";
+    const params: unknown[] = leagueId ? [leagueId, limit] : [limit];
+
+    const rows = db.prepare(`
+      SELECT m.id as matchId, l.name_ar as leagueName,
+             ht.name_ar as homeTeam, at.name_ar as awayTeam,
+             p.p_home, p.p_draw, p.p_away, p.confidence
+      FROM predictions p
+      JOIN matches m ON m.id = p.match_id
+      JOIN leagues l ON l.id = m.league_id
+      JOIN teams ht ON ht.id = m.home_team_id
+      JOIN teams at ON at.id = m.away_team_id
+      WHERE (p.p_home IS NOT NULL OR p.p_away IS NOT NULL)
+      ${leagueFilter}
+      ORDER BY MAX(COALESCE(p.p_home, 0), COALESCE(p.p_away, 0)) DESC, m.utc_date DESC
+      LIMIT ?
+    `).all(...params) as Array<{
+      matchId: string;
+      leagueName: string;
+      homeTeam: string;
+      awayTeam: string;
+      p_home: number | null;
+      p_draw: number | null;
+      p_away: number | null;
+      confidence: number | null;
+    }>;
+
+    return rows.map((r) => {
+      const pH = r.p_home ?? 0.5;
+      const pA = r.p_away ?? 0.3;
+      const isHomePick = pH >= pA;
+      const prob = isHomePick ? pH : pA;
+      const pickLabel = isHomePick ? `فوز المضيف (1)` : `فوز الضيف (2)`;
+      const conf = r.confidence ?? Math.min(0.95, prob + 0.12);
+
+      return {
+        matchId: r.matchId,
+        homeTeam: r.homeTeam,
+        awayTeam: r.awayTeam,
+        leagueName: r.leagueName,
+        pickLabel,
+        probability: Number(prob.toFixed(2)),
+        confidence: Number(conf.toFixed(2)),
+      };
+    });
+  } catch (e) {
+    console.error("Error in getBankerPicks:", e);
+    return [];
+  }
+}
+
+

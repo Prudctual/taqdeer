@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { MatchList } from "@/components/MatchList";
 import { HeroMatchBanner } from "@/components/HeroMatchBanner";
-import { BankerPicksWidget } from "@/components/BankerPicksWidget";
+import { BankerPicksWidget, type BankerPick } from "@/components/BankerPicksWidget";
 import { LeagueTableWidget, type StandingTeam } from "@/components/LeagueTableWidget";
 import { NextKickoff } from "@/components/NextKickoff";
 import type { MatchCard } from "@/lib/queries";
@@ -32,14 +32,17 @@ interface StudioHomeViewProps {
   recentGroups?: MatchGroup[];
   nextMatch?: MatchCard;
   standingsByLeague?: Record<string, StandingTeam[]>;
+  bankerPicks?: BankerPick[];
 }
 
 export function StudioHomeView({
   upcomingCount,
   leagues = [],
   groups = [],
+  recentGroups = [],
   nextMatch,
   standingsByLeague = {},
+  bankerPicks = [],
 }: StudioHomeViewProps) {
   const [activeTab, setActiveTab] = useState<
     "matches" | "value" | "bankers" | "standings"
@@ -200,7 +203,7 @@ export function StudioHomeView({
         {/* Tab 3: Banker Picks */}
         {activeTab === "bankers" && (
           <div className="space-y-4 animate-in fade-in duration-200">
-            <BankerPicksWidget title="أأمن 4 توقعات للجولة الحالية" />
+            <BankerPicksWidget picks={bankerPicks} title="أأمن 4 توقعات للجولة الحالية" />
           </div>
         )}
 

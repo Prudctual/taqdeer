@@ -18,6 +18,7 @@ import {
   getAvailableSeasons,
   getStandings,
   getStrengthTable,
+  getBankerPicks,
 } from "@/lib/queries";
 import { leagueEmblemUrl, tournamentEmblemUrl, type TournamentType } from "@/lib/leagues";
 
@@ -607,7 +608,7 @@ export default async function LeaguePage({
       </div>
 
       {/* Banker Picks Section */}
-      <BankerPicksWidget title={`أأمن 4 توقعات لـ ${league.name_ar}`} />
+      <BankerPicksWidget picks={getBankerPicks(4, league.id)} title={`أأمن 4 توقعات لـ ${league.name_ar}`} />
 
       {/* League Matches Section */}
       <div className="card bg-surface p-5 sm:p-7 rounded-2xl border border-line shadow-xs space-y-4">

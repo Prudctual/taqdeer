@@ -9,6 +9,7 @@ import {
   matchCount,
   getLeagues,
   getStandings,
+  getBankerPicks,
 } from "@/lib/queries";
 
 export const revalidate = 300;
@@ -19,6 +20,7 @@ export default function HomePage() {
   const recentByLeague = getRecentFinishedByLeague(5);
   const lastFit = getMeta("last_fit");
   const leagues = getLeagues();
+  const bankerPicks = getBankerPicks(4);
 
   const standingsByLeague: Record<string, StandingTeam[]> = {};
   leagues.forEach((l) => {
@@ -137,6 +139,7 @@ export default function HomePage() {
       recentGroups={recentByLeague}
       nextMatch={nextMatch}
       standingsByLeague={standingsByLeague}
+      bankerPicks={bankerPicks}
     />
   );
 }
