@@ -409,6 +409,35 @@ function getBankerPicks(limit: number = 4): MatchRow[] {
   return db.query(fallbackQuery).all(limit) as MatchRow[];
 }
 
+// Anti-Spam & Rate Limiter Store
+const userActivityMap = new Map<number, { timestamps: number[]; blockedUntil: number }>();
+
+function isRateLimited(chatId: number): boolean {
+  const now = Date.now();
+  const userData = userActivityMap.get(chatId) || { timestamps: [], blockedUntil: 0 };
+
+  if (now < userData.blockedUntil) {
+    return true;
+  }
+
+  userData.timestamps = userData.timestamps.filter((ts) => now - ts < 10000);
+  userData.timestamps.push(now);
+
+  if (userData.timestamps.length > 10) {
+    userData.blockedUntil = now + 120000;
+    userActivityMap.set(chatId, userData);
+    return true;
+  }
+
+  userActivityMap.set(chatId, userData);
+  return false;
+}
+
+function sanitizeString(str?: string | null): string | null {
+  if (!str) return null;
+  return str.replace(/</g, "&lt;").replace(/>/g, "&gt;").trim();
+}
+
 // Ensure subscribers table exists
 db.run(`
   CREATE TABLE IF NOT EXISTS telegram_subscribers (
@@ -434,16 +463,24 @@ function saveSubscriber(chatId: number, username?: string, firstName?: string) {
   }
 }
 
+type TelegramUser = {
+  id: number;
+  is_bot?: boolean;
+  username?: string;
+  first_name?: string;
+  language_code?: string;
+};
+
 type TelegramUpdate = {
   message?: {
     chat: { id: number };
-    from?: { username?: string; first_name?: string };
+    from?: TelegramUser;
     text?: string;
   };
   callback_query?: {
     id: string;
     data?: string;
-    from?: { username?: string; first_name?: string };
+    from?: TelegramUser;
     message?: { chat: { id: number } };
   };
 };
@@ -452,9 +489,28 @@ async function handleUpdate(update: TelegramUpdate) {
   const user = update.message?.from || update.callback_query?.from;
   const chatId = update.message?.chat?.id || update.callback_query?.message?.chat?.id;
 
-  if (chatId && user) {
-    saveSubscriber(chatId, user.username, user.first_name);
+  // Anti-Bot Filter: Reject all automated bot accounts
+  if (user?.is_bot) {
+    console.log(`🛡️ [Anti-Bot] Rejecting request from bot user ID: ${user.id}`);
+    return;
   }
+
+  if (!chatId || !user) return;
+
+  // Rate Limiting & Anti-Spam Flood Protection
+  if (isRateLimited(chatId)) {
+    if (update.callback_query) {
+      await answerCallbackQuery(update.callback_query.id, "⚠️ تفعيل الحماية المؤقتة ضد طلبات السخام.");
+    } else {
+      await sendMessage(
+        chatId,
+        "<b>⚠️ تنبيه حماية المنصة:</b>\nتم رصد طلبات مكثفة ومتتالية من حسابك. لحماية الخدمة من الحسابات الوهمية والسبام، يرجى الانتظار لمدة دقيقتين."
+      );
+    }
+    return;
+  }
+
+  saveSubscriber(chatId, sanitizeString(user.username) || undefined, sanitizeString(user.first_name) || undefined);
 
   const todayStr = new Date().toLocaleDateString("ar-EG", { day: "numeric", month: "short" });
 
