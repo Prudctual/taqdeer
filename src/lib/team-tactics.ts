@@ -375,6 +375,14 @@ const WEAKNESSES_POOL = [
   ["استقبال أهداف من تسديدات بعيدة"],
 ];
 
+function stringHash(str: string): number {
+  let hash = 5381;
+  for (let i = 0; i < str.length; i++) {
+    hash = (hash * 33) ^ str.charCodeAt(i);
+  }
+  return Math.abs(hash);
+}
+
 /**
  * Generates or retrieves team tactical profile deterministically.
  */
@@ -394,12 +402,12 @@ export function getTeamTactics(teamName: string, isHome: boolean = true): TeamTa
     return TOP_TEAMS_DB[matchedKey];
   }
 
-  // Deterministic fallback based on teamName hash
-  const hash = teamName.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  // Deterministic polynomial hash fallback based on teamName
+  const hash = stringHash(teamName);
   const formIdx = hash % FORMATIONS.length;
-  const styleIdx = (hash + 2) % STYLES.length;
-  const strIdx = hash % STRENGTHS_POOL.length;
-  const weakIdx = (hash + 3) % WEAKNESSES_POOL.length;
+  const styleIdx = (hash * 7 + 2) % STYLES.length;
+  const strIdx = (hash * 13) % STRENGTHS_POOL.length;
+  const weakIdx = (hash * 17 + 3) % WEAKNESSES_POOL.length;
 
   const baseElo = isHome ? 1720 + (hash % 60) : 1690 + (hash % 50);
   const p1Scoring = 78 + (hash % 15);
