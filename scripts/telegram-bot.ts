@@ -151,7 +151,7 @@ function getUpcomingMatches(limit: number = 8): MatchRow[] {
     LEFT JOIN predictions p ON p.match_id = m.id
     WHERE (m.status = 'TIMED' OR m.status = 'SCHEDULED')
       AND m.utc_date >= datetime('now')
-    ORDER BY m.utc_date ASC
+    ORDER BY (p.p_home IS NOT NULL) DESC, m.utc_date ASC
     LIMIT ?;
   `;
   return db.query(query).all(limit) as MatchRow[];
@@ -189,7 +189,7 @@ function formatMatchCard(m: MatchRow): string {
     text += `🏁 <b>النتيجة النهائية:</b> ${m.home_goals} - ${m.away_goals}\n`;
   }
 
-  if (m.p_home != null && m.p_draw != null && m.p_away != null) {
+  if (m.p_home != null && m.p_draw != null && m.p_away != null && (m.p_home > 0 || m.p_draw > 0 || m.p_away > 0)) {
     const pH = Math.round(m.p_home * 100);
     const pD = Math.round(m.p_draw * 100);
     const pA = Math.round(m.p_away * 100);
@@ -204,7 +204,7 @@ function formatMatchCard(m: MatchRow): string {
       pickP = pA;
     }
 
-    const conf = m.confidence ? Math.round(m.confidence * 100) : pickP;
+    const conf = m.confidence && m.confidence > 0 ? Math.round(m.confidence * 100) : pickP;
 
     text += `\n🎯 <b>التشخيص الكمّي:</b> ${pick} (ثقة ${conf}%)\n`;
     text += `📊 <b>توزيع الاحتمالات:</b>\n`;
@@ -227,19 +227,26 @@ function getConciseHighlights(): string {
     text += `أبرز المواجهات القادمة وأعلى الإشارات:\n\n`;
     for (const m of upcoming) {
       const dateLabel = formatMatchDateLabel(m.utc_date);
-      const pH = Math.round((m.p_home || 0) * 100);
-      const pD = Math.round((m.p_draw || 0) * 100);
-      const pA = Math.round((m.p_away || 0) * 100);
-      const conf = Math.round((m.confidence || 0) * 100);
-
-      let pick = `فوز ${m.home_team}`;
-      if (pA > pH && pA > pD) pick = `فوز ${m.away_team}`;
-      if (pD > pH && pD > pA) pick = "التعادل";
+      const hasPreds = m.p_home != null && m.p_draw != null && m.p_away != null && (m.p_home > 0 || m.p_draw > 0 || m.p_away > 0);
 
       text += `⚽ <b>${m.home_team} × ${m.away_team}</b>\n`;
       text += `🏆 <i>${m.league_name}</i> · ⏰ ${dateLabel}\n`;
-      text += `🎯 التوقع: <b>${pick}</b> (${conf}% ثقة)\n`;
-      text += `📊 الاحتمالات: 🏠 ${pH}% | 🤝 ${pD}% | ✈️ ${pA}%\n\n`;
+
+      if (hasPreds) {
+        const pH = Math.round(m.p_home! * 100);
+        const pD = Math.round(m.p_draw! * 100);
+        const pA = Math.round(m.p_away! * 100);
+        const conf = m.confidence && m.confidence > 0 ? Math.round(m.confidence * 100) : Math.max(pH, pD, pA);
+
+        let pick = `فوز ${m.home_team}`;
+        if (pA > pH && pA > pD) pick = `فوز ${m.away_team}`;
+        if (pD > pH && pD > pA) pick = "التعادل";
+
+        text += `🎯 التوقع: <b>${pick}</b> (${conf}% ثقة)\n`;
+        text += `📊 الاحتمالات: 🏠 ${pH}% | 🤝 ${pD}% | ✈️ ${pA}%\n\n`;
+      } else {
+        text += `🎯 <i>جاري حساب وتحليل النموذج الكمّي للمواجهة...</i>\n\n`;
+      }
     }
   } else {
     text += `لا تتوفر مباريات مجدولة خلال الساعات القادمة.\nيمكنك متابعة جداول الترتيب والتحليلات عبر المنصة.\n\n`;
