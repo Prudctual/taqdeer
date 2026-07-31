@@ -182,11 +182,11 @@ function searchMatchesByTeam(term: string): MatchRow[] {
 function formatMatchCard(m: MatchRow): string {
   const dateLabel = formatMatchDateLabel(m.utc_date);
 
-  let text = `<b>${m.home_team} × ${m.away_team}</b>\n`;
-  text += `<i>${m.league_name}</i> · ${dateLabel}\n`;
+  let text = `⚽ <b>${m.home_team} × ${m.away_team}</b>\n`;
+  text += `🏆 <i>${m.league_name}</i> · ⏰ ${dateLabel}\n`;
 
   if (m.status === "FINISHED" && m.home_goals !== null) {
-    text += `النتيجة النهائية: <b>${m.home_goals} - ${m.away_goals}</b>\n`;
+    text += `🏁 <b>النتيجة النهائية:</b> ${m.home_goals} - ${m.away_goals}\n`;
   }
 
   if (m.p_home != null && m.p_draw != null && m.p_away != null) {
@@ -194,7 +194,7 @@ function formatMatchCard(m: MatchRow): string {
     const pD = Math.round(m.p_draw * 100);
     const pA = Math.round(m.p_away * 100);
 
-    let pick = "تعادل";
+    let pick = "التعادل";
     let pickP = pD;
     if (pH >= pD && pH >= pA) {
       pick = `فوز ${m.home_team}`;
@@ -204,13 +204,15 @@ function formatMatchCard(m: MatchRow): string {
       pickP = pA;
     }
 
-    text += `التوصية: <b>${pick} (${pickP}%)</b>\n`;
-    text += `الاحتمالات: 🏠 ${pH}% | 🤝 ${pD}% | ✈️ ${pA}%\n`;
-    if (m.confidence) {
-      text += `نسبة الثقة: <b>${Math.round(m.confidence * 100)}%</b>\n`;
-    }
+    const conf = m.confidence ? Math.round(m.confidence * 100) : pickP;
+
+    text += `\n🎯 <b>التشخيص الكمّي:</b> ${pick} (ثقة ${conf}%)\n`;
+    text += `📊 <b>توزيع الاحتمالات:</b>\n`;
+    text += `  • 🏠 ${m.home_team}: <b>${pH}%</b>\n`;
+    text += `  • 🤝 التعادل: <b>${pD}%</b>\n`;
+    text += `  • ✈️ ${m.away_team}: <b>${pA}%</b>\n`;
   } else {
-    text += `التوقع: <i>جاري تحليل البيانات...</i>\n`;
+    text += `\n🔄 <i>جاري تحليل بيانات المواجهة...</i>\n`;
   }
 
   return text;
@@ -219,7 +221,7 @@ function formatMatchCard(m: MatchRow): string {
 function getConciseHighlights(): string {
   const upcoming = getUpcomingMatches(4);
 
-  let text = `<b>تحديث «تقدير» الدوري والتحليلات</b>\n\n`;
+  let text = `🌟 <b>تحديث منصة «تقدير» الدوري والتحليلات</b>\n\n`;
 
   if (upcoming.length > 0) {
     text += `أبرز المواجهات القادمة وأعلى الإشارات:\n\n`;
@@ -234,15 +236,16 @@ function getConciseHighlights(): string {
       if (pA > pH && pA > pD) pick = `فوز ${m.away_team}`;
       if (pD > pH && pD > pA) pick = "التعادل";
 
-      text += `• <b>${m.home_team} × ${m.away_team}</b> (${m.league_name})\n`;
-      text += `  الموعد: ${dateLabel} | التوقع: <b>${pick}</b> (${conf}% ثقة)\n`;
-      text += `  الاحتمالات: ${pH}% / ${pD}% / ${pA}%\n\n`;
+      text += `⚽ <b>${m.home_team} × ${m.away_team}</b>\n`;
+      text += `🏆 <i>${m.league_name}</i> · ⏰ ${dateLabel}\n`;
+      text += `🎯 التوقع: <b>${pick}</b> (${conf}% ثقة)\n`;
+      text += `📊 الاحتمالات: 🏠 ${pH}% | 🤝 ${pD}% | ✈️ ${pA}%\n\n`;
     }
   } else {
     text += `لا تتوفر مباريات مجدولة خلال الساعات القادمة.\nيمكنك متابعة جداول الترتيب والتحليلات عبر المنصة.\n\n`;
   }
 
-  text += `المزيد عبر المنصة: http://13.53.56.196`;
+  text += `🌐 <b>تابع المزيد بالمنصة الحية:</b> http://13.53.56.196`;
   return text;
 }
 
@@ -723,17 +726,18 @@ async function handleUpdate(update: TelegramUpdate) {
     } else if (data?.startsWith("cmd_league_")) {
       const leagueId = data.replace("cmd_league_", "");
       const standings = getLeagueStandings(leagueId);
-      let reply = `<b>🏆 جدول ترتيب ${standings.leagueName}:</b>\n\n`;
+      let reply = `🏆 <b>جدول ترتيب ${standings.leagueName}</b>\n\n`;
       if (standings.rows.length > 0) {
-        reply += `<code>المركز  الفريق          لعب  نقاط  فارق</code>\n`;
-        for (const r of standings.rows) {
-          const pos = String(r.position).padStart(2, " ");
-          const name = r.name_ar.padEnd(14, " ");
-          const gd = (r.goal_difference > 0 ? `+${r.goal_difference}` : String(r.goal_difference)).padStart(3, " ");
-          reply += `<code>${pos}. ${name}  ${r.played}    ${r.points}   ${gd}</code>\n`;
+        const numberMedals = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣"];
+        for (let i = 0; i < standings.rows.length; i++) {
+          const r = standings.rows[i]!;
+          const medal = numberMedals[i] || `${r.position}.`;
+          const gdStr = r.goal_difference > 0 ? `+${r.goal_difference}` : `${r.goal_difference}`;
+          reply += `${medal} <b>${r.name_ar}</b>\n`;
+          reply += `   📊 <b>${r.points}</b> نقطة · لعب ${r.played} (فاز ${r.won} / تعادل ${r.drawn} / خسر ${r.lost}) · فارق (${gdStr})\n\n`;
         }
       } else {
-        reply += `لا تتوفر بيانات جدول حالياً.\n`;
+        reply += `<i>لا تتوفر بيانات جدول حالياً.</i>\n`;
       }
       const kb = {
         inline_keyboard: [
