@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Article } from "@/lib/queries";
-import { BookOpen, Clock, Eye, Sparkles, Search, Layers, Filter } from "lucide-react";
+import { BookOpen, Clock, Sparkles, Search, Layers, Filter } from "lucide-react";
 
 interface ArticlesFilterClientProps {
   articles: Article[];
@@ -106,10 +106,6 @@ export default function ArticlesFilterClient({ articles }: ArticlesFilterClientP
                 <span className="font-medium flex items-center gap-1 text-slate-300">
                   <BookOpen className="h-3.5 w-3.5 text-emerald-400" />
                   {art.author}
-                </span>
-                <span className="flex items-center gap-1">
-                  <Eye className="h-3.5 w-3.5 text-slate-400" />
-                  {art.viewsCount.toLocaleString("ar-EG")} مشاهدة
                 </span>
               </div>
             </Link>

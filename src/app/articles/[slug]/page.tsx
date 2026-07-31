@@ -2,7 +2,7 @@ import { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { getArticleBySlug, getArticles } from "@/lib/queries";
-import { BookOpen, Clock, Eye, Sparkles, ArrowRight, Calendar } from "lucide-react";
+import { BookOpen, Clock, Sparkles, ArrowRight, Calendar } from "lucide-react";
 
 interface ArticlePageProps {
   params: Promise<{ slug: string }>;
@@ -118,10 +118,6 @@ export default async function ArticleDetailsPage(props: ArticlePageProps) {
           <span className="text-xs text-slate-400 flex items-center gap-1">
             <Clock className="w-3.5 h-3.5" />
             قراءة {article.readTimeMins} دقائق
-          </span>
-          <span className="text-xs text-slate-400 flex items-center gap-1">
-            <Eye className="w-3.5 h-3.5" />
-            {article.viewsCount.toLocaleString("ar-EG")} مشاهدة
           </span>
         </div>
 

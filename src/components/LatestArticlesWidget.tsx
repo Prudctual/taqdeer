@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { getArticles } from "@/lib/queries";
 import { SectionCard } from "./ui";
-import { BookOpen, Clock, Eye, Sparkles } from "lucide-react";
+import { BookOpen, Clock, Sparkles } from "lucide-react";
 
 export function LatestArticlesWidget() {
   const articles = getArticles(3);
@@ -58,10 +58,6 @@ export function LatestArticlesWidget() {
               <span className="font-medium text-slate-400 flex items-center gap-1">
                 <BookOpen className="h-3 w-3 text-emerald-500" />
                 {art.author}
-              </span>
-              <span className="flex items-center gap-1 text-slate-400">
-                <Eye className="h-3 w-3" />
-                {art.viewsCount.toLocaleString("ar-EG")} مشاهدة
               </span>
             </div>
           </Link>

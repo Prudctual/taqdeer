@@ -1,7 +1,7 @@
 import { Metadata } from "next";
 import Link from "next/link";
 import { getArticles, getFeaturedArticle } from "@/lib/queries";
-import { BookOpen, Clock, Eye, Sparkles, TrendingUp } from "lucide-react";
+import { BookOpen, Clock, Sparkles, TrendingUp } from "lucide-react";
 import ArticlesFilterClient from "./ArticlesFilterClient";
 
 export const metadata: Metadata = {
@@ -65,10 +65,6 @@ export default function ArticlesPage() {
                 <span className="flex items-center gap-1.5">
                   <Clock className="w-4 h-4 text-slate-400" />
                   {featured.readTimeMins} دقائق قراءة
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <Eye className="w-4 h-4 text-slate-400" />
-                  {featured.viewsCount.toLocaleString("ar-EG")} مشاهدة
                 </span>
               </div>
             </div>
