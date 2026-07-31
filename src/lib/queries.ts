@@ -753,7 +753,7 @@ export function getMeta(key: string): string | null {
   }
 }
 
-export function getValueMatches(): Array<{
+export const getValueMatches = cache(function getValueMatches(): Array<{
   id: string;
   league_id: string;
   league_name_ar: string;
@@ -872,7 +872,7 @@ export function getValueMatches(): Array<{
   } catch {
     return [];
   }
-}
+});
 
 export type BankerPick = {
   matchId: string;
@@ -884,7 +884,7 @@ export type BankerPick = {
   confidence: number;
 };
 
-export function getBankerPicks(limit = 4, leagueId?: string): BankerPick[] {
+export const getBankerPicks = cache(function getBankerPicks(limit = 4, leagueId?: string): BankerPick[] {
   try {
     const db = getDb();
     const leagueFilter = leagueId ? "AND m.league_id = ?" : "";
@@ -955,6 +955,6 @@ export function getBankerPicks(limit = 4, leagueId?: string): BankerPick[] {
     console.error("Error in getBankerPicks:", e);
     return [];
   }
-}
+});
 
 

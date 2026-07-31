@@ -1,3 +1,6 @@
+"use client";
+
+import { useState } from "react";
 import Image from "next/image";
 
 type Size = "xs" | "chip" | "sm" | "md" | "lg" | "xl";
@@ -44,10 +47,6 @@ const fallbackText: Record<Size, string> = {
   xl: "text-sm",
 };
 
-/**
- * شعار نادٍ أو دوري — لوح محايد بخط شعري واحد.
- * زخرفي دائماً: الاسم مكتوب بجواره في كل استعمال، لذا يُخفى عن القارئ الصوتي.
- */
 export function Crest({
   src,
   alt,
@@ -63,15 +62,15 @@ export function Crest({
   size?: Size;
   fallback?: string;
   tone?: "home" | "away" | "neutral";
-  /** soft أنسب لشعارات الدوريات */
   shape?: Shape;
   className?: string;
   priority?: boolean;
 }) {
+  const [imgError, setImgError] = useState(false);
   const px = imgSize[size];
   const plate = `inline-grid shrink-0 place-items-center border border-line bg-panel ${shapeCls[shape]} ${box[size]}`;
 
-  if (src) {
+  if (src && !imgError) {
     return (
       <span
         className={`relative overflow-hidden ${plate} ${className}`}
@@ -84,13 +83,13 @@ export function Crest({
           width={px}
           height={px}
           priority={priority}
+          onError={() => setImgError(true)}
           className={`h-full w-full object-contain ${imgPad[size]}`}
         />
       </span>
     );
   }
 
-  // بديل نصي: الرمز يحمل المعنى، واللون تأكيد لا أكثر
   const glyphTone =
     tone === "home"
       ? "text-home"
@@ -98,13 +97,15 @@ export function Crest({
         ? "text-away"
         : "text-muted";
 
+  const initial = fallback || (alt ? alt.substring(0, 1) : "•");
+
   return (
     <span
       className={`font-semibold tabular ${plate} ${fallbackText[size]} ${glyphTone} ${className}`}
       aria-hidden
       title={alt}
     >
-      {fallback ?? "•"}
+      {initial}
     </span>
   );
 }

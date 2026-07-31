@@ -12,6 +12,10 @@ export function getDb() {
   if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
   _db = new Database(dbPath);
   _db.pragma("journal_mode = WAL");
+  _db.pragma("synchronous = NORMAL");
+  _db.pragma("cache_size = -64000");
+  _db.pragma("temp_store = MEMORY");
+  _db.pragma("mmap_size = 268435456");
   _db.pragma("foreign_keys = ON");
   initSchema(_db);
   return _db;
@@ -59,6 +63,7 @@ function initSchema(db: Database.Database) {
     );
     CREATE INDEX IF NOT EXISTS idx_matches_league_date ON matches(league_id, utc_date);
     CREATE INDEX IF NOT EXISTS idx_matches_status_date ON matches(status, utc_date);
+    CREATE INDEX IF NOT EXISTS idx_matches_home_away ON matches(home_team_id, away_team_id);
 
     CREATE TABLE IF NOT EXISTS standings (
       id TEXT PRIMARY KEY,
@@ -96,6 +101,7 @@ function initSchema(db: Database.Database) {
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
+    CREATE INDEX IF NOT EXISTS idx_predictions_match ON predictions(match_id);
 
     CREATE TABLE IF NOT EXISTS elo_snapshots (
       id TEXT PRIMARY KEY,

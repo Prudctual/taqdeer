@@ -50,8 +50,7 @@ import {
   getVenueRecord,
 } from "@/lib/queries";
 
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
+export const revalidate = 180;
 
 /** مشترك بين generateMetadata والصفحة داخل الطلب نفسه */
 const loadMatch = cache((id: string) => getMatchById(id));
