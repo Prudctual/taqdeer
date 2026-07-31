@@ -1067,5 +1067,40 @@ export const getArticleBySlug = cache((slug: string): Article | null => {
   }
 });
 
+export type NewsItem = {
+  id: string;
+  title: string;
+  summary: string;
+  sourceName: string;
+  sourceUrl: string | null;
+  category: string;
+  publishedAt: string;
+  imageUrl: string | null;
+};
+
+export const getLatestNews = cache((limit = 20, category?: string): NewsItem[] => {
+  try {
+    const db = getDb();
+    let sql = `
+      SELECT id, title, summary, source_name as sourceName, source_url as sourceUrl,
+             category, published_at as publishedAt, image_url as imageUrl
+      FROM news
+    `;
+    const params: (string | number)[] = [];
+    if (category && category !== "الكل") {
+      sql += ` WHERE category = ?`;
+      params.push(category);
+    }
+    sql += ` ORDER BY published_at DESC LIMIT ?`;
+    params.push(limit);
+
+    return db.prepare(sql).all(...params) as NewsItem[];
+  } catch (e) {
+    console.error("Error in getLatestNews:", e);
+    return [];
+  }
+});
+
+
 
 

@@ -2,6 +2,8 @@ import { StudioHomeView } from "@/components/StudioHomeView";
 import { MatchTableRow } from "@/components/ShadcnDataTable";
 import { StandingTeam } from "@/components/LeagueTableWidget";
 import { SectionCard, EmptyState } from "@/components/ui";
+import { LatestArticlesWidget } from "@/components/LatestArticlesWidget";
+import { LatestNewsWidget } from "@/components/LatestNewsWidget";
 import {
   getUpcomingByLeague,
   getRecentFinishedByLeague,
@@ -129,17 +131,21 @@ export default function HomePage() {
   });
 
   return (
-    <StudioHomeView
-      matchCount={count}
-      upcomingCount={upcomingCount}
-      lastFit={lastFit}
-      leagues={leagues}
-      tableMatches={allMatchesList}
-      groups={groups}
-      recentGroups={recentByLeague}
-      nextMatch={nextMatch}
-      standingsByLeague={standingsByLeague}
-      bankerPicks={bankerPicks}
-    />
+    <div className="space-y-8">
+      <StudioHomeView
+        matchCount={count}
+        upcomingCount={upcomingCount}
+        lastFit={lastFit}
+        leagues={leagues}
+        tableMatches={allMatchesList}
+        groups={groups}
+        recentGroups={recentByLeague}
+        nextMatch={nextMatch}
+        standingsByLeague={standingsByLeague}
+        bankerPicks={bankerPicks}
+      />
+      <LatestNewsWidget />
+      <LatestArticlesWidget />
+    </div>
   );
 }

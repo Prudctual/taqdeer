@@ -157,7 +157,18 @@ function initSchema(db: Database.Database) {
       updated_at TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_articles_slug ON articles(slug);
-    CREATE INDEX IF NOT EXISTS idx_articles_featured ON articles(is_featured, published_at);
+    CREATE TABLE IF NOT EXISTS news (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      summary TEXT NOT NULL,
+      source_name TEXT NOT NULL,
+      source_url TEXT,
+      category TEXT NOT NULL DEFAULT 'أخبار عامة',
+      published_at TEXT NOT NULL,
+      image_url TEXT,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_news_published ON news(published_at DESC);
   `);
 
   migrate(db);

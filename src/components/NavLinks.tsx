@@ -16,6 +16,11 @@ const links = [
     match: (p: string) => p.startsWith("/accuracy"),
   },
   {
+    href: "/news",
+    label: "الأخبار اللحظية",
+    match: (p: string) => p.startsWith("/news"),
+  },
+  {
     href: "/articles",
     label: "المقالات والتقارير",
     match: (p: string) => p.startsWith("/articles"),
