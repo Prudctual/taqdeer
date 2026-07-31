@@ -42,23 +42,41 @@ interface MatchRow {
   odds_away: number | null;
 }
 
+const TIMEZONE = "Asia/Baghdad";
+
 function formatMatchDateLabel(utcDate: string): string {
   const dateObj = new Date(utcDate);
   const now = new Date();
 
-  const matchDay = new Date(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate());
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const diffDays = Math.round((matchDay.getTime() - today.getTime()) / (1000 * 3600 * 24));
+  const getDayStr = (d: Date) =>
+    d.toLocaleDateString("en-CA", { timeZone: TIMEZONE });
 
-  const timeStr = dateObj.toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" });
+  const matchDayStr = getDayStr(dateObj);
+  const todayStr = getDayStr(now);
 
-  if (diffDays === 0) {
+  const tomorrowObj = new Date(now.getTime() + 24 * 3600 * 1000);
+  const tomorrowStr = getDayStr(tomorrowObj);
+
+  const timeStr = dateObj.toLocaleTimeString("ar-EG", {
+    timeZone: TIMEZONE,
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
+  if (matchDayStr === todayStr) {
     return `اليوم · ${timeStr}`;
-  } else if (diffDays === 1) {
+  } else if (matchDayStr === tomorrowStr) {
     return `غداً · ${timeStr}`;
   } else {
-    const dayName = dateObj.toLocaleDateString("ar-EG", { weekday: "short" });
-    const dateStr = dateObj.toLocaleDateString("ar-EG", { day: "numeric", month: "short" });
+    const dayName = dateObj.toLocaleDateString("ar-EG", {
+      timeZone: TIMEZONE,
+      weekday: "short",
+    });
+    const dateStr = dateObj.toLocaleDateString("ar-EG", {
+      timeZone: TIMEZONE,
+      day: "numeric",
+      month: "short",
+    });
     return `${dayName}، ${dateStr} · ${timeStr}`;
   }
 }
