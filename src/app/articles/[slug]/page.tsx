@@ -105,7 +105,6 @@ export default async function ArticleDetailsPage(props: ArticlePageProps) {
           <ArrowRight className="w-4 h-4" />
           <span>العودة لجميع المقالات والتقارير</span>
         </Link>
-        <span className="text-xs text-slate-500 font-medium">غرفة التحليلات الحصرية</span>
       </div>
 
       {/* Article Header Metadata */}

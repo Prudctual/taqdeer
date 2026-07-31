@@ -149,7 +149,7 @@ function initSchema(db: Database.Database) {
       content_md TEXT NOT NULL,
       category TEXT NOT NULL,
       image_url TEXT,
-      author TEXT NOT NULL DEFAULT 'غرفة تحليلات تقدير',
+      author TEXT NOT NULL DEFAULT 'تـقـديـر',
       read_time_mins INTEGER NOT NULL DEFAULT 4,
       views_count INTEGER NOT NULL DEFAULT 0,
       is_featured INTEGER NOT NULL DEFAULT 0,

@@ -1,12 +1,12 @@
 import { Metadata } from "next";
 import Link from "next/link";
 import { getArticles, getFeaturedArticle } from "@/lib/queries";
-import { BookOpen, Clock, Sparkles, TrendingUp } from "lucide-react";
+import { BookOpen, Clock, TrendingUp } from "lucide-react";
 import ArticlesFilterClient from "./ArticlesFilterClient";
 
 export const metadata: Metadata = {
-  title: "المقالات والتقارير الحصرية — منصة تقدير",
-  description: "غرفة التحليلات والدراسات الرياضية الكمية: قراءات تكتيكية، تفكيك أرقام المتوقع، وتقارير حصرية تعتمد المعايرة العلمية بدقة متناهية.",
+  title: "المقالات والتقارير — منصة تقدير",
+  description: "دراسات تكتيكية وتحليلات كمية تجمع بين علوم الاحتمالات المعايرة والرؤية الفنية المعمقة.",
 };
 
 export default function ArticlesPage() {
@@ -17,12 +17,8 @@ export default function ArticlesPage() {
     <div className="min-h-screen bg-slate-950 text-slate-100 py-8 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto space-y-10 dir-rtl">
       {/* Header Banner */}
       <div className="space-y-3 border-b border-white/10 pb-6">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold">
-          <Sparkles className="w-3.5 h-3.5" />
-          <span>غرفة تحليلات تقدير</span>
-        </div>
         <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-white">
-          المقالات والتقارير الرياضية الحصرية
+          المقالات والتقارير الرياضية
         </h1>
         <p className="text-sm sm:text-base text-slate-400 max-w-3xl leading-relaxed">
           دراسات تكتيكية وتحليلات كمية تجمع بين علوم الاحتمالات المعايرة والرؤية الفنية المعمقة.

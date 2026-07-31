@@ -12,8 +12,8 @@ export function LatestArticlesWidget() {
 
   return (
     <SectionCard
-      title="التقارير التحليلية والمقالات الحصرية"
-      subtitle="قراءات تكتيكية ودراسات كمية خالية من الانحياز، بأقلام غرفة تحليلات منصة «تقدير»"
+      title="التقارير التحليلية والمقالات"
+      subtitle="قراءات تكتيكية ودراسات كمية خالية من الانحياز"
       headerRight={
         <Link
           href="/articles"
