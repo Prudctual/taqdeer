@@ -778,8 +778,117 @@ function clearNonRealScheduled(db: ReturnType<typeof getDb>) {
   }
 }
 
+async function syncFixturesFromApiFootball(db: ReturnType<typeof getDb>) {
+  const apiFootballKey = process.env.API_FOOTBALL_KEY?.trim() || process.env.API_SPORTS_KEY?.trim();
+  if (!apiFootballKey) return;
+
+  console.log("مزامنة المباريات والحكام الحقيقيين من API-Football (api-sports.io)...");
+  const API_FOOTBALL_LEAGUES: Record<string, number> = {
+    pl: 39,
+    pd: 140,
+    sa: 135,
+    bl1: 78,
+    fl1: 61,
+    kl1: 292,
+  };
+
+  const updateRef = db.prepare(`
+    UPDATE matches SET referee_name = ?
+    WHERE (league_id = ? AND date(utc_date) = date(?))
+       OR (source = 'api-football' AND external_id = ?)
+  `);
+
+  const insert = db.prepare(`
+    INSERT INTO matches (
+      id, league_id, season, matchday, utc_date, status,
+      home_team_id, away_team_id, home_goals, away_goals, referee_name, source, external_id
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'api-football', ?)
+    ON CONFLICT(id) DO UPDATE SET
+      utc_date=excluded.utc_date,
+      status=excluded.status,
+      home_goals=excluded.home_goals,
+      away_goals=excluded.away_goals,
+      referee_name=COALESCE(excluded.referee_name, matches.referee_name),
+      home_team_id=excluded.home_team_id,
+      away_team_id=excluded.away_team_id
+  `);
+
+  const targetSeasons = [2024, 2025];
+
+  for (const league of LEAGUES) {
+    const apiId = API_FOOTBALL_LEAGUES[league.id];
+    if (!apiId) continue;
+
+    let totalLeagueCount = 0;
+    for (const seasonYear of targetSeasons) {
+      try {
+        const url = `https://v3.football.api-sports.io/fixtures?league=${apiId}&season=${seasonYear}`;
+        const res = await fetch(url, {
+          headers: { "x-apisports-key": apiFootballKey },
+        });
+        if (!res.ok) continue;
+
+        const data = (await res.json()) as {
+          response?: Array<{
+            fixture: {
+              id: number;
+              date: string;
+              referee?: string | null;
+              status: { short: string };
+              venue?: { name?: string };
+            };
+            teams: {
+              home: { name: string; logo?: string };
+              away: { name: string; logo?: string };
+            };
+            goals: { home?: number | null; away?: number | null };
+          }>;
+        };
+
+        const fixtures = data.response ?? [];
+        for (const item of fixtures) {
+          const f = item.fixture;
+          const homeName = resolveTeamName(item.teams.home.name);
+          const awayName = resolveTeamName(item.teams.away.name);
+          const homeId = upsertTeam(db, league.id, homeName, item.teams.home.logo);
+          const awayId = upsertTeam(db, league.id, awayName, item.teams.away.logo);
+
+          const statusStr = f.status.short === "FT" ? "FINISHED" : "SCHEDULED";
+          const id = `${league.id}-apif-${f.id}`;
+          const refName = f.referee ? f.referee.trim() : null;
+
+          if (refName) {
+            updateRef.run(refName, league.id, f.date, String(f.id));
+          }
+
+          insert.run(
+            id,
+            league.id,
+            String(seasonYear),
+            null,
+            f.date,
+            statusStr,
+            homeId,
+            awayId,
+            item.goals.home ?? null,
+            item.goals.away ?? null,
+            refName,
+            String(f.id),
+          );
+          totalLeagueCount++;
+        }
+        await new Promise((r) => setTimeout(r, 1200));
+      } catch (e) {
+        console.warn(`  API-Football ${league.code} ${seasonYear} error:`, e);
+      }
+    }
+    console.log(`  API-Football ${league.nameAr}: ${totalLeagueCount} مباراة حقيقية بأسماء الحكام المعتمدة`);
+  }
+}
+
 async function syncFixturesFromApi(db: ReturnType<typeof getDb>) {
   clearNonRealScheduled(db);
+  await syncFixturesFromApiFootball(db);
 
   const key = process.env.FOOTBALL_DATA_API_KEY?.trim();
   if (!key) {
