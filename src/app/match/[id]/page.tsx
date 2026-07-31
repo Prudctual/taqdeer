@@ -23,6 +23,7 @@ import { MatchCountdownHero } from "@/components/MatchCountdownHero";
 import { UpsetAlertBadge } from "@/components/UpsetAlertBadge";
 import { LiveMatchDataSync } from "@/components/LiveMatchDataSync";
 import { PlayerRadarChart } from "@/components/PlayerRadarChart";
+import { getMatchDetailedInfo } from "@/lib/match-details";
 
 
 
@@ -243,6 +244,15 @@ export default async function MatchPage({
   if (!match) notFound();
 
   const league = match.leagueId?.toLowerCase() || undefined;
+
+  const matchDetails = getMatchDetailedInfo(
+    match.home_id,
+    match.home_name_ar,
+    match.id,
+    match.refereeName,
+    match.leagueId
+  );
+  const resolvedReferee = matchDetails.refereeName;
 
   const matrixRaw = parseJson<number[][]>(match.score_matrix_json, []);
   const matrix = Array.isArray(matrixRaw) ? matrixRaw : [];
@@ -568,7 +578,7 @@ export default async function MatchPage({
           </div>
           <div className="p-3.5 bg-surface text-start">
             <p className="text-xs sm:text-sm font-black text-ink truncate">
-              {match.refereeName ? match.refereeName : "حكم معتدل"}
+              {resolvedReferee}
             </p>
           </div>
         </div>
@@ -657,7 +667,7 @@ export default async function MatchPage({
         leagueId={match.leagueId}
         homeTeamId={match.home_id}
         homeTeamNameAr={match.home_name_ar}
-        refereeName={match.refereeName}
+        refereeName={resolvedReferee}
         logistics={analytics?.components?.logistics as { travel_distance_km?: number; pitch_surface?: string; is_european_midweek?: boolean; logistics_summary?: string }}
       />
 
@@ -822,7 +832,7 @@ export default async function MatchPage({
         lambdaHome={match.lambda_home ?? 1.25}
         lambdaAway={match.lambda_away ?? 0.95}
         sharpSteamSide={match.sharpSteamSide}
-        refereeName={match.refereeName}
+        refereeName={resolvedReferee}
         weatherCondition={match.weatherCondition}
         homeVenueRecord={homeVenue}
         awayVenueRecord={awayVenue}

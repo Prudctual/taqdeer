@@ -15,6 +15,14 @@ export interface DetailedMatchInfo {
   travelDistanceKm: number;
 }
 
+function stringHash(str: string): number {
+  let hash = 5381;
+  for (let i = 0; i < str.length; i++) {
+    hash = (hash * 33) ^ str.charCodeAt(i);
+  }
+  return Math.abs(hash);
+}
+
 const STADIUM_MAP: Record<string, string> = {
   // Premier League
   "pl-liverpool": "ملعب الأنفيلد (ليفربول)",
@@ -82,6 +90,10 @@ const LEAGUE_REFEREES: Record<string, string[]> = {
     "سايمون هوبر (Simon Hooper)",
     "كريس كافانا (Chris Kavanagh)",
     "دارين إنجلاند (Darren England)",
+    "ستيوارت أتويل (Stuart Attwell)",
+    "روبرت جونز (Robert Jones)",
+    "أندي مادلي (Andy Madley)",
+    "جون بروكس (John Brooks)",
   ],
   pd: [
     "خوسيه ماريا سانشيز (Sánchez Martínez)",
@@ -89,6 +101,9 @@ const LEAGUE_REFEREES: Record<string, string[]> = {
     "أليخاندرو هيرنانديز (Hernández Hernández)",
     "غيليرمو كوادرا (Cuadra Fernández)",
     "سيزار سوتو غرادو (Soto Grado)",
+    "خوان مارتينيز مونيويرا (Martínez Munuera)",
+    "خافيير ألبيرولا روخاس (Alberola Rojas)",
+    "ريكاردو دي بورغوس (De Burgos Bengoetxea)",
   ],
   sa: [
     "دانييلي أورساتو (Daniele Orsato)",
@@ -96,6 +111,9 @@ const LEAGUE_REFEREES: Record<string, string[]> = {
     "دافيدي ماسا (Davide Massa)",
     "ماوريزيو مارياني (Maurizio Mariani)",
     "سيموني سوزا (Simone Sozza)",
+    "فابيو ماريشكا (Fabio Maresca)",
+    "ميخائيل فابري (Michael Fabbri)",
+    "أندريا كولومبو (Andrea Colombo)",
   ],
   bl1: [
     "فيليكس تسواير (Felix Zwayer)",
@@ -103,18 +121,30 @@ const LEAGUE_REFEREES: Record<string, string[]> = {
     "توبياس شتيلر (Tobias Stieler)",
     "دينيز أايتيكين (Deniz Aytekin)",
     "زاشا شتيغمان (Sascha Stegemann)",
+    "فلوريان باديشتوبنر (Florian Badstübner)",
+    "سفين يابلونسكي (Sven Jablonski)",
+    "باتريك إتريش (Patrick Ittrich)",
   ],
   fl1: [
     "كليمان توربان (Clément Turpin)",
     "بنوا باستيان (Benoît Bastien)",
     "فرانسوا ليتكسييه (François Letexier)",
     "ستيفاني فرابار (Stéphanie Frappart)",
+    "جيروم بريسارد (Jérôme Brisard)",
+    "ويلى ديلاجود (Willy Delajod)",
+    "تيكسير رودي (Rudy Buquet)",
   ],
   kl1: [
     "كيم جونغ هيوك (Kim Jong-hyeok)",
     "غو هيون جين (Ko Hyung-jin)",
     "كيم داي يونغ (Kim Dae-yong)",
     "تشاي سانغ هيوب (Chae Sang-hyeop)",
+    "لي دونغ جون (Lee Dong-jun)",
+    "كيم وو سونغ (Kim Woo-sung)",
+    "شين يونغ جون (Shin Yong-jun)",
+    "سونغ مين سيوك (Song Min-seok)",
+    "بارك بيونغ أون (Park Byung-eun)",
+    "كيم يونغ سو (Kim Young-soo)",
   ],
 };
 
@@ -143,9 +173,9 @@ export function getMatchDetailedInfo(
   const cleanId = homeTeamId.toLowerCase();
   const stadium = STADIUM_MAP[cleanId] || `ملعب ${homeTeamNameAr}`;
 
-  // Deterministic seed combining matchId and homeTeamNameAr
+  // Deterministic polynomial hash combining matchId and homeTeamNameAr
   const seedString = `${matchId}_${homeTeamNameAr}_${homeTeamId}`;
-  const hash = seedString.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  const hash = stringHash(seedString);
 
   // Referee resolution
   let refName = refereeNameFromDb?.trim();

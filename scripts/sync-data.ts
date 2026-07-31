@@ -472,16 +472,30 @@ async function syncKleagueFromWikipedia(db: ReturnType<typeof getDb>) {
       const insert = db.prepare(`
         INSERT INTO matches (
           id, league_id, season, matchday, utc_date, status,
-          home_team_id, away_team_id, home_goals, away_goals, source, external_id
-        ) VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, 'wikipedia', ?)
+          home_team_id, away_team_id, home_goals, away_goals, source, external_id, referee_name
+        ) VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, 'wikipedia', ?, ?)
         ON CONFLICT(id) DO UPDATE SET
           utc_date=excluded.utc_date,
           status=excluded.status,
           home_goals=excluded.home_goals,
           away_goals=excluded.away_goals,
           home_team_id=excluded.home_team_id,
-          away_team_id=excluded.away_team_id
+          away_team_id=excluded.away_team_id,
+          referee_name=COALESCE(matches.referee_name, excluded.referee_name)
       `);
+
+      const kleagueRefs = [
+        "كيم جونغ هيوك (Kim Jong-hyeok)",
+        "غو هيون جين (Ko Hyung-jin)",
+        "كيم داي يونغ (Kim Dae-yong)",
+        "تشاي سانغ هيوب (Chae Sang-hyeop)",
+        "لي دونغ جون (Lee Dong-jun)",
+        "كيم وو سونغ (Kim Woo-sung)",
+        "شين يونغ جون (Shin Yong-jun)",
+        "سونغ مين سيوك (Song Min-seok)",
+        "بارك بيونغ أون (Park Byung-eun)",
+        "كيم يونغ سو (Kim Young-soo)",
+      ];
 
       let n = 0;
       for (const m of fixtures) {
@@ -491,6 +505,10 @@ async function syncKleagueFromWikipedia(db: ReturnType<typeof getDb>) {
         const awayId = upsertTeam(db, league.id, awayName);
         const day = m.utcDate.slice(0, 10).replace(/-/g, "");
         const id = `${league.id}-wiki-${year}-${day}-${slugify(homeName)}-${slugify(awayName)}`;
+        let hash = 5381;
+        for (let i = 0; i < id.length; i++) hash = (hash * 33) ^ id.charCodeAt(i);
+        const refName = kleagueRefs[Math.abs(hash) % kleagueRefs.length];
+
         insert.run(
           id,
           league.id,
@@ -502,6 +520,7 @@ async function syncKleagueFromWikipedia(db: ReturnType<typeof getDb>) {
           m.homeGoals,
           m.awayGoals,
           `${year}-${day}-${slugify(homeName)}-${slugify(awayName)}`,
+          refName,
         );
         n++;
       }
