@@ -16,6 +16,11 @@ const links = [
     match: (p: string) => p.startsWith("/accuracy"),
   },
   {
+    href: "/articles",
+    label: "المقالات والتقارير",
+    match: (p: string) => p.startsWith("/articles"),
+  },
+  {
     href: "/methodology",
     label: "المنهجية",
     match: (p: string) => p.startsWith("/methodology"),

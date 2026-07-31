@@ -957,4 +957,115 @@ export const getBankerPicks = cache(function getBankerPicks(limit = 4, leagueId?
   }
 });
 
+export type Article = {
+  id: string;
+  slug: string;
+  title: string;
+  summary: string;
+  contentMd: string;
+  category: string;
+  imageUrl: string | null;
+  author: string;
+  readTimeMins: number;
+  viewsCount: number;
+  isFeatured: boolean;
+  publishedAt: string;
+  updatedAt: string;
+};
+
+export const getArticles = cache((limit = 12, category?: string): Article[] => {
+  try {
+    const db = getDb();
+    let sql = `
+      SELECT id, slug, title, summary, content_md as contentMd, category,
+             image_url as imageUrl, author, read_time_mins as readTimeMins,
+             views_count as viewsCount, is_featured as isFeatured,
+             published_at as publishedAt, updated_at as updatedAt
+      FROM articles
+    `;
+    const params: (string | number)[] = [];
+    if (category && category !== "الكل") {
+      sql += ` WHERE category = ?`;
+      params.push(category);
+    }
+    sql += ` ORDER BY is_featured DESC, published_at DESC LIMIT ?`;
+    params.push(limit);
+
+    const rows = db.prepare(sql).all(...params) as Array<{
+      id: string;
+      slug: string;
+      title: string;
+      summary: string;
+      contentMd: string;
+      category: string;
+      imageUrl: string | null;
+      author: string;
+      readTimeMins: number;
+      viewsCount: number;
+      isFeatured: number;
+      publishedAt: string;
+      updatedAt: string;
+    }>;
+
+    return rows.map((r) => ({
+      ...r,
+      isFeatured: Boolean(r.isFeatured),
+    }));
+  } catch (e) {
+    console.error("Error in getArticles:", e);
+    return [];
+  }
+});
+
+export const getFeaturedArticle = cache((): Article | null => {
+  const articles = getArticles(1);
+  return articles[0] || null;
+});
+
+export const getArticleBySlug = cache((slug: string): Article | null => {
+  try {
+    const db = getDb();
+    const row = db.prepare(`
+      SELECT id, slug, title, summary, content_md as contentMd, category,
+             image_url as imageUrl, author, read_time_mins as readTimeMins,
+             views_count as viewsCount, is_featured as isFeatured,
+             published_at as publishedAt, updated_at as updatedAt
+      FROM articles
+      WHERE slug = ?
+    `).get(slug) as {
+      id: string;
+      slug: string;
+      title: string;
+      summary: string;
+      contentMd: string;
+      category: string;
+      imageUrl: string | null;
+      author: string;
+      readTimeMins: number;
+      viewsCount: number;
+      isFeatured: number;
+      publishedAt: string;
+      updatedAt: string;
+    } | undefined;
+
+    if (!row) return null;
+
+    // Increment view count asynchronously
+    try {
+      db.prepare(`UPDATE articles SET views_count = views_count + 1 WHERE slug = ?`).run(slug);
+    } catch {
+      // ignore
+    }
+
+    return {
+      ...row,
+      isFeatured: Boolean(row.isFeatured),
+    };
+  } catch (e) {
+    console.error("Error in getArticleBySlug:", e);
+    return null;
+  }
+});
+
+
 

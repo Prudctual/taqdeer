@@ -140,6 +140,24 @@ function initSchema(db: Database.Database) {
       key TEXT PRIMARY KEY,
       value TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS articles (
+      id TEXT PRIMARY KEY,
+      slug TEXT UNIQUE NOT NULL,
+      title TEXT NOT NULL,
+      summary TEXT NOT NULL,
+      content_md TEXT NOT NULL,
+      category TEXT NOT NULL,
+      image_url TEXT,
+      author TEXT NOT NULL DEFAULT 'غرفة تحليلات تقدير',
+      read_time_mins INTEGER NOT NULL DEFAULT 4,
+      views_count INTEGER NOT NULL DEFAULT 0,
+      is_featured INTEGER NOT NULL DEFAULT 0,
+      published_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_articles_slug ON articles(slug);
+    CREATE INDEX IF NOT EXISTS idx_articles_featured ON articles(is_featured, published_at);
   `);
 
   migrate(db);
