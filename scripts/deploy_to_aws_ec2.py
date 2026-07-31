@@ -43,8 +43,8 @@ def deploy(host_ip):
     git fetch origin main
     git reset --hard origin/main
     bun install
-    bun run build
     bun run sync
+    bun run build
     pm2 startOrReload ecosystem.config.js --update-env || pm2 start ecosystem.config.js
     pm2 save
     """

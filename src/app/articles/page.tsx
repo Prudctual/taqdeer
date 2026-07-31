@@ -4,6 +4,8 @@ import { getArticles, getFeaturedArticle } from "@/lib/queries";
 import { BookOpen, Clock, TrendingUp } from "lucide-react";
 import ArticlesFilterClient from "./ArticlesFilterClient";
 
+export const revalidate = 60;
+
 export const metadata: Metadata = {
   title: "المقالات والتقارير — منصة تقدير",
   description: "دراسات تكتيكية وتحليلات كمية تجمع بين علوم الاحتمالات المعايرة والرؤية الفنية المعمقة.",

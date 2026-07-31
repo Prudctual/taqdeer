@@ -3,6 +3,8 @@ import { getLatestNews } from "@/lib/queries";
 import { RefreshCw } from "lucide-react";
 import NewsFeedClient from "./NewsFeedClient";
 
+export const revalidate = 60;
+
 export const metadata: Metadata = {
   title: "الأخبار الرياضية اللحظية — منصة تقدير",
   description: "موجز رياضي مباشر ولحظي لأحدث الأخبار الموثوقة وسوق الانتقالات وتحديثات التشكيلات والإصابات من كبرى المصادر الرياضية العالمية.",
