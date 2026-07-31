@@ -18,6 +18,8 @@ if (!fs.existsSync(path.dirname(dbPath))) {
 }
 
 const db = new Database(dbPath);
+db.query("PRAGMA journal_mode = WAL;").run();
+db.query("PRAGMA busy_timeout = 10000;").run();
 
 console.log(`🤖 Starting Taqdeer Telegram Bot (@Taqdeerbot)...`);
 console.log(`📁 Connected to Database: ${dbPath}`);

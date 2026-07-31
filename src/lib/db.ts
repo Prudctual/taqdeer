@@ -12,6 +12,7 @@ export function getDb() {
   if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
   _db = new Database(dbPath);
   _db.pragma("journal_mode = WAL");
+  _db.pragma("busy_timeout = 10000");
   _db.pragma("synchronous = NORMAL");
   _db.pragma("cache_size = -64000");
   _db.pragma("temp_store = MEMORY");
