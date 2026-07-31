@@ -11,7 +11,7 @@ if (!fs.existsSync(dataDir)) {
 
 const db = new Database(dbPath);
 
-console.log("📰 Starting Taqdeer Real-Time Live Sports News Fetcher...");
+console.log("📰 Starting Taqdeer Real-Time Live Sports News Fetcher with Arabic Auto-Translation...");
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS news (
@@ -52,6 +52,33 @@ const FEEDS = [
 
 function stripHtml(html: string): string {
   return html.replace(/<[^>]*>?/gm, "").replace(/\s+/g, " ").trim();
+}
+
+async function translateEnToAr(text: string): Promise<string> {
+  if (!text || text.trim().length === 0) return text;
+  // If already contains Arabic text, return directly
+  if (/[\u0600-\u06FF]/.test(text)) return text;
+
+  try {
+    const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=ar&dt=t&q=${encodeURIComponent(text)}`;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 5000);
+
+    const res = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+      },
+    });
+    clearTimeout(timer);
+
+    if (!res.ok) return text;
+    const json = (await res.json()) as Array<Array<[string, string]>>;
+    const translated = json[0]?.map((part) => part[0]).join("") || text;
+    return translated.trim();
+  } catch {
+    return text;
+  }
 }
 
 async function fetchRssFeed(feedUrl: string, sourceName: string, category: string): Promise<RSSItem[]> {
@@ -150,6 +177,9 @@ const FALLBACK_LIVE_NEWS = [
 async function syncNews() {
   let count = 0;
 
+  // Clear older English non-translated entries if any
+  db.exec(`DELETE FROM news WHERE title GLOB '*[a-zA-Z]*'`);
+
   const insertStmt = db.prepare(`
     INSERT INTO news (id, title, summary, source_name, source_url, category, published_at, image_url, created_at)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -176,16 +206,22 @@ async function syncNews() {
     count++;
   }
 
-  // Fetch live RSS items
+  // Fetch live RSS items and translate to Arabic
   for (const feed of FEEDS) {
     const rssItems = await fetchRssFeed(feed.url, feed.name, feed.category);
     for (let i = 0; i < rssItems.length; i++) {
       const item = rssItems[i]!;
       const id = `news-rss-${feed.name.toLowerCase().replace(/\s+/g, "")}-${i}`;
+
+      console.log(`🌐 Translating news [${feed.name}]: "${item.title.slice(0, 40)}..."`);
+
+      const arTitle = await translateEnToAr(item.title);
+      const arSummary = await translateEnToAr(item.description || item.title);
+
       insertStmt.run(
         id,
-        item.title,
-        item.description || item.title,
+        arTitle,
+        arSummary,
         item.source,
         item.link,
         item.category,
@@ -197,7 +233,7 @@ async function syncNews() {
     }
   }
 
-  console.log(`✅ Live News sync complete: Stored ${count} real-time news updates.`);
+  console.log(`✅ Live News sync complete: Translated and stored ${count} real-time Arabic news items.`);
   db.close();
 }
 
