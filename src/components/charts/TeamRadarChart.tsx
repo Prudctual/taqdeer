@@ -41,7 +41,7 @@ export function TeamRadarChart({ match }: { match?: MatchCard | null }) {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
-            <span className="h-2.5 w-2.5 rounded-full bg-purple-600 animate-pulse" />
+            <span className="h-2.5 w-2.5 rounded-full bg-accent animate-pulse" />
             <h3 className="text-base sm:text-lg font-black text-ink">
               المقارنة التكتيكية السداسية بين {homeName} و {awayName}
             </h3>
@@ -52,10 +52,10 @@ export function TeamRadarChart({ match }: { match?: MatchCard | null }) {
         </div>
 
         <div className="flex items-center gap-2 font-mono font-bold text-xs">
-          <span className="bg-blue-500/15 border border-blue-500/30 text-blue-600 dark:text-blue-400 px-3 py-1 rounded-full">
+          <span className="bg-blue-500/15 border border-blue-500/30 text-home px-3 py-1 rounded-full">
             {homeName} (Elo {eloHome})
           </span>
-          <span className="bg-rose-500/15 border border-rose-500/30 text-rose-600 dark:text-rose-400 px-3 py-1 rounded-full">
+          <span className="bg-danger-dim border border-rose-500/30 text-danger px-3 py-1 rounded-full">
             {awayName} (Elo {eloAway})
           </span>
         </div>
@@ -81,15 +81,15 @@ export function TeamRadarChart({ match }: { match?: MatchCard | null }) {
             <Radar
               name={homeName}
               dataKey="home"
-              stroke="#2563eb"
-              fill="#2563eb"
+              stroke="var(--home)"
+              fill="var(--home)"
               fillOpacity={0.4}
             />
             <Radar
               name={awayName}
               dataKey="away"
-              stroke="#e11d48"
-              fill="#e11d48"
+              stroke="var(--away)"
+              fill="var(--away)"
               fillOpacity={0.4}
             />
           </RadarChart>
@@ -98,7 +98,7 @@ export function TeamRadarChart({ match }: { match?: MatchCard | null }) {
 
       <div className="pt-3 border-t border-line flex flex-wrap items-center justify-between text-xs text-muted font-semibold gap-2">
         <span>الأفضلية التكتيكية: <strong className="text-ink">{pHome >= pAway ? homeName : awayName}</strong></span>
-        <span className="font-mono font-black text-blue-600 dark:text-blue-400">
+        <span className="font-mono font-black text-home">
           مؤشر Elo المباشر: {eloHome} vs {eloAway}
         </span>
       </div>

@@ -35,7 +35,7 @@ export function LeagueAccuracyChart({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
-            <span className="h-2.5 w-2.5 rounded-full bg-blue-600 animate-pulse" />
+            <span className="h-2.5 w-2.5 rounded-full bg-home animate-pulse" />
             <h3 className="text-base sm:text-lg font-black text-ink">
               دقة النموذج حسب الدوري (Walk-Forward)
             </h3>
@@ -45,7 +45,7 @@ export function LeagueAccuracyChart({
           </p>
         </div>
 
-        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-600 dark:text-blue-400 font-extrabold text-xs">
+        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-home font-extrabold text-xs">
           <span>دقة النموذج الأعلى أفضل</span>
         </div>
       </div>
@@ -58,10 +58,10 @@ export function LeagueAccuracyChart({
 
           const barColor =
             item.accuracy >= 0.48
-              ? "bg-blue-600"
+              ? "bg-home"
               : item.accuracy >= 0.44
-              ? "bg-indigo-600"
-              : "bg-amber-600";
+              ? "bg-accent"
+              : "bg-warn";
 
           return (
             <div key={item.leagueId} className="space-y-1.5">
@@ -81,7 +81,7 @@ export function LeagueAccuracyChart({
                   className={`h-full rounded-lg ${barColor} transition-all duration-500 flex items-center justify-end px-2`}
                   style={{ width: barWidth }}
                 >
-                  <span className="text-[10px] font-black text-white font-mono opacity-90">
+                  <span className="text-[10px] font-black text-on-fill font-mono opacity-90">
                     {pctVal}%
                   </span>
                 </div>

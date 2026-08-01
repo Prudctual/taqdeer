@@ -82,27 +82,27 @@ export function SignalBreakdown({
     <div className="space-y-4 p-4 sm:p-5">
       {/* Top Consensus Summary Banner */}
       {agreeCount != null && (
-        <div className="rounded-xl border-0 bg-emerald-600 text-white p-4 flex flex-wrap items-center justify-between gap-3 shadow-sm">
+        <div className="rounded-xl border-0 bg-success text-on-fill p-4 flex flex-wrap items-center justify-between gap-3 shadow-sm">
           <div className="flex items-center gap-3">
-            <span className="p-2 bg-white/20 rounded-lg text-white">
+            <span className="p-2 bg-on-fill/20 rounded-lg text-on-fill">
               <HandshakeIcon size={20} />
             </span>
             <div>
               <h4 className="text-sm font-black tracking-tight">
                 نتيجة التوافق بين الخوارزميات: {agreeCount} من أصل {rows.length} نماذج متفقة تماماً!
               </h4>
-              <p className="text-xs text-emerald-100 font-medium">
+              <p className="text-xs text-on-fill/80 font-medium">
                 جميع محركات التحليل تُشير إلى نفس اتجاه القراءة النهائية بدون تعارض.
               </p>
             </div>
           </div>
-          <span className="shrink-0 font-extrabold text-xs bg-white text-emerald-800 px-3.5 py-1.5 rounded-full shadow-2xs">
+          <span className="shrink-0 font-extrabold text-xs bg-on-fill text-success px-3.5 py-1.5 rounded-full shadow-2xs">
             توافق كامل 100%
           </span>
         </div>
       )}
 
-      <p className="text-xs font-bold text-slate-700">
+      <p className="text-xs font-bold text-muted">
         تفكيك نسبة ترجيح كل خوارزمية على حدة قبل دمجها في النتيجة النهائية:
       </p>
 

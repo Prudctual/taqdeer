@@ -128,7 +128,7 @@ export function TeamTacticalSpotlight({
             </p>
           </div>
         </div>
-        <span className="text-xs font-black text-white bg-accent px-3 py-1 rounded-full shadow-xs">
+        <span className="text-xs font-black text-on-fill bg-accent px-3 py-1 rounded-full shadow-xs">
           تحليل النماذج المتقدم
         </span>
       </div>
@@ -159,15 +159,15 @@ export function TeamTacticalSpotlight({
         </h3>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {/* Top Attacker */}
-          <div className="bg-panel p-4 rounded-2xl border border-emerald-500/30 space-y-2 relative overflow-hidden">
+          <div className="bg-panel p-4 rounded-2xl border border-success/30 space-y-2 relative overflow-hidden">
             <div className="flex items-center justify-between text-xs">
-              <span className="font-extrabold text-emerald-600 dark:text-emerald-400">🔥 هداف الفريق</span>
+              <span className="font-extrabold text-success">🔥 هداف الفريق</span>
               <span className="font-mono font-black text-ink">{data.topAttacker.threat} خطورة</span>
             </div>
             <h4 className="text-sm font-black text-ink">{data.topAttacker.name}</h4>
             <div className="text-[11px] font-bold text-muted space-y-0.5 border-t border-line pt-2">
               <p>المركز: <strong className="text-ink">{data.topAttacker.pos}</strong></p>
-              <p>الأهداف المسجلة: <strong className="text-emerald-500 font-mono font-black">{data.topAttacker.goals} هدف</strong></p>
+              <p>الأهداف المسجلة: <strong className="text-success font-mono font-black">{data.topAttacker.goals} هدف</strong></p>
               <p>مساهمة xG: <strong className="text-ink font-mono">{data.topAttacker.xg}</strong></p>
             </div>
           </div>
@@ -175,7 +175,7 @@ export function TeamTacticalSpotlight({
           {/* Top Midfielder */}
           <div className="bg-panel p-4 rounded-2xl border border-blue-500/30 space-y-2 relative overflow-hidden">
             <div className="flex items-center justify-between text-xs">
-              <span className="font-extrabold text-blue-600 dark:text-blue-400">🎯 صانع الألعاب</span>
+              <span className="font-extrabold text-home">🎯 صانع الألعاب</span>
               <span className="font-mono font-black text-ink">{data.topMidfielder.assistRate} تقييم</span>
             </div>
             <h4 className="text-sm font-black text-ink">{data.topMidfielder.name}</h4>

@@ -84,14 +84,14 @@ export function LambdaCompare({
       key: "H" as const,
       name: homeName ?? "مضيف",
       value: home,
-      color: "#2563eb",
+      color: "var(--home)",
       badge: "المضيف",
     },
     {
       key: "A" as const,
       name: awayName ?? "ضيف",
       value: away,
-      color: "#e11d48",
+      color: "var(--away)",
       badge: "الضيف",
     },
   ];
@@ -112,8 +112,8 @@ export function LambdaCompare({
             <div key={s.key} className="space-y-1.5">
               <div className="flex items-center justify-between text-xs">
                 <dt className="flex items-center gap-2">
-                  <span className={`h-2 w-2 rounded-full ${isHome ? "bg-blue-600" : "bg-rose-600"}`} />
-                  <span className={`font-black ${isHome ? "text-blue-600 dark:text-blue-400" : "text-rose-600 dark:text-rose-400"}`}>
+                  <span className={`h-2 w-2 rounded-full ${isHome ? "bg-home" : "bg-danger"}`} />
+                  <span className={`font-black ${isHome ? "text-home" : "text-danger"}`}>
                     {s.name}
                   </span>
                 </dt>
@@ -210,10 +210,10 @@ function FormCard({
     <div className={`rounded-xl p-4 space-y-2 border shadow-2xs transition-all ${
       isHome 
         ? "bg-surface border-blue-500/20" 
-        : "bg-surface border-rose-500/20"
+        : "bg-surface border-danger/25"
     }`}>
       <div className="flex items-center justify-between text-xs">
-        <span className={`font-black ${isHome ? "text-blue-600 dark:text-blue-400" : "text-rose-600 dark:text-rose-400"}`}>
+        <span className={`font-black ${isHome ? "text-home" : "text-danger"}`}>
           {label}
         </span>
         <span className="font-mono font-extrabold text-ink">{pts.toFixed(2)} / 3</span>

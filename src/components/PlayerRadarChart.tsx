@@ -76,7 +76,7 @@ export function PlayerRadarChart(props: PlayerRadarProps) {
                   const y = center + radius * Math.sin(angle);
                   return <line key={i} x1={center} y1={center} x2={x} y2={y} stroke="var(--line)" />;
                 })}
-                <polygon points={points} fill="#2563eb" fillOpacity="0.3" stroke="#2563eb" strokeWidth="2.5" />
+                <polygon points={points} fill="var(--home)" fillOpacity="0.3" stroke="var(--home)" strokeWidth="2.5" />
                 {labels.map((lbl, i) => {
                   const angle = i * angleStep - Math.PI / 2;
                   const x = center + (radius + 22) * Math.cos(angle);
@@ -98,7 +98,7 @@ export function PlayerRadarChart(props: PlayerRadarProps) {
             <dl className="space-y-2">
               <div className="flex items-center justify-between text-xs">
                 <dt className="text-muted font-bold">الحس التهديفي xG Threat:</dt>
-                <dd className="font-extrabold text-blue-600 dark:text-blue-400 tabular">{m.scoring}/100</dd>
+                <dd className="font-extrabold text-home tabular">{m.scoring}/100</dd>
               </div>
               <div className="flex items-center justify-between text-xs">
                 <dt className="text-muted font-bold">صناعة الفرص المحققة xA:</dt>
@@ -110,7 +110,7 @@ export function PlayerRadarChart(props: PlayerRadarProps) {
               </div>
               <div className="flex items-center justify-between text-xs">
                 <dt className="text-muted font-bold">الجاهزية والياقة البدنية:</dt>
-                <dd className="font-extrabold text-emerald-600 dark:text-emerald-400 tabular">{m.fitness}/100</dd>
+                <dd className="font-extrabold text-success tabular">{m.fitness}/100</dd>
               </div>
             </dl>
           </div>
@@ -195,15 +195,15 @@ export function PlayerRadarChart(props: PlayerRadarProps) {
               })}
 
               {/* Home Polygon - Blue */}
-              <polygon points={homePoints} fill="#2563eb" fillOpacity="0.2" stroke="#2563eb" strokeWidth="2.5" />
+              <polygon points={homePoints} fill="var(--home)" fillOpacity="0.2" stroke="var(--home)" strokeWidth="2.5" />
               {homeCoord.map((c, i) => (
-                <circle key={`h-${i}`} cx={c.x} cy={c.y} r="3.5" fill="#2563eb" />
+                <circle key={`h-${i}`} cx={c.x} cy={c.y} r="3.5" fill="var(--home)" />
               ))}
 
               {/* Away Polygon - Red */}
-              <polygon points={awayPoints} fill="#e11d48" fillOpacity="0.2" stroke="#e11d48" strokeWidth="2.5" />
+              <polygon points={awayPoints} fill="var(--away)" fillOpacity="0.2" stroke="var(--away)" strokeWidth="2.5" />
               {awayCoord.map((c, i) => (
-                <circle key={`a-${i}`} cx={c.x} cy={c.y} r="3.5" fill="#e11d48" />
+                <circle key={`a-${i}`} cx={c.x} cy={c.y} r="3.5" fill="var(--away)" />
               ))}
 
               {/* Axis Labels */}
@@ -234,15 +234,15 @@ export function PlayerRadarChart(props: PlayerRadarProps) {
           <div className="grid grid-cols-2 gap-3 text-center">
             {/* Home Star Card */}
             <div className="rounded-xl border border-blue-500/30 bg-blue-500/10 p-3 space-y-0.5">
-              <span className="text-[10px] font-extrabold text-blue-600 dark:text-blue-400 block truncate">
+              <span className="text-[10px] font-extrabold text-home block truncate">
                 نجم {homeTeam}
               </span>
               <span className="font-black text-ink text-xs sm:text-sm block truncate">{homeStarName}</span>
             </div>
 
             {/* Away Star Card */}
-            <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 space-y-0.5">
-              <span className="text-[10px] font-extrabold text-rose-600 dark:text-rose-400 block truncate">
+            <div className="rounded-xl border border-rose-500/30 bg-danger-dim p-3 space-y-0.5">
+              <span className="text-[10px] font-extrabold text-danger block truncate">
                 نجم {awayTeam}
               </span>
               <span className="font-black text-ink text-xs sm:text-sm block truncate">{awayStarName}</span>
@@ -257,11 +257,11 @@ export function PlayerRadarChart(props: PlayerRadarProps) {
               return (
                 <div key={lbl} className="space-y-1">
                   <div className="flex items-center justify-between text-xs font-bold">
-                    <span className="text-blue-600 dark:text-blue-400 font-mono font-black bg-blue-500/10 px-2 py-0.5 rounded border border-blue-500/20">
+                    <span className="text-home font-mono font-black bg-blue-500/10 px-2 py-0.5 rounded border border-blue-500/20">
                       {hVal}
                     </span>
                     <span className="text-ink font-black text-xs">{lbl}</span>
-                    <span className="text-rose-600 dark:text-rose-400 font-mono font-black bg-rose-500/10 px-2 py-0.5 rounded border border-rose-500/20">
+                    <span className="text-danger font-mono font-black bg-danger-dim px-2 py-0.5 rounded border border-danger/25">
                       {aVal}
                     </span>
                   </div>
@@ -271,14 +271,14 @@ export function PlayerRadarChart(props: PlayerRadarProps) {
                     {/* Home bar (RTL: expands from center to right) */}
                     <div className="h-full bg-panel rounded-full overflow-hidden flex justify-end">
                       <div
-                        className="h-full bg-blue-600 rounded-full transition-all duration-500"
+                        className="h-full bg-home rounded-full transition-all duration-500"
                         style={{ width: `${hVal}%` }}
                       />
                     </div>
                     {/* Away bar (expands from center to left) */}
                     <div className="h-full bg-panel rounded-full overflow-hidden flex justify-start">
                       <div
-                        className="h-full bg-rose-600 rounded-full transition-all duration-500"
+                        className="h-full bg-danger rounded-full transition-all duration-500"
                         style={{ width: `${aVal}%` }}
                       />
                     </div>

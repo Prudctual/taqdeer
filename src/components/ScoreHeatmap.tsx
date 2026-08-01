@@ -50,9 +50,9 @@ export function ScoreHeatmap({ matrix, homeLabel, awayLabel }: Props) {
         <div className="flex items-center gap-2">
           <span className="text-xs font-bold text-muted">النتيجة الأرجح:</span>
           <span className="inline-flex items-center gap-1.5 rounded-lg bg-surface border border-line px-3 py-1 font-mono font-black text-sm text-ink tabular">
-            <span className="text-blue-600 dark:text-blue-400">{topI}</span>
+            <span className="text-home">{topI}</span>
             <span className="text-muted">–</span>
-            <span className="text-rose-600 dark:text-rose-400">{topJ}</span>
+            <span className="text-danger">{topJ}</span>
           </span>
           <span className="text-sm font-black tabular text-accent">
             ({pct(topP, 1)})
@@ -68,9 +68,9 @@ export function ScoreHeatmap({ matrix, homeLabel, awayLabel }: Props) {
                   key={`${s.i}-${s.j}`}
                   className="inline-flex items-center gap-1 rounded-md bg-surface border border-line px-2 py-0.5 text-xs text-ink"
                 >
-                  <span className="text-blue-600 dark:text-blue-400">{s.i}</span>
+                  <span className="text-home">{s.i}</span>
                   <span className="text-muted">–</span>
-                  <span className="text-rose-600 dark:text-rose-400">{s.j}</span>
+                  <span className="text-danger">{s.j}</span>
                   <span className="text-muted font-normal text-[10px]">({pct(s.p, 1)})</span>
                 </span>
               ))}
@@ -82,14 +82,14 @@ export function ScoreHeatmap({ matrix, homeLabel, awayLabel }: Props) {
       {/* تسمية المحورين بوضوح وألوان المضيف والضيف */}
       <div className="grid grid-cols-2 gap-3 text-xs">
         <div className="rounded-xl border border-blue-500/20 bg-blue-500/10 p-3 space-y-0.5">
-          <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 block">
+          <span className="text-[10px] font-bold text-home block">
             أهداف المضيف (الصفوف ↓)
           </span>
           <span className="font-black text-ink truncate block">{homeLabel}</span>
         </div>
 
-        <div className="rounded-xl border border-rose-500/20 bg-rose-500/10 p-3 text-end space-y-0.5">
-          <span className="text-[10px] font-bold text-rose-600 dark:text-rose-400 block">
+        <div className="rounded-xl border border-danger/25 bg-danger-dim p-3 text-end space-y-0.5">
+          <span className="text-[10px] font-bold text-danger block">
             أهداف الضيف (الأعمدة →)
           </span>
           <span className="font-black text-ink truncate block">{awayLabel}</span>
@@ -112,7 +112,7 @@ export function ScoreHeatmap({ matrix, homeLabel, awayLabel }: Props) {
                   key={`col-${j}`}
                   scope="col"
                   className={`h-9 border border-line bg-panel text-center text-xs font-black tabular ${
-                    j === topJ ? "text-rose-600 dark:text-rose-400" : "text-muted"
+                    j === topJ ? "text-danger" : "text-muted"
                   }`}
                 >
                   {j}
@@ -126,7 +126,7 @@ export function ScoreHeatmap({ matrix, homeLabel, awayLabel }: Props) {
                 <th
                   scope="row"
                   className={`w-9 h-9 border border-line bg-panel text-center text-xs font-black tabular ${
-                    i === topI ? "text-blue-600 dark:text-blue-400" : "text-muted"
+                    i === topI ? "text-home" : "text-muted"
                   }`}
                 >
                   {i}
@@ -145,7 +145,7 @@ export function ScoreHeatmap({ matrix, homeLabel, awayLabel }: Props) {
                       key={`${i}-${j}`}
                       className={`h-9 border border-line text-center text-xs font-mono font-bold tabular transition-all duration-150 select-none ${
                         isTop
-                          ? "font-black text-white bg-accent ring-2 ring-accent shadow-md rounded-sm scale-105"
+                          ? "font-black text-on-fill bg-accent text-on-fill ring-2 ring-accent rounded-sm scale-105"
                           : isRunner
                             ? "font-extrabold text-ink border-accent/40 bg-accent-dim/30"
                             : t > 0.2

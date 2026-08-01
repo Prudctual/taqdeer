@@ -129,7 +129,7 @@ export function AutomatedModelAdjustments({
                     className={`shrink-0 text-xs font-extrabold tabular tracking-wide px-3.5 py-1 rounded-full border-0 ${
                       isNeutral
                         ? "bg-panel text-muted"
-                        : "bg-accent text-white"
+                        : "bg-accent text-on-fill"
                     }`}
                   >
                     {adj.impact}
@@ -167,13 +167,13 @@ export function AutomatedModelAdjustments({
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5 text-xs font-black">
-          <span className="rounded-full bg-home text-white px-4 py-2 border-0 font-mono tracking-wide text-xs">
+          <span className="rounded-full bg-home text-on-fill px-4 py-2 border-0 font-mono tracking-wide text-xs">
             فوز 1: {Math.round(homeP * 100)}%
           </span>
-          <span className="rounded-full bg-draw text-white px-4 py-2 border-0 font-mono tracking-wide text-xs">
+          <span className="rounded-full bg-draw text-draw-ink px-4 py-2 border-0 font-mono tracking-wide text-xs">
             تعادل X: {Math.round(drawP * 100)}%
           </span>
-          <span className="rounded-full bg-away text-white px-4 py-2 border-0 font-mono tracking-wide text-xs">
+          <span className="rounded-full bg-away text-on-fill px-4 py-2 border-0 font-mono tracking-wide text-xs">
             فوز 2: {Math.round(awayP * 100)}%
           </span>
         </div>

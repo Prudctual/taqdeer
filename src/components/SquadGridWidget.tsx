@@ -48,13 +48,13 @@ export function SquadGridWidget({
             {/* Header bar blue for home, red for away */}
             <div
               className={`flex items-center justify-between border-b pb-3 ${
-                p.isHome ? "border-blue-500/20" : "border-rose-500/20"
+                p.isHome ? "border-blue-500/20" : "border-danger/25"
               }`}
             >
               <span className="text-xs font-bold text-muted">{p.position}</span>
               <span
                 className={`text-xl font-black tabular font-mono ${
-                  p.isHome ? "text-blue-600 dark:text-blue-400" : "text-rose-600 dark:text-rose-400"
+                  p.isHome ? "text-home" : "text-danger"
                 }`}
               >
                 #{p.number}
@@ -65,7 +65,7 @@ export function SquadGridWidget({
             <div className="my-4 flex justify-center">
               <div
                 className={`relative h-20 w-20 rounded-full border overflow-hidden shadow-md group-hover:scale-105 transition-transform ${
-                  p.isHome ? "border-blue-500/40 bg-blue-950/20" : "border-rose-500/40 bg-rose-950/20"
+                  p.isHome ? "border-home/40 bg-home/15" : "border-danger/40 bg-danger-dim"
                 }`}
               >
                 {p.photoUrl ? (
@@ -84,7 +84,7 @@ export function SquadGridWidget({
                 <div
                   style={{ display: p.photoUrl ? "none" : "flex" }}
                   className={`h-full w-full items-center justify-center font-mono font-black text-lg ${
-                    p.isHome ? "text-blue-600 dark:text-blue-400" : "text-rose-600 dark:text-rose-400"
+                    p.isHome ? "text-home" : "text-danger"
                   }`}
                 >
                   {p.initials}
@@ -98,7 +98,7 @@ export function SquadGridWidget({
                 {p.name}
               </h3>
               <div className="flex items-center justify-center gap-1.5 pt-0.5">
-                <span className={`h-1.5 w-1.5 rounded-full ${p.isHome ? "bg-blue-600" : "bg-rose-600"}`} />
+                <span className={`h-1.5 w-1.5 rounded-full ${p.isHome ? "bg-home" : "bg-danger"}`} />
                 <p className="text-xs font-semibold text-muted">{p.team}</p>
               </div>
             </div>
@@ -111,7 +111,7 @@ export function SquadGridWidget({
               </div>
               <div className="bg-panel p-2 rounded-xl border border-line">
                 <span className="text-[10px] font-bold text-muted block">تأثير xG</span>
-                <span className="font-mono font-black text-emerald-600 dark:text-emerald-400 text-xs tabular">
+                <span className="font-mono font-black text-success text-xs tabular">
                   {p.xgImpact}
                 </span>
               </div>

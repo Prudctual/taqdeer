@@ -78,13 +78,13 @@ export function LiveInPlaySimulator({
       <div className="flex flex-wrap items-center justify-between border-b border-zinc-800/80 pb-3 mb-4 gap-2">
         <div className="flex items-center gap-2">
           {isFinished ? (
-            <span className="inline-flex items-center justify-center h-5 px-2 rounded-full bg-zinc-800 text-[10px] font-bold text-zinc-300 border border-zinc-700">
+            <span className="inline-flex items-center justify-center h-5 px-2 rounded-full bg-raised text-[10px] font-bold text-zinc-300 border border-zinc-700">
               أداة محاكاة
             </span>
           ) : (
             <span className="relative flex h-3 w-3">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-3 w-3 bg-success"></span>
             </span>
           )}
           <div>
@@ -100,7 +100,7 @@ export function LiveInPlaySimulator({
             )}
           </div>
         </div>
-        <span className="text-xs font-mono text-emerald-400 bg-emerald-950/80 border border-emerald-800/50 px-2.5 py-1 rounded-full">
+        <span className="text-xs font-mono text-success bg-success-dim border border-success/40 px-2.5 py-1 rounded-full">
           الدقيقة {minute}&apos;
         </span>
       </div>
@@ -118,7 +118,7 @@ export function LiveInPlaySimulator({
             max="90"
             value={minute}
             onChange={(e) => setMinute(parseInt(e.target.value, 10))}
-            className="w-full accent-emerald-500 cursor-pointer bg-zinc-800 h-2 rounded-lg"
+            className="w-full accent-[var(--success)] cursor-pointer bg-raised h-2 rounded-lg"
           />
           <div className="flex justify-between text-[10px] text-zinc-500 font-mono mt-1">
             <span>0&apos;</span>
@@ -137,16 +137,16 @@ export function LiveInPlaySimulator({
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setHomeScore(Math.max(0, homeScore - 1))}
-                className="w-7 h-7 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-mono text-sm font-bold transition"
+                className="w-7 h-7 rounded bg-raised hover:bg-zinc-700 text-zinc-200 font-mono text-sm font-bold transition"
               >
                 -
               </button>
-              <span className="font-mono text-sm font-bold text-emerald-400 w-4 text-center">
+              <span className="font-mono text-sm font-bold text-success w-4 text-center">
                 {homeScore}
               </span>
               <button
                 onClick={() => setHomeScore(homeScore + 1)}
-                className="w-7 h-7 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-mono text-sm font-bold transition"
+                className="w-7 h-7 rounded bg-raised hover:bg-zinc-700 text-zinc-200 font-mono text-sm font-bold transition"
               >
                 +
               </button>
@@ -154,20 +154,20 @@ export function LiveInPlaySimulator({
           </div>
 
           <div className="flex items-center justify-between pt-1 border-t border-zinc-800/40">
-            <span className="text-xs text-rose-400">بطاقات حمراء:</span>
+            <span className="text-xs text-danger">بطاقات حمراء:</span>
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setHomeRedCards(Math.max(0, homeRedCards - 1))}
-                className="w-7 h-7 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-mono text-sm font-bold transition"
+                className="w-7 h-7 rounded bg-raised hover:bg-zinc-700 text-zinc-200 font-mono text-sm font-bold transition"
               >
                 -
               </button>
-              <span className="font-mono text-sm font-bold text-rose-400 w-4 text-center">
+              <span className="font-mono text-sm font-bold text-danger w-4 text-center">
                 {homeRedCards}
               </span>
               <button
                 onClick={() => setHomeRedCards(Math.min(2, homeRedCards + 1))}
-                className="w-7 h-7 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-mono text-sm font-bold transition"
+                className="w-7 h-7 rounded bg-raised hover:bg-zinc-700 text-zinc-200 font-mono text-sm font-bold transition"
               >
                 +
               </button>
@@ -185,16 +185,16 @@ export function LiveInPlaySimulator({
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setAwayScore(Math.max(0, awayScore - 1))}
-                className="w-7 h-7 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-mono text-sm font-bold transition"
+                className="w-7 h-7 rounded bg-raised hover:bg-zinc-700 text-zinc-200 font-mono text-sm font-bold transition"
               >
                 -
               </button>
-              <span className="font-mono text-sm font-bold text-emerald-400 w-4 text-center">
+              <span className="font-mono text-sm font-bold text-success w-4 text-center">
                 {awayScore}
               </span>
               <button
                 onClick={() => setAwayScore(awayScore + 1)}
-                className="w-7 h-7 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-mono text-sm font-bold transition"
+                className="w-7 h-7 rounded bg-raised hover:bg-zinc-700 text-zinc-200 font-mono text-sm font-bold transition"
               >
                 +
               </button>
@@ -202,20 +202,20 @@ export function LiveInPlaySimulator({
           </div>
 
           <div className="flex items-center justify-between pt-1 border-t border-zinc-800/40">
-            <span className="text-xs text-rose-400">بطاقات حمراء:</span>
+            <span className="text-xs text-danger">بطاقات حمراء:</span>
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setAwayRedCards(Math.max(0, awayRedCards - 1))}
-                className="w-7 h-7 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-mono text-sm font-bold transition"
+                className="w-7 h-7 rounded bg-raised hover:bg-zinc-700 text-zinc-200 font-mono text-sm font-bold transition"
               >
                 -
               </button>
-              <span className="font-mono text-sm font-bold text-rose-400 w-4 text-center">
+              <span className="font-mono text-sm font-bold text-danger w-4 text-center">
                 {awayRedCards}
               </span>
               <button
                 onClick={() => setAwayRedCards(Math.min(2, awayRedCards + 1))}
-                className="w-7 h-7 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-mono text-sm font-bold transition"
+                className="w-7 h-7 rounded bg-raised hover:bg-zinc-700 text-zinc-200 font-mono text-sm font-bold transition"
               >
                 +
               </button>
@@ -229,7 +229,7 @@ export function LiveInPlaySimulator({
         <div>
           <div className="text-xs text-zinc-400 mb-2 flex justify-between">
             <span>الاحتمالات الحية المتوقعة للنهاية:</span>
-            <span className="text-emerald-400 font-mono text-[11px]">
+            <span className="text-success font-mono text-[11px]">
               تحديث رياضي مباشر
             </span>
           </div>
@@ -264,7 +264,7 @@ export function LiveInPlaySimulator({
               <span className="text-[11px] text-zinc-400 block">
                 نتيجة متوقعة #{idx + 1}
               </span>
-              <span className="font-mono text-sm font-bold text-emerald-400">
+              <span className="font-mono text-sm font-bold text-success">
                 {s.score} <span className="text-[10px] text-zinc-500 font-normal">({(s.probability * 100).toFixed(0)}%)</span>
               </span>
             </div>

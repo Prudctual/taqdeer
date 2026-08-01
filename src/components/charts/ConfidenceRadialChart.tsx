@@ -22,11 +22,11 @@ export function ConfidenceRadialChart({ match }: { match?: MatchCard | null }) {
   const softmaxTempScore = 92;
 
   const radialData = [
-    { name: "ثقة النموذج المباشر (Poisson)", count: poissonScore, fill: "#2563eb" },
-    { name: "فارق تصنيف Pi-ratings & Elo", count: piRatingScore, fill: "#059669" },
-    { name: "مؤشر حركية أسعار السوق", count: match?.sharpSteamSide ? 94 : 75, fill: "#7c3aed" },
-    { name: "معايرة Softmax (T=0.92)", count: softmaxTempScore, fill: "#d97706" },
-    { name: "معدل استقرار توقع المباراة", count: confidenceScore, fill: "#0284c7" },
+    { name: "ثقة النموذج المباشر (Poisson)", count: poissonScore, fill: "var(--home)" },
+    { name: "فارق تصنيف Pi-ratings & Elo", count: piRatingScore, fill: "var(--success)" },
+    { name: "مؤشر حركية أسعار السوق", count: match?.sharpSteamSide ? 94 : 75, fill: "var(--accent)" },
+    { name: "معايرة Softmax (T=0.92)", count: softmaxTempScore, fill: "var(--warn)" },
+    { name: "معدل استقرار توقع المباراة", count: confidenceScore, fill: "var(--accent)" },
   ];
 
   return (
@@ -34,7 +34,7 @@ export function ConfidenceRadialChart({ match }: { match?: MatchCard | null }) {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
-            <span className="h-2.5 w-2.5 rounded-full bg-sky-600 animate-pulse" />
+            <span className="h-2.5 w-2.5 rounded-full bg-accent animate-pulse" />
             <h3 className="text-base sm:text-lg font-black text-ink">
               مؤشرات ثقة التوقع لهذه المباراة
             </h3>
@@ -44,7 +44,7 @@ export function ConfidenceRadialChart({ match }: { match?: MatchCard | null }) {
           </p>
         </div>
 
-        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-sky-500/10 border border-sky-500/20 text-sky-600 dark:text-sky-400 font-extrabold text-xs">
+        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-accent-dim border border-accent/25 text-sky-600 dark:text-sky-400 font-extrabold text-xs">
           <span>معدل الثقة العام: {confidenceScore}%</span>
         </div>
       </div>

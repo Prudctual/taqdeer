@@ -42,12 +42,12 @@ export function TacticalMatchupCard({
           <div className="rounded-2xl border border-blue-500/20 bg-surface overflow-hidden space-y-0 shadow-2xs">
             <div className="flex items-center justify-between bg-blue-500/10 border-b border-blue-500/20 px-4 py-3 sm:px-5 sm:py-3.5">
               <div className="flex items-center gap-2">
-                <span className="h-2.5 w-2.5 rounded-full bg-blue-600" />
-                <span className="font-black text-blue-600 dark:text-blue-400 text-sm sm:text-base">
+                <span className="h-2.5 w-2.5 rounded-full bg-home" />
+                <span className="font-black text-home text-sm sm:text-base">
                   {homeTeam}
                 </span>
               </div>
-              <span className="rounded-full bg-blue-600 text-white px-2.5 py-0.5 text-[11px] font-extrabold shadow-2xs">
+              <span className="rounded-full bg-home text-on-fill px-2.5 py-0.5 text-[11px] font-extrabold shadow-2xs">
                 المضيف
               </span>
             </div>
@@ -55,7 +55,7 @@ export function TacticalMatchupCard({
             <div className="p-4 sm:p-5 space-y-2">
               <div className="flex items-baseline justify-between">
                 <span className="text-xs font-bold text-muted">التشكيلة المتوقعة</span>
-                <span className="text-xl font-black text-blue-600 dark:text-blue-400 tabular font-mono">
+                <span className="text-xl font-black text-home tabular font-mono">
                   {hForm}
                 </span>
               </div>
@@ -69,15 +69,15 @@ export function TacticalMatchupCard({
           </div>
 
           {/* Away Team Card - Red Header */}
-          <div className="rounded-2xl border border-rose-500/20 bg-surface overflow-hidden space-y-0 shadow-2xs">
-            <div className="flex items-center justify-between bg-rose-500/10 border-b border-rose-500/20 px-4 py-3 sm:px-5 sm:py-3.5">
+          <div className="rounded-2xl border border-danger/25 bg-surface overflow-hidden space-y-0 shadow-2xs">
+            <div className="flex items-center justify-between bg-danger-dim border-b border-danger/25 px-4 py-3 sm:px-5 sm:py-3.5">
               <div className="flex items-center gap-2">
-                <span className="h-2.5 w-2.5 rounded-full bg-rose-600" />
-                <span className="font-black text-rose-600 dark:text-rose-400 text-sm sm:text-base">
+                <span className="h-2.5 w-2.5 rounded-full bg-danger" />
+                <span className="font-black text-danger text-sm sm:text-base">
                   {awayTeam}
                 </span>
               </div>
-              <span className="rounded-full bg-rose-600 text-white px-2.5 py-0.5 text-[11px] font-extrabold shadow-2xs">
+              <span className="rounded-full bg-danger text-on-fill px-2.5 py-0.5 text-[11px] font-extrabold shadow-2xs">
                 الضيف
               </span>
             </div>
@@ -85,7 +85,7 @@ export function TacticalMatchupCard({
             <div className="p-4 sm:p-5 space-y-2">
               <div className="flex items-baseline justify-between">
                 <span className="text-xs font-bold text-muted">التشكيلة المتوقعة</span>
-                <span className="text-xl font-black text-rose-600 dark:text-rose-400 tabular font-mono">
+                <span className="text-xl font-black text-danger tabular font-mono">
                   {aForm}
                 </span>
               </div>

@@ -38,11 +38,11 @@ export function BankerPicksWidget({
             className="group block rounded-2xl border border-indigo-500/30 bg-surface overflow-hidden shadow-2xs space-y-0 transition-all hover:border-indigo-500 hover:shadow-md cursor-pointer"
           >
             {/* Header Strip */}
-            <div className="bg-indigo-500/10 border-b border-indigo-500/20 px-3.5 py-2 flex items-center justify-between">
+            <div className="bg-accent-dim border-b border-accent/25 px-3.5 py-2 flex items-center justify-between">
               <span className="text-[11px] font-black text-indigo-600 dark:text-indigo-400 truncate">
                 {item.leagueName}
               </span>
-              <span className="bg-indigo-600 text-white font-extrabold text-[10px] px-2 py-0.5 rounded-full shrink-0">
+              <span className="bg-accent text-on-fill font-extrabold text-[10px] px-2 py-0.5 rounded-full shrink-0">
                 ثقة {pct(item.confidence)}
               </span>
             </div>

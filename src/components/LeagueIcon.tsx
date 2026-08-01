@@ -14,7 +14,7 @@ export function LeagueIcon({ leagueId, className = "w-8 h-8" }: { leagueId?: str
 
   if (tone === "kl1") {
     return (
-      <div className="flex h-full w-full items-center justify-center rounded-full bg-[#044e3b] p-1 shadow-inner">
+      <div className="flex h-full w-full items-center justify-center rounded-full bg-success p-1 shadow-inner">
         <Image
           src="/crests/kl1-league.png"
           alt="K League"

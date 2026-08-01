@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { PageNav, BackBar } from "@/components/ui";
+import { PageNav, BackBar, EmptyState } from "@/components/ui";
 import { getUpcomingByLeague, getValueMatches, getMeta } from "@/lib/queries";
 import { formatMetaStamp } from "@/lib/format";
 import { MatchChartsInteractiveContainer } from "@/components/MatchChartsInteractiveContainer";
@@ -40,8 +40,8 @@ export default function ChartsPage() {
         {/* Hero Header Banner */}
         <div className="rounded-2xl border border-line bg-panel p-6 sm:p-8 space-y-4 shadow-2xs mt-2">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-600 dark:text-blue-400 font-black text-xs">
-              <span className="h-2 w-2 rounded-full bg-blue-600 animate-pulse" />
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-accent-dim border border-line text-accent font-black text-xs">
+              <span className="h-2 w-2 rounded-full bg-accent" />
               مركز المخططات والرسوم البيانية للمباريات
             </span>
 
@@ -64,7 +64,16 @@ export default function ChartsPage() {
       </div>
 
       {/* Interactive Match Charts Selector & Container */}
-      <MatchChartsInteractiveContainer matches={allMatches} />
+      {allMatches.length > 0 ? (
+        <MatchChartsInteractiveContainer matches={allMatches} />
+      ) : (
+        <div className="rounded-2xl border border-line bg-surface p-8">
+          <EmptyState
+            title="لا توجد مباريات للرسوم حالياً"
+            body="عند توفر مباريات مجدولة أو فرص قيمة ستظهر هنا مخططاتها التفاعلية."
+          />
+        </div>
+      )}
 
       <BackBar links={[{ href: "/", label: "الرئيسية" }]} />
     </div>

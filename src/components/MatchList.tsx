@@ -27,7 +27,7 @@ export function MatchList({
     return (
       <div>
         <MatchListHeader leagueId={leagueId} />
-        <ul className="divide-y divide-slate-100">
+        <ul className="divide-y divide-line">
           {matches.map((m) => (
             <li key={m.id}>
               <MatchRow m={m} showLeague={showLeague} />
@@ -47,7 +47,7 @@ export function MatchList({
         {days.map((day) => (
           <section key={day.key} aria-label={day.label} className="space-y-1">
             <DayRail>
-              <div className="bg-slate-100/90 rounded-2xl px-4 py-2.5 flex items-center justify-between border border-slate-200/60 shadow-2xs">
+              <div className="bg-panel rounded-2xl px-4 py-2.5 flex items-center justify-between border border-line">
                 <div className="flex items-center gap-2">
                   {day.relative ? (
                     <span className="bg-accent-dim text-accent px-3 py-0.5 rounded-full text-xs font-black border border-accent/20">
@@ -72,7 +72,7 @@ export function MatchList({
               </div>
             </DayRail>
 
-            <ul className="divide-y divide-slate-100 bg-white rounded-2xl overflow-hidden shadow-2xs">
+            <ul className="divide-y divide-line bg-surface rounded-2xl overflow-hidden border border-line">
               {day.items.map((m) => (
                 <li key={m.id}>
                   <MatchRow m={m} showLeague={showLeague} hideRelative />

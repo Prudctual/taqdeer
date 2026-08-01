@@ -62,17 +62,17 @@ export function UpsetAlertBadge({
   return (
     <div className="rounded-2xl border border-amber-500/40 bg-surface overflow-hidden shadow-2xs my-4">
       {/* Header bar - ultra clear text contrast */}
-      <div className="bg-amber-500/20 dark:bg-amber-950/40 border-b border-amber-500/30 px-4 py-3 flex items-center justify-between gap-3">
+      <div className="bg-warn-dim border-b border-warn/30 px-4 py-3 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2.5">
           <span className="relative flex h-2.5 w-2.5">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
-            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500" />
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-warn opacity-75" />
+            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-warn" />
           </span>
           <span className="font-black text-ink text-xs sm:text-sm">
             تنبيه مفاجأة متوقعة في المباراة
           </span>
         </div>
-        <span className="bg-amber-600 text-white font-extrabold text-[11px] px-3 py-1 rounded-full shadow-xs">
+        <span className="bg-warn text-on-fill font-extrabold text-[11px] px-3 py-1 rounded-full shadow-xs">
           خطر تعثر {favoriteName}
         </span>
       </div>

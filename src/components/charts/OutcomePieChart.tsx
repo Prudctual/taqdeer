@@ -20,17 +20,17 @@ export function OutcomePieChart({ match }: { match?: MatchCard | null }) {
   const awayName = match?.awayNameAr ?? "برشلونة (الضيف)";
 
   const outcomeData = [
-    { name: `فوز ${homeName}`, value: Number((pHome * 100).toFixed(1)), color: "#2563eb" },
-    { name: "التعادل (X)", value: Number((pDraw * 100).toFixed(1)), color: "#64748b" },
-    { name: `فوز ${awayName}`, value: Number((pAway * 100).toFixed(1)), color: "#e11d48" },
+    { name: `فوز ${homeName}`, value: Number((pHome * 100).toFixed(1)), color: "var(--home)" },
+    { name: "التعادل (X)", value: Number((pDraw * 100).toFixed(1)), color: "var(--muted)" },
+    { name: `فوز ${awayName}`, value: Number((pAway * 100).toFixed(1)), color: "var(--away)" },
   ];
 
   const pOver25 = match?.pOver25 ?? 0.58;
   const pUnder25 = 1 - pOver25;
 
   const goalMarketsData = [
-    { name: "أكثر من 2.5 هدف (Over)", value: Number((pOver25 * 100).toFixed(1)), color: "#059669" },
-    { name: "أقل من 2.5 هدف (Under)", value: Number((pUnder25 * 100).toFixed(1)), color: "#d97706" },
+    { name: "أكثر من 2.5 هدف (Over)", value: Number((pOver25 * 100).toFixed(1)), color: "var(--success)" },
+    { name: "أقل من 2.5 هدف (Under)", value: Number((pUnder25 * 100).toFixed(1)), color: "var(--warn)" },
   ];
 
   return (
@@ -39,7 +39,7 @@ export function OutcomePieChart({ match }: { match?: MatchCard | null }) {
       <div className="rounded-2xl border border-line bg-panel p-5 sm:p-6 space-y-4 shadow-2xs">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
-            <span className="h-2.5 w-2.5 rounded-full bg-blue-600 animate-pulse" />
+            <span className="h-2.5 w-2.5 rounded-full bg-home animate-pulse" />
             <h3 className="text-base sm:text-lg font-black text-ink">
               توزيع احتمالات النتيجة (1X2) لهذه المباراة
             </h3>
@@ -83,7 +83,7 @@ export function OutcomePieChart({ match }: { match?: MatchCard | null }) {
 
         <div className="pt-2 border-t border-line flex items-center justify-between text-xs text-muted font-bold">
           <span>النتيجة الأرجح: <strong className="text-ink">{pHome >= pAway && pHome >= pDraw ? `فوز ${homeName}` : pAway >= pHome && pAway >= pDraw ? `فوز ${awayName}` : "التعادل"}</strong></span>
-          <span className="font-mono font-black text-blue-600 dark:text-blue-400">{pct(Math.max(pHome, pDraw, pAway))}</span>
+          <span className="font-mono font-black text-home">{pct(Math.max(pHome, pDraw, pAway))}</span>
         </div>
       </div>
 
@@ -91,7 +91,7 @@ export function OutcomePieChart({ match }: { match?: MatchCard | null }) {
       <div className="rounded-2xl border border-line bg-panel p-5 sm:p-6 space-y-4 shadow-2xs">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
-            <span className="h-2.5 w-2.5 rounded-full bg-emerald-600 animate-pulse" />
+            <span className="h-2.5 w-2.5 rounded-full bg-success animate-pulse" />
             <h3 className="text-base sm:text-lg font-black text-ink">
               احتمالية أهداف المباراة (Over / Under 2.5)
             </h3>
@@ -135,7 +135,7 @@ export function OutcomePieChart({ match }: { match?: MatchCard | null }) {
 
         <div className="pt-2 border-t border-line flex items-center justify-between text-xs text-muted font-bold">
           <span>سوق الأهداف: <strong className="text-ink">{pOver25 >= 0.5 ? "مباراة هجومية (Over 2.5)" : "مباراة متوازنة (Under 2.5)"}</strong></span>
-          <span className="font-mono font-black text-emerald-600 dark:text-emerald-400">{pct(pOver25)} Over</span>
+          <span className="font-mono font-black text-success">{pct(pOver25)} Over</span>
         </div>
       </div>
     </div>

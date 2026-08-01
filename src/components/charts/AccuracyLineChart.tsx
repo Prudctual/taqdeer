@@ -29,7 +29,7 @@ export function AccuracyLineChart() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
-            <span className="h-2.5 w-2.5 rounded-full bg-blue-600 animate-pulse" />
+            <span className="h-2.5 w-2.5 rounded-full bg-home animate-pulse" />
             <h3 className="text-base sm:text-lg font-black text-ink">
               مسار تطور دقة التوقعات عبر الجولات
             </h3>
@@ -40,10 +40,10 @@ export function AccuracyLineChart() {
         </div>
 
         <div className="flex items-center gap-2 text-xs font-mono font-bold">
-          <span className="px-2.5 py-1 rounded-lg bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/20">
+          <span className="px-2.5 py-1 rounded-lg bg-blue-500/15 text-home border border-blue-500/20">
             الدوري الإنجليزي: 54.0%
           </span>
-          <span className="px-2.5 py-1 rounded-lg bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
+          <span className="px-2.5 py-1 rounded-lg bg-accent-dim text-accent border border-accent/25">
             الدوري الإسباني: 51.8%
           </span>
         </div>
@@ -84,25 +84,25 @@ export function AccuracyLineChart() {
               name="الدوري الإنجليزي (Premier League)"
               type="monotone"
               dataKey="pl"
-              stroke="#2563eb"
+              stroke="var(--home)"
               strokeWidth={3}
-              dot={{ r: 4, fill: "#2563eb" }}
+              dot={{ r: 4, fill: "var(--home)" }}
               activeDot={{ r: 7 }}
             />
             <Line
               name="الدوري الإسباني (La Liga)"
               type="monotone"
               dataKey="pd"
-              stroke="#7c3aed"
+              stroke="var(--accent)"
               strokeWidth={3}
-              dot={{ r: 4, fill: "#7c3aed" }}
+              dot={{ r: 4, fill: "var(--accent)" }}
               activeDot={{ r: 7 }}
             />
             <Line
               name="متوسط النماذج العام"
               type="monotone"
               dataKey="accuracy"
-              stroke="#059669"
+              stroke="var(--success)"
               strokeWidth={2}
               strokeDasharray="4 4"
               dot={false}
@@ -113,7 +113,7 @@ export function AccuracyLineChart() {
 
       <div className="pt-3 border-t border-line flex items-center justify-between text-xs text-muted font-semibold">
         <span>تحسن مستمر بـ +10.0% منذ انطلاق الموسم</span>
-        <span className="font-mono font-black text-emerald-600 dark:text-emerald-400">
+        <span className="font-mono font-black text-success">
           استقرار المعايرة: 94.2%
         </span>
       </div>

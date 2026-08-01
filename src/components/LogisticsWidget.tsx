@@ -44,11 +44,11 @@ export function LogisticsWidget({
         {/* 1. Stadium & Pitch Location - Blue Theme */}
         <div className="rounded-2xl border border-blue-500/30 bg-surface overflow-hidden shadow-2xs">
           <div className="bg-blue-500/10 border-b border-blue-500/20 px-3.5 py-2 flex items-center justify-between">
-            <span className="text-xs font-black text-blue-600 dark:text-blue-400 flex items-center gap-1.5">
+            <span className="text-xs font-black text-home flex items-center gap-1.5">
               <span>🏟️</span>
               <span>الملعب والموقع</span>
             </span>
-            <span className="rounded-full bg-blue-600 text-white px-2 py-0.5 text-[10px] font-extrabold">
+            <span className="rounded-full bg-home text-on-fill px-2 py-0.5 text-[10px] font-extrabold">
               مكان المباراة
             </span>
           </div>
@@ -64,12 +64,12 @@ export function LogisticsWidget({
 
         {/* 2. Referee & Strictness - Purple Theme */}
         <div className="rounded-2xl border border-purple-500/30 bg-surface overflow-hidden shadow-2xs">
-          <div className="bg-purple-500/10 border-b border-purple-500/20 px-3.5 py-2 flex items-center justify-between">
+          <div className="bg-accent-dim border-b border-accent/25 px-3.5 py-2 flex items-center justify-between">
             <span className="text-xs font-black text-purple-600 dark:text-purple-400 flex items-center gap-1.5">
               <span>⚖️</span>
               <span>التحكيم وحكم المباراة</span>
             </span>
-            <span className="rounded-full bg-purple-600 text-white px-2 py-0.5 text-[10px] font-extrabold">
+            <span className="rounded-full bg-accent text-on-fill px-2 py-0.5 text-[10px] font-extrabold">
               الصرامة
             </span>
           </div>
@@ -84,18 +84,18 @@ export function LogisticsWidget({
         </div>
 
         {/* 3. Goal Expectation & Market Liquidity - Emerald Theme */}
-        <div className="rounded-2xl border border-emerald-500/30 bg-surface overflow-hidden shadow-2xs">
-          <div className="bg-emerald-500/10 border-b border-emerald-500/20 px-3.5 py-2 flex items-center justify-between">
-            <span className="text-xs font-black text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
+        <div className="rounded-2xl border border-success/30 bg-surface overflow-hidden shadow-2xs">
+          <div className="bg-success-dim border-b border-success/25 px-3.5 py-2 flex items-center justify-between">
+            <span className="text-xs font-black text-success flex items-center gap-1.5">
               <span>⚽</span>
               <span>توقع الأهداف والسيولة</span>
             </span>
-            <span className="rounded-full bg-emerald-600 text-white px-2 py-0.5 text-[10px] font-extrabold">
+            <span className="rounded-full bg-success text-on-fill px-2 py-0.5 text-[10px] font-extrabold">
               الأهداف
             </span>
           </div>
           <div className="p-3.5 space-y-1 bg-surface text-start">
-            <div className="text-xs font-black text-emerald-600 dark:text-emerald-400">
+            <div className="text-xs font-black text-success">
               توقع الأهداف: <strong className="text-ink font-black">{info.goalExpectation}</strong>
             </div>
             <p className="text-[11px] font-semibold text-muted">
@@ -105,13 +105,13 @@ export function LogisticsWidget({
         </div>
 
         {/* 4. Weather & Pitch Condition - Amber Theme */}
-        <div className="rounded-2xl border border-amber-500/30 bg-surface overflow-hidden shadow-2xs">
-          <div className="bg-amber-500/10 border-b border-amber-500/20 px-3.5 py-2 flex items-center justify-between">
+        <div className="rounded-2xl border border-warn/30 bg-surface overflow-hidden shadow-2xs">
+          <div className="bg-warn/10 border-b border-warn/25 px-3.5 py-2 flex items-center justify-between">
             <span className="text-xs font-black text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
               <span>🌤️</span>
               <span>حالة الطقس والملعب</span>
             </span>
-            <span className="rounded-full bg-amber-600 text-white px-2 py-0.5 text-[10px] font-extrabold">
+            <span className="rounded-full bg-warn text-on-fill px-2 py-0.5 text-[10px] font-extrabold">
               الطقس
             </span>
           </div>

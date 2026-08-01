@@ -27,7 +27,7 @@ const LEAGUES_CONFIG = [
   { id: "bl1", name: "الدوري الألماني", icon: "🇩🇪" },
   { id: "sa", name: "الدوري الإيطالي", icon: "🇮🇹" },
   { id: "fl1", name: "الدوري الفرنسي", icon: "🇫🇷" },
-  { id: "kl1", name: "الدوري الكوري", icon: "🇰🇷" },
+  { id: "no1", name: "الدوري النرويجي", icon: "🇳🇴" },
 ];
 
 export function ValueMatchesView({ matches }: { matches: ValueMatchItem[] }) {
@@ -75,11 +75,20 @@ export function ValueMatchesView({ matches }: { matches: ValueMatchItem[] }) {
 
   return (
     <div className="space-y-4">
+      {matches.length === 0 ? (
+        <div className="rounded-2xl border border-line bg-surface p-8 text-center space-y-2">
+          <h2 className="text-sm font-black text-ink">لا توجد فرص قيمة حالياً</h2>
+          <p className="text-xs text-muted max-w-lg mx-auto leading-relaxed">
+            عند ظهور انحراف إيجابي بين احتمال النموذج وأسعار السوق ستظهر الفرص هنا تلقائياً.
+          </p>
+        </div>
+      ) : null}
+
       {/* 1. Hero Header & Overview Metrics */}
-      <div className="rounded-2xl border border-emerald-500/30 bg-panel p-4 sm:p-5 space-y-4 shadow-2xs">
+      <div className="rounded-2xl border border-success/30 bg-panel p-4 sm:p-5 space-y-4 shadow-2xs">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/25 text-emerald-600 dark:text-emerald-400 font-black text-[11px]">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+          <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-success-dim border border-success/25 text-success font-black text-[11px]">
+            <span className="h-1.5 w-1.5 rounded-full bg-success animate-pulse" />
             تحليل فرص القيمة والسيولة (+EV)
           </span>
 
@@ -102,11 +111,11 @@ export function ValueMatchesView({ matches }: { matches: ValueMatchItem[] }) {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-2.5 border-t border-line">
             <div className="rounded-xl border border-line bg-surface p-2.5 space-y-0.5">
               <span className="text-[10px] font-bold text-muted block">عدد الفرص المتاحة</span>
-              <span className="text-xl font-black text-emerald-600 dark:text-emerald-400 font-mono tabular">{matches.length}</span>
+              <span className="text-xl font-black text-success font-mono tabular">{matches.length}</span>
             </div>
             <div className="rounded-xl border border-line bg-surface p-2.5 space-y-0.5">
               <span className="text-[10px] font-bold text-muted block">أعلى عائد (+EV)</span>
-              <span className="text-xl font-black text-blue-600 dark:text-blue-400 font-mono tabular">+{(maxEv * 100).toFixed(1)}%</span>
+              <span className="text-xl font-black text-home font-mono tabular">+{(maxEv * 100).toFixed(1)}%</span>
             </div>
             <div className="rounded-xl border border-line bg-surface p-2.5 space-y-0.5">
               <span className="text-[10px] font-bold text-muted block">متوسط الفائدة</span>
@@ -146,7 +155,7 @@ export function ValueMatchesView({ matches }: { matches: ValueMatchItem[] }) {
                   onClick={() => setSelectedLeague(league.id)}
                   className={`shrink-0 press-scale flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap ${
                     isActive
-                      ? "bg-surface text-ink border border-emerald-500/60 shadow-2xs font-black ring-1 ring-emerald-500/30"
+                      ? "bg-surface text-ink border border-success/60 shadow-2xs font-black ring-1 ring-success/30"
                       : "text-muted hover:text-ink hover:bg-surface/50 border border-transparent"
                   }`}
                 >
@@ -155,7 +164,7 @@ export function ValueMatchesView({ matches }: { matches: ValueMatchItem[] }) {
                   <span
                     className={`shrink-0 px-1.5 py-0.2 rounded-full text-[9px] font-mono font-black ${
                       isActive
-                        ? "bg-emerald-500 text-white"
+                        ? "bg-success text-on-fill"
                         : "bg-surface border border-line text-muted"
                     }`}
                   >
@@ -174,7 +183,7 @@ export function ValueMatchesView({ matches }: { matches: ValueMatchItem[] }) {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="🔍 ابحث باسم الفريق في فرص القيمة..."
-            className="w-full rounded-xl border border-line bg-surface px-3.5 py-2 text-xs font-semibold text-ink placeholder:text-muted focus:border-emerald-500 focus:outline-none transition-colors"
+            className="w-full rounded-xl border border-line bg-surface px-3.5 py-2 text-xs font-semibold text-ink placeholder:text-muted focus:border-success focus:outline-none transition-colors"
           />
           {searchQuery && (
             <button
@@ -202,7 +211,7 @@ export function ValueMatchesView({ matches }: { matches: ValueMatchItem[] }) {
               setSelectedLeague("ALL");
               setSearchQuery("");
             }}
-            className="press-scale inline-block px-3.5 py-1.5 rounded-xl bg-accent text-white font-bold text-xs shadow-xs"
+            className="press-scale inline-block px-3.5 py-1.5 rounded-xl bg-accent text-on-fill font-bold text-xs shadow-xs"
           >
             عرض كافة فرص القيمة ({matches.length})
           </button>
@@ -221,20 +230,20 @@ export function ValueMatchesView({ matches }: { matches: ValueMatchItem[] }) {
 
             const sideTextColor =
               val?.side === "home"
-                ? "text-blue-600 dark:text-blue-400"
+                ? "text-home"
                 : val?.side === "away"
-                ? "text-rose-600 dark:text-rose-400"
+                ? "text-danger"
                 : "text-amber-600 dark:text-amber-400";
 
             return (
               <div
                 key={m.id}
-                className="rounded-xl border border-emerald-500/30 bg-surface p-3.5 sm:p-4 space-y-3 shadow-2xs hover:border-emerald-500/60 transition-all"
+                className="rounded-xl border border-success/30 bg-surface p-3.5 sm:p-4 space-y-3 shadow-2xs hover:border-success/60 transition-all"
               >
                 {/* Card Top Pill & Date */}
                 <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line pb-2.5">
                   <div className="flex items-center gap-2">
-                    <span className="px-2.5 py-0.5 rounded-md bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-black text-[11px]">
+                    <span className="px-2.5 py-0.5 rounded-md bg-success-dim text-success font-black text-[11px]">
                       {m.league_name_ar}
                     </span>
                     <span className="text-[11px] font-bold text-muted">
@@ -244,7 +253,7 @@ export function ValueMatchesView({ matches }: { matches: ValueMatchItem[] }) {
 
                   <Link
                     href={`/match/${encodeURIComponent(m.id)}`}
-                    className="press-scale inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-panel border border-line hover:border-emerald-500 text-ink hover:text-emerald-600 dark:hover:text-emerald-400 font-black text-xs no-underline transition-all shadow-2xs"
+                    className="press-scale inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-panel border border-line hover:border-success text-ink hover:text-success dark:hover:text-success font-black text-xs no-underline transition-all shadow-2xs"
                   >
                     <span>تحليل المباراة</span>
                     <span>←</span>
@@ -281,9 +290,9 @@ export function ValueMatchesView({ matches }: { matches: ValueMatchItem[] }) {
                         <div className="font-mono font-black text-ink text-xs tabular">{val.odds}</div>
                       </div>
 
-                      <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-2 text-center space-y-0.5 shadow-2xs min-w-[5rem]">
-                        <span className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 block">الفائدة (+EV)</span>
-                        <div className="font-mono font-black text-emerald-600 dark:text-emerald-400 text-xs tabular">+{(val.ev * 100).toFixed(1)}%</div>
+                      <div className="rounded-lg border border-success/30 bg-success-dim p-2 text-center space-y-0.5 shadow-2xs min-w-[5rem]">
+                        <span className="text-[9px] font-bold text-success block">الفائدة (+EV)</span>
+                        <div className="font-mono font-black text-success text-xs tabular">+{(val.ev * 100).toFixed(1)}%</div>
                       </div>
 
                       <div className="rounded-lg border border-line bg-panel p-2 text-center space-y-0.5 shadow-2xs min-w-[4.5rem]">

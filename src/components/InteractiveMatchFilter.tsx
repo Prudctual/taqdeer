@@ -50,7 +50,7 @@ export function InteractiveMatchFilter({ onFilterChange }: MatchFilterProps) {
           onClick={() => handleSortSelect("all")}
           className={`flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-black transition-all duration-140 active:scale-[0.97] cursor-pointer ${
             selectedSort === "all"
-              ? "bg-accent text-white shadow-xs border-0"
+              ? "bg-accent text-on-fill shadow-xs border-0"
               : "bg-panel text-muted hover:bg-surface hover:text-ink border border-line"
           }`}
         >
@@ -61,7 +61,7 @@ export function InteractiveMatchFilter({ onFilterChange }: MatchFilterProps) {
           onClick={() => handleSortSelect("confidence")}
           className={`flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-black transition-all duration-140 active:scale-[0.97] cursor-pointer ${
             selectedSort === "confidence"
-              ? "bg-accent text-white shadow-xs border-0"
+              ? "bg-accent text-on-fill shadow-xs border-0"
               : "bg-panel text-muted hover:bg-surface hover:text-ink border border-line"
           }`}
         >
@@ -73,7 +73,7 @@ export function InteractiveMatchFilter({ onFilterChange }: MatchFilterProps) {
           onClick={() => handleSortSelect("sharp")}
           className={`flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-black transition-all duration-140 active:scale-[0.97] cursor-pointer ${
             selectedSort === "sharp"
-              ? "bg-accent text-white shadow-xs border-0"
+              ? "bg-accent text-on-fill shadow-xs border-0"
               : "bg-panel text-muted hover:bg-surface hover:text-ink border border-line"
           }`}
         >
@@ -85,7 +85,7 @@ export function InteractiveMatchFilter({ onFilterChange }: MatchFilterProps) {
           onClick={() => handleSortSelect("elo")}
           className={`flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-black transition-all duration-140 active:scale-[0.97] cursor-pointer ${
             selectedSort === "elo"
-              ? "bg-accent text-white shadow-xs border-0"
+              ? "bg-accent text-on-fill shadow-xs border-0"
               : "bg-panel text-muted hover:bg-surface hover:text-ink border border-line"
           }`}
         >

@@ -544,12 +544,12 @@ export default async function MatchPage({
       {/* 4 مؤشرات سريعة ومبسطة للمباراة */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
         {/* Card 1 */}
-        <div className="rounded-2xl border border-emerald-500/30 bg-surface overflow-hidden shadow-2xs">
-          <div className="bg-emerald-500/10 border-b border-emerald-500/20 px-3.5 py-2 flex items-center justify-between">
-            <span className="text-xs font-black text-emerald-600 dark:text-emerald-400">
+        <div className="rounded-2xl border border-success/30 bg-surface overflow-hidden shadow-2xs">
+          <div className="bg-success-dim border-b border-success/25 px-3.5 py-2 flex items-center justify-between">
+            <span className="text-xs font-black text-success">
               توقع الأهداف
             </span>
-            <span className="rounded-full bg-emerald-600 text-white px-2 py-0.5 text-[10px] font-extrabold">
+            <span className="rounded-full bg-success text-on-fill px-2 py-0.5 text-[10px] font-extrabold">
               الأهداف
             </span>
           </div>
@@ -563,10 +563,10 @@ export default async function MatchPage({
         {/* Card 2 */}
         <div className="rounded-2xl border border-blue-500/30 bg-surface overflow-hidden shadow-2xs">
           <div className="bg-blue-500/10 border-b border-blue-500/20 px-3.5 py-2 flex items-center justify-between">
-            <span className="text-xs font-black text-blue-600 dark:text-blue-400">
+            <span className="text-xs font-black text-home">
               اتجاه المراهنات
             </span>
-            <span className="rounded-full bg-blue-600 text-white px-2 py-0.5 text-[10px] font-extrabold">
+            <span className="rounded-full bg-home text-on-fill px-2 py-0.5 text-[10px] font-extrabold">
               السيولة
             </span>
           </div>
@@ -579,11 +579,11 @@ export default async function MatchPage({
 
         {/* Card 3 */}
         <div className="rounded-2xl border border-rose-500/30 bg-surface overflow-hidden shadow-2xs">
-          <div className="bg-rose-500/10 border-b border-rose-500/20 px-3.5 py-2 flex items-center justify-between">
-            <span className="text-xs font-black text-rose-600 dark:text-rose-400">
+          <div className="bg-danger-dim border-b border-danger/25 px-3.5 py-2 flex items-center justify-between">
+            <span className="text-xs font-black text-danger">
               صرامة الحكم
             </span>
-            <span className="rounded-full bg-rose-600 text-white px-2 py-0.5 text-[10px] font-extrabold">
+            <span className="rounded-full bg-danger text-on-fill px-2 py-0.5 text-[10px] font-extrabold">
               التحكيم
             </span>
           </div>
@@ -596,11 +596,11 @@ export default async function MatchPage({
 
         {/* Card 4 */}
         <div className="rounded-2xl border border-sky-500/30 bg-surface overflow-hidden shadow-2xs">
-          <div className="bg-sky-500/10 border-b border-sky-500/20 px-3.5 py-2 flex items-center justify-between">
+          <div className="bg-accent-dim border-b border-accent/25 px-3.5 py-2 flex items-center justify-between">
             <span className="text-xs font-black text-sky-600 dark:text-sky-400">
               حالة الطقس والملعب
             </span>
-            <span className="rounded-full bg-sky-600 text-white px-2 py-0.5 text-[10px] font-extrabold">
+            <span className="rounded-full bg-accent text-on-fill px-2 py-0.5 text-[10px] font-extrabold">
               الطقس
             </span>
           </div>
@@ -748,9 +748,9 @@ export default async function MatchPage({
                         <td className="py-3 px-3 tabular font-bold text-muted">{i + 1}</td>
                         <td className="py-3 px-3 text-center">
                           <span className="inline-flex items-center justify-center gap-1.5 px-3 py-1 rounded-lg bg-panel border border-line font-mono font-black text-xs text-ink tabular min-w-[3.5rem]">
-                            <span className="text-blue-600 dark:text-blue-400">{s.hg}</span>
+                            <span className="text-home">{s.hg}</span>
                             <span className="text-muted">–</span>
-                            <span className="text-rose-600 dark:text-rose-400">{s.ag}</span>
+                            <span className="text-danger">{s.ag}</span>
                           </span>
                         </td>
                         <td
@@ -794,7 +794,7 @@ export default async function MatchPage({
                       gloss={m.gloss}
                       meter={m.meter}
                       value={m.value}
-                      color={topMarket && m.label === topMarket.label ? "var(--accent)" : "#94a3b8"}
+                      color={topMarket && m.label === topMarket.label ? "var(--accent)" : "var(--faint)"}
                     />
                   ))}
                 </dl>
@@ -803,10 +803,10 @@ export default async function MatchPage({
                 <div className="border-t border-line">
                   <p className="px-4 pt-3.5 pb-1 text-xs font-bold text-muted sm:px-5">احتمالات الحفاظ على الشباك والأهداف</p>
                   <dl className="divide-y divide-line">
-                    <MarketRow label="فوق 1.5 هدف" meter={derived.over15} value={pct(derived.over15)} color="#94a3b8" />
-                    <MarketRow label="فوق 3.5 أهداف" meter={derived.over35} value={pct(derived.over35)} color="#94a3b8" />
-                    <MarketRow label={<><span className="text-blue-600 dark:text-blue-400 font-bold me-1">المضيف</span> شباك نظيفة</>} meter={derived.csHome} value={pct(derived.csHome)} color="#2563eb" />
-                    <MarketRow label={<><span className="text-rose-600 dark:text-rose-400 font-bold me-1">الضيف</span> شباك نظيفة</>} meter={derived.csAway} value={pct(derived.csAway)} color="#e11d48" />
+                    <MarketRow label="فوق 1.5 هدف" meter={derived.over15} value={pct(derived.over15)} color="var(--faint)" />
+                    <MarketRow label="فوق 3.5 أهداف" meter={derived.over35} value={pct(derived.over35)} color="var(--faint)" />
+                    <MarketRow label={<><span className="text-home font-bold me-1">المضيف</span> شباك نظيفة</>} meter={derived.csHome} value={pct(derived.csHome)} color="var(--home)" />
+                    <MarketRow label={<><span className="text-danger font-bold me-1">الضيف</span> شباك نظيفة</>} meter={derived.csAway} value={pct(derived.csAway)} color="var(--away)" />
                   </dl>
                 </div>
               ) : null}
@@ -814,8 +814,8 @@ export default async function MatchPage({
                 <div className="border-t border-line">
                   <p className="px-4 pt-3.5 pb-1 text-xs font-bold text-muted sm:px-5">النقاط المتوقعة (xPts) · من أصل 3 نقاط</p>
                   <dl className="divide-y divide-line">
-                    <MarketRow label={match.home_name_ar} meter={match.xpts_home! / 3} value={match.xpts_home!.toFixed(2)} color="#2563eb" />
-                    <MarketRow label={match.away_name_ar} meter={match.xpts_away! / 3} value={match.xpts_away!.toFixed(2)} color="#e11d48" />
+                    <MarketRow label={match.home_name_ar} meter={match.xpts_home! / 3} value={match.xpts_home!.toFixed(2)} color="var(--home)" />
+                    <MarketRow label={match.away_name_ar} meter={match.xpts_away! / 3} value={match.xpts_away!.toFixed(2)} color="var(--away)" />
                   </dl>
                 </div>
               ) : null}

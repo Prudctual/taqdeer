@@ -26,11 +26,11 @@ export function MatchCenterWidget() {
           </div>
 
           {/* Tactical Pitch SVG/Grid */}
-          <div className="relative aspect-video w-full rounded-lg border-0 bg-emerald-950/20 p-4 overflow-hidden flex flex-col items-center justify-between">
+          <div className="relative aspect-video w-full rounded-lg border-0 bg-success-dim p-4 overflow-hidden flex flex-col items-center justify-between">
             {/* Pitch Lines */}
-            <div className="absolute inset-2 border border-emerald-500/20 rounded-sm pointer-events-none" />
-            <div className="absolute inset-y-2 left-1/2 w-px bg-emerald-500/20 pointer-events-none" />
-            <div className="absolute top-1/2 left-1/2 h-16 w-16 -translate-x-1/2 -translate-y-1/2 rounded-full border border-emerald-500/20 pointer-events-none" />
+            <div className="absolute inset-2 border border-success/25 rounded-sm pointer-events-none" />
+            <div className="absolute inset-y-2 left-1/2 w-px bg-success-dim pointer-events-none" />
+            <div className="absolute top-1/2 left-1/2 h-16 w-16 -translate-x-1/2 -translate-y-1/2 rounded-full border border-success/25 pointer-events-none" />
 
             {/* Tactical Position Dots */}
             <div className="w-full flex justify-around relative z-10">

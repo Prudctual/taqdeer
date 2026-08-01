@@ -104,7 +104,7 @@ export function Badge({
   const variants = {
     default: "bg-accent text-on-fill hover:bg-accent/90",
     secondary: "bg-panel text-muted hover:bg-raised hover:text-ink border border-line",
-    destructive: "bg-rose-500/10 text-rose-600 border border-rose-500/20",
+    destructive: "bg-danger-dim text-danger border border-danger/25",
     outline: "border border-line text-muted hover:text-ink",
     success: "bg-success-dim text-success border border-success/20",
   };

@@ -30,6 +30,21 @@ export default function LeaguesPage() {
 
   const leagues = getLeagues();
 
+  if (leagues.length === 0) {
+    return (
+      <div className="space-y-6">
+        <PageNav backHref="/" backLabel="المباريات" />
+        <div className="card bg-surface p-8 rounded-2xl border border-line">
+          <EmptyState
+            title="لا توجد دوريات بعد"
+            body="شغّل مزامنة البيانات لتحميل الدوريات المدعومة."
+          />
+        </div>
+        <BackBar links={[{ href: "/", label: "المباريات" }]} />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -99,7 +114,7 @@ export default function LeaguesPage() {
 
             <div className="pt-4 mt-4 border-t border-line flex items-center justify-between text-xs font-extrabold">
               <span className="text-muted group-hover:text-ink">جدول الترتيب وقوة النموذج</span>
-              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-panel text-muted group-hover:bg-accent group-hover:text-white transition-all">
+              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-panel text-muted group-hover:bg-accent group-hover:text-on-fill transition-all">
                 <ChevronIcon className="-scale-x-100" size={14} />
               </span>
             </div>

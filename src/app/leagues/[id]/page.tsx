@@ -39,19 +39,19 @@ function zoneOf(leagueId: string, position: number, total: number): Zone | null 
   if (leagueId === "kl1") {
     if (position === 1) {
       return {
-        color: "#0284c7",
-        bgColor: "bg-sky-500/10 hover:bg-sky-500/20",
+        color: "var(--accent)",
+        bgColor: "bg-accent-dim hover:bg-accent-dim",
         textColor: "text-sky-500 font-black",
-        positionBgColor: "bg-sky-500/20",
+        positionBgColor: "bg-accent-dim",
         positionTextColor: "text-sky-500",
-        borderColor: "border-sky-500/30",
+        borderColor: "border-accent/30",
         label: "دوري أبطال آسيا للنخبة",
         tournamentType: "acl_elite",
       };
     }
     if (position === 2 || position === 3) {
       return {
-        color: "#0d9488",
+        color: "var(--success)",
         bgColor: "bg-teal-500/10 hover:bg-teal-500/20",
         textColor: "text-teal-500 font-black",
         positionBgColor: "bg-teal-500/20",
@@ -63,10 +63,10 @@ function zoneOf(leagueId: string, position: number, total: number): Zone | null 
     }
     if (total >= 6 && position >= total - 1) {
       return {
-        color: "#dc2626",
-        bgColor: "bg-rose-500/10 hover:bg-rose-500/20",
+        color: "var(--danger)",
+        bgColor: "bg-danger-dim hover:bg-danger-dim",
         textColor: "text-rose-500 font-black",
-        positionBgColor: "bg-rose-500/20",
+        positionBgColor: "bg-danger-dim",
         positionTextColor: "text-rose-500",
         borderColor: "border-rose-500/30",
         label: "مرحلة الهبوط / التصفيات",
@@ -77,7 +77,7 @@ function zoneOf(leagueId: string, position: number, total: number): Zone | null 
 
   if (position <= 4) {
     return {
-      color: "#0056b3",
+      color: "var(--home)",
       bgColor: "bg-blue-500/10 hover:bg-blue-500/20",
       textColor: "text-blue-500 font-black",
       positionBgColor: "bg-blue-500/20",
@@ -89,7 +89,7 @@ function zoneOf(leagueId: string, position: number, total: number): Zone | null 
   }
   if (position === 5 || position === 6) {
     return {
-      color: "#ff6600",
+      color: "var(--warn)",
       bgColor: "bg-orange-500/10 hover:bg-orange-500/20",
       textColor: "text-orange-500 font-black",
       positionBgColor: "bg-orange-500/20",
@@ -101,10 +101,10 @@ function zoneOf(leagueId: string, position: number, total: number): Zone | null 
   }
   if (total >= 8 && position >= total - 2) {
     return {
-      color: "#dc2626",
-      bgColor: "bg-rose-500/10 hover:bg-rose-500/20",
+      color: "var(--danger)",
+      bgColor: "bg-danger-dim hover:bg-danger-dim",
       textColor: "text-rose-500 font-black",
-      positionBgColor: "bg-rose-500/20",
+      positionBgColor: "bg-danger-dim",
       positionTextColor: "text-rose-500",
       borderColor: "border-rose-500/30",
       label: "منطقة الهبوط",
@@ -304,7 +304,7 @@ export default async function LeaguePage({
             <span className="bg-panel text-ink px-3.5 py-1.5 rounded-full shadow-2xs border border-line">
               {totalFinishedMatchesInSeason > 0
                 ? `${totalFinishedMatchesInSeason} مباراة مكتملة`
-                : `${counts.finished || 306} مباراة`}
+                : `${counts.finished} مباراة`}
             </span>
           </div>
         </div>
@@ -320,7 +320,7 @@ export default async function LeaguePage({
               href={`/leagues/${l.id}`}
               className={`press-scale px-4 py-2 rounded-full text-xs font-black no-underline transition-all duration-200 ${
                 isActive
-                  ? "bg-accent text-white shadow-sm scale-105"
+                  ? "bg-accent text-on-fill shadow-sm scale-105"
                   : "bg-surface text-ink hover:bg-panel hover:text-accent border border-line shadow-2xs"
               }`}
             >
@@ -351,9 +351,9 @@ export default async function LeaguePage({
                   href={`/leagues/${id}?season=${s}`}
                   className={`px-4 py-2 rounded-full text-xs font-mono font-black no-underline transition-all ${
                     isActive
-                      ? "bg-accent !text-white shadow-sm border-0 scale-105"
+                      ? "bg-accent !text-on-fill shadow-sm border-0 scale-105"
                       : isUpcoming
-                      ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/30 hover:bg-emerald-500/20"
+                      ? "bg-success-dim text-success border border-success/30 hover:bg-success-dim"
                       : "bg-panel text-ink hover:bg-panel/80 border border-line"
                   }`}
                 >
@@ -389,7 +389,7 @@ export default async function LeaguePage({
 
         {n === 0 ? (
           <div className="bg-panel/50 p-6 sm:p-8 rounded-2xl border border-line space-y-6 text-center">
-            <div className="inline-flex items-center justify-center h-14 w-14 rounded-2xl bg-emerald-500/10 text-emerald-500 font-black text-2xl shadow-2xs">
+            <div className="inline-flex items-center justify-center h-14 w-14 rounded-2xl bg-success-dim text-success font-black text-2xl shadow-2xs">
               ⏳
             </div>
             <div className="max-w-md mx-auto space-y-2">

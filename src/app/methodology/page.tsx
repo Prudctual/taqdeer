@@ -1,7 +1,14 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { BackBar, PageNav, SectionCard } from "@/components/ui";
 import { formatMetaStamp } from "@/lib/format";
 import { getMeta } from "@/lib/queries";
+
+export const metadata: Metadata = {
+  title: "منهجية الحسابات والنماذج",
+  description:
+    "كيف تُحسب احتمالات تقدير: Dixon–Coles، Elo، Pi-ratings، الفورم، ودمج الإشارة مع خط السوق.",
+};
 
 export const revalidate = 300;
 
@@ -12,7 +19,7 @@ const steps = [
     titleAr: "نموذج الأهداف مع الاندثار الزمني",
     titleEn: "Dixon–Coles + Time Decay",
     body: "Poisson مزدوج مع تصحيح النتائج المنخفضة (ρ) وترجيح أسي لأهمية المباريات الحديثة (~140 يوماً). المعيار الأساسي لتوزيع الأهداف.",
-    color: "#2563eb",
+    color: "var(--home)",
   },
   {
     n: "02",
@@ -20,7 +27,7 @@ const steps = [
     titleAr: "تصنيفات الهجوم والدفاع المحدثة",
     titleEn: "Pi-ratings",
     body: "تصنيف هجوم/دفاع ديناميكي يتحدّث تلقائياً بعد كل مباراة يلتقط التحوّلات السريعة في مستويات الفرق (Constantinou & Fenton).",
-    color: "#059669",
+    color: "var(--success)",
   },
   {
     n: "03",
@@ -28,7 +35,7 @@ const steps = [
     titleAr: "مقياس القوة الهيكلية المباشر",
     titleEn: "Elo Rating",
     body: "قوة نسبية عالمية داخل كل دوري مع مضاعف متوازن لفرق الأهداف وتأثير الأرض والجمهور.",
-    color: "#7c3aed",
+    color: "var(--accent)",
   },
   {
     n: "04",
@@ -36,7 +43,7 @@ const steps = [
     titleAr: "الفورم وإحصاءات التسديدات الحديثة",
     titleEn: "Form + Shots",
     body: "آخر 5 مباريات: النقاط المسجلة، فارق الأهداف، والتسديدات المباشرة كبديل مستقر وواقعي لـ xG عند غياب البيانات الرسمية.",
-    color: "#d97706",
+    color: "var(--warn)",
   },
   {
     n: "05",
@@ -44,7 +51,7 @@ const steps = [
     titleAr: "سيولة واسحارات أسواق المراهنين",
     titleEn: "Market Odds Implied",
     body: "احتمالات ضمنية مستخلصة من متوسط أسعار الإغلاق العالمية بعد خصم هامش الشركات للحصول على إشارة خارجية قوية.",
-    color: "#e11d48",
+    color: "var(--away)",
   },
   {
     n: "06",
@@ -52,7 +59,7 @@ const steps = [
     titleAr: "معايرة الحرارة وضبط الثقة",
     titleEn: "Temperature Softmax",
     body: "معايرة حرارة احتمالات Softmax على نافذة اختبار سابقة لتقليل الثقة الزائدة وتحقيق أفضل دقة Brier و Log-loss.",
-    color: "#0284c7",
+    color: "var(--accent)",
   },
 ];
 
@@ -95,19 +102,19 @@ export default function MethodologyPage() {
           {/* 6 Signals Quick Pills */}
           <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-line">
             <span className="text-[11px] font-bold text-muted me-1">الإشارات الست:</span>
-            <span className="px-2.5 py-1 rounded-lg bg-surface border border-blue-500/30 text-blue-600 dark:text-blue-400 font-mono font-bold text-xs">
+            <span className="px-2.5 py-1 rounded-lg bg-surface border border-blue-500/30 text-home font-mono font-bold text-xs">
               01. Dixon–Coles
             </span>
-            <span className="px-2.5 py-1 rounded-lg bg-surface border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 font-mono font-bold text-xs">
+            <span className="px-2.5 py-1 rounded-lg bg-surface border border-success/30 text-success font-mono font-bold text-xs">
               02. Pi-ratings
             </span>
             <span className="px-2.5 py-1 rounded-lg bg-surface border border-purple-500/30 text-purple-600 dark:text-purple-400 font-mono font-bold text-xs">
               03. Elo Strength
             </span>
-            <span className="px-2.5 py-1 rounded-lg bg-surface border border-amber-500/30 text-amber-600 dark:text-amber-400 font-mono font-bold text-xs">
+            <span className="px-2.5 py-1 rounded-lg bg-surface border border-warn/30 text-amber-600 dark:text-amber-400 font-mono font-bold text-xs">
               04. Form & Shots
             </span>
-            <span className="px-2.5 py-1 rounded-lg bg-surface border border-rose-500/30 text-rose-600 dark:text-rose-400 font-mono font-bold text-xs">
+            <span className="px-2.5 py-1 rounded-lg bg-surface border border-rose-500/30 text-danger font-mono font-bold text-xs">
               05. Market Odds
             </span>
             <span className="px-2.5 py-1 rounded-lg bg-surface border border-sky-500/30 text-sky-600 dark:text-sky-400 font-mono font-bold text-xs">
@@ -121,7 +128,7 @@ export default function MethodologyPage() {
       <SectionCard title="الفكرة والهدف الحسابي" subtitle="كيف نترجم البيانات الرياضية إلى احتمالات واقعية">
         <div className="p-5 sm:p-6 space-y-4 text-xs sm:text-sm font-semibold text-ink leading-relaxed">
           <p>
-            لكل مباراة نُخرج ثلاثة أرقام مجموعها 100٪: <strong className="text-blue-600 dark:text-blue-400 font-bold">فوز المضيف</strong>، <strong className="text-muted font-bold">التعادل</strong>، و <strong className="text-rose-600 dark:text-rose-400 font-bold">فوز الضيف</strong>. هذه الأرقام ليست تخميناً ولا نصيحة مراهنة، بل توزيع احتمالي إحصائي يُقاس صدقه مستقبلاً على مباريات لم يرها النموذج.
+            لكل مباراة نُخرج ثلاثة أرقام مجموعها 100٪: <strong className="text-home font-bold">فوز المضيف</strong>، <strong className="text-muted font-bold">التعادل</strong>، و <strong className="text-danger font-bold">فوز الضيف</strong>. هذه الأرقام ليست تخميناً ولا نصيحة مراهنة، بل توزيع احتمالي إحصائي يُقاس صدقه مستقبلاً على مباريات لم يرها النموذج.
           </p>
           <p>
             تُبنى هذه الاحتمالات عبر 6 إشارات مستقلة تُحسب من بيانات رسمية مجانية (نتائج سابقة، تسديدات، وأسعار سوق)، ثم تُدمج وتُعاير بدقة قبل عرضها للمستخدم.
@@ -184,11 +191,11 @@ export default function MethodologyPage() {
 
       {/* حدود صادقة */}
       <div className="rounded-2xl border border-amber-500/40 bg-surface overflow-hidden shadow-2xs">
-        <div className="bg-amber-500/15 border-b border-amber-500/25 px-5 py-3.5 flex items-center justify-between">
+        <div className="bg-warn/15 border-b border-warn/25 px-5 py-3.5 flex items-center justify-between">
           <span className="font-black text-ink text-sm sm:text-base">
             حدود وحقائق صادقة عن النموذج
           </span>
-          <span className="bg-amber-600 text-white font-extrabold text-[11px] px-3 py-1 rounded-full">
+          <span className="bg-warn text-on-fill font-extrabold text-[11px] px-3 py-1 rounded-full">
             تنبيه منهجي
           </span>
         </div>

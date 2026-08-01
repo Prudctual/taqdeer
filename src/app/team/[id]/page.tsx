@@ -6,9 +6,7 @@ import { Crest } from "@/components/Crest";
 import { MatchList } from "@/components/MatchList";
 import { RevealOnView } from "@/components/RevealOnView";
 import { TrophyIcon } from "@/components/Icons";
-import { PlayerRadarChart } from "@/components/PlayerRadarChart";
 import { TeamTacticalSpotlight } from "@/components/TeamTacticalSpotlight";
-import { SquadGridWidget } from "@/components/SquadGridWidget";
 import {
   BackBar,
   EmptyState,
@@ -28,9 +26,9 @@ export const revalidate = 300;
 const loadTeam = cache((id: string) => getTeam(id));
 
 const RESULT = {
-  W: { glyph: "ف", label: "فوز", bg: "bg-emerald-600 text-white" },
-  D: { glyph: "ت", label: "تعادل", bg: "bg-amber-500 text-white" },
-  L: { glyph: "خ", label: "خسارة", bg: "bg-rose-600 text-white" },
+  W: { glyph: "ف", label: "فوز", bg: "bg-success text-on-fill" },
+  D: { glyph: "ت", label: "تعادل", bg: "bg-warn text-on-fill" },
+  L: { glyph: "خ", label: "خسارة", bg: "bg-danger text-on-fill" },
 } as const;
 
 type ResultKey = keyof typeof RESULT;
@@ -213,7 +211,7 @@ export default async function TeamPage({
                 <span className="w-16 font-black text-ink shrink-0">القوة الهجومية</span>
                 <div className="h-3 flex-1 rounded-full bg-panel overflow-hidden">
                   <div
-                    className="h-full bg-emerald-500 rounded-full transition-all"
+                    className="h-full bg-success rounded-full transition-all"
                     style={{ width: `${Math.min(100, (team.attack / 2.2) * 100)}%` }}
                   />
                 </div>
@@ -248,7 +246,7 @@ export default async function TeamPage({
                 الفورم · نتائج المباريات الأخيرة (الأحدث أولاً)
               </span>
               <span className="text-xs font-extrabold text-muted bg-panel px-3 py-1 rounded-full border border-line">
-                <span className="text-emerald-500 font-mono font-black me-1">{tally.W}</span> فوز ·{" "}
+                <span className="text-success font-mono font-black me-1">{tally.W}</span> فوز ·{" "}
                 <span className="text-amber-500 font-mono font-black me-1">{tally.D}</span> تعادل ·{" "}
                 <span className="text-rose-500 font-mono font-black me-1">{tally.L}</span> خسارة
               </span>
@@ -353,19 +351,9 @@ export default async function TeamPage({
         crestUrl={team.crest_url}
       />
 
-      {/* 4 — Player Impact & Squad Grid */}
-      <SquadGridWidget homeTeam={team.name_ar} awayTeam="المنافس" />
-
-      {/* 5 — Player Impact Radar Chart */}
-      <PlayerRadarChart
-        playerName={team.name_ar.includes("مدريد") ? "فينيسيوس جونيور" : team.name_ar.includes("ليفربول") ? "محمد صلاح" : "قائد خط الهجوم"}
-        playerPos="مهاجم حاسم"
-        teamName={team.name_ar}
-      />
-
-      {/* 3 — Upcoming Matches */}
-      {upcoming.length > 0 && (
-        <div className="card bg-surface p-6 sm:p-8 rounded-2xl border border-line shadow-xs space-y-4">
+      {/* 4 — Upcoming Matches */}
+      {upcoming.length > 0 ? (
+        <div className="card bg-surface p-6 sm:p-8 rounded-2xl border border-line space-y-4">
           <div className="border-b border-line pb-3">
             <h2 className="text-base sm:text-xl font-black text-ink tracking-tight">
               المباريات القادمة للفريق
@@ -380,9 +368,16 @@ export default async function TeamPage({
             leagueId={team.league_id}
           />
         </div>
+      ) : (
+        <div className="card bg-surface p-6 rounded-2xl border border-line">
+          <EmptyState
+            title="لا مباريات قادمة مسجّلة"
+            body="عند إدراج الجولة القادمة لهذا الفريق ستظهر مواعيدها هنا."
+          />
+        </div>
       )}
 
-      {/* 4 — Last Matches */}
+      {/* 5 — Last Matches */}
       <div className="card bg-surface p-6 sm:p-8 rounded-2xl border border-line shadow-xs space-y-4">
         <div className="flex items-center justify-between border-b border-line pb-3">
           <div>

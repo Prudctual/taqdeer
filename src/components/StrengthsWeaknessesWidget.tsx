@@ -33,12 +33,12 @@ export function StrengthsWeaknessesWidget({
         <div className="rounded-2xl border border-blue-500/20 bg-surface overflow-hidden space-y-0 shadow-2xs">
           <div className="flex items-center justify-between bg-blue-500/10 border-b border-blue-500/20 px-4 py-3 sm:px-5 sm:py-3.5">
             <div className="flex items-center gap-2">
-              <span className="h-2.5 w-2.5 rounded-full bg-blue-600" />
-              <span className="font-black text-blue-600 dark:text-blue-400 text-sm sm:text-base">
+              <span className="h-2.5 w-2.5 rounded-full bg-home" />
+              <span className="font-black text-home text-sm sm:text-base">
                 {homeTeam}
               </span>
             </div>
-            <span className="rounded-full bg-blue-600 text-white px-2.5 py-0.5 text-[11px] font-extrabold shadow-2xs">
+            <span className="rounded-full bg-home text-on-fill px-2.5 py-0.5 text-[11px] font-extrabold shadow-2xs">
               المضيف
             </span>
           </div>
@@ -47,7 +47,7 @@ export function StrengthsWeaknessesWidget({
             {/* Strengths */}
             <div className="space-y-2">
               <div className="flex items-center gap-1.5 text-xs font-extrabold text-ink">
-                <span className="flex h-4 w-4 items-center justify-center rounded-full bg-blue-500/15 text-blue-600 dark:text-blue-400 font-mono text-[10px] font-bold">
+                <span className="flex h-4 w-4 items-center justify-center rounded-full bg-blue-500/15 text-home font-mono text-[10px] font-bold">
                   +
                 </span>
                 <span>نقاط القوة</span>
@@ -58,7 +58,7 @@ export function StrengthsWeaknessesWidget({
                     key={idx}
                     className="flex items-center gap-1.5 rounded-lg border border-line bg-panel px-3 py-1.5 text-xs font-semibold text-ink"
                   >
-                    <span className="h-1.5 w-1.5 rounded-full bg-blue-600" />
+                    <span className="h-1.5 w-1.5 rounded-full bg-home" />
                     <span>{item}</span>
                   </div>
                 ))}
@@ -89,15 +89,15 @@ export function StrengthsWeaknessesWidget({
         </div>
 
         {/* Away Team Card - Red Header Bar */}
-        <div className="rounded-2xl border border-rose-500/20 bg-surface overflow-hidden space-y-0 shadow-2xs">
-          <div className="flex items-center justify-between bg-rose-500/10 border-b border-rose-500/20 px-4 py-3 sm:px-5 sm:py-3.5">
+        <div className="rounded-2xl border border-danger/25 bg-surface overflow-hidden space-y-0 shadow-2xs">
+          <div className="flex items-center justify-between bg-danger-dim border-b border-danger/25 px-4 py-3 sm:px-5 sm:py-3.5">
             <div className="flex items-center gap-2">
-              <span className="h-2.5 w-2.5 rounded-full bg-rose-600" />
-              <span className="font-black text-rose-600 dark:text-rose-400 text-sm sm:text-base">
+              <span className="h-2.5 w-2.5 rounded-full bg-danger" />
+              <span className="font-black text-danger text-sm sm:text-base">
                 {awayTeam}
               </span>
             </div>
-            <span className="rounded-full bg-rose-600 text-white px-2.5 py-0.5 text-[11px] font-extrabold shadow-2xs">
+            <span className="rounded-full bg-danger text-on-fill px-2.5 py-0.5 text-[11px] font-extrabold shadow-2xs">
               الضيف
             </span>
           </div>
@@ -106,7 +106,7 @@ export function StrengthsWeaknessesWidget({
             {/* Strengths */}
             <div className="space-y-2">
               <div className="flex items-center gap-1.5 text-xs font-extrabold text-ink">
-                <span className="flex h-4 w-4 items-center justify-center rounded-full bg-rose-500/15 text-rose-600 dark:text-rose-400 font-mono text-[10px] font-bold">
+                <span className="flex h-4 w-4 items-center justify-center rounded-full bg-danger-dim text-danger font-mono text-[10px] font-bold">
                   +
                 </span>
                 <span>نقاط القوة</span>
@@ -117,7 +117,7 @@ export function StrengthsWeaknessesWidget({
                     key={idx}
                     className="flex items-center gap-1.5 rounded-lg border border-line bg-panel px-3 py-1.5 text-xs font-semibold text-ink"
                   >
-                    <span className="h-1.5 w-1.5 rounded-full bg-rose-600" />
+                    <span className="h-1.5 w-1.5 rounded-full bg-danger" />
                     <span>{item}</span>
                   </div>
                 ))}

@@ -111,7 +111,7 @@ export function MatchChartsInteractiveContainer({
             onClick={() => setActiveCategory("all")}
             className={`press-scale px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer whitespace-nowrap border ${
               activeCategory === "all"
-                ? "bg-blue-600 text-white border-blue-600 shadow-xs"
+                ? "bg-home text-on-fill border-home shadow-xs"
                 : "bg-surface text-ink border-line hover:bg-panel"
             }`}
           >
@@ -123,7 +123,7 @@ export function MatchChartsInteractiveContainer({
             onClick={() => setActiveCategory("radar")}
             className={`press-scale px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer whitespace-nowrap border ${
               activeCategory === "radar"
-                ? "bg-purple-600 text-white border-purple-600 shadow-xs"
+                ? "bg-accent text-on-fill border-accent shadow-xs"
                 : "bg-surface text-ink border-line hover:bg-panel"
             }`}
           >
@@ -135,7 +135,7 @@ export function MatchChartsInteractiveContainer({
             onClick={() => setActiveCategory("pie")}
             className={`press-scale px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer whitespace-nowrap border ${
               activeCategory === "pie"
-                ? "bg-blue-600 text-white border-blue-600 shadow-xs"
+                ? "bg-home text-on-fill border-home shadow-xs"
                 : "bg-surface text-ink border-line hover:bg-panel"
             }`}
           >
@@ -147,7 +147,7 @@ export function MatchChartsInteractiveContainer({
             onClick={() => setActiveCategory("ev")}
             className={`press-scale px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer whitespace-nowrap border ${
               activeCategory === "ev"
-                ? "bg-emerald-600 text-white border-emerald-600 shadow-xs"
+                ? "bg-success text-on-fill border-success shadow-xs"
                 : "bg-surface text-ink border-line hover:bg-panel"
             }`}
           >
@@ -159,7 +159,7 @@ export function MatchChartsInteractiveContainer({
             onClick={() => setActiveCategory("goals")}
             className={`press-scale px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer whitespace-nowrap border ${
               activeCategory === "goals"
-                ? "bg-indigo-600 text-white border-indigo-600 shadow-xs"
+                ? "bg-accent text-on-fill border-accent shadow-xs"
                 : "bg-surface text-ink border-line hover:bg-panel"
             }`}
           >
@@ -171,7 +171,7 @@ export function MatchChartsInteractiveContainer({
             onClick={() => setActiveCategory("line")}
             className={`press-scale px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer whitespace-nowrap border ${
               activeCategory === "line"
-                ? "bg-blue-600 text-white border-blue-600 shadow-xs"
+                ? "bg-home text-on-fill border-home shadow-xs"
                 : "bg-surface text-ink border-line hover:bg-panel"
             }`}
           >
@@ -183,7 +183,7 @@ export function MatchChartsInteractiveContainer({
             onClick={() => setActiveCategory("radial")}
             className={`press-scale px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer whitespace-nowrap border ${
               activeCategory === "radial"
-                ? "bg-sky-600 text-white border-sky-600 shadow-xs"
+                ? "bg-accent text-on-fill border-accent shadow-xs"
                 : "bg-surface text-ink border-line hover:bg-panel"
             }`}
           >

@@ -72,7 +72,7 @@ export function LeagueTableWidget({
                   onClick={() => setSelectedLeagueId(l.id)}
                   className={`press-scale flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer whitespace-nowrap border ${
                     isSelected
-                      ? "bg-amber-600 text-white border-amber-600 shadow-xs"
+                      ? "bg-warn text-on-fill border-warn shadow-xs"
                       : "bg-panel text-ink border-line hover:bg-surface"
                   }`}
                 >
@@ -121,9 +121,9 @@ export function LeagueTableWidget({
                     </div>
                   </td>
                   <td className="p-3 text-center tabular font-semibold text-muted">{team.played}</td>
-                  <td className="p-3 text-center tabular font-semibold text-emerald-600 dark:text-emerald-400">{team.won}</td>
+                  <td className="p-3 text-center tabular font-semibold text-success">{team.won}</td>
                   <td className="p-3 text-center tabular font-semibold text-muted">{team.drawn}</td>
-                  <td className="p-3 text-center tabular font-semibold text-rose-600 dark:text-rose-400">{team.lost}</td>
+                  <td className="p-3 text-center tabular font-semibold text-danger">{team.lost}</td>
                   <td className="p-3 text-center tabular font-semibold text-muted hidden sm:table-cell">
                     {team.goal_difference > 0 ? `+${team.goal_difference}` : team.goal_difference}
                   </td>

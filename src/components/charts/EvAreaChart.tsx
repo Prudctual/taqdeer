@@ -29,19 +29,19 @@ export function EvAreaChart({ match }: { match?: MatchCard | null }) {
   const evAway = Number(((pAway * oddsAway - 1) * 100).toFixed(1));
 
   const evData = [
-    { name: `فوز ${homeName}`, ev: Math.max(-10, evHome), odds: oddsHome, color: "#2563eb" },
-    { name: "التعادل (X)", ev: Math.max(-10, evDraw), odds: oddsDraw, color: "#64748b" },
-    { name: `فوز ${awayName}`, ev: Math.max(-10, evAway), odds: oddsAway, color: "#e11d48" },
+    { name: `فوز ${homeName}`, ev: Math.max(-10, evHome), odds: oddsHome, color: "var(--home)" },
+    { name: "التعادل (X)", ev: Math.max(-10, evDraw), odds: oddsDraw, color: "var(--muted)" },
+    { name: `فوز ${awayName}`, ev: Math.max(-10, evAway), odds: oddsAway, color: "var(--away)" },
   ];
 
   const maxEv = Math.max(evHome, evDraw, evAway);
 
   return (
-    <div className="rounded-2xl border border-emerald-500/30 bg-panel p-5 sm:p-6 space-y-4 shadow-2xs">
+    <div className="rounded-2xl border border-success/30 bg-panel p-5 sm:p-6 space-y-4 shadow-2xs">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
-            <span className="h-2.5 w-2.5 rounded-full bg-emerald-600 animate-pulse" />
+            <span className="h-2.5 w-2.5 rounded-full bg-success animate-pulse" />
             <h3 className="text-base sm:text-lg font-black text-ink">
               مقارنة القيمة المتوقعة (+EV) لأسعار هذه المباراة
             </h3>
@@ -52,7 +52,7 @@ export function EvAreaChart({ match }: { match?: MatchCard | null }) {
         </div>
 
         <div className="flex items-center gap-2 font-mono font-black text-xs">
-          <span className="bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 px-3 py-1 rounded-full">
+          <span className="bg-success-dim border border-success/30 text-success px-3 py-1 rounded-full">
             أعلى فائدة: {maxEv >= 0 ? `+${maxEv}% EV` : "متوازنة مع السوق"}
           </span>
         </div>
@@ -80,7 +80,7 @@ export function EvAreaChart({ match }: { match?: MatchCard | null }) {
             />
             <Bar dataKey="ev" radius={[8, 8, 0, 0]}>
               {evData.map((entry, index) => (
-                <Cell key={`ev-cell-${index}`} fill={entry.ev >= 3 ? "#059669" : entry.color} />
+                <Cell key={`ev-cell-${index}`} fill={entry.ev >= 3 ? "var(--success)" : entry.color} />
               ))}
             </Bar>
           </BarChart>
@@ -89,7 +89,7 @@ export function EvAreaChart({ match }: { match?: MatchCard | null }) {
 
       <div className="pt-3 border-t border-line flex flex-wrap items-center justify-between text-xs text-muted font-semibold gap-2">
         <span>الأسعار المعروضة: {oddsHome} (مضيف) | {oddsDraw} (تعادل) | {oddsAway} (ضيف)</span>
-        <span className="font-mono font-black text-emerald-600 dark:text-emerald-400">
+        <span className="font-mono font-black text-success">
           توصية كيلي: {maxEv >= 3 ? "رهان جزئي 2.5%" : "لا توجد مخاطرة"}
         </span>
       </div>
