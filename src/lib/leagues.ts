@@ -67,6 +67,14 @@ export const LEAGUES: LeagueDef[] = [
     fdOrgCode: "FL1",
     fdUkCode: "F1",
   },
+  {
+    id: "no1",
+    code: "NO1",
+    nameAr: "الدوري النرويجي",
+    nameEn: "Eliteserien",
+    countryAr: "النرويج",
+    fdOrgCode: "NO1",
+  },
 ];
 
 export function leagueByCode(code: string) {
