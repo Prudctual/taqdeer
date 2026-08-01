@@ -67,15 +67,15 @@ export function DynamicMatchSection({ groups }: DynamicMatchSectionProps) {
     <div className="space-y-4">
       {/* Fast Ticker / Nearest Match */}
       {topUpcomingMatch ? (
-        <div className="bg-white p-4 sm:p-5 rounded-3xl border-0 shadow-sm flex flex-wrap items-center justify-between gap-3">
+        <div className="bg-surface border border-line p-4 sm:p-5 rounded-2xl flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-3">
-            <span className="text-xs font-black text-slate-900 flex items-center gap-2">
-              <ClockIcon size={16} className="text-rose-600" />
+            <span className="text-xs font-black text-ink flex items-center gap-2">
+              <ClockIcon size={16} className="text-accent" />
               <span>أقرب مواجهة انطلاقاً:</span>
             </span>
             <Link
               href={`/match/${topUpcomingMatch.id}`}
-              className="text-xs sm:text-sm font-black text-rose-600 hover:text-rose-700 bg-rose-50 px-3.5 py-1 rounded-full border border-rose-200/60 no-underline transition-colors"
+              className="text-xs sm:text-sm font-black text-accent bg-accent-dim px-3.5 py-1 rounded-full border border-line no-underline motion-colors hover:opacity-80"
             >
               {topUpcomingMatch.homeNameAr} ضد {topUpcomingMatch.awayNameAr}
             </Link>
@@ -99,17 +99,17 @@ export function DynamicMatchSection({ groups }: DynamicMatchSectionProps) {
             <div
               key={group.leagueId}
               data-league={group.leagueId}
-              className="card bg-white p-5 sm:p-6 rounded-3xl border-0 shadow-sm space-y-3"
+              className="card border border-line bg-surface p-5 sm:p-6 rounded-2xl space-y-3"
             >
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center justify-between border-b border-line pb-3">
                 <Link
                   href={`/leagues/${group.leagueId}`}
-                  className="flex items-center gap-2 text-base font-black text-slate-900 no-underline hover:text-rose-600 transition-colors"
+                  className="flex items-center gap-2 text-base font-black text-ink no-underline hover:text-accent motion-colors"
                 >
-                  <span className="h-2.5 w-2.5 rounded-full bg-rose-600" />
+                  <span className="h-2.5 w-2.5 rounded-full bg-accent" />
                   <span>{group.leagueNameAr}</span>
                 </Link>
-                <span className="text-xs font-extrabold text-slate-700 bg-slate-100 px-3 py-1 rounded-full">
+                <span className="text-xs font-extrabold text-muted bg-panel px-3 py-1 rounded-full border border-line">
                   {formatMatchCount(group.matches.length)}
                 </span>
               </div>
@@ -123,7 +123,7 @@ export function DynamicMatchSection({ groups }: DynamicMatchSectionProps) {
             </div>
           ))
         ) : (
-          <div className="bg-white p-8 rounded-3xl border-0 shadow-sm text-center text-xs font-bold text-slate-500">
+          <div className="bg-surface border border-line p-8 rounded-2xl text-center text-xs font-bold text-muted">
             لا توجد مباريات تطابق البحث أو خيارات التصفية الحالية.
           </div>
         )}

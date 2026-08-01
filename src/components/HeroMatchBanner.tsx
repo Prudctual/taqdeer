@@ -21,7 +21,7 @@ export function HeroMatchBanner({ match }: { match: MatchCard | null }) {
 
   return (
     <div className={`relative overflow-hidden rounded-2xl border-2 p-5 sm:p-7 shadow-xs transition-all ${
-      isLive ? "border-emerald-500/50 bg-emerald-500/5" : "border-line bg-surface"
+      isLive ? "border-live/50 bg-live-dim" : "border-line bg-surface"
     }`}>
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         {/* Left Info & Teams */}
@@ -30,9 +30,9 @@ export function HeroMatchBanner({ match }: { match: MatchCard | null }) {
             <span>🏆 {match.leagueNameAr}</span>
             <span className="text-faint">•</span>
             {isLive ? (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 font-extrabold text-xs">
-                <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                <span>🔴 {match.liveStatusAr || (match.minute ? `د ${match.minute}'` : "مباشر الآن")}</span>
+              <span className="live-badge">
+                <span className="live-badge-dot live-pulse-dot" />
+                <span>{match.liveStatusAr || (match.minute ? `د ${match.minute}'` : "مباشر الآن")}</span>
               </span>
             ) : (
               <span className="text-muted">{formatShortDate(match.utcDate)}</span>
@@ -48,7 +48,7 @@ export function HeroMatchBanner({ match }: { match: MatchCard | null }) {
             {score ? (
               <span className={`text-lg sm:text-2xl font-mono font-black bg-panel border px-3 py-1 rounded-xl shadow-xs tabular ${
                 isLive
-                  ? "text-emerald-600 dark:text-emerald-400 border-emerald-500/40"
+                  ? "text-live border-live/40"
                   : "text-ink border-line"
               }`}>
                 {score.replace("–", " – ")}
@@ -84,7 +84,7 @@ export function HeroMatchBanner({ match }: { match: MatchCard | null }) {
         <div className="shrink-0">
           <Link
             href={`/match/${match.id}`}
-            className="press-scale inline-flex items-center justify-center gap-2 rounded-xl bg-accent px-5 py-3 text-xs font-extrabold text-white no-underline shadow-xs hover:bg-accent/90 transition-all"
+            className="press-scale inline-flex items-center justify-center gap-2 rounded-xl bg-accent px-5 py-3 text-xs font-extrabold text-on-fill no-underline shadow-xs hover:bg-accent/90 transition-all"
           >
             <span>تحليل المباراة والتوقعات</span>
             <span>←</span>

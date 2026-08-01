@@ -1,55 +1,56 @@
 @import "tailwindcss";
 
 /*
-  تقدير — نظام التصميم التحليلي المستوحى من أبل (Apple Design & Design Engineering System)
-  استجابة لمس فوريّة، طباعة بصريّة متفاعلة، منحنيات ربيع (Spring Physics)، وحساسية للمس والسرعة.
+  تقدير — طاولة تحليل: أسطح ملوّنة بلطف نحو الأزرق، لهجة واحدة، 1X2 تحمل المعنى.
+  التوكنات OKLCH وفق DESIGN.md — فاتح وداكن بمستويات تباين مقروءة.
 */
 
 :root {
   color-scheme: light;
 
-  /* أسطح صلبة ناصعة */
-  --bg: #f8fafc;
-  --surface: #ffffff;
-  --panel: #f1f5f9;
-  --raised: #e2e8f0;
+  --bg: oklch(0.975 0.006 250);
+  --surface: oklch(0.995 0.004 250);
+  --panel: oklch(0.945 0.01 250);
+  --raised: oklch(0.91 0.012 250);
 
-  /* حبر داكن */
-  --ink: #0f172a;
-  --muted: #475569;
-  --faint: #94a3b8;
+  --ink: oklch(0.22 0.02 250);
+  --muted: oklch(0.48 0.02 250);
+  --faint: oklch(0.62 0.015 250);
 
-  /* خطوط وحدود شعرية */
-  --line: #e2e8f0;
-  --line-strong: #cbd5e1;
+  --line: oklch(0.22 0.02 250 / 0.1);
+  --line-strong: oklch(0.22 0.02 250 / 0.18);
 
-  /* لهجة Rose افتراضية */
-  --accent: #e11d48;
-  --accent-hover: #be123c;
-  --accent-dim: #ffe4e6;
-  --on-fill: #ffffff;
+  --accent: oklch(0.55 0.12 245);
+  --accent-hover: oklch(0.48 0.13 245);
+  --accent-dim: oklch(0.55 0.12 245 / 0.12);
+  --on-fill: oklch(0.99 0.004 250);
 
-  /* radius افتراضي (Apple smooth squircle feel) */
-  --radius: 0.875rem;
+  --radius: 0.75rem;
 
-  /* 1X2 - نتائج المباريات */
-  --home: #16a34a;
-  --draw: #ea580c;
-  --away: #2563eb;
+  /* 1X2 — رمز + لون معاً دائماً */
+  --home: oklch(0.55 0.12 248);
+  --draw: oklch(0.68 0.12 75);
+  --away: oklch(0.58 0.14 33);
   --home-fill: var(--home);
   --draw-fill: var(--draw);
   --away-fill: var(--away);
-  --draw-ink: #ffffff;
+  --draw-ink: var(--on-fill);
 
-  --success: #16a34a;
-  --danger: #e11d48;
+  --success: oklch(0.55 0.12 155);
+  --success-dim: oklch(0.55 0.12 155 / 0.12);
+  --danger: oklch(0.55 0.16 25);
+  --danger-dim: oklch(0.55 0.16 25 / 0.12);
+  --live: oklch(0.55 0.14 155);
+  --live-dim: oklch(0.55 0.14 155 / 0.12);
+  --warn: oklch(0.7 0.12 75);
+  --warn-dim: oklch(0.7 0.12 75 / 0.14);
 
-  /* Apple Fluid Spring & Easings (Designing Fluid Interfaces WWDC) */
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
   --ease-apple-smooth: cubic-bezier(0.25, 1, 0.5, 1);
   --ease-apple-spring: cubic-bezier(0.175, 0.885, 0.32, 1.1);
   --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+  --ease: cubic-bezier(0.2, 0, 0, 1);
 
   --motion-instant: 90ms;
   --motion-fast: 140ms;
@@ -58,27 +59,42 @@
   --content-max: 1200px;
 }
 
-/* ——— النمط الداكن (Dark Mode) — Shadcn Zinc Dark Theme ——— */
 .dark {
   color-scheme: dark;
 
-  --bg: #09090b;
-  --surface: #18181b;
-  --panel: #27272a;
-  --raised: #3f3f46;
+  --bg: oklch(0.16 0.011 250);
+  --surface: oklch(0.202 0.013 250);
+  --panel: oklch(0.245 0.015 250);
+  --raised: oklch(0.285 0.016 250);
 
-  --ink: #f4f4f5;
-  --muted: #a1a1aa;
-  --faint: #71717a;
+  --ink: oklch(0.968 0.004 250);
+  --muted: oklch(0.735 0.011 250);
+  --faint: oklch(0.62 0.012 250);
 
-  --line: #27272a;
-  --line-strong: #3f3f46;
+  --line: oklch(1 0 0 / 0.085);
+  --line-strong: oklch(1 0 0 / 0.17);
 
-  --accent-dim: rgba(225, 29, 72, 0.2);
+  --accent: oklch(0.72 0.11 245);
+  --accent-hover: oklch(0.78 0.1 245);
+  --accent-dim: oklch(0.72 0.11 245 / 0.16);
+  --on-fill: oklch(0.16 0.011 250);
 
-  --home: #22c55e;
-  --draw: #f97316;
-  --away: #3b82f6;
+  --home: oklch(0.715 0.115 248);
+  --draw: oklch(0.79 0.1 85);
+  --away: oklch(0.72 0.125 33);
+  --home-fill: var(--home);
+  --draw-fill: var(--draw);
+  --away-fill: var(--away);
+  --draw-ink: oklch(0.18 0.02 250);
+
+  --success: oklch(0.72 0.12 155);
+  --success-dim: oklch(0.72 0.12 155 / 0.14);
+  --danger: oklch(0.7 0.14 25);
+  --danger-dim: oklch(0.7 0.14 25 / 0.14);
+  --live: oklch(0.74 0.14 155);
+  --live-dim: oklch(0.74 0.14 155 / 0.14);
+  --warn: oklch(0.8 0.11 85);
+  --warn-dim: oklch(0.8 0.11 85 / 0.14);
 }
 
 @theme inline {
@@ -102,7 +118,13 @@
   --color-away-fill: var(--away-fill);
   --color-draw-ink: var(--draw-ink);
   --color-success: var(--success);
+  --color-success-dim: var(--success-dim);
   --color-danger: var(--danger);
+  --color-danger-dim: var(--danger-dim);
+  --color-live: var(--live);
+  --color-live-dim: var(--live-dim);
+  --color-warn: var(--warn);
+  --color-warn-dim: var(--warn-dim);
   --font-sans: var(--font-arabic);
 }
 
@@ -113,6 +135,13 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   transition: background-color var(--motion-fast) var(--ease-apple-smooth), color var(--motion-fast) var(--ease-apple-smooth);
+}
+
+.motion-colors {
+  transition:
+    color var(--motion-fast) var(--ease),
+    background-color var(--motion-fast) var(--ease),
+    border-color var(--motion-fast) var(--ease);
 }
 
 a {
@@ -434,10 +463,13 @@ a {
   --league: #0284c7;
 }
 [data-league="fl1"] {
-  --league: #059669;
+  --league: oklch(0.55 0.12 155);
+}
+[data-league="no1"] {
+  --league: oklch(0.55 0.14 250);
 }
 [data-league="kl1"] {
-  --league: #16a34a;
+  --league: oklch(0.55 0.12 145);
 }
 
 .league-band {
@@ -465,6 +497,67 @@ a {
   height: 0.4rem;
   border-radius: 999px;
   background: var(--league, var(--muted));
+}
+
+/* شارات الأرجح 1X2 — لون يملأ الشارة ونص بـ on-fill للقراءة */
+.pick-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  min-width: 2.75rem;
+  padding: 0.2rem 0.45rem;
+  border-radius: 0.4rem;
+  font-size: 0.6875rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--on-fill);
+  line-height: 1.2;
+}
+
+.verdict-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.4rem;
+  border-radius: 0.35rem;
+  font-size: 0.625rem;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.verdict-chip-hit {
+  background: var(--success-dim);
+  color: var(--success);
+  border: 1px solid color-mix(in oklch, var(--success) 35%, transparent);
+}
+
+.verdict-chip-miss {
+  background: var(--danger-dim);
+  color: var(--danger);
+  border: 1px solid color-mix(in oklch, var(--danger) 35%, transparent);
+}
+
+/* شارة مباشر موحّدة */
+.live-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  background: var(--live-dim);
+  border: 1px solid color-mix(in oklch, var(--live) 35%, transparent);
+  color: var(--live);
+  font-weight: 800;
+  font-size: 0.6875rem;
+  line-height: 1.2;
+}
+
+.live-badge-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 999px;
+  background: var(--live);
+  flex-shrink: 0;
 }
 
 /* ——— أنميشن دخول الكروت وعناصر الواجهة — scale(0.95) start state ——— */

@@ -122,7 +122,7 @@ export function StudioHomeView({
                 : "text-muted hover:text-ink hover:bg-surface/50 border border-transparent"
             }`}
           >
-            <svg className="h-4 w-4 shrink-0 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+            <svg className="h-4 w-4 shrink-0 text-live" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
               <path strokeLinecap="round" strokeLinejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
             </svg>
             <span>فرص القيمة المحتملة (+EV)</span>
@@ -154,7 +154,7 @@ export function StudioHomeView({
                 : "text-muted hover:text-ink hover:bg-surface/50 border border-transparent"
             }`}
           >
-            <svg className="h-4 w-4 shrink-0 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+            <svg className="h-4 w-4 shrink-0 text-warn" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
               <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
             </svg>
             <span>جدول الترتيب المباشر</span>
@@ -166,15 +166,15 @@ export function StudioHomeView({
           <div className="space-y-4 animate-in fade-in duration-200">
             {/* Live Matches Section */}
             {isLiveActive && liveMatches.length > 0 && (
-              <div className="space-y-3 rounded-2xl border-2 border-emerald-500/40 bg-emerald-500/5 p-4 sm:p-5 shadow-xs">
+              <div className="space-y-3 rounded-2xl border-2 border-live/40 bg-live-dim p-4 sm:p-5 shadow-xs">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <span className="h-3 w-3 rounded-full bg-emerald-500 animate-ping shrink-0" />
+                    <span className="h-3 w-3 rounded-full bg-live animate-ping shrink-0" />
                     <h3 className="text-sm font-black text-ink">
                       🔴 مباشر الآن — نتائج حية لحظية ({liveMatches.length})
                     </h3>
                   </div>
-                  <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 animate-pulse">
+                  <span className="text-[11px] font-bold text-live animate-pulse">
                     تحديث لحظي مستمر
                   </span>
                 </div>
@@ -187,13 +187,13 @@ export function StudioHomeView({
             {/* Upcoming Matches Header Bar */}
             <div className="flex flex-wrap items-center justify-between gap-3 bg-panel p-3 rounded-2xl border border-line">
               <div className="flex items-center gap-2">
-                <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="h-2 w-2 rounded-full bg-live animate-pulse" />
                 <h3 className="text-xs font-black text-ink">
                   مواعيد ومباريات الجولة القادمة المباشرة
                 </h3>
               </div>
 
-              <span className="px-3 py-1 rounded-xl bg-surface border border-line text-xs font-black text-emerald-600 dark:text-emerald-400">
+              <span className="px-3 py-1 rounded-xl bg-surface border border-line text-xs font-black text-live">
                 🟢 {upcomingMatchesList.length} مواجهة قادمة
               </span>
             </div>
@@ -234,19 +234,19 @@ export function StudioHomeView({
         {/* Tab 2: Value Bets (+EV) */}
         {activeTab === "value" && (
           <div className="space-y-4 animate-in fade-in duration-200">
-            <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-6 space-y-4 shadow-2xs">
+            <div className="rounded-2xl border border-success/30 bg-success-dim p-6 space-y-4 shadow-2xs">
               <div className="flex items-center justify-between">
-                <span className="bg-emerald-600 text-white font-extrabold text-xs px-3 py-1 rounded-full shadow-xs">
+                <span className="bg-success text-on-fill font-extrabold text-xs px-3 py-1 rounded-full shadow-xs">
                   فرص قيمة (+EV ≥ 3%)
                 </span>
-                <span className="text-xs font-black text-emerald-600 dark:text-emerald-400">حاسبة كيلي الحسابية</span>
+                <span className="text-xs font-black text-live">حاسبة كيلي الحسابية</span>
               </div>
               <h3 className="text-base font-black text-ink">المباريات ذات القيمة التهديفية والاستثمارية المحتملة</h3>
               <p className="text-xs font-semibold text-muted leading-relaxed max-w-2xl">
                 يستعرض هذا القسم المباريات القادمة التي يُظهر فيها نموذج التحليل انحرافاً إيجابياً ومزايا رياضية عن أسعار المراهنين.
               </p>
               <Link href="/value" className="inline-block no-underline">
-                <div className="press-scale inline-flex items-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 text-xs font-black shadow-xs transition-colors">
+                <div className="press-scale inline-flex items-center gap-2 rounded-xl bg-success text-on-fill hover:opacity-90 px-5 py-2.5 text-xs font-black shadow-xs transition-colors">
                   <span>تصفح صفحة مباريات القيمة الكاملة</span>
                   <span>←</span>
                 </div>

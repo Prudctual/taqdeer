@@ -26,7 +26,7 @@ export function SiteHeader() {
           {/* Mobile: Brand Logo */}
           <div className="flex items-center gap-2.5 md:hidden">
             <Link href="/" className="flex items-center gap-2 no-underline">
-              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-accent font-black text-base text-white shadow-xs">
+              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-accent font-black text-base text-on-fill shadow-xs">
                 ت
               </div>
               <span className="font-black text-base tracking-tight text-ink">تقدير</span>

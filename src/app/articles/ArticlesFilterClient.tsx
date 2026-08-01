@@ -37,19 +37,18 @@ export default function ArticlesFilterClient({ articles }: ArticlesFilterClientP
 
   return (
     <div className="space-y-6">
-      {/* Category Pills & Search Controls */}
-      <div className="flex flex-col md:flex-row justify-between items-stretch md:items-center gap-4 bg-slate-900/60 p-4 rounded-xl border border-white/10">
-        {/* Category Pills */}
+      <div className="flex flex-col md:flex-row justify-between items-stretch md:items-center gap-4 bg-panel p-4 rounded-xl border border-line">
         <div className="flex items-center gap-2 overflow-x-auto pb-2 md:pb-0 scrollbar-none">
-          <Filter className="w-4 h-4 text-emerald-400 shrink-0 ml-1" />
+          <Filter className="w-4 h-4 text-accent shrink-0 ms-1" />
           {CATEGORIES.map((cat) => (
             <button
               key={cat}
+              type="button"
               onClick={() => setSelectedCategory(cat)}
-              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-colors whitespace-nowrap ${
                 selectedCategory === cat
-                  ? "bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20"
-                  : "bg-white/5 text-slate-300 hover:bg-white/10 hover:text-white"
+                  ? "bg-accent text-on-fill"
+                  : "bg-surface text-muted hover:text-ink border border-line"
               }`}
             >
               {cat}
@@ -57,54 +56,49 @@ export default function ArticlesFilterClient({ articles }: ArticlesFilterClientP
           ))}
         </div>
 
-        {/* Search Input */}
         <div className="relative min-w-[240px]">
-          <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <Search className="absolute end-3 top-1/2 -translate-y-1/2 w-4 h-4 text-faint" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="بحث في المقالات..."
-            className="w-full pl-3 pr-9 py-1.5 bg-slate-950 border border-white/15 rounded-lg text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition-colors"
+            className="w-full ps-3 pe-9 py-1.5 bg-surface border border-line rounded-lg text-xs text-ink placeholder:text-faint focus:outline-none focus:border-accent motion-colors"
           />
         </div>
       </div>
 
-      {/* Articles Grid */}
       {filteredArticles.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredArticles.map((art) => (
             <Link
               key={art.id}
               href={`/articles/${art.slug}`}
-              className="group relative flex flex-col justify-between overflow-hidden rounded-xl border border-white/10 bg-slate-900/80 p-5 text-white transition-all duration-300 hover:border-emerald-500/40 hover:shadow-xl hover:shadow-emerald-500/5 hover:-translate-y-1"
+              className="group relative flex flex-col justify-between overflow-hidden rounded-xl border border-line bg-panel p-5 no-underline motion-colors hover:border-line-strong"
             >
               <div className="space-y-3">
-                {/* Top Category Badge & Read Time */}
                 <div className="flex items-center justify-between gap-2">
-                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-3 py-1 text-[11px] font-bold text-emerald-400 border border-emerald-500/20">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-accent-dim px-3 py-1 text-[11px] font-bold text-accent border border-line">
                     <Sparkles className="h-3 w-3" />
                     {art.category}
                   </span>
-                  <span className="inline-flex items-center gap-1 text-[11px] text-slate-400 font-medium">
+                  <span className="inline-flex items-center gap-1 text-[11px] text-faint font-medium tabular">
                     <Clock className="h-3 w-3" />
                     {art.readTimeMins} دقائق
                   </span>
                 </div>
 
-                {/* Title & Summary */}
-                <h3 className="text-base font-bold leading-snug text-white group-hover:text-emerald-300 transition-colors">
+                <h3 className="text-base font-bold leading-snug text-ink group-hover:text-accent motion-colors">
                   {art.title}
                 </h3>
-                <p className="text-xs text-slate-400 line-clamp-3 leading-relaxed">
+                <p className="text-xs text-muted line-clamp-3 leading-relaxed">
                   {art.summary}
                 </p>
               </div>
 
-              {/* Bottom Metadata */}
-              <div className="mt-6 pt-3 border-t border-white/5 flex items-center justify-between text-[11px] text-slate-400">
-                <span className="font-medium flex items-center gap-1 text-slate-300">
-                  <BookOpen className="h-3.5 w-3.5 text-emerald-400" />
+              <div className="mt-6 pt-3 border-t border-line flex items-center justify-between text-[11px] text-faint">
+                <span className="font-medium flex items-center gap-1 text-muted">
+                  <BookOpen className="h-3.5 w-3.5 text-accent" />
                   {art.author}
                 </span>
               </div>
@@ -112,10 +106,10 @@ export default function ArticlesFilterClient({ articles }: ArticlesFilterClientP
           ))}
         </div>
       ) : (
-        <div className="text-center py-16 bg-slate-900/40 rounded-xl border border-white/5">
-          <Layers className="w-10 h-10 text-slate-600 mx-auto mb-3" />
-          <h3 className="text-base font-bold text-slate-300">لا توجد مقالات مطابقة لخيارات البحث</h3>
-          <p className="text-xs text-slate-500 mt-1">جرّب تغيير كلمة البحث أو اختيار تصنيف آخر.</p>
+        <div className="text-center py-16 bg-panel rounded-xl border border-line">
+          <Layers className="w-10 h-10 text-faint mx-auto mb-3" />
+          <h3 className="text-base font-bold text-ink">لا توجد مقالات مطابقة لخيارات البحث</h3>
+          <p className="text-xs text-muted mt-1">جرّب تغيير كلمة البحث أو اختيار تصنيف آخر.</p>
         </div>
       )}
     </div>

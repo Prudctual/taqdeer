@@ -102,11 +102,11 @@ export function Badge({
   const base =
     "inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-bold transition-colors focus:outline-none tabular";
   const variants = {
-    default: "bg-accent text-white hover:bg-accent/90",
+    default: "bg-accent text-on-fill hover:bg-accent/90",
     secondary: "bg-panel text-muted hover:bg-raised hover:text-ink border border-line",
     destructive: "bg-rose-500/10 text-rose-600 border border-rose-500/20",
     outline: "border border-line text-muted hover:text-ink",
-    success: "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20",
+    success: "bg-success-dim text-success border border-success/20",
   };
 
   return (
@@ -134,11 +134,11 @@ export function Button({
     "press-scale inline-flex items-center justify-center font-bold text-xs transition-all cursor-pointer disabled:pointer-events-none disabled:opacity-50 select-none";
 
   const variants = {
-    default: "bg-accent text-white hover:bg-accent/90 rounded-xl shadow-xs",
+    default: "bg-accent text-on-fill hover:bg-accent/90 rounded-xl shadow-xs",
     secondary: "bg-panel text-ink hover:bg-raised border border-line rounded-xl",
     outline: "border border-line bg-surface hover:bg-panel text-muted hover:text-ink rounded-xl",
     ghost: "hover:bg-panel text-muted hover:text-ink rounded-xl",
-    destructive: "bg-rose-600 text-white hover:bg-rose-700 rounded-xl shadow-xs",
+    destructive: "bg-danger text-on-fill hover:opacity-90 rounded-xl shadow-xs",
   };
 
   const sizes = {

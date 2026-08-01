@@ -46,19 +46,18 @@ export default function NewsFeedClient({ initialNews }: NewsFeedClientProps) {
 
   return (
     <div className="space-y-6">
-      {/* Category Pills & Search Bar */}
-      <div className="flex flex-col md:flex-row justify-between items-stretch md:items-center gap-4 bg-slate-900/60 p-4 rounded-xl border border-white/10">
-        {/* Category Pills */}
+      <div className="flex flex-col md:flex-row justify-between items-stretch md:items-center gap-4 bg-panel p-4 rounded-xl border border-line">
         <div className="flex items-center gap-2 overflow-x-auto pb-2 md:pb-0 scrollbar-none">
-          <Filter className="w-4 h-4 text-emerald-400 shrink-0 ml-1" />
+          <Filter className="w-4 h-4 text-accent shrink-0 ms-1" />
           {CATEGORIES.map((cat) => (
             <button
               key={cat}
+              type="button"
               onClick={() => setSelectedCategory(cat)}
-              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-colors whitespace-nowrap ${
                 selectedCategory === cat
-                  ? "bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20"
-                  : "bg-white/5 text-slate-300 hover:bg-white/10 hover:text-white"
+                  ? "bg-accent text-on-fill"
+                  : "bg-surface text-muted hover:text-ink border border-line"
               }`}
             >
               {cat}
@@ -66,59 +65,54 @@ export default function NewsFeedClient({ initialNews }: NewsFeedClientProps) {
           ))}
         </div>
 
-        {/* Search Bar */}
         <div className="relative min-w-[240px]">
-          <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <Search className="absolute end-3 top-1/2 -translate-y-1/2 w-4 h-4 text-faint" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="بحث في الأخبار اللحظية..."
-            className="w-full pl-3 pr-9 py-1.5 bg-slate-950 border border-white/15 rounded-lg text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition-colors"
+            className="w-full ps-3 pe-9 py-1.5 bg-surface border border-line rounded-lg text-xs text-ink placeholder:text-faint focus:outline-none focus:border-accent motion-colors"
           />
         </div>
       </div>
 
-      {/* Live News Timeline List */}
       {filtered.length > 0 ? (
-        <div className="space-y-4">
+        <div className="space-y-3">
           {filtered.map((item) => (
             <div
               key={item.id}
-              className="group relative flex flex-col md:flex-row justify-between items-start md:items-center gap-4 p-5 rounded-xl border border-white/10 bg-slate-900/70 hover:bg-slate-900 hover:border-emerald-500/40 transition-all duration-200"
+              className="group relative flex flex-col md:flex-row justify-between items-start md:items-center gap-4 p-5 rounded-xl border border-line bg-surface hover:border-line-strong motion-colors"
             >
               <div className="space-y-2 max-w-4xl">
-                {/* Source & Time Metadata */}
-                <div className="flex items-center gap-3">
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-white/5 border border-white/10 text-emerald-400 text-[11px] font-bold">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-accent-dim border border-line text-accent text-[11px] font-bold">
                     <Globe className="w-3 h-3" />
                     {item.sourceName}
                   </span>
-                  <span className="text-[11px] font-semibold text-slate-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                  <span className="text-[11px] font-semibold text-muted bg-panel px-2 py-0.5 rounded border border-line">
                     {item.category}
                   </span>
-                  <span className="text-[11px] text-slate-400 flex items-center gap-1">
+                  <span className="text-[11px] text-faint flex items-center gap-1 tabular">
                     <Clock className="w-3 h-3" />
                     {timeAgoArabic(item.publishedAt)}
                   </span>
                 </div>
 
-                {/* Title & Summary */}
-                <h3 className="text-base sm:text-lg font-bold text-white group-hover:text-emerald-300 transition-colors leading-snug">
+                <h3 className="text-base sm:text-lg font-bold text-ink group-hover:text-accent motion-colors leading-snug">
                   {item.title}
                 </h3>
-                <p className="text-xs sm:text-sm text-slate-400 leading-relaxed line-clamp-2">
+                <p className="text-xs sm:text-sm text-muted leading-relaxed line-clamp-2">
                   {item.summary}
                 </p>
               </div>
 
-              {/* Action Link */}
               {item.sourceUrl && (
                 <a
                   href={item.sourceUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-white/5 border border-white/10 text-xs font-bold text-slate-300 hover:text-white hover:bg-emerald-500/20 hover:border-emerald-500/40 transition-all shrink-0 self-end md:self-center"
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-panel border border-line text-xs font-bold text-muted hover:text-accent hover:border-accent motion-colors shrink-0 self-end md:self-center"
                 >
                   <span>المصدر الأصلي</span>
                   <ExternalLink className="w-3.5 h-3.5" />
@@ -128,10 +122,10 @@ export default function NewsFeedClient({ initialNews }: NewsFeedClientProps) {
           ))}
         </div>
       ) : (
-        <div className="text-center py-16 bg-slate-900/40 rounded-xl border border-white/5">
-          <Radio className="w-10 h-10 text-slate-600 mx-auto mb-3 animate-pulse" />
-          <h3 className="text-base font-bold text-slate-300">لا توجد أخبار مطابقة لخيارات التصفية</h3>
-          <p className="text-xs text-slate-500 mt-1">جرّب تغيير عبارة البحث أو اختيار تصنيف آخر.</p>
+        <div className="text-center py-16 bg-panel rounded-xl border border-line">
+          <Radio className="w-10 h-10 text-faint mx-auto mb-3" />
+          <h3 className="text-base font-bold text-ink">لا توجد أخبار مطابقة لخيارات التصفية</h3>
+          <p className="text-xs text-muted mt-1">جرّب تغيير عبارة البحث أو اختيار تصنيف آخر.</p>
         </div>
       )}
     </div>

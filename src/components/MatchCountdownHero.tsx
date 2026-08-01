@@ -40,7 +40,7 @@ export function MatchCountdownHero({
   if (isFinished) {
     return (
       <div className="inline-flex items-center gap-2 rounded-full bg-panel px-4 py-1.5 text-xs font-black text-ink">
-        <span className="h-2 w-2 rounded-full bg-emerald-500" />
+        <span className="h-2 w-2 rounded-full bg-success" />
         {score ? (
           <span>
             نتيجة منتهية:{" "}
@@ -55,8 +55,8 @@ export function MatchCountdownHero({
 
   if (isLive) {
     return (
-      <div className="inline-flex items-center gap-2 rounded-full bg-emerald-500/15 px-4 py-1.5 text-xs font-black text-emerald-700 dark:text-emerald-400">
-        <span className="h-2 w-2 rounded-full bg-emerald-500 animate-ping" />
+      <div className="live-badge px-4 py-1.5 text-xs">
+        <span className="live-badge-dot live-pulse-dot" />
         <span>
           جارية الآن
           {score ? (
@@ -72,8 +72,8 @@ export function MatchCountdownHero({
 
   if (phase === "awaiting") {
     return (
-      <div className="inline-flex items-center gap-2 rounded-full bg-panel px-4 py-1.5 text-xs font-black text-muted">
-        <span className="h-2 w-2 rounded-full bg-amber-500" />
+      <div className="inline-flex items-center gap-2 rounded-full bg-warn-dim px-4 py-1.5 text-xs font-black text-warn border border-line">
+        <span className="h-2 w-2 rounded-full bg-warn" />
         <span>انطلقت · بانتظار النتيجة</span>
       </div>
     );

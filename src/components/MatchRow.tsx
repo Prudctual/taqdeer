@@ -6,12 +6,12 @@ import type { MatchCard } from "@/lib/queries";
 import { actualOutcome, pct, topOutcome } from "@/lib/format";
 import { matchDisplay } from "@/lib/match-status";
 
-/** لون النتيجة يملأ الشارة فقط — النص عليها بلون السطح الداكن */
+/** لون النتيجة يملأ الشارة — النص بـ on-fill للقراءة على الخلفية الملوّنة */
 const pickFill: Record<string, string> = {
-  H: "bg-home-fill",
-  D: "bg-draw-fill",
-  A: "bg-away-fill",
-  EQ: "bg-amber-500/20 text-amber-500 border border-amber-500/40",
+  H: "bg-home-fill text-on-fill",
+  D: "bg-draw-fill text-draw-ink",
+  A: "bg-away-fill text-on-fill",
+  EQ: "bg-warn-dim text-warn border border-line",
 };
 
 /** الرمز يرافق اللون دائماً — لا معنى يُحمل باللون وحده */
@@ -93,7 +93,7 @@ export function MatchRow({
       className={`match-row ${
         showLeague ? "league-row" : ""
       } grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-2 px-4 py-2.5 text-ink no-underline sm:gap-y-0 ${rowGrid} ${
-        isLive ? "bg-emerald-500/5 dark:bg-emerald-950/20 border-r-4 border-r-emerald-500" : ""
+        isLive ? "bg-live-dim border-e-4 border-e-live" : ""
       }`}
     >
       {/* ١ · الموعد */}

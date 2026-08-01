@@ -17,46 +17,43 @@ export function LatestArticlesWidget() {
       headerRight={
         <Link
           href="/articles"
-          className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-400 hover:text-emerald-300 transition-colors"
+          className="inline-flex items-center gap-1.5 text-xs font-bold text-accent hover:opacity-80 transition-opacity"
         >
           <span>عرض كافة المقالات</span>
-          <span className="text-sm">←</span>
+          <span aria-hidden>←</span>
         </Link>
       }
     >
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {articles.map((art) => (
           <Link
             key={art.id}
             href={`/articles/${art.slug}`}
-            className="group relative flex flex-col justify-between overflow-hidden rounded-xl border border-white/10 bg-gradient-to-b from-slate-900/90 to-slate-950 p-5 text-white transition-all duration-300 hover:border-emerald-500/40 hover:shadow-xl hover:shadow-emerald-500/5 hover:-translate-y-1"
+            className="group relative flex flex-col justify-between overflow-hidden rounded-xl border border-line bg-panel p-5 no-underline motion-colors hover:border-line-strong"
           >
-            {/* Top Category Badge & Read Time */}
             <div className="flex items-center justify-between gap-2 mb-4">
-              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-3 py-1 text-[11px] font-bold text-emerald-400 border border-emerald-500/20">
+              <span className="inline-flex items-center gap-1 rounded-full bg-accent-dim px-3 py-1 text-[11px] font-bold text-accent border border-line">
                 <Sparkles className="h-3 w-3" />
                 {art.category}
               </span>
-              <span className="inline-flex items-center gap-1 text-[11px] text-slate-400">
+              <span className="inline-flex items-center gap-1 text-[11px] text-faint tabular">
                 <Clock className="h-3 w-3" />
                 {art.readTimeMins} دقائق
               </span>
             </div>
 
-            {/* Article Content Preview */}
             <div className="space-y-2.5 flex-1">
-              <h3 className="text-base font-bold leading-snug text-white group-hover:text-emerald-300 transition-colors line-clamp-2">
+              <h3 className="text-base font-bold leading-snug text-ink group-hover:text-accent motion-colors line-clamp-2">
                 {art.title}
               </h3>
-              <p className="text-xs text-slate-400 line-clamp-3 leading-relaxed">
+              <p className="text-xs text-muted line-clamp-3 leading-relaxed">
                 {art.summary}
               </p>
             </div>
 
-            {/* Footer Metadata */}
-            <div className="mt-5 pt-3 border-t border-white/5 flex items-center justify-between text-[11px] text-slate-500">
-              <span className="font-medium text-slate-400 flex items-center gap-1">
-                <BookOpen className="h-3 w-3 text-emerald-500" />
+            <div className="mt-5 pt-3 border-t border-line flex items-center justify-between text-[11px] text-faint">
+              <span className="font-medium text-muted flex items-center gap-1">
+                <BookOpen className="h-3 w-3 text-accent" />
                 {art.author}
               </span>
             </div>

@@ -213,7 +213,7 @@ export function ShadcnDataTable({
                             return (
                               <span className={`inline-flex items-center justify-center px-1.5 py-0.5 rounded-md border font-mono font-black text-xs tabular min-w-[2.75rem] ${
                                 isLive
-                                  ? "bg-emerald-500/10 border-emerald-500/40 text-emerald-600 dark:text-emerald-400 animate-pulse"
+                                  ? "bg-live/10 border-live/40 text-live animate-pulse"
                                   : "bg-panel border-line text-ink"
                               }`}>
                                 {score ?? badge}

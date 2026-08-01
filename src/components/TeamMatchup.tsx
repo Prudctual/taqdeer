@@ -57,20 +57,20 @@ export function TeamMatchup({
             <span
               className={`text-2xl sm:text-4xl font-mono font-black tabular ${
                 isLive
-                  ? "text-emerald-600 dark:text-emerald-400"
+                  ? "text-live"
                   : "text-ink"
               }`}
             >
               {score}
             </span>
           ) : (
-            <span className="text-xs font-black text-white bg-accent px-3 py-1 rounded-full shadow-xs">
+            <span className="text-xs font-black text-on-fill bg-accent px-3 py-1 rounded-full">
               {placeholder}
             </span>
           )}
           {isLive ? (
-            <span className="mt-1.5 inline-flex items-center gap-1 text-[10px] font-extrabold text-emerald-600 dark:text-emerald-400">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="mt-1.5 live-badge text-[10px]">
+              <span className="live-badge-dot live-pulse-dot" />
               مباشر
             </span>
           ) : null}

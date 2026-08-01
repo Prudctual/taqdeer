@@ -81,8 +81,9 @@ export function NextKickoff({ m }: { m: MatchCard }) {
       <div className="league-band flex-wrap">
         <span className="flex min-w-0 items-center gap-2">
           {isLive ? (
-            <span className="px-2 py-0.5 rounded-full bg-emerald-500 text-white text-[10px] font-black animate-pulse">
-              🔴 مباشر الآن
+            <span className="live-badge text-[10px]">
+              <span className="live-badge-dot live-pulse-dot" />
+              مباشر الآن
             </span>
           ) : (
             <span className="type-label">إحاطة الجولة</span>
@@ -96,7 +97,7 @@ export function NextKickoff({ m }: { m: MatchCard }) {
         </span>
         <span suppressHydrationWarning className="flex flex-wrap items-center gap-x-1.5 text-[11px] tabular text-muted">
           {isLive ? (
-            <span className="font-extrabold text-emerald-600 dark:text-emerald-400">
+            <span className="font-extrabold text-live">
               {m.liveStatusAr || (m.minute ? `الدقيقة ${m.minute}'` : "جارية الآن")}
             </span>
           ) : (
@@ -135,7 +136,7 @@ export function NextKickoff({ m }: { m: MatchCard }) {
           {score ? (
             <span className={`text-xl sm:text-2xl font-mono font-black bg-panel border px-3 py-1 rounded-xl shadow-xs tabular ${
               isLive
-                ? "text-emerald-600 dark:text-emerald-400 border-emerald-500/40"
+                ? "text-live border-live/40"
                 : "text-ink border-line"
             }`}>
               {score.replace("–", " – ")}

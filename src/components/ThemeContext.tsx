@@ -26,23 +26,94 @@ interface ThemeContextType {
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
-const PRESET_COLORS: Record<ColorPreset, { accent: string; accentHover: string; accentDim: string }> = {
-  rose: { accent: "#e11d48", accentHover: "#be123c", accentDim: "#ffe4e6" },
-  zinc: { accent: "#18181b", accentHover: "#09090b", accentDim: "#f4f4f5" },
-  emerald: { accent: "#059669", accentHover: "#047857", accentDim: "#d1fae5" },
-  blue: { accent: "#2563eb", accentHover: "#1d4ed8", accentDim: "#dbeafe" },
-  violet: { accent: "#7c3aed", accentHover: "#6d28d9", accentDim: "#ede9fe" },
+type PresetColors = {
+  accent: string;
+  accentHover: string;
+  accentDim: string;
 };
+
+/** قيم مختلفة للفاتح/الداكن حتى لا يختفي accent (مثل zinc الأسود على خلفية داكنة) */
+const PRESET_COLORS: Record<
+  ColorPreset,
+  { light: PresetColors; dark: PresetColors }
+> = {
+  rose: {
+    light: {
+      accent: "oklch(0.55 0.18 15)",
+      accentHover: "oklch(0.48 0.18 15)",
+      accentDim: "oklch(0.55 0.18 15 / 0.12)",
+    },
+    dark: {
+      accent: "oklch(0.72 0.14 15)",
+      accentHover: "oklch(0.78 0.12 15)",
+      accentDim: "oklch(0.72 0.14 15 / 0.16)",
+    },
+  },
+  zinc: {
+    light: {
+      accent: "oklch(0.28 0.01 250)",
+      accentHover: "oklch(0.2 0.01 250)",
+      accentDim: "oklch(0.28 0.01 250 / 0.1)",
+    },
+    dark: {
+      accent: "oklch(0.92 0.01 250)",
+      accentHover: "oklch(0.98 0.005 250)",
+      accentDim: "oklch(0.92 0.01 250 / 0.14)",
+    },
+  },
+  emerald: {
+    light: {
+      accent: "oklch(0.52 0.12 155)",
+      accentHover: "oklch(0.45 0.12 155)",
+      accentDim: "oklch(0.52 0.12 155 / 0.12)",
+    },
+    dark: {
+      accent: "oklch(0.74 0.12 155)",
+      accentHover: "oklch(0.8 0.1 155)",
+      accentDim: "oklch(0.74 0.12 155 / 0.14)",
+    },
+  },
+  blue: {
+    light: {
+      accent: "oklch(0.55 0.12 245)",
+      accentHover: "oklch(0.48 0.13 245)",
+      accentDim: "oklch(0.55 0.12 245 / 0.12)",
+    },
+    dark: {
+      accent: "oklch(0.72 0.11 245)",
+      accentHover: "oklch(0.78 0.1 245)",
+      accentDim: "oklch(0.72 0.11 245 / 0.16)",
+    },
+  },
+  violet: {
+    light: {
+      accent: "oklch(0.5 0.16 295)",
+      accentHover: "oklch(0.44 0.16 295)",
+      accentDim: "oklch(0.5 0.16 295 / 0.12)",
+    },
+    dark: {
+      accent: "oklch(0.72 0.12 295)",
+      accentHover: "oklch(0.78 0.1 295)",
+      accentDim: "oklch(0.72 0.12 295 / 0.16)",
+    },
+  },
+};
+
+function resolveIsDark(mode: ThemeMode): boolean {
+  if (mode === "dark") return true;
+  if (mode === "light") return false;
+  if (typeof window === "undefined") return false;
+  return window.matchMedia("(prefers-color-scheme: dark)").matches;
+}
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [mode, setModeState] = useState<ThemeMode>("light");
-  const [preset, setPresetState] = useState<ColorPreset>("rose");
+  const [preset, setPresetState] = useState<ColorPreset>("blue");
   const [radius, setRadiusState] = useState<RadiusValue>("0.75");
   const [density, setDensityState] = useState<DensityValue>("comfortable");
   const [customizerOpen, setCustomizerOpen] = useState<boolean>(false);
   const [commandOpen, setCommandOpen] = useState<boolean>(false);
 
-  // Load initial values from localStorage on mount
   useEffect(() => {
     const savedMode = localStorage.getItem("taqdeer-theme-mode") as ThemeMode | null;
     const savedPreset = localStorage.getItem("taqdeer-theme-preset") as ColorPreset | null;
@@ -55,49 +126,49 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     if (savedDensity) setDensityState(savedDensity);
   }, []);
 
-  // Update HTML class & CSS variables when state changes
   useEffect(() => {
     const root = document.documentElement;
+    const isDark = resolveIsDark(mode);
 
-    // Mode (Light / Dark)
-    if (mode === "dark") {
+    if (isDark) {
       root.classList.add("dark");
       root.classList.remove("light");
       root.setAttribute("data-theme", "dark");
-    } else if (mode === "light") {
+    } else {
       root.classList.add("light");
       root.classList.remove("dark");
       root.setAttribute("data-theme", "light");
-    } else {
-      // System
-      const isDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-      if (isDark) {
-        root.classList.add("dark");
-        root.classList.remove("light");
-        root.setAttribute("data-theme", "dark");
-      } else {
-        root.classList.add("light");
-        root.classList.remove("dark");
-        root.setAttribute("data-theme", "light");
-      }
     }
 
-    // Color preset
-    const colors = PRESET_COLORS[preset] || PRESET_COLORS.rose;
+    const colors = PRESET_COLORS[preset]?.[isDark ? "dark" : "light"] ?? PRESET_COLORS.blue.light;
     root.style.setProperty("--accent", colors.accent);
     root.style.setProperty("--accent-hover", colors.accentHover);
     root.style.setProperty("--accent-dim", colors.accentDim);
     root.setAttribute("data-preset", preset);
 
-    // Radius
     root.style.setProperty("--radius", `${radius}rem`);
     root.setAttribute("data-radius", radius);
-
-    // Density
     root.setAttribute("data-density", density);
   }, [mode, preset, radius, density]);
 
-  // Keybindings (Cmd+K / Ctrl+K)
+  useEffect(() => {
+    if (mode !== "system") return;
+    const mq = window.matchMedia("(prefers-color-scheme: dark)");
+    const onChange = () => {
+      const root = document.documentElement;
+      const isDark = mq.matches;
+      root.classList.toggle("dark", isDark);
+      root.classList.toggle("light", !isDark);
+      root.setAttribute("data-theme", isDark ? "dark" : "light");
+      const colors = PRESET_COLORS[preset][isDark ? "dark" : "light"];
+      root.style.setProperty("--accent", colors.accent);
+      root.style.setProperty("--accent-hover", colors.accentHover);
+      root.style.setProperty("--accent-dim", colors.accentDim);
+    };
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, [mode, preset]);
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {

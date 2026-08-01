@@ -99,7 +99,7 @@ export function SiteSidebar() {
       {/* Brand Header */}
       <div className="sidebar-brand">
         <Link href="/" className="flex items-center gap-3 no-underline group">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent font-black text-sm text-white group-hover:scale-105 active:scale-95 transition-transform duration-150 shadow-xs">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent font-black text-sm text-on-fill group-hover:scale-105 active:scale-95 transition-transform duration-150 shadow-xs">
             ت
           </div>
           <div className="flex flex-col">
@@ -173,7 +173,7 @@ export function SiteSidebar() {
           >
             {mode === "dark" ? (
               <>
-                <svg className="h-4 w-4 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <svg className="h-4 w-4 text-warn" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
                 </svg>
                 <span>النمط الفاتح</span>

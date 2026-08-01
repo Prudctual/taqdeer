@@ -92,8 +92,8 @@ export function MatchWhen({
     if (variant === "row") {
       return (
         <div className={`min-w-0 tabular ${className}`}>
-          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 font-extrabold text-[11px]">
-            <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+          <span className="live-badge">
+            <span className="live-badge-dot live-pulse-dot" />
             <span>{liveText}</span>
           </span>
         </div>
@@ -101,8 +101,8 @@ export function MatchWhen({
     }
 
     return (
-      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 font-extrabold text-xs ${className}`}>
-        <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+      <span className={`live-badge ${className}`}>
+        <span className="live-badge-dot live-pulse-dot" />
         <span>مباشر · {liveText}</span>
       </span>
     );
