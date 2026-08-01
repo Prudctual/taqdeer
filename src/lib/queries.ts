@@ -235,10 +235,11 @@ export function getUpcomingByLeague(perLeague = 6): {
 }[] {
   const db = getDb();
 
-  // 1. المباريات القادمة والمباشرة التي لم تنتهي بعد (SCHEDULED, TIMED, IN_PLAY, PAUSED, LIVE, etc.)
+  // 1. المباريات القادمة والمباشرة (SCHEDULED, TIMED, IN_PLAY, etc.) النشطة اليوم أو في المستقبل
   const activeStmt = db.prepare(
     `${LIST_SELECT}
      WHERE m.status IN ('SCHEDULED','TIMED','IN_PLAY','PAUSED','LIVE','1H','2H','HT','ET','P','BREAK')
+       AND (datetime(m.utc_date) >= datetime('now', '-1 day') OR m.status IN ('IN_PLAY','PAUSED','LIVE','1H','2H','HT','ET','P','BREAK'))
        AND m.league_id = ?
        AND m.source NOT IN ('preview-holdout','synthetic','demo')
      ORDER BY m.utc_date ASC
@@ -256,18 +257,23 @@ export function getUpcomingByLeague(perLeague = 6): {
 
   return getLeagues()
     .map((league) => {
-      let matches = activeStmt.all(league.id, perLeague) as MatchCard[];
-      if (matches.length === 0) {
-        matches = (fallbackStmt.all(league.id, perLeague) as MatchCard[]).reverse();
-      }
+      const activeMatches = activeStmt.all(league.id, perLeague) as MatchCard[];
+      const isFallback = activeMatches.length === 0;
+      const matches = isFallback
+        ? (fallbackStmt.all(league.id, perLeague) as MatchCard[]).reverse()
+        : activeMatches;
       return {
         leagueId: league.id,
         leagueNameAr: league.name_ar,
+        isFallback,
         matches,
       };
     })
     .filter((g) => g.matches.length > 0)
     .sort((a, b) => {
+      // active upcoming leagues (like K League 1) come FIRST
+      if (!a.isFallback && b.isFallback) return -1;
+      if (a.isFallback && !b.isFallback) return 1;
       const aDate = a.matches[0]?.utcDate ?? "";
       const bDate = b.matches[0]?.utcDate ?? "";
       return aDate.localeCompare(bDate);

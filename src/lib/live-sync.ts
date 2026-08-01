@@ -70,7 +70,7 @@ export async function syncRealLiveMatches(): Promise<number> {
 
     const db = getDb();
 
-    // Map known API-Football league IDs to our league IDs
+    // STRICT FILTER: Only sync official tracked leagues (PL, La Liga, Serie A, Bundesliga, Ligue 1, K League 1)
     const KNOWN_LEAGUES: Record<number, string> = {
       39: "pl",
       140: "pd",
@@ -79,12 +79,6 @@ export async function syncRealLiveMatches(): Promise<number> {
       61: "fl1",
       292: "kl1",
     };
-
-    const upsertLeague = db.prepare(`
-      INSERT INTO leagues (id, code, name_ar, name_en, country_ar)
-      VALUES (?, ?, ?, ?, ?)
-      ON CONFLICT(id) DO NOTHING
-    `);
 
     const upsertTeam = db.prepare(`
       INSERT INTO teams (id, league_id, name_ar, name_en, short_name, crest_url)
@@ -125,21 +119,12 @@ export async function syncRealLiveMatches(): Promise<number> {
     let syncedCount = 0;
 
     for (const item of fixtures) {
-      const f = item.fixture;
-      const leagueId = KNOWN_LEAGUES[item.league.id] || `live-${item.league.id}`;
-      const leagueCode = KNOWN_LEAGUES[item.league.id] || `LIVE-${item.league.id}`;
-      const leagueNameAr = KNOWN_LEAGUES[item.league.id]
-        ? undefined
-        : `${item.league.name} (${item.league.country})`;
+      const knownLeagueCode = KNOWN_LEAGUES[item.league.id];
+      // IF NOT IN OUR TRACKED LEAGUES, SKIP!
+      if (!knownLeagueCode) continue;
 
-      // Ensure league exists
-      upsertLeague.run(
-        leagueId,
-        leagueCode,
-        leagueNameAr || item.league.name,
-        item.league.name,
-        item.league.country || "عالمي",
-      );
+      const f = item.fixture;
+      const leagueId = knownLeagueCode;
 
       const homeResolved = resolveTeamName(item.teams.home.name);
       const awayResolved = resolveTeamName(item.teams.away.name);
