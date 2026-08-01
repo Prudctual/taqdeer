@@ -132,7 +132,7 @@ def main() -> None:
             """,
             (lid,),
         ).fetchall()
-        if len(finished) < 50:
+        if len(finished) < 20:
             print(f"  skip {lid}: {len(finished)} matches")
             continue
 
