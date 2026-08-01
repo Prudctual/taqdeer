@@ -1180,6 +1180,68 @@ export const getLatestNews = cache((limit = 20, category?: string): NewsItem[] =
   }
 });
 
+export type DbPlayer = {
+  id: string;
+  teamId: string;
+  nameEn: string;
+  nameAr: string | null;
+  position: string | null;
+  shirtNumber: number | null;
+  photoUrl: string | null;
+};
+
+export function getTeamPlayers(teamId: string, limit = 24): DbPlayer[] {
+  try {
+    const db = getDb();
+    return db
+      .prepare(
+        `SELECT p.id,
+                p.team_id as teamId,
+                p.name_en as nameEn,
+                p.name_ar as nameAr,
+                p.position,
+                p.shirt_number as shirtNumber,
+                p.photo_url as photoUrl
+         FROM players p
+         WHERE p.team_id IN (
+           SELECT id FROM teams WHERE id = ?
+           UNION
+           SELECT t2.id
+           FROM teams t1
+           JOIN teams t2
+             ON t2.league_id = t1.league_id
+            AND lower(t2.name_en) = lower(t1.name_en)
+           WHERE t1.id = ?
+           UNION
+           SELECT t2.id
+           FROM teams t1
+           JOIN teams t2
+             ON t2.sportsdb_id IS NOT NULL
+            AND t2.sportsdb_id = t1.sportsdb_id
+           WHERE t1.id = ? AND t1.sportsdb_id IS NOT NULL
+         )
+         ORDER BY
+           CASE
+             WHEN p.position LIKE '%Forward%' OR p.position LIKE '%Winger%' OR p.position LIKE '%Striker%' THEN 0
+             WHEN p.position LIKE '%Attacking Mid%' THEN 1
+             WHEN p.position LIKE '%Midfield%' THEN 2
+             WHEN p.position LIKE '%Back%' OR p.position LIKE '%Defender%' THEN 3
+             WHEN p.position LIKE '%Goalkeeper%' THEN 4
+             ELSE 5
+           END,
+           CASE WHEN p.photo_url IS NOT NULL AND p.photo_url != '' THEN 0 ELSE 1 END,
+           CASE WHEN p.shirt_number IS NULL THEN 1 ELSE 0 END,
+           p.shirt_number ASC,
+           p.name_en ASC
+         LIMIT ?`,
+      )
+      .all(teamId, teamId, teamId, limit) as DbPlayer[];
+  } catch (e) {
+    console.error("Error in getTeamPlayers:", e);
+    return [];
+  }
+}
+
 
 
 

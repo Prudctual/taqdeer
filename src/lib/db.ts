@@ -170,6 +170,20 @@ function initSchema(db: Database.Database) {
       created_at TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_news_published ON news(published_at DESC);
+
+    CREATE TABLE IF NOT EXISTS players (
+      id TEXT PRIMARY KEY,
+      team_id TEXT NOT NULL REFERENCES teams(id),
+      name_en TEXT NOT NULL,
+      name_ar TEXT,
+      position TEXT,
+      shirt_number INTEGER,
+      photo_url TEXT,
+      sportsdb_id TEXT,
+      updated_at TEXT NOT NULL,
+      UNIQUE(team_id, name_en)
+    );
+    CREATE INDEX IF NOT EXISTS idx_players_team ON players(team_id);
   `);
 
   migrate(db);
@@ -274,6 +288,31 @@ function migrate(db: Database.Database) {
   if (!mcols.has("rps")) {
     db.exec(`ALTER TABLE model_metrics ADD COLUMN rps REAL`);
   }
+
+  const tcols = new Set(
+    (
+      db.prepare(`PRAGMA table_info(teams)`).all() as { name: string }[]
+    ).map((c) => c.name),
+  );
+  if (!tcols.has("sportsdb_id")) {
+    db.exec(`ALTER TABLE teams ADD COLUMN sportsdb_id TEXT`);
+  }
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS players (
+      id TEXT PRIMARY KEY,
+      team_id TEXT NOT NULL REFERENCES teams(id),
+      name_en TEXT NOT NULL,
+      name_ar TEXT,
+      position TEXT,
+      shirt_number INTEGER,
+      photo_url TEXT,
+      sportsdb_id TEXT,
+      updated_at TEXT NOT NULL,
+      UNIQUE(team_id, name_en)
+    );
+    CREATE INDEX IF NOT EXISTS idx_players_team ON players(team_id);
+  `);
 }
 
 export function closeDb() {

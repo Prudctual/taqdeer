@@ -7,6 +7,7 @@ import { MatchList } from "@/components/MatchList";
 import { RevealOnView } from "@/components/RevealOnView";
 import { TrophyIcon } from "@/components/Icons";
 import { TeamTacticalSpotlight } from "@/components/TeamTacticalSpotlight";
+import { SquadGridWidget } from "@/components/SquadGridWidget";
 import {
   BackBar,
   EmptyState,
@@ -19,7 +20,9 @@ import {
   getLeagueMatches,
   getTeam,
   getTeamMatches,
+  getTeamPlayers,
 } from "@/lib/queries";
+import { toSquadStars } from "@/lib/players";
 
 export const revalidate = 300;
 
@@ -72,6 +75,13 @@ export default async function TeamPage({
         (m.homeId === team.id || m.awayId === team.id),
     )
     .slice(0, 6);
+
+  const squadStars = toSquadStars(
+    getTeamPlayers(team.id, 16),
+    team.name_ar,
+    true,
+    8,
+  );
 
   const form = matches
     .filter((m) => m.homeGoals != null && m.awayGoals != null)
@@ -350,6 +360,8 @@ export default async function TeamPage({
         defenseRating={team.defense}
         crestUrl={team.crest_url}
       />
+
+      <SquadGridWidget homeTeam={team.name_ar} awayTeam="" players={squadStars} />
 
       {/* 4 — Upcoming Matches */}
       {upcoming.length > 0 ? (

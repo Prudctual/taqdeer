@@ -49,8 +49,10 @@ import {
   getStandings,
   getStandingsAt,
   getStandingsSeason,
+  getTeamPlayers,
   getVenueRecord,
 } from "@/lib/queries";
+import { toSquadStars } from "@/lib/players";
 
 export const revalidate = 180;
 
@@ -259,6 +261,22 @@ export default async function MatchPage({
     match.leagueId
   );
   const resolvedReferee = matchDetails.refereeName;
+
+  const homeSquad = toSquadStars(
+    getTeamPlayers(match.home_id, 16),
+    match.home_name_ar,
+    true,
+    4,
+  );
+  const awaySquad = toSquadStars(
+    getTeamPlayers(match.away_id, 16),
+    match.away_name_ar,
+    false,
+    4,
+  );
+  const squadStars = [...homeSquad, ...awaySquad];
+  const homeStar = homeSquad[0] ?? null;
+  const awayStar = awaySquad[0] ?? null;
 
   const matrixRaw = parseJson<number[][]>(match.score_matrix_json, []);
   const matrix = Array.isArray(matrixRaw) ? matrixRaw : [];
@@ -696,9 +714,18 @@ export default async function MatchPage({
         logistics={analytics?.components?.logistics as { travel_distance_km?: number; pitch_surface?: string; is_european_midweek?: boolean; logistics_summary?: string }}
       />
 
-      <SquadGridWidget homeTeam={match.home_name_ar} awayTeam={match.away_name_ar} />
+      <SquadGridWidget
+        homeTeam={match.home_name_ar}
+        awayTeam={match.away_name_ar}
+        players={squadStars}
+      />
 
-      <PlayerRadarChart homeTeam={match.home_name_ar} awayTeam={match.away_name_ar} />
+      <PlayerRadarChart
+        homeTeam={match.home_name_ar}
+        awayTeam={match.away_name_ar}
+        homeStar={homeStar}
+        awayStar={awayStar}
+      />
     </div>
   );
 
