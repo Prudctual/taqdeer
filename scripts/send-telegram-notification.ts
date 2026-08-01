@@ -1,7 +1,8 @@
 import { Database } from "bun:sqlite";
 import path from "path";
 
-const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || "8767599696:AAHgX8dlyUfuUmOKRBPwsdfrfm0D3b9cw6U";
+const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+if (!BOT_TOKEN) throw new Error("TELEGRAM_BOT_TOKEN environment variable is required");
 const API_URL = `https://api.telegram.org/bot${BOT_TOKEN}`;
 
 const dbPath = path.resolve(process.cwd(), "data/taqdeer.db");

@@ -8,7 +8,7 @@ import os
 from typing import Dict, Any, Optional
 
 
-RAPIDAPI_KEY = os.environ.get("RAPIDAPI_KEY", "eba270730cmsh926c754a32cb815p1ec397jsnf771a5ebb722")
+RAPIDAPI_KEY = os.environ.get("RAPIDAPI_KEY", "")
 RAPIDAPI_HOST = os.environ.get("RAPIDAPI_HOST", "sportspage-feeds.p.rapidapi.com")
 
 

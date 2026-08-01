@@ -1,3 +1,7 @@
+from __future__ import annotations
+
+from typing import Dict, List, Optional, Tuple
+
 from .player_impact import apply_rapm_to_xg
 
 

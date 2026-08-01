@@ -132,9 +132,9 @@ def tiered_form(
     """
     stats: Dict[str, Dict[str, Dict[str, float]]] = defaultdict(
         lambda: {
-            "vs_strong": {"played": 0, "pts": 0, "gf": 0, "ga": 0},
-            "vs_mid": {"played": 0, "pts": 0, "gf": 0, "ga": 0},
-            "vs_weak": {"played": 0, "pts": 0, "gf": 0, "ga": 0},
+            "vs_strong": {"played": 0, "pts": 0, "gf": 0, "ga": 0, "wins": 0},
+            "vs_mid": {"played": 0, "pts": 0, "gf": 0, "ga": 0, "wins": 0},
+            "vs_weak": {"played": 0, "pts": 0, "gf": 0, "ga": 0, "wins": 0},
         }
     )
 
@@ -149,6 +149,8 @@ def tiered_form(
         stats[m.home][tier_for_home]["pts"] += hp
         stats[m.home][tier_for_home]["gf"] += m.home_goals
         stats[m.home][tier_for_home]["ga"] += m.away_goals
+        if hp == 3:
+            stats[m.home][tier_for_home]["wins"] += 1
 
         # Away team vs Home team tier
         tier_for_away = "vs_strong" if home_elo >= 1650 else "vs_mid" if home_elo >= 1500 else "vs_weak"
@@ -157,6 +159,8 @@ def tiered_form(
         stats[m.away][tier_for_away]["pts"] += ap
         stats[m.away][tier_for_away]["gf"] += m.away_goals
         stats[m.away][tier_for_away]["ga"] += m.home_goals
+        if ap == 3:
+            stats[m.away][tier_for_away]["wins"] += 1
 
     # Compute averages per tier
     out: Dict[str, Dict[str, Dict[str, float]]] = {}
@@ -169,7 +173,7 @@ def tiered_form(
                 "ppm": round(data["pts"] / n, 2),
                 "gf_avg": round(data["gf"] / n, 2),
                 "ga_avg": round(data["ga"] / n, 2),
-                "win_rate": round(data["pts"] / (3.0 * n), 2) if data["played"] > 0 else 0.0,
+                "win_rate": round(data["wins"] / n, 2) if data["played"] > 0 else 0.0,
             }
 
     return out

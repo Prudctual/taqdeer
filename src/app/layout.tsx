@@ -22,6 +22,22 @@ export const metadata: Metadata = {
   },
   description:
     "احتمالات 1X2 وتوزيع النتائج للدوريات الأوروبية الخمس الكبرى بنماذج Dixon–Coles وElo معايرة على نتائج حقيقية.",
+  metadataBase: new URL("https://taqdeer.app"),
+  openGraph: {
+    type: "website",
+    locale: "ar_SA",
+    url: "https://taqdeer.app",
+    siteName: "تقدير",
+    title: "تقدير — منصة وتوقعات كرة القدم العالمية",
+    description:
+      "احتمالات 1X2 وتوزيع النتائج للدوريات الأوروبية الخمس الكبرى بنماذج Dixon–Coles وElo معايرة على نتائج حقيقية.",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "تقدير — منصة وتوقعات كرة القدم العالمية",
+    description:
+      "احتمالات 1X2 وتوزيع النتائج للدوريات الأوروبية الخمس الكبرى بنماذج Dixon–Coles وElo معايرة على نتائج حقيقية.",
+  },
   icons: {
     icon: "/favicon.svg",
     shortcut: "/favicon.svg",

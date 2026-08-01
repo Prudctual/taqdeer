@@ -251,7 +251,12 @@ def predict_match(
     mat = score_matrix(lam, mu, dc.rho)
 
     mk = markets_from_matrix(mat)
-    dc_p = (mk["p_home"], mk["p_draw"], mk["p_away"])
+    # dc_p uses raw DC lambdas — NOT the blended lam/mu which already contain
+    # Pi and Form signals. Using blended lambdas here would double-count those
+    # signals when dc_p is later blended with pi_p and form_p in _blend_many.
+    mat_dc_raw = score_matrix(lam_dc * f_h, mu_dc * f_a, dc.rho)
+    mk_dc = markets_from_matrix(mat_dc_raw)
+    dc_p = (mk_dc["p_home"], mk_dc["p_draw"], mk_dc["p_away"])
 
     mat_pi = score_matrix(lam_pi, mu_pi, dc.rho * 0.5)
     mk_pi = markets_from_matrix(mat_pi)

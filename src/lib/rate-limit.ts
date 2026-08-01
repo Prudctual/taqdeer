@@ -51,8 +51,8 @@ export function checkRateLimit(request: Request): RateLimitResult {
   const apiKeyQuery = url.searchParams.get("api_key");
   const apiKey = apiKeyHeader || apiKeyQuery;
 
-  const validB2BKey = process.env.TAQDEER_B2B_API_KEY || "taqdeer_b2b_secret_key_2026";
-  const isAuthenticated = apiKey === validB2BKey;
+  const validB2BKey = process.env.TAQDEER_B2B_API_KEY || "";
+  const isAuthenticated = validB2BKey !== "" && apiKey === validB2BKey;
 
   const limit = isAuthenticated ? 1000 : 60;
   const windowMs = 60 * 1000; // 1 minute
