@@ -53,6 +53,7 @@ function TeamLine({
 }
 
 export function NextKickoff({ m }: { m: MatchCard }) {
+  const isLive = ["IN_PLAY", "PAUSED", "LIVE", "1H", "2H", "HT", "ET", "P", "BREAK"].includes(m.status);
   const pick =
     m.pHome != null ? topOutcome(m.pHome, m.pDraw!, m.pAway!) : null;
   const relative = formatRelativeDay(m.utcDate);
@@ -70,7 +71,13 @@ export function NextKickoff({ m }: { m: MatchCard }) {
     >
       <div className="league-band flex-wrap">
         <span className="flex min-w-0 items-center gap-2">
-          <span className="type-label">إحاطة الجولة</span>
+          {isLive ? (
+            <span className="px-2 py-0.5 rounded-full bg-emerald-500 text-white text-[10px] font-black animate-pulse">
+              🔴 مباشر الآن
+            </span>
+          ) : (
+            <span className="type-label">إحاطة الجولة</span>
+          )}
           <span className="text-line" aria-hidden>
             ·
           </span>
@@ -79,36 +86,50 @@ export function NextKickoff({ m }: { m: MatchCard }) {
           </span>
         </span>
         <span suppressHydrationWarning className="flex flex-wrap items-center gap-x-1.5 text-[11px] tabular text-muted">
-          {relative ? (
+          {isLive ? (
+            <span className="font-extrabold text-emerald-600 dark:text-emerald-400">
+              {m.liveStatusAr || (m.minute ? `الدقيقة ${m.minute}'` : "جارية الآن")}
+            </span>
+          ) : (
             <>
-              <span className="font-medium text-ink">{relative}</span>
+              {relative ? (
+                <>
+                  <span className="font-medium text-ink">{relative}</span>
+                  <span className="text-line" aria-hidden>
+                    ·
+                  </span>
+                </>
+              ) : null}
+              <span>{longDate}</span>
               <span className="text-line" aria-hidden>
                 ·
               </span>
+              <time dateTime={m.utcDate} className="font-medium text-ink">
+                {time}
+              </time>
+              {countdown ? (
+                <>
+                  <span className="text-line" aria-hidden>
+                    ·
+                  </span>
+                  <span>{countdown}</span>
+                </>
+              ) : null}
             </>
-          ) : null}
-          <span>{longDate}</span>
-          <span className="text-line" aria-hidden>
-            ·
-          </span>
-          <time dateTime={m.utcDate} className="font-medium text-ink">
-            {time}
-          </time>
-          {countdown ? (
-            <>
-              <span className="text-line" aria-hidden>
-                ·
-              </span>
-              <span>{countdown}</span>
-            </>
-          ) : null}
+          )}
         </span>
       </div>
 
       <div className="motion-colors group-hover:bg-panel">
         <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 px-4 py-4 sm:px-5">
           <TeamLine name={m.homeNameAr} crestUrl={m.homeCrestUrl} side="home" />
-          <span className="text-[11px] text-faint">ضد</span>
+          {isLive || m.status === "FINISHED" ? (
+            <span className="text-xl sm:text-2xl font-mono font-black text-ink bg-panel border border-line px-3 py-1 rounded-xl shadow-xs tabular">
+              {m.homeGoals ?? 0} – {m.awayGoals ?? 0}
+            </span>
+          ) : (
+            <span className="text-[11px] text-faint">ضد</span>
+          )}
           <TeamLine name={m.awayNameAr} crestUrl={m.awayCrestUrl} side="away" />
         </div>
 

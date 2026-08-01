@@ -202,9 +202,13 @@ export function ShadcnDataTable({
 
                         {/* Score or VS */}
                         <div className="w-13 shrink-0 text-center flex items-center justify-center mx-auto">
-                          <span className="inline-flex items-center justify-center px-1.5 py-0.5 rounded-md border border-line bg-panel font-mono font-black text-xs text-ink tabular min-w-[2.75rem]">
-                            {m.status === "FINISHED" ? (
-                              <span className="text-accent">
+                          <span className={`inline-flex items-center justify-center px-1.5 py-0.5 rounded-md border font-mono font-black text-xs tabular min-w-[2.75rem] ${
+                            m.status === "IN_PLAY" || m.status === "PAUSED"
+                              ? "bg-emerald-500/10 border-emerald-500/40 text-emerald-600 dark:text-emerald-400 animate-pulse"
+                              : "bg-panel border-line text-ink"
+                          }`}>
+                            {m.status === "FINISHED" || m.status === "IN_PLAY" || m.status === "PAUSED" ? (
+                              <span>
                                 {m.homeScore ?? 0}–{m.awayScore ?? 0}
                               </span>
                             ) : (

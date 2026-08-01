@@ -209,6 +209,10 @@ function migrate(db: Database.Database) {
     ["sharp_steam_side", "TEXT"],
     ["referee_name", "TEXT"],
     ["weather_condition", "TEXT"],
+    ["minute", "INTEGER"],
+    ["live_status_ar", "TEXT"],
+    ["live_events_json", "TEXT"],
+    ["live_stats_json", "TEXT"],
   ];
   for (const [name, typ] of addMatch) {
     if (!cols.has(name)) {

@@ -6,19 +6,29 @@ import type { MatchCard } from "@/lib/queries";
 export function HeroMatchBanner({ match }: { match: MatchCard | null }) {
   if (!match) return null;
 
+  const isLive = ["IN_PLAY", "PAUSED", "LIVE", "1H", "2H", "HT", "ET", "P", "BREAK"].includes(match.status);
   const pHome = match.pHome ? Math.round(match.pHome * 100) : 48;
   const pDraw = match.pDraw ? Math.round(match.pDraw * 100) : 24;
   const pAway = match.pAway ? Math.round(match.pAway * 100) : 28;
 
   return (
-    <div className="relative overflow-hidden rounded-2xl border-0 bg-surface p-5 sm:p-7 shadow-none">
+    <div className={`relative overflow-hidden rounded-2xl border-2 p-5 sm:p-7 shadow-xs transition-all ${
+      isLive ? "border-emerald-500/50 bg-emerald-500/5" : "border-line bg-surface"
+    }`}>
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         {/* Left Info & Teams */}
         <div className="space-y-4 flex-1">
           <div className="flex items-center gap-2 text-xs font-semibold text-accent">
             <span>🏆 {match.leagueNameAr}</span>
             <span className="text-faint">•</span>
-            <span className="text-muted">{formatShortDate(match.utcDate)}</span>
+            {isLive ? (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 font-extrabold text-xs">
+                <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span>🔴 {match.liveStatusAr || (match.minute ? `د ${match.minute}'` : "مباشر الآن")}</span>
+              </span>
+            ) : (
+              <span className="text-muted">{formatShortDate(match.utcDate)}</span>
+            )}
           </div>
 
           <div className="flex items-center gap-4 sm:gap-6">
@@ -26,7 +36,15 @@ export function HeroMatchBanner({ match }: { match: MatchCard | null }) {
               <Crest src={match.homeCrestUrl} alt={match.homeNameAr} size="md" />
               <span className="text-base sm:text-lg font-black text-ink">{match.homeNameAr}</span>
             </div>
-            <span className="text-xs font-bold text-faint">ضد</span>
+            
+            {isLive || match.status === "FINISHED" ? (
+              <span className="text-lg sm:text-2xl font-mono font-black text-ink bg-panel border border-line px-3 py-1 rounded-xl shadow-xs tabular">
+                {match.homeGoals ?? 0} – {match.awayGoals ?? 0}
+              </span>
+            ) : (
+              <span className="text-xs font-bold text-faint">ضد</span>
+            )}
+
             <div className="flex items-center gap-3">
               <Crest src={match.awayCrestUrl} alt={match.awayNameAr} size="md" />
               <span className="text-base sm:text-lg font-black text-ink">{match.awayNameAr}</span>

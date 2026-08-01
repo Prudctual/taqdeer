@@ -53,6 +53,9 @@ export function MatchWhen({
   variant = "inline",
   showCountdown = true,
   finished = false,
+  isLive = false,
+  liveMinute = null,
+  liveStatusAr = null,
   /** إخفاء «اليوم/غداً» عند وجودها في سكة الأيام أعلاه */
   hideRelative = false,
   className = "",
@@ -61,11 +64,14 @@ export function MatchWhen({
   variant?: Variant;
   showCountdown?: boolean;
   finished?: boolean;
+  isLive?: boolean;
+  liveMinute?: number | null;
+  liveStatusAr?: string | null;
   hideRelative?: boolean;
   className?: string;
 }) {
   /** هل ينتظر السطر عدّاً تنازلياً؟ يُحجز مكانه مسبقاً فلا يقفز السطر */
-  const live = showCountdown && !finished;
+  const live = showCountdown && !finished && !isLive;
   const now = useClientNow(live);
   const clientTz = useClientTz();
 
@@ -77,6 +83,27 @@ export function MatchWhen({
   // نسبي — مشتق من الساعة، بعد التركيب فقط
   const relative = now && !hideRelative ? formatRelativeDay(iso, now) : null;
   const countdown = live && now ? formatCountdown(iso, now) : null;
+
+  if (isLive) {
+    const liveText = liveStatusAr || (liveMinute ? `د ${liveMinute}'` : "مباشر الآن");
+    if (variant === "row") {
+      return (
+        <div className={`min-w-0 tabular ${className}`}>
+          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 font-extrabold text-[11px]">
+            <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+            <span>{liveText}</span>
+          </span>
+        </div>
+      );
+    }
+
+    return (
+      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 font-extrabold text-xs ${className}`}>
+        <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+        <span>مباشر · {liveText}</span>
+      </span>
+    );
+  }
 
   if (variant === "row") {
     return (

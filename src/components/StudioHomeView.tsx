@@ -7,6 +7,7 @@ import { HeroMatchBanner } from "@/components/HeroMatchBanner";
 import { BankerPicksWidget, type BankerPick } from "@/components/BankerPicksWidget";
 import { LeagueTableWidget, type StandingTeam } from "@/components/LeagueTableWidget";
 import { NextKickoff } from "@/components/NextKickoff";
+import { useLiveScores } from "@/lib/hooks/useLiveScores";
 import type { MatchCard } from "@/lib/queries";
 
 interface LeagueItem {
@@ -47,11 +48,19 @@ export function StudioHomeView({
     "matches" | "value" | "bankers" | "standings"
   >("matches");
 
-  const upcomingMatchesList: MatchCard[] = groups
+  const { liveMatches, isLiveActive } = useLiveScores(10000);
+
+  const initialMatchesList: MatchCard[] = groups
     ? groups.flatMap((g) => g.matches || g.items || [])
     : [];
 
-  const heroMatch = nextMatch || upcomingMatchesList[0];
+  // Merge real-time live match updates into the upcoming list
+  const upcomingMatchesList = initialMatchesList.map((m) => {
+    const liveUpdate = liveMatches.find((lm) => lm.id === m.id);
+    return liveUpdate ? { ...m, ...liveUpdate } : m;
+  });
+
+  const heroMatch = liveMatches[0] || nextMatch || upcomingMatchesList[0];
 
   return (
     <div className="space-y-6">
@@ -148,6 +157,26 @@ export function StudioHomeView({
         {/* Tab 1: Matches Feed */}
         {activeTab === "matches" && (
           <div className="space-y-4 animate-in fade-in duration-200">
+            {/* Live Matches Section */}
+            {isLiveActive && liveMatches.length > 0 && (
+              <div className="space-y-3 rounded-2xl border-2 border-emerald-500/40 bg-emerald-500/5 p-4 sm:p-5 shadow-xs">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="h-3 w-3 rounded-full bg-emerald-500 animate-ping shrink-0" />
+                    <h3 className="text-sm font-black text-ink">
+                      🔴 مباشر الآن — نتائج حية لحظية ({liveMatches.length})
+                    </h3>
+                  </div>
+                  <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 animate-pulse">
+                    تحديث لحظي مستمر
+                  </span>
+                </div>
+                <div className="rounded-xl border border-line bg-surface p-3">
+                  <MatchList matches={liveMatches} groupDays={false} showLeague />
+                </div>
+              </div>
+            )}
+
             {/* Upcoming Matches Header Bar */}
             <div className="flex flex-wrap items-center justify-between gap-3 bg-panel p-3 rounded-2xl border border-line">
               <div className="flex items-center gap-2">

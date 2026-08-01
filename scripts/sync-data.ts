@@ -853,10 +853,9 @@ async function syncFixturesFromApiFootball(db: ReturnType<typeof getDb>) {
           const homeId = upsertTeam(db, league.id, homeName, item.teams.home.logo);
           const awayId = upsertTeam(db, league.id, awayName, item.teams.away.logo);
 
-          const isFinished =
-            ["FT", "AET", "PEN", "FINISHED"].includes(f.status?.short) ||
-            (item.goals?.home != null && item.goals?.away != null);
-          const statusStr = isFinished ? "FINISHED" : "SCHEDULED";
+          const isFinished = ["FT", "AET", "PEN", "FINISHED"].includes(f.status?.short);
+          const isLive = ["1H", "2H", "HT", "ET", "P", "LIVE", "IN_PLAY", "PAUSED", "BREAK", "BT"].includes(f.status?.short);
+          const statusStr = isFinished ? "FINISHED" : isLive ? "IN_PLAY" : "SCHEDULED";
           const id = `${league.id}-apif-${f.id}`;
           const refName = f.referee ? f.referee.trim() : null;
 

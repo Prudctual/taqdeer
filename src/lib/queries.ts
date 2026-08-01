@@ -58,6 +58,10 @@ export type MatchCard = {
   refereeName?: string | null;
   weatherCondition?: string | null;
   matchday?: number | null;
+  minute?: number | null;
+  liveStatusAr?: string | null;
+  liveEventsJson?: string | null;
+  liveStatsJson?: string | null;
 };
 
 /** @deprecated alias — prefer MatchCard */
@@ -108,6 +112,10 @@ const LIST_SELECT = `
          m.status,
          m.season,
          m.matchday,
+         m.minute,
+         m.live_status_ar as liveStatusAr,
+         m.live_events_json as liveEventsJson,
+         m.live_stats_json as liveStatsJson,
          ht.name_ar as homeNameAr, at.name_ar as awayNameAr,
          ht.name_en as homeNameEn, at.name_en as awayNameEn,
          ht.crest_url as homeCrestUrl, at.crest_url as awayCrestUrl,
@@ -140,6 +148,10 @@ const DETAIL_SELECT = `
          m.status,
          m.season,
          m.matchday,
+         m.minute,
+         m.live_status_ar as liveStatusAr,
+         m.live_events_json as liveEventsJson,
+         m.live_stats_json as liveStatsJson,
          ht.name_ar as homeNameAr, at.name_ar as awayNameAr,
          ht.name_en as homeNameEn, at.name_en as awayNameEn,
          ht.crest_url as homeCrestUrl, at.crest_url as awayCrestUrl,
@@ -212,9 +224,9 @@ function toLegacy(m: MatchCard & { matchday?: number | null }): MatchRow {
 }
 
 /**
- * الجولة القادمة لكل دوري على حدة.
- * القائمة الزمنية الموحّدة تنحاز لدوري يلعب على مدار السنة (الكوري) فتُخفي
- * الخمس الكبرى تماماً خارج موسمها؛ الحصة لكل دوري تُبقي الستة ظاهرة.
+ * المباريات المباشرة والقادمة لكل دوري على حدة.
+ * لا تختفي المباريات عند انطلاقها أو أثناء اللعب، بل تبقى ظاهرة حتى تنتهي رسمياً (FINISHED)،
+ * وبعد انتهائها تصعد المباريات والجولات التي تليها تلقائياً.
  */
 export function getUpcomingByLeague(perLeague = 6): {
   leagueId: string;
@@ -222,25 +234,60 @@ export function getUpcomingByLeague(perLeague = 6): {
   matches: MatchCard[];
 }[] {
   const db = getDb();
-  const now = new Date().toISOString();
-  const stmt = db.prepare(
+
+  // 1. المباريات القادمة والمباشرة التي لم تنتهي بعد (SCHEDULED, TIMED, IN_PLAY, PAUSED, LIVE, etc.)
+  const activeStmt = db.prepare(
     `${LIST_SELECT}
-     WHERE m.status IN ('SCHEDULED','TIMED','IN_PLAY','PAUSED')
+     WHERE m.status IN ('SCHEDULED','TIMED','IN_PLAY','PAUSED','LIVE','1H','2H','HT','ET','P','BREAK')
        AND m.league_id = ?
        AND m.source NOT IN ('preview-holdout','synthetic','demo')
-       AND m.utc_date >= ?
      ORDER BY m.utc_date ASC
      LIMIT ?`,
   );
 
+  // 2. احتياطي: إذا كانت كل مباريات الدوري منتهية، إحضار آخر جولة/مباريات حتى لا يختفي الدوري
+  const fallbackStmt = db.prepare(
+    `${LIST_SELECT}
+     WHERE m.league_id = ?
+       AND m.source NOT IN ('preview-holdout','synthetic','demo')
+     ORDER BY m.utc_date DESC
+     LIMIT ?`,
+  );
+
   return getLeagues()
-    .map((league) => ({
-      leagueId: league.id,
-      leagueNameAr: league.name_ar,
-      matches: stmt.all(league.id, now, perLeague) as MatchCard[],
-    }))
+    .map((league) => {
+      let matches = activeStmt.all(league.id, perLeague) as MatchCard[];
+      if (matches.length === 0) {
+        matches = (fallbackStmt.all(league.id, perLeague) as MatchCard[]).reverse();
+      }
+      return {
+        leagueId: league.id,
+        leagueNameAr: league.name_ar,
+        matches,
+      };
+    })
     .filter((g) => g.matches.length > 0)
-    .sort((a, b) => a.matches[0]!.utcDate.localeCompare(b.matches[0]!.utcDate));
+    .sort((a, b) => {
+      const aDate = a.matches[0]?.utcDate ?? "";
+      const bDate = b.matches[0]?.utcDate ?? "";
+      return aDate.localeCompare(bDate);
+    });
+}
+
+/** المباريات الجارية حالياً (Live In-Play) */
+export function getLiveMatches(): MatchCard[] {
+  const db = getDb();
+  return db
+    .prepare(
+      `${LIST_SELECT}
+       WHERE (m.status IN ('IN_PLAY','PAUSED','LIVE','1H','2H','HT','ET','P','BREAK')
+              OR (m.status NOT IN ('FINISHED','POSTPONED','CANCELLED')
+                  AND m.utc_date <= datetime('now')
+                  AND m.utc_date >= datetime('now', '-3 hours')))
+         AND m.source NOT IN ('preview-holdout','synthetic','demo')
+       ORDER BY m.utc_date ASC`,
+    )
+    .all() as MatchCard[];
 }
 
 /** أحدث النتائج الحقيقية للموسم الحالي 2026 */

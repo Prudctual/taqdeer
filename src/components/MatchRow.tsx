@@ -63,6 +63,7 @@ export function MatchRow({
 }) {
   const hasPred = m.pHome != null;
   const pick = hasPred ? topOutcome(m.pHome!, m.pDraw!, m.pAway!) : null;
+  const isLive = ["IN_PLAY", "PAUSED", "LIVE", "1H", "2H", "HT", "ET", "P", "BREAK"].includes(m.status);
   const finished = m.status === "FINISHED" && m.homeGoals != null;
   const hit =
     finished && pick && m.awayGoals != null
@@ -70,13 +71,20 @@ export function MatchRow({
       : null;
   const tone = m.leagueId.toLowerCase();
 
+  const currentScore =
+    isLive || finished
+      ? `${m.homeGoals ?? 0}–${m.awayGoals ?? 0}`
+      : null;
+
   return (
     <Link
       href={`/match/${encodeURIComponent(m.id)}`}
       data-league={tone}
       className={`match-row ${
         showLeague ? "league-row" : ""
-      } grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-2 px-4 py-2.5 text-ink no-underline sm:gap-y-0 ${rowGrid}`}
+      } grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-2 px-4 py-2.5 text-ink no-underline sm:gap-y-0 ${rowGrid} ${
+        isLive ? "bg-emerald-500/5 dark:bg-emerald-950/20 border-r-4 border-r-emerald-500" : ""
+      }`}
     >
       {/* ١ · الموعد */}
       <div className="min-w-0 text-start sm:col-start-1 sm:row-start-1">
@@ -93,6 +101,9 @@ export function MatchRow({
           iso={m.utcDate}
           variant="row"
           finished={finished}
+          isLive={isLive}
+          liveMinute={m.minute}
+          liveStatusAr={m.liveStatusAr}
           hideRelative={hideRelative}
         />
       </div>
@@ -104,7 +115,7 @@ export function MatchRow({
           awayName={m.awayNameAr}
           homeCrestUrl={m.homeCrestUrl}
           awayCrestUrl={m.awayCrestUrl}
-          score={finished ? `${m.homeGoals}–${m.awayGoals}` : null}
+          score={currentScore}
         />
       </div>
 
