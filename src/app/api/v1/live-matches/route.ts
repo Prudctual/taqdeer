@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
 import { getLiveMatches, getUpcomingByLeague } from "@/lib/queries";
+import { syncRealLiveMatches } from "@/lib/live-sync";
 import {
   checkRateLimit,
   createRateLimitErrorResponse,
@@ -64,6 +65,9 @@ export async function GET(request: Request) {
   }
 
   try {
+    // Sync real active live matches currently playing right now
+    await syncRealLiveMatches();
+
     const rawLiveMatches = getLiveMatches();
     const now = new Date();
 
