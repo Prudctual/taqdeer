@@ -51,10 +51,10 @@ export function cleanSpace(str: string): string {
   return str.replace(/[\u00a0\u202f\u2007\u200b]/g, " ").replace(/\s+/g, " ").trim();
 }
 
-export function formatMatchTime(iso: string): string {
+export function formatMatchTime(iso: string, tz?: string): string {
   return cleanSpace(
     new Intl.DateTimeFormat("ar", {
-      timeZone: DISPLAY_TZ,
+      timeZone: tz || DISPLAY_TZ,
       hour: "2-digit",
       minute: "2-digit",
     }).format(parseDate(iso))
@@ -62,10 +62,10 @@ export function formatMatchTime(iso: string): string {
 }
 
 /** يوم مختصر: ١٥ أغسطس */
-export function formatShortDate(iso: string): string {
+export function formatShortDate(iso: string, tz?: string): string {
   return cleanSpace(
     new Intl.DateTimeFormat("ar", {
-      timeZone: DISPLAY_TZ,
+      timeZone: tz || DISPLAY_TZ,
       day: "numeric",
       month: "short",
     }).format(parseDate(iso))
@@ -73,10 +73,10 @@ export function formatShortDate(iso: string): string {
 }
 
 /** يوم كامل بدون وقت: السبت ١٥ أغسطس */
-export function formatLongDate(iso: string): string {
+export function formatLongDate(iso: string, tz?: string): string {
   return cleanSpace(
     new Intl.DateTimeFormat("ar", {
-      timeZone: DISPLAY_TZ,
+      timeZone: tz || DISPLAY_TZ,
       weekday: "long",
       day: "numeric",
       month: "long",

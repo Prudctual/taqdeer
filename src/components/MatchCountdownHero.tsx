@@ -48,16 +48,28 @@ export function MatchCountdownHero({
     return () => clearInterval(interval);
   }, [utcDate, status]);
 
-  if (status === "FINISHED" && homeGoals != null && awayGoals != null) {
+  const isFinishedStatus = status === "FINISHED" || status === "FT" || status === "COMPLETED";
+  const hasGoals = homeGoals != null && awayGoals != null;
+  const target = new Date(utcDate).getTime();
+  const now = Date.now();
+  const difference = target - now;
+  const isPastMatch = difference < -150 * 60 * 1000;
+  const isLiveStatus = status === "IN_PLAY" || status === "PAUSED" || status === "LIVE";
+
+  if (isFinishedStatus || hasGoals || (isPastMatch && !isLiveStatus)) {
     return (
       <div className="inline-flex items-center gap-2 rounded-full bg-panel px-4 py-1.5 text-xs font-black text-ink">
         <span className="h-2 w-2 rounded-full bg-emerald-500" />
-        <span>نتيجة منتهية: <strong className="tabular font-bold">{homeGoals} - {awayGoals}</strong></span>
+        {hasGoals ? (
+          <span>نتيجة منتهية: <strong className="tabular font-bold">{homeGoals} - {awayGoals}</strong></span>
+        ) : (
+          <span>مباراة منتهية</span>
+        )}
       </div>
     );
   }
 
-  if (timeLeft.isFinished) {
+  if (isLiveStatus || (timeLeft.isFinished && !isPastMatch)) {
     return (
       <div className="inline-flex items-center gap-2 rounded-full bg-accent/15 px-4 py-1.5 text-xs font-black text-accent">
         <span className="h-2 w-2 rounded-full bg-accent animate-ping" />

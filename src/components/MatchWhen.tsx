@@ -29,6 +29,21 @@ function useClientNow(tick: boolean): Date | null {
   return now;
 }
 
+function useClientTz(): string | undefined {
+  const [tz, setTz] = useState<string | undefined>(undefined);
+
+  useEffect(() => {
+    try {
+      const userTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      if (userTz) setTz(userTz);
+    } catch {
+      // fallback to default DISPLAY_TZ
+    }
+  }, []);
+
+  return tz;
+}
+
 /**
  * عرض موحّد لموعد المباراة — تاريخ / وقت / عدّ تنازلي.
  * row: عمود القائمة · inline: سطر واحد · detail: صفحة المباراة
@@ -52,11 +67,12 @@ export function MatchWhen({
   /** هل ينتظر السطر عدّاً تنازلياً؟ يُحجز مكانه مسبقاً فلا يقفز السطر */
   const live = showCountdown && !finished;
   const now = useClientNow(live);
+  const clientTz = useClientTz();
 
-  // مطلق — مشتق من التاريخ وحده
-  const time = formatMatchTime(iso);
-  const shortDate = formatShortDate(iso);
-  const longDate = formatLongDate(iso);
+  // مطلق — مشتق من التاريخ وحده بتوقيت جهاز القارئ
+  const time = formatMatchTime(iso, clientTz);
+  const shortDate = formatShortDate(iso, clientTz);
+  const longDate = formatLongDate(iso, clientTz);
 
   // نسبي — مشتق من الساعة، بعد التركيب فقط
   const relative = now && !hideRelative ? formatRelativeDay(iso, now) : null;

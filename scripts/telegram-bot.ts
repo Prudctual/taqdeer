@@ -44,7 +44,6 @@ interface MatchRow {
   odds_away: number | null;
 }
 
-const BAGHDAD_UTC_OFFSET_MS = 3 * 3600 * 1000; // UTC+3 for Baghdad / Mecca timezone
 
 function parseUtcDate(utcDateStr: string): Date {
   let s = (utcDateStr || "").trim();
@@ -57,21 +56,14 @@ function parseUtcDate(utcDateStr: string): Date {
 
 function formatMatchTimeBaghdad(utcDateStr: string): string {
   const d = parseUtcDate(utcDateStr);
-  if (isNaN(d.getTime())) return "15:00";
+  if (isNaN(d.getTime())) return "١٥:٠٠";
 
-  const baghdadMs = d.getTime() + BAGHDAD_UTC_OFFSET_MS;
-  const bDate = new Date(baghdadMs);
-
-  const hours24 = bDate.getUTCHours();
-  const minutes = bDate.getUTCMinutes().toString().padStart(2, "0");
-
-  const period = hours24 >= 12 ? "م" : "ص";
-  const hours12 = hours24 % 12 === 0 ? 12 : hours24 % 12;
-
-  const toArabicDigits = (num: number | string) =>
-    String(num).replace(/\d/g, (digit) => "٠١٢٣٤٥٦٧٨٩"[parseInt(digit, 10)]!);
-
-  return `${toArabicDigits(hours12)}:${toArabicDigits(minutes)} ${period}`;
+  return new Intl.DateTimeFormat("ar-EG", {
+    timeZone: "Asia/Riyadh",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  }).format(d);
 }
 
 function formatMatchDateLabel(utcDateStr: string): string {
@@ -80,19 +72,13 @@ function formatMatchDateLabel(utcDateStr: string): string {
 
   const now = new Date();
 
-  const baghdadMatchMs = d.getTime() + BAGHDAD_UTC_OFFSET_MS;
-  const baghdadNowMs = now.getTime() + BAGHDAD_UTC_OFFSET_MS;
-
-  const bMatch = new Date(baghdadMatchMs);
-  const bNow = new Date(baghdadNowMs);
-
   const getDayKey = (dt: Date) =>
-    `${dt.getUTCFullYear()}-${String(dt.getUTCMonth() + 1).padStart(2, "0")}-${String(dt.getUTCDate()).padStart(2, "0")}`;
+    new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Riyadh" }).format(dt);
 
-  const matchDayKey = getDayKey(bMatch);
-  const todayDayKey = getDayKey(bNow);
+  const matchDayKey = getDayKey(d);
+  const todayDayKey = getDayKey(now);
 
-  const tomorrowDate = new Date(baghdadNowMs + 24 * 3600 * 1000);
+  const tomorrowDate = new Date(now.getTime() + 24 * 3600 * 1000);
   const tomorrowDayKey = getDayKey(tomorrowDate);
 
   const timeStr = formatMatchTimeBaghdad(utcDateStr);
@@ -102,17 +88,11 @@ function formatMatchDateLabel(utcDateStr: string): string {
   } else if (matchDayKey === tomorrowDayKey) {
     return `غداً · ${timeStr}`;
   } else {
-    const dayNames = ["الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
-    const monthNames = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
+    const dayName = new Intl.DateTimeFormat("ar-EG", { timeZone: "Asia/Riyadh", weekday: "long" }).format(d);
+    const dayNum = new Intl.DateTimeFormat("ar-EG", { timeZone: "Asia/Riyadh", day: "numeric" }).format(d);
+    const monthName = new Intl.DateTimeFormat("ar-EG", { timeZone: "Asia/Riyadh", month: "long" }).format(d);
 
-    const dayName = dayNames[bMatch.getUTCDay()] || "اليوم";
-    const dayNum = bMatch.getUTCDate();
-    const monthName = monthNames[bMatch.getUTCMonth()] || "";
-
-    const toArabicDigits = (num: number | string) =>
-      String(num).replace(/\d/g, (digit) => "٠١٢٣٤٥٦٧٨٩"[parseInt(digit, 10)]!);
-
-    return `${dayName}، ${toArabicDigits(dayNum)} ${monthName} · ${timeStr}`;
+    return `${dayName}، ${dayNum} ${monthName} · ${timeStr}`;
   }
 }
 
@@ -530,6 +510,18 @@ type TelegramUpdate = {
   };
 };
 
+function normalizeText(str: string): string {
+  return (str || "")
+    .toLowerCase()
+    .replace(/[\u064B-\u0652]/g, "")
+    .replace(/[أإآ]/g, "ا")
+    .replace(/ة/g, "ه")
+    .replace(/ى/g, "ي")
+    .replace(/[^\w\s\u0600-\u06FF]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 async function handleUpdate(update: TelegramUpdate) {
   const user = update.message?.from || update.callback_query?.from;
   const chatId = update.message?.chat?.id || update.callback_query?.message?.chat?.id;
@@ -563,7 +555,7 @@ async function handleUpdate(update: TelegramUpdate) {
     const msg = update.message;
     const chatId = msg.chat.id;
     const text = (msg.text || "").trim();
-    const cleanText = text.replace(/[🛡️💎⚽📅🏆📊🧠🌐]/g, "").trim();
+    const normText = normalizeText(text);
 
     if (text.startsWith("/start") || text.startsWith("/help")) {
       const welcome = `<b>مرحباً بك في منصة «تقدير» ⚽</b>\n\nمنصة التحليل الرياضي والتوقعات الخوارزمية المتقدمة للدوريات العالمية.\n\nاستخدم القائمة السفلى أو الأزرار للتنقل المباشر:`;
@@ -574,10 +566,10 @@ async function handleUpdate(update: TelegramUpdate) {
 
     if (
       text.startsWith("/bankers") ||
-      cleanText.includes("أأمن") ||
-      cleanText.includes("أامن") ||
-      cleanText.includes("المضمونة") ||
-      cleanText.includes("Bankers")
+      normText.includes("اامن") ||
+      normText.includes("أأمن") ||
+      normText.includes("مضمون") ||
+      normText.includes("banker")
     ) {
       const matches = getBankerPicks();
       let reply = `<b>🛡️ أأمن التوقعات للجولة الحالية (Banker Picks):</b>\n\n`;
@@ -589,8 +581,7 @@ async function handleUpdate(update: TelegramUpdate) {
     if (
       text.startsWith("/today") ||
       text.startsWith("/matches") ||
-      cleanText.includes("مباريات اليوم") ||
-      cleanText.includes("اليوم")
+      normText.includes("اليوم")
     ) {
       const todayMatches = getTodayMatches();
       if (!todayMatches.length) {
@@ -608,8 +599,9 @@ async function handleUpdate(update: TelegramUpdate) {
 
     if (
       text.startsWith("/upcoming") ||
-      cleanText.includes("المباريات القادمة") ||
-      cleanText.includes("القادمة")
+      normText.includes("قادمه") ||
+      normText.includes("قادمة") ||
+      normText.includes("مقبل")
     ) {
       const matches = getUpcomingMatches(8);
       if (!matches.length) {
@@ -624,8 +616,10 @@ async function handleUpdate(update: TelegramUpdate) {
 
     if (
       text.startsWith("/value") ||
-      cleanText.includes("فرص القيمة") ||
-      cleanText.includes("القيمة")
+      normText.includes("قيمه") ||
+      normText.includes("قيمة") ||
+      normText.includes("فرص") ||
+      normText.includes("value")
     ) {
       const matches = getValueBets();
       let reply = `<b>💎 أبرز فرص القيمة والأعلى ثقة (+EV):</b>\n\n`;
@@ -640,8 +634,10 @@ async function handleUpdate(update: TelegramUpdate) {
 
     if (
       text.startsWith("/leagues") ||
-      cleanText.includes("الدوريات") ||
-      cleanText.includes("الترتيب")
+      normText.includes("دوري") ||
+      normText.includes("دوريات") ||
+      normText.includes("ترتيب") ||
+      normText.includes("جدول")
     ) {
       const reply = `<b>🏆 اختر الدوري لاستعراض جدول الترتيب والأرقام الحالية:</b>`;
       await sendMessage(chatId, reply, LEAGUES_KEYBOARD);
@@ -650,8 +646,10 @@ async function handleUpdate(update: TelegramUpdate) {
 
     if (
       text.startsWith("/accuracy") ||
-      cleanText.includes("سجل الدقة") ||
-      cleanText.includes("الدقة")
+      normText.includes("دقه") ||
+      normText.includes("دقة") ||
+      normText.includes("سجل") ||
+      normText.includes("احصائ")
     ) {
       const reply = `<b>📊 سجل الدقة والتحقق الرياضي:</b>\n\n• <b>نسبة التوقع الصحيح (Out-of-sample):</b> 47.3%\n• <b>نطاق الاختبار:</b> 582 مباراة موثقة على نماذج Dixon-Coles و Elo.\n• <b>معايرة الاحتمالات:</b> Temperature Scaling بدون تسريب بيانات.\n\nاستعرض السجل الكامل والتحليل المتقدم:`;
       const kb = {
@@ -663,7 +661,9 @@ async function handleUpdate(update: TelegramUpdate) {
 
     if (
       text.startsWith("/methodology") ||
-      cleanText.includes("المنهجية")
+      normText.includes("منهج") ||
+      normText.includes("طريق") ||
+      normText.includes("محرك")
     ) {
       const reply = `<b>🧠 المنهجية الحسابية لمنصة «تقدير»:</b>\n\nتعتمد منصتنا على دمج 4 محركات رياضية مستقلة:\n1. <b>Dixon-Coles:</b> حساب قوة التهديف والهجوم والدفاع.\n2. <b>Pi-ratings & Elo:</b> تقييم الفورم والأداء التاريخي.\n3. <b>De-margined Odds:</b> قراءة الاحتمالات بعد إزالة هامش ربح المراهن.\n4. <b>Temperature Scaling:</b> معايرة الاحتمالات الرياضية.`;
       const kb = {
@@ -673,7 +673,7 @@ async function handleUpdate(update: TelegramUpdate) {
       return;
     }
 
-    // Direct search if text typed
+    // Direct search if text typed (only for actual team search queries)
     if (text && !text.startsWith("/")) {
       const matches = searchMatchesByTeam(text);
       if (!matches.length) {

@@ -39,7 +39,6 @@ export function StudioHomeView({
   upcomingCount,
   leagues = [],
   groups = [],
-  recentGroups = [],
   nextMatch,
   standingsByLeague = {},
   bankerPicks = [],

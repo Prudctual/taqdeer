@@ -8,6 +8,7 @@ interface LiveInPlaySimulatorProps {
   initialLambdaAway?: number;
   homeNameAr?: string;
   awayNameAr?: string;
+  isFinished?: boolean;
 }
 
 export function LiveInPlaySimulator({
@@ -15,6 +16,7 @@ export function LiveInPlaySimulator({
   initialLambdaAway = 1.15,
   homeNameAr = "صاحب الأرض",
   awayNameAr = "الضيف",
+  isFinished = false,
 }: LiveInPlaySimulatorProps) {
   const [minute, setMinute] = useState(0);
   const [homeScore, setHomeScore] = useState(0);
@@ -73,15 +75,30 @@ export function LiveInPlaySimulator({
 
   return (
     <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-5 shadow-lg dir-rtl text-right">
-      <div className="flex items-center justify-between border-b border-zinc-800/80 pb-3 mb-4">
+      <div className="flex flex-wrap items-center justify-between border-b border-zinc-800/80 pb-3 mb-4 gap-2">
         <div className="flex items-center gap-2">
-          <span className="relative flex h-3 w-3">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
-          </span>
-          <h3 className="font-semibold text-zinc-100 text-base">
-            محاكي الأحداث الحية أثناء المباراة (Live In-Play Engine)
-          </h3>
+          {isFinished ? (
+            <span className="inline-flex items-center justify-center h-5 px-2 rounded-full bg-zinc-800 text-[10px] font-bold text-zinc-300 border border-zinc-700">
+              أداة محاكاة
+            </span>
+          ) : (
+            <span className="relative flex h-3 w-3">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+            </span>
+          )}
+          <div>
+            <h3 className="font-semibold text-zinc-100 text-base">
+              {isFinished
+                ? "محاكي السيناريوهات التفاعلي (In-Play Scenario Simulator)"
+                : "محاكي الأحداث الحية أثناء المباراة (Live In-Play Engine)"}
+            </h3>
+            {isFinished && (
+              <p className="text-[11px] text-zinc-400 font-normal">
+                اختبر تغير الاحتمالات سيناريوهياً حسب الدقيقة والأهداف والبطاقات
+              </p>
+            )}
+          </div>
         </div>
         <span className="text-xs font-mono text-emerald-400 bg-emerald-950/80 border border-emerald-800/50 px-2.5 py-1 rounded-full">
           الدقيقة {minute}&apos;

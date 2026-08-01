@@ -268,11 +268,13 @@ export default async function MatchPage({
   const pick = hasPred
     ? topOutcome(match.p_home!, match.p_draw!, match.p_away!)
     : null;
+  const matchTimePast = Date.parse(match.utc_date) < Date.now() - 150 * 60 * 1000;
   const finished =
-    match.status === "FINISHED" &&
-    match.home_goals != null &&
-    match.away_goals != null;
-  const upcoming = match.status !== "FINISHED";
+    match.status === "FINISHED" ||
+    match.status === "FT" ||
+    (match.home_goals != null && match.away_goals != null) ||
+    (matchTimePast && match.status !== "IN_PLAY" && match.status !== "PAUSED");
+  const upcoming = !finished;
   const form = analytics?.components?.form as
     | {
         home_pts?: number;
@@ -615,6 +617,7 @@ export default async function MatchPage({
         initialLambdaAway={match.lambda_away || 1.15}
         homeNameAr={match.home_name_ar}
         awayNameAr={match.away_name_ar}
+        isFinished={finished}
       />
 
       {hasShots ? (
@@ -1118,7 +1121,7 @@ export default async function MatchPage({
         </SectionCard>
       ) : (
         <div className="space-y-4">
-          <LiveMatchDataSync intervalSeconds={30} />
+          <LiveMatchDataSync intervalSeconds={30} finished={finished} />
           <MatchTabContainer
             overviewContent={overviewContent}
             tacticsContent={tacticsContent}

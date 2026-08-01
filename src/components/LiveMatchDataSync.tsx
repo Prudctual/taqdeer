@@ -5,8 +5,10 @@ import { useRouter } from "next/navigation";
 
 export function LiveMatchDataSync({
   intervalSeconds = 30,
+  finished = false,
 }: {
   intervalSeconds?: number;
+  finished?: boolean;
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -21,8 +23,10 @@ export function LiveMatchDataSync({
     });
   }, [router]);
 
-  // حلقة تكرار التحديث التلقائي من السيرفر
+  // حلقة تكرار التحديث التلقائي من السيرفر — للمباريات القادمة أو الحية فقط
   useEffect(() => {
+    if (finished) return;
+
     const pollTimer = setInterval(() => {
       handleRefresh();
     }, intervalSeconds * 1000);
@@ -35,7 +39,23 @@ export function LiveMatchDataSync({
       clearInterval(pollTimer);
       clearInterval(secondsTimer);
     };
-  }, [handleRefresh, intervalSeconds, lastUpdated]);
+  }, [finished, handleRefresh, intervalSeconds, lastUpdated]);
+
+  if (finished) {
+    return (
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-surface px-4 py-2.5 shadow-2xs text-xs">
+        <div className="flex items-center gap-2.5">
+          <span className="flex h-2.5 w-2.5 rounded-full bg-emerald-500/80" />
+          <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
+            <span className="font-black text-ink">أرشيف البيانات والنماذج مكتمل</span>
+            <span className="text-muted font-bold text-[11px]">
+              (بيانات وتحليلات هذه المباراة مؤرشفة ومحفوظة للنظام)
+            </span>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-surface px-4 py-2.5 shadow-2xs text-xs">
