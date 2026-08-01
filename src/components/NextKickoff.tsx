@@ -12,12 +12,13 @@ import {
 import { ProbBar } from "./ProbBar";
 import type { MatchCard } from "@/lib/queries";
 
-const GLYPH = { H: "1", D: "X", A: "2" } as const;
-const TONE = {
+const GLYPH: Record<string, string> = { H: "1", D: "X", A: "2", EQ: "⚖" };
+const TONE: Record<string, string> = {
   H: "var(--home)",
   D: "var(--draw)",
   A: "var(--away)",
-} as const;
+  EQ: "oklch(0.75 0.16 75)",
+};
 
 function TeamLine({
   name,

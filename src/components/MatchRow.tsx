@@ -10,14 +10,16 @@ const pickFill: Record<string, string> = {
   H: "bg-home-fill",
   D: "bg-draw-fill",
   A: "bg-away-fill",
+  EQ: "bg-amber-500/20 text-amber-500 border border-amber-500/40",
 };
 
 /** الرمز يرافق اللون دائماً — لا معنى يُحمل باللون وحده */
-const pickGlyph: Record<string, string> = { H: "1", D: "X", A: "2" };
+const pickGlyph: Record<string, string> = { H: "1", D: "X", A: "2", EQ: "⚖" };
 const pickName: Record<string, string> = {
   H: "فوز المضيف",
   D: "تعادل",
   A: "فوز الضيف",
+  EQ: "مواجهة متكافئة",
 };
 
 /** شبكة موحّدة للرأس والصف — المحاذاة داخل كل عمود تتبع عنصره */

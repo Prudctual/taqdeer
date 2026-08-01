@@ -211,20 +211,33 @@ export function confidenceLabel(c: number): string {
   return "مباراة متقاربة";
 }
 
-export type OutcomeKey = "H" | "D" | "A";
+export type OutcomeKey = "H" | "D" | "A" | "EQ";
 
 export function topOutcome(
   pHome: number,
   pDraw: number,
   pAway: number,
-): { key: OutcomeKey; label: string; p: number } {
-  if (pHome >= pDraw && pHome >= pAway) {
-    return { key: "H", label: "فوز المضيف", p: pHome };
+): { key: OutcomeKey; label: string; p: number; isEquallyBalanced?: boolean } {
+  const sorted = [
+    { key: "H" as const, label: "فوز المضيف", p: pHome },
+    { key: "D" as const, label: "تعادل", p: pDraw },
+    { key: "A" as const, label: "فوز الضيف", p: pAway },
+  ].sort((a, b) => b.p - a.p);
+
+  const top1 = sorted[0]!;
+  const top2 = sorted[1]!;
+
+  // High Entropy Boundary: If top outcome is less than 5% ahead of second outcome, it is equally balanced
+  if (top1.p - top2.p < 0.05) {
+    return {
+      key: "EQ",
+      label: "مواجهة متكافئة",
+      p: top1.p,
+      isEquallyBalanced: true,
+    };
   }
-  if (pAway >= pDraw && pAway >= pHome) {
-    return { key: "A", label: "فوز الضيف", p: pAway };
-  }
-  return { key: "D", label: "تعادل", p: pDraw };
+
+  return top1;
 }
 
 export function outcomeLabel(pHome: number, pDraw: number, pAway: number): string {

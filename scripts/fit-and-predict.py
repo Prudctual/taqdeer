@@ -333,11 +333,11 @@ def main() -> None:
             f"  {lid}: DC on {len(obs)} · shots-DC {'on' if obs_shots else 'off'} · Elo/Pi on {len(elo_source)}…",
             flush=True,
         )
-        model = fit_dixon_coles(obs, half_life_days=HALF_LIFE)
+        model = fit_dixon_coles(obs, half_life_days=HALF_LIFE, league_id=lid)
         model_shots = (
-            fit_dixon_coles(obs_shots, half_life_days=HALF_LIFE) if obs_shots else None
+            fit_dixon_coles(obs_shots, half_life_days=HALF_LIFE, league_id=lid) if obs_shots else None
         )
-        ratings, history = update_elo(elo_matches, seeds=elo_seeds)
+        ratings, history = update_elo(elo_matches, home_adv=(35.0 if lid == "kl1" else 80.0), seeds=elo_seeds)
         pi_state = update_pi(
             pi_matches, off_seeds=pi_off_seeds, def_seeds=pi_def_seeds
         )

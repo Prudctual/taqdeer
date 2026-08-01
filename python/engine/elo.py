@@ -40,6 +40,13 @@ def update_elo(
     ratings: Dict[str, float] = {}
     history: List[Tuple[str, str, float]] = []
 
+    def get_k_factor(team_id: str) -> float:
+        # Sangmu military teams have rapid roster turnover due to military service cycles
+        tid_lower = team_id.lower()
+        if "sangmu" in tid_lower or "gimcheon" in tid_lower:
+            return k * 2.5
+        return k
+
     for m in matches:
         rh = ratings.get(m.home, seeds.get(m.home, initial))
         ra = ratings.get(m.away, seeds.get(m.away, initial))
@@ -52,8 +59,10 @@ def update_elo(
         else:
             sh = sa = 0.5
         g = goal_multiplier(m.home_goals - m.away_goals)
-        ratings[m.home] = rh + k * g * (sh - eh)
-        ratings[m.away] = ra + k * g * (sa - ea)
+        kh = get_k_factor(m.home)
+        ka = get_k_factor(m.away)
+        ratings[m.home] = rh + kh * g * (sh - eh)
+        ratings[m.away] = ra + ka * g * (sa - ea)
         history.append((m.home, m.date, ratings[m.home]))
         history.append((m.away, m.date, ratings[m.away]))
 

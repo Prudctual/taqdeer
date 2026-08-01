@@ -80,7 +80,7 @@ export function ProbBar({
     A: pAway,
   };
   const segments = OUTCOMES.map((o) => ({ ...o, value: values[o.key] }));
-  const pickColor = OUTCOMES.find((o) => o.key === pick.key)!.color;
+  const pickColor = OUTCOMES.find((o) => o.key === pick.key)?.color ?? "oklch(0.75 0.16 75)";
   const reading = segments.map((s) => `${s.label} ${pct(s.value)}`).join("، ");
 
   const ref = useRef<HTMLDivElement>(null);

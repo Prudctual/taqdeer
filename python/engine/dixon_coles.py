@@ -75,6 +75,7 @@ def make_weights(
 def fit_dixon_coles(
     matches: List[MatchObs],
     half_life_days: float = 150.0,
+    league_id: str | None = None,
 ) -> DixonColesResult:
     teams = sorted({m.home for m in matches} | {m.away for m in matches})
     n = len(teams)
@@ -91,10 +92,11 @@ def fit_dixon_coles(
         attack = theta[:n].copy()
         defense = theta[n : 2 * n].copy()
         home_adv = float(theta[2 * n])
+        if league_id == "kl1":
+            # K League home advantage is historically much weaker (~0.08 vs 0.25 in Europe)
+            home_adv = float(np.clip(home_adv, 0.02, 0.12))
         rho = float(np.clip(theta[2 * n + 1], -0.3, 0.3))
         intercept = float(theta[2 * n + 2])
-        # الهجوم والدفاع كلاهما متمركز حول الصفر؛ intercept حر يحمل مستوى التهديف
-        # العام — بدونه كان متوسط الدفاع هو الـintercept الفعلي فيقلّصه الـridge
         attack = attack - attack.mean()
         defense = defense - defense.mean()
         return attack, defense, home_adv, rho, intercept
@@ -112,7 +114,7 @@ def fit_dixon_coles(
         return total
 
     x0 = np.zeros(2 * n + 3)
-    x0[2 * n] = 0.25
+    x0[2 * n] = 0.08 if league_id == "kl1" else 0.25
     x0[2 * n + 1] = -0.05
     x0[2 * n + 2] = 0.1
 
@@ -123,7 +125,6 @@ def fit_dixon_coles(
         options={"maxiter": 400, "ftol": 1e-9},
     )
     if not res.success:
-        # لا نُسقط النتيجة — لكن الصمت على عدم التقارب يخفي انحيازاً في التقديرات
         print(f"    ⚠ Dixon-Coles لم يتقارب: {res.message}")
     attack, defense, home_adv, rho, intercept = unpack(res.x)
     return DixonColesResult(

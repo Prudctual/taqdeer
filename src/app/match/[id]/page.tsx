@@ -341,7 +341,7 @@ export default async function MatchPage({
   const verdict =
     finished && hasPred
       ? (() => {
-          const key = actualOutcome(match.home_goals!, match.away_goals!);
+          const key = actualOutcome(match.home_goals!, match.away_goals!) as "H" | "D" | "A";
           const p = { H: match.p_home!, D: match.p_draw!, A: match.p_away! }[
             key
           ];
@@ -351,7 +351,7 @@ export default async function MatchPage({
             ) + 1;
           const exact =
             matrix[match.home_goals!]?.[match.away_goals!] ??
-            (rank > 0 ? tops[rank - 1]!.p : null);
+            (rank > 0 ? tops[rank - 1]?.p ?? 0 : 0);
           return { key, p, exact, rank, surprise: surpriseLabel(p) };
         })()
       : null;
@@ -860,14 +860,14 @@ export default async function MatchPage({
           <SignalBreakdown
             components={analytics.components}
             weights={analytics.weights}
-            pickKey={pick?.key ?? "H"}
+            pickKey={pick?.key === "EQ" ? "D" : (pick?.key ?? "H")}
           />
           <FormBars
             homePts={form?.home_pts}
             awayPts={form?.away_pts}
             homeGd={form?.home_gd}
             awayGd={form?.away_gd}
-            pickKey={pick?.key}
+            pickKey={pick?.key === "EQ" ? "D" : pick?.key}
           />
         </SectionCard>
       ) : null}
