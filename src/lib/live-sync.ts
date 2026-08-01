@@ -70,14 +70,13 @@ export async function syncRealLiveMatches(): Promise<number> {
 
     const db = getDb();
 
-    // STRICT FILTER: Only sync official tracked leagues (PL, La Liga, Serie A, Bundesliga, Ligue 1, K League 1)
+    // STRICT FILTER: Only sync official tracked leagues (PL, La Liga, Serie A, Bundesliga, Ligue 1)
     const KNOWN_LEAGUES: Record<number, string> = {
       39: "pl",
       140: "pd",
       135: "sa",
       78: "bl1",
       61: "fl1",
-      292: "kl1",
     };
 
     const upsertTeam = db.prepare(`

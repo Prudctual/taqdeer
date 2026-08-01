@@ -235,7 +235,7 @@ export function getUpcomingByLeague(perLeague = 6): {
 }[] {
   const db = getDb();
 
-  // 1. المباريات القادمة والمباشرة (SCHEDULED, TIMED, IN_PLAY, etc.) النشطة اليوم أو في المستقبل
+  // المباريات القادمة والمباشرة (SCHEDULED, TIMED, IN_PLAY, etc.) النشطة اليوم أو في المستقبل فقط
   const activeStmt = db.prepare(
     `${LIST_SELECT}
      WHERE m.status IN ('SCHEDULED','TIMED','IN_PLAY','PAUSED','LIVE','1H','2H','HT','ET','P','BREAK')
@@ -246,34 +246,17 @@ export function getUpcomingByLeague(perLeague = 6): {
      LIMIT ?`,
   );
 
-  // 2. احتياطي: إذا كانت كل مباريات الدوري منتهية، إحضار آخر جولة/مباريات حتى لا يختفي الدوري
-  const fallbackStmt = db.prepare(
-    `${LIST_SELECT}
-     WHERE m.league_id = ?
-       AND m.source NOT IN ('preview-holdout','synthetic','demo')
-     ORDER BY m.utc_date DESC
-     LIMIT ?`,
-  );
-
   return getLeagues()
     .map((league) => {
-      const activeMatches = activeStmt.all(league.id, perLeague) as MatchCard[];
-      const isFallback = activeMatches.length === 0;
-      const matches = isFallback
-        ? (fallbackStmt.all(league.id, perLeague) as MatchCard[]).reverse()
-        : activeMatches;
+      const matches = activeStmt.all(league.id, perLeague) as MatchCard[];
       return {
         leagueId: league.id,
         leagueNameAr: league.name_ar,
-        isFallback,
         matches,
       };
     })
     .filter((g) => g.matches.length > 0)
     .sort((a, b) => {
-      // active upcoming leagues (like K League 1) come FIRST
-      if (!a.isFallback && b.isFallback) return -1;
-      if (a.isFallback && !b.isFallback) return 1;
       const aDate = a.matches[0]?.utcDate ?? "";
       const bDate = b.matches[0]?.utcDate ?? "";
       return aDate.localeCompare(bDate);
@@ -695,6 +678,7 @@ export const getLeagues = cache(function getLeagues() {
           LIMIT 1
         ) AS crest_url
        FROM leagues l
+       WHERE l.id NOT IN ('kl1', 'kl2')
        ORDER BY l.name_ar`,
     )
     .all() as Array<{
