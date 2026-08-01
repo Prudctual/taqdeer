@@ -123,20 +123,21 @@ export function resolveMatchPhase(input: MatchStatusInput): MatchPhase {
 
 /**
  * نص النتيجة للواجهة، أو null عند غيابها.
- * - جارية: تظهر دائماً (0–0 مقبول قبل الهدف الأول)
- * - منتهية: تظهر فقط عند وجود أهداف مسجّلة
- * - لم تبدأ / بانتظار البيانات / مؤجّلة / ملغاة: null
+ * المنتهية والجارية تظهران النتيجة كاملة عند وجود أهداف مسجّلة.
+ * للجارية نعرض 0–0 قبل الهدف الأول؛ للمنتهية بلا أهداف نُبقي الشارة نصّية.
  */
 export function formatMatchScore(
   phase: MatchPhase,
   homeGoals: number | null | undefined,
   awayGoals: number | null | undefined,
 ): string | null {
-  if (phase === "live") {
-    return `${homeGoals ?? 0}–${awayGoals ?? 0}`;
-  }
-  if (phase === "finished" && hasRecordedScore(homeGoals, awayGoals)) {
-    return `${homeGoals}–${awayGoals}`;
+  if (phase === "live" || phase === "finished") {
+    if (hasRecordedScore(homeGoals, awayGoals)) {
+      return `${homeGoals}–${awayGoals}`;
+    }
+    if (phase === "live") {
+      return `${homeGoals ?? 0}–${awayGoals ?? 0}`;
+    }
   }
   return null;
 }

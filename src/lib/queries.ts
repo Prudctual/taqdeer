@@ -300,8 +300,9 @@ export function getRecentFinished(limit = 20, season = "2026"): MatchCard[] {
      WHERE m.status = 'FINISHED'
        AND m.league_id = ?
        AND m.season = ?
-       AND p.id IS NOT NULL
-       AND m.source IN ('football-data.co.uk','uk-csv','football-data.org','wikipedia')
+       AND m.home_goals IS NOT NULL
+       AND m.away_goals IS NOT NULL
+       AND m.source IN ('football-data.co.uk','uk-csv','football-data.org','wikipedia','real-eliteserien')
      ORDER BY m.utc_date DESC
      LIMIT ?`,
   );
@@ -329,8 +330,9 @@ export function getRecentFinishedByLeague(perLeague = 4, season = "2026"): {
      WHERE m.status = 'FINISHED'
        AND m.league_id = ?
        AND m.season = ?
-       AND p.id IS NOT NULL
-       AND m.source IN ('football-data.co.uk','uk-csv','football-data.org','wikipedia')
+       AND m.home_goals IS NOT NULL
+       AND m.away_goals IS NOT NULL
+       AND m.source IN ('football-data.co.uk','uk-csv','football-data.org','wikipedia','real-eliteserien')
      ORDER BY m.utc_date DESC
      LIMIT ?`,
   );

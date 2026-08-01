@@ -40,6 +40,7 @@ export function StudioHomeView({
   upcomingCount,
   leagues = [],
   groups = [],
+  recentGroups = [],
   nextMatch,
   standingsByLeague = {},
   bankerPicks = [],
@@ -59,6 +60,12 @@ export function StudioHomeView({
     const liveUpdate = liveMatches.find((lm) => lm.id === m.id);
     return liveUpdate ? { ...m, ...liveUpdate } : m;
   });
+
+  const recentMatchesList: MatchCard[] = recentGroups.flatMap(
+    (g) => g.matches || g.items || [],
+  );
+  // أحدث النتائج أولاً مع إبقاء تنوّع الدوريات
+  recentMatchesList.sort((a, b) => b.utcDate.localeCompare(a.utcDate));
 
   const heroMatch = liveMatches[0] || nextMatch || upcomingMatchesList[0];
 
@@ -201,6 +208,26 @@ export function StudioHomeView({
                 <p className="text-xs text-muted">ترتفع الجولة القادمة أوتوماتيكياً بمجرد إدراج المباريات الجديدة.</p>
               </div>
             )}
+
+            {/* أحدث النتائج المنتهية بالنتيجة الكاملة */}
+            {recentMatchesList.length > 0 ? (
+              <div className="space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-3 bg-panel p-3 rounded-2xl border border-line">
+                  <div className="flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full bg-ink/40" />
+                    <h3 className="text-xs font-black text-ink">
+                      أحدث النتائج — النتيجة الكاملة
+                    </h3>
+                  </div>
+                  <span className="px-3 py-1 rounded-xl bg-surface border border-line text-xs font-black text-muted">
+                    {recentMatchesList.length} مباراة منتهية
+                  </span>
+                </div>
+                <div className="rounded-2xl border border-line bg-surface p-4 sm:p-6 shadow-2xs">
+                  <MatchList matches={recentMatchesList} groupDays showLeague />
+                </div>
+              </div>
+            ) : null}
           </div>
         )}
 

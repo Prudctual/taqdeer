@@ -19,10 +19,10 @@ export const NORWAY_TEAMS: Record<string, { nameAr: string; nameEn: string; cres
   STA: { nameAr: "ستارتا", nameEn: "Start", crestUrl: "https://crests.football-data.org/STA.png" },
 };
 
-// Official 2026 Standings as of 31 July 2026
+// Official 2026 Standings after Round 16 matches on 1 August 2026
 const STANDINGS_DATA = [
   { code: "BOD", pos: 1, pld: 16, w: 12, d: 2, l: 2, gf: 41, ga: 11, pts: 38 },
-  { code: "VIK", pos: 2, pld: 14, w: 11, d: 1, l: 2, gf: 34, ga: 14, pts: 34 },
+  { code: "VIK", pos: 2, pld: 15, w: 12, d: 1, l: 2, gf: 37, ga: 14, pts: 37 },
   { code: "TRO", pos: 3, pld: 15, w: 9, d: 4, l: 2, gf: 26, ga: 15, pts: 31 },
   { code: "LIL", pos: 4, pld: 15, w: 8, d: 1, l: 6, gf: 22, ga: 18, pts: 25 },
   { code: "MOL", pos: 5, pld: 14, w: 7, d: 2, l: 5, gf: 25, ga: 19, pts: 23 },
@@ -31,20 +31,25 @@ const STANDINGS_DATA = [
   { code: "VAL", pos: 8, pld: 15, w: 6, d: 2, l: 7, gf: 22, ga: 27, pts: 20 },
   { code: "BRA", pos: 9, pld: 15, w: 6, d: 1, l: 8, gf: 30, ga: 25, pts: 19 },
   { code: "ROS", pos: 10, pld: 14, w: 5, d: 3, l: 6, gf: 19, ga: 18, pts: 18 },
-  { code: "SAN", pos: 11, pld: 14, w: 4, d: 3, l: 7, gf: 13, ga: 20, pts: 15 },
-  { code: "FRE", pos: 12, pld: 14, w: 4, d: 2, l: 8, gf: 15, ga: 27, pts: 14 },
+  { code: "FRE", pos: 11, pld: 15, w: 5, d: 2, l: 8, gf: 16, ga: 27, pts: 17 },
+  { code: "SAN", pos: 12, pld: 15, w: 4, d: 3, l: 8, gf: 13, ga: 21, pts: 15 },
   { code: "AAL", pos: 13, pld: 14, w: 2, d: 7, l: 5, gf: 19, ga: 29, pts: 13 },
   { code: "KFU", pos: 14, pld: 14, w: 3, d: 3, l: 8, gf: 15, ga: 25, pts: 12 },
   { code: "KRI", pos: 15, pld: 14, w: 3, d: 3, l: 8, gf: 12, ga: 23, pts: 12 },
-  { code: "STA", pos: 16, pld: 15, w: 2, d: 4, l: 9, gf: 16, ga: 34, pts: 10 },
+  { code: "STA", pos: 16, pld: 16, w: 2, d: 4, l: 10, gf: 16, ga: 37, pts: 10 },
 ];
 
-// Real Round 16 & Round 17 Fixtures around August 1, 2026
+/** نتائج مؤكّدة للجولة 16 — تُعرض كاملة في الواجهة */
+const REAL_FINISHED_MATCHES = [
+  { home: "VAL", away: "HAM", date: "2026-07-31T17:00:00Z", round: 16, hg: 2, ag: 3 },
+  { home: "BOD", away: "LIL", date: "2026-07-31T17:00:00Z", round: 16, hg: 4, ag: 0 },
+  { home: "FRE", away: "SAN", date: "2026-08-01T14:00:00Z", round: 16, hg: 1, ag: 0 },
+  { home: "STA", away: "VIK", date: "2026-08-01T16:00:00Z", round: 16, hg: 0, ag: 3 },
+];
+
+// Real Round 16 & Round 17 Fixtures still to play
 const REAL_SCHEDULED_MATCHES = [
-  // Round 16 - Saturday 1 August 2026 (Today)
-  { home: "FRE", away: "SAN", date: "2026-08-01T14:00:00Z", round: 16 },
-  { home: "STA", away: "VIK", date: "2026-08-01T16:00:00Z", round: 16 },
-  // Round 16 - Sunday 2 August 2026 (Tomorrow)
+  // Round 16 - Sunday 2 August 2026
   { home: "MOL", away: "SAR", date: "2026-08-02T15:00:00Z", round: 16 },
   { home: "KFU", away: "KRI", date: "2026-08-02T15:00:00Z", round: 16 },
   { home: "AAL", away: "TRO", date: "2026-08-02T15:00:00Z", round: 16 },
@@ -156,11 +161,15 @@ export async function syncNorwayEliteserien() {
     matchStmt.run(matchId, homeId, awayId, "FINISHED", dateIso, 1, m.hg, m.ag);
   });
 
-  // Insert Recent Round 16 Finished Matches (July 31, 2026)
-  matchStmt.run("no1-2026-r16-vif-ham", "no1-val", "no1-ham", "FINISHED", "2026-07-31T17:00:00Z", 16, 2, 3);
-  matchStmt.run("no1-2026-r16-bod-lil", "no1-bod", "no1-lil", "FINISHED", "2026-07-31T17:00:00Z", 16, 4, 0);
+  // Insert confirmed Round 16 results with full scores for the UI
+  REAL_FINISHED_MATCHES.forEach((m) => {
+    const matchId = `no1-2026-r16-${m.home.toLowerCase()}-${m.away.toLowerCase()}`;
+    const homeId = `no1-${m.home.toLowerCase()}`;
+    const awayId = `no1-${m.away.toLowerCase()}`;
+    matchStmt.run(matchId, homeId, awayId, "FINISHED", m.date, m.round, m.hg, m.ag);
+  });
 
-  // Insert Actual Real Scheduled Matches (Today Aug 1, Tomorrow Aug 2, Round 17 Aug 7-9)
+  // Insert remaining scheduled fixtures (Aug 2, Round 17 Aug 7-9)
   REAL_SCHEDULED_MATCHES.forEach((m) => {
     const matchId = `no1-2026-sch-${m.home.toLowerCase()}-${m.away.toLowerCase()}`;
     const homeId = `no1-${m.home.toLowerCase()}`;
@@ -169,7 +178,9 @@ export async function syncNorwayEliteserien() {
   });
 
   db.exec("PRAGMA foreign_keys = ON;");
-  console.log(`Norway Eliteserien 2026 REAL DATA synchronized! (${finishedList.length + 2} finished, ${REAL_SCHEDULED_MATCHES.length} real scheduled)`);
+  console.log(
+    `Norway Eliteserien 2026 REAL DATA synchronized! (${finishedList.length + REAL_FINISHED_MATCHES.length} finished, ${REAL_SCHEDULED_MATCHES.length} real scheduled)`,
+  );
 }
 
 if (require.main === module) {
