@@ -1,12 +1,18 @@
 import Link from "next/link";
 import { Crest } from "./Crest";
 import { formatShortDate } from "@/lib/format";
+import { matchDisplay } from "@/lib/match-status";
 import type { MatchCard } from "@/lib/queries";
 
 export function HeroMatchBanner({ match }: { match: MatchCard | null }) {
   if (!match) return null;
 
-  const isLive = ["IN_PLAY", "PAUSED", "LIVE", "1H", "2H", "HT", "ET", "P", "BREAK"].includes(match.status);
+  const { isLive, isFinished, score } = matchDisplay({
+    status: match.status,
+    utcDate: match.utcDate,
+    homeGoals: match.homeGoals,
+    awayGoals: match.awayGoals,
+  });
   const pHome = match.pHome ? Math.round(match.pHome * 100) : 48;
   const pDraw = match.pDraw ? Math.round(match.pDraw * 100) : 24;
   const pAway = match.pAway ? Math.round(match.pAway * 100) : 28;
@@ -37,10 +43,16 @@ export function HeroMatchBanner({ match }: { match: MatchCard | null }) {
               <span className="text-base sm:text-lg font-black text-ink">{match.homeNameAr}</span>
             </div>
             
-            {isLive || match.status === "FINISHED" ? (
-              <span className="text-lg sm:text-2xl font-mono font-black text-ink bg-panel border border-line px-3 py-1 rounded-xl shadow-xs tabular">
-                {match.homeGoals ?? 0} – {match.awayGoals ?? 0}
+            {score ? (
+              <span className={`text-lg sm:text-2xl font-mono font-black bg-panel border px-3 py-1 rounded-xl shadow-xs tabular ${
+                isLive
+                  ? "text-emerald-600 dark:text-emerald-400 border-emerald-500/40"
+                  : "text-ink border-line"
+              }`}>
+                {score.replace("–", " – ")}
               </span>
+            ) : isFinished ? (
+              <span className="text-xs font-bold text-muted">انتهت</span>
             ) : (
               <span className="text-xs font-bold text-faint">ضد</span>
             )}

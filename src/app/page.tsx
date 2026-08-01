@@ -13,8 +13,21 @@ import {
   getStandings,
   getBankerPicks,
 } from "@/lib/queries";
+import { resolveMatchPhase } from "@/lib/match-status";
 
 export const revalidate = 300;
+
+function toTableStatus(
+  status: string,
+  utcDate: string,
+  homeGoals: number | null,
+  awayGoals: number | null,
+): MatchTableRow["status"] {
+  const phase = resolveMatchPhase({ status, utcDate, homeGoals, awayGoals });
+  if (phase === "finished") return "FINISHED";
+  if (phase === "live") return "IN_PLAY";
+  return "SCHEDULED";
+}
 
 export default function HomePage() {
   const count = matchCount();
@@ -71,12 +84,12 @@ export default function HomePage() {
   // Add upcoming matches
   groups.forEach((g) => {
     g.matches.forEach((m) => {
-      const matchStatus: MatchTableRow["status"] =
-        m.status === "FINISHED"
-          ? "FINISHED"
-          : m.status === "IN_PLAY" || m.status === "PAUSED"
-          ? "IN_PLAY"
-          : "SCHEDULED";
+      const matchStatus = toTableStatus(
+        m.status,
+        m.utcDate,
+        m.homeGoals,
+        m.awayGoals,
+      );
 
       allMatchesList.push({
         id: m.id,
@@ -102,12 +115,12 @@ export default function HomePage() {
   // Add recent finished matches
   recentByLeague.forEach((g) => {
     g.matches.forEach((m) => {
-      const matchStatus: MatchTableRow["status"] =
-        m.status === "FINISHED"
-          ? "FINISHED"
-          : m.status === "IN_PLAY" || m.status === "PAUSED"
-          ? "IN_PLAY"
-          : "SCHEDULED";
+      const matchStatus = toTableStatus(
+        m.status,
+        m.utcDate,
+        m.homeGoals,
+        m.awayGoals,
+      );
 
       allMatchesList.push({
         id: m.id,

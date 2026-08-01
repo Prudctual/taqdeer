@@ -12,6 +12,9 @@ type Props = {
   homeCrestUrl?: string | null;
   awayCrestUrl?: string | null;
   score?: string | null;
+  /** نص الوسط عند غياب النتيجة — VS للمجدولة، انتهت للمنتهية بلا أهداف */
+  placeholder?: string;
+  isLive?: boolean;
 };
 
 export function TeamMatchup({
@@ -22,6 +25,8 @@ export function TeamMatchup({
   homeCrestUrl,
   awayCrestUrl,
   score,
+  placeholder = "VS",
+  isLive = false,
 }: Props) {
   return (
     <div className="rounded-2xl border border-line bg-surface p-5 sm:p-7 shadow-xs">
@@ -49,14 +54,26 @@ export function TeamMatchup({
         {/* Center Score / VS */}
         <div className="flex flex-col items-center justify-center shrink-0 px-3">
           {score ? (
-            <span className="text-2xl sm:text-4xl font-mono font-black text-ink tabular">
+            <span
+              className={`text-2xl sm:text-4xl font-mono font-black tabular ${
+                isLive
+                  ? "text-emerald-600 dark:text-emerald-400"
+                  : "text-ink"
+              }`}
+            >
               {score}
             </span>
           ) : (
             <span className="text-xs font-black text-white bg-accent px-3 py-1 rounded-full shadow-xs">
-              VS
+              {placeholder}
             </span>
           )}
+          {isLive ? (
+            <span className="mt-1.5 inline-flex items-center gap-1 text-[10px] font-extrabold text-emerald-600 dark:text-emerald-400">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              مباشر
+            </span>
+          ) : null}
         </div>
 
         {/* Away Team */}

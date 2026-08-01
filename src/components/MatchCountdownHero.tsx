@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { matchDisplay } from "@/lib/match-status";
 
 interface MatchCountdownHeroProps {
   utcDate: string;
@@ -11,57 +12,34 @@ interface MatchCountdownHeroProps {
 
 export function MatchCountdownHero({
   utcDate,
-  status,
+  status = "SCHEDULED",
   homeGoals,
   awayGoals,
 }: MatchCountdownHeroProps) {
-  const [timeLeft, setTimeLeft] = useState<{
-    days: number;
-    hours: number;
-    minutes: number;
-    seconds: number;
-    isFinished: boolean;
-  }>({ days: 0, hours: 0, minutes: 0, seconds: 0, isFinished: false });
+  const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
-    const target = new Date(utcDate).getTime();
-
-    function updateTimer() {
-      const now = new Date().getTime();
-      const difference = target - now;
-
-      if (difference <= 0 || status === "FINISHED") {
-        setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0, isFinished: true });
-        return;
-      }
-
-      const days = Math.floor(difference / (1000 * 60 * 60 * 24));
-      const hours = Math.floor((difference % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-      const minutes = Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60));
-      const seconds = Math.floor((difference % (1000 * 60)) / 1000);
-
-      setTimeLeft({ days, hours, minutes, seconds, isFinished: false });
-    }
-
-    updateTimer();
-    const interval = setInterval(updateTimer, 1000);
+    const interval = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(interval);
-  }, [utcDate, status]);
+  }, []);
 
-  const isFinishedStatus = status === "FINISHED" || status === "FT" || status === "COMPLETED";
-  const hasGoals = homeGoals != null && awayGoals != null;
-  const target = new Date(utcDate).getTime();
-  const now = Date.now();
-  const difference = target - now;
-  const isPastMatch = difference < -150 * 60 * 1000;
-  const isLiveStatus = status === "IN_PLAY" || status === "PAUSED" || status === "LIVE";
+  const { phase, isLive, isFinished, score } = matchDisplay({
+    status,
+    utcDate,
+    homeGoals,
+    awayGoals,
+    now,
+  });
 
-  if (isFinishedStatus || hasGoals || (isPastMatch && !isLiveStatus)) {
+  if (isFinished) {
     return (
       <div className="inline-flex items-center gap-2 rounded-full bg-panel px-4 py-1.5 text-xs font-black text-ink">
         <span className="h-2 w-2 rounded-full bg-emerald-500" />
-        {hasGoals ? (
-          <span>نتيجة منتهية: <strong className="tabular font-bold">{homeGoals} - {awayGoals}</strong></span>
+        {score ? (
+          <span>
+            نتيجة منتهية:{" "}
+            <strong className="tabular font-bold">{score.replace("–", " - ")}</strong>
+          </span>
         ) : (
           <span>مباراة منتهية</span>
         )}
@@ -69,26 +47,63 @@ export function MatchCountdownHero({
     );
   }
 
-  if (isLiveStatus || (timeLeft.isFinished && !isPastMatch)) {
+  if (isLive) {
     return (
-      <div className="inline-flex items-center gap-2 rounded-full bg-accent/15 px-4 py-1.5 text-xs font-black text-accent">
-        <span className="h-2 w-2 rounded-full bg-accent animate-ping" />
-        <span>المباراة جارية الآن ⚽ LIVE</span>
+      <div className="inline-flex items-center gap-2 rounded-full bg-emerald-500/15 px-4 py-1.5 text-xs font-black text-emerald-700 dark:text-emerald-400">
+        <span className="h-2 w-2 rounded-full bg-emerald-500 animate-ping" />
+        <span>
+          جارية الآن
+          {score ? (
+            <>
+              {" · "}
+              <strong className="tabular font-bold">{score.replace("–", " - ")}</strong>
+            </>
+          ) : null}
+        </span>
       </div>
     );
   }
+
+  if (phase === "postponed") {
+    return (
+      <div className="inline-flex items-center gap-2 rounded-full bg-panel px-4 py-1.5 text-xs font-black text-muted">
+        مؤجّلة
+      </div>
+    );
+  }
+
+  if (phase === "cancelled") {
+    return (
+      <div className="inline-flex items-center gap-2 rounded-full bg-panel px-4 py-1.5 text-xs font-black text-muted">
+        ملغاة
+      </div>
+    );
+  }
+
+  const target = Date.parse(utcDate);
+  const difference = Number.isFinite(target) ? target - now : 0;
+  const days = Math.max(0, Math.floor(difference / (1000 * 60 * 60 * 24)));
+  const hours = Math.max(
+    0,
+    Math.floor((difference % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)),
+  );
+  const minutes = Math.max(
+    0,
+    Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60)),
+  );
+  const seconds = Math.max(0, Math.floor((difference % (1000 * 60)) / 1000));
 
   return (
     <div className="inline-flex flex-wrap items-center gap-2 rounded-2xl bg-panel/80 px-4 py-2 text-xs font-bold text-ink border-0 shadow-none">
       <span className="text-muted text-[11px]">ينطلق خلال:</span>
       <div className="flex items-center gap-1.5 font-mono text-xs tabular text-accent font-black">
-        <span className="rounded-md bg-surface px-2 py-0.5">{timeLeft.days} يوم</span>
+        <span className="rounded-md bg-surface px-2 py-0.5">{days} يوم</span>
         <span className="text-muted">:</span>
-        <span className="rounded-md bg-surface px-2 py-0.5">{timeLeft.hours} س</span>
+        <span className="rounded-md bg-surface px-2 py-0.5">{hours} س</span>
         <span className="text-muted">:</span>
-        <span className="rounded-md bg-surface px-2 py-0.5">{timeLeft.minutes} د</span>
+        <span className="rounded-md bg-surface px-2 py-0.5">{minutes} د</span>
         <span className="text-muted">:</span>
-        <span className="rounded-md bg-surface px-2 py-0.5">{timeLeft.seconds} ث</span>
+        <span className="rounded-md bg-surface px-2 py-0.5">{seconds} ث</span>
       </div>
     </div>
   );

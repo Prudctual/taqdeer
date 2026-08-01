@@ -105,6 +105,28 @@ export function MatchWhen({
     );
   }
 
+  if (finished) {
+    if (variant === "row") {
+      return (
+        <div className={`min-w-0 tabular ${className}`}>
+          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-panel border border-line text-muted font-extrabold text-[11px]">
+            انتهت
+          </span>
+          {!hideRelative ? (
+            <div
+              suppressHydrationWarning
+              className={`mt-1.5 truncate text-[11px] leading-none ${
+                relative ? "text-accent" : "text-faint"
+              }`}
+            >
+              {relative ?? shortDate}
+            </div>
+          ) : null}
+        </div>
+      );
+    }
+  }
+
   if (variant === "row") {
     return (
       <div className={`min-w-0 tabular ${className}`}>

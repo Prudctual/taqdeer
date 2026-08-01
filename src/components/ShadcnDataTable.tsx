@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ProbBar } from "./ProbBar";
 import { Crest } from "./Crest";
 import { formatShortDate } from "@/lib/format";
+import { matchDisplay } from "@/lib/match-status";
 
 export interface MatchTableRow {
   id: string;
@@ -202,19 +203,23 @@ export function ShadcnDataTable({
 
                         {/* Score or VS */}
                         <div className="w-13 shrink-0 text-center flex items-center justify-center mx-auto">
-                          <span className={`inline-flex items-center justify-center px-1.5 py-0.5 rounded-md border font-mono font-black text-xs tabular min-w-[2.75rem] ${
-                            m.status === "IN_PLAY" || m.status === "PAUSED"
-                              ? "bg-emerald-500/10 border-emerald-500/40 text-emerald-600 dark:text-emerald-400 animate-pulse"
-                              : "bg-panel border-line text-ink"
-                          }`}>
-                            {m.status === "FINISHED" || m.status === "IN_PLAY" || m.status === "PAUSED" ? (
-                              <span>
-                                {m.homeScore ?? 0}–{m.awayScore ?? 0}
+                          {(() => {
+                            const { isLive, isFinished, score } = matchDisplay({
+                              status: m.status,
+                              utcDate: m.utcDate,
+                              homeGoals: m.homeScore,
+                              awayGoals: m.awayScore,
+                            });
+                            return (
+                              <span className={`inline-flex items-center justify-center px-1.5 py-0.5 rounded-md border font-mono font-black text-xs tabular min-w-[2.75rem] ${
+                                isLive
+                                  ? "bg-emerald-500/10 border-emerald-500/40 text-emerald-600 dark:text-emerald-400 animate-pulse"
+                                  : "bg-panel border-line text-ink"
+                              }`}>
+                                {score ?? (isFinished ? "انتهت" : "VS")}
                               </span>
-                            ) : (
-                              "VS"
-                            )}
-                          </span>
+                            );
+                          })()}
                         </div>
 
                         {/* Away Team - Pushed close to center VS */}

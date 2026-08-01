@@ -41,6 +41,7 @@ import {
   pctCss,
   topOutcome,
 } from "@/lib/format";
+import { matchDisplay } from "@/lib/match-status";
 import {
   getHeadToHead,
   getMatchById,
@@ -268,13 +269,18 @@ export default async function MatchPage({
   const pick = hasPred
     ? topOutcome(match.p_home!, match.p_draw!, match.p_away!)
     : null;
-  const matchTimePast = Date.parse(match.utc_date) < Date.now() - 150 * 60 * 1000;
-  const finished =
-    match.status === "FINISHED" ||
-    match.status === "FT" ||
-    (match.home_goals != null && match.away_goals != null) ||
-    (matchTimePast && match.status !== "IN_PLAY" && match.status !== "PAUSED");
-  const upcoming = !finished;
+  const {
+    isLive,
+    isFinished: finished,
+    isScheduled,
+    score: matchScore,
+  } = matchDisplay({
+    status: match.status,
+    utcDate: match.utc_date,
+    homeGoals: match.home_goals,
+    awayGoals: match.away_goals,
+  });
+  const upcoming = isScheduled;
   const form = analytics?.components?.form as
     | {
         home_pts?: number;
@@ -1078,6 +1084,7 @@ export default async function MatchPage({
               iso={match.utc_date}
               variant="detail"
               finished={finished}
+              isLive={isLive}
               showCountdown={false}
             />
           </div>
@@ -1093,7 +1100,9 @@ export default async function MatchPage({
           awayCrestUrl={match.away_crest_url}
           homeMeta={homeMeta}
           awayMeta={awayMeta}
-          score={finished ? `${match.home_goals}–${match.away_goals}` : null}
+          score={matchScore}
+          placeholder={finished ? "انتهت" : "VS"}
+          isLive={isLive}
         />
       </div>
 

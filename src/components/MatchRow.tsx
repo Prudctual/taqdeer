@@ -4,6 +4,7 @@ import { ProbBar } from "./ProbBar";
 import { TeamNamesInline } from "./TeamMatchup";
 import type { MatchCard } from "@/lib/queries";
 import { actualOutcome, pct, topOutcome } from "@/lib/format";
+import { matchDisplay } from "@/lib/match-status";
 
 /** لون النتيجة يملأ الشارة فقط — النص عليها بلون السطح الداكن */
 const pickFill: Record<string, string> = {
@@ -65,18 +66,17 @@ export function MatchRow({
 }) {
   const hasPred = m.pHome != null;
   const pick = hasPred ? topOutcome(m.pHome!, m.pDraw!, m.pAway!) : null;
-  const isLive = ["IN_PLAY", "PAUSED", "LIVE", "1H", "2H", "HT", "ET", "P", "BREAK"].includes(m.status);
-  const finished = m.status === "FINISHED" && m.homeGoals != null;
+  const { isLive, isFinished, score: currentScore } = matchDisplay({
+    status: m.status,
+    utcDate: m.utcDate,
+    homeGoals: m.homeGoals,
+    awayGoals: m.awayGoals,
+  });
   const hit =
-    finished && pick && m.awayGoals != null
-      ? actualOutcome(m.homeGoals!, m.awayGoals!) === pick.key
+    isFinished && pick && m.homeGoals != null && m.awayGoals != null
+      ? actualOutcome(m.homeGoals, m.awayGoals) === pick.key
       : null;
   const tone = m.leagueId.toLowerCase();
-
-  const currentScore =
-    isLive || finished
-      ? `${m.homeGoals ?? 0}–${m.awayGoals ?? 0}`
-      : null;
 
   return (
     <Link
@@ -102,7 +102,7 @@ export function MatchRow({
         <MatchWhen
           iso={m.utcDate}
           variant="row"
-          finished={finished}
+          finished={isFinished}
           isLive={isLive}
           liveMinute={m.minute}
           liveStatusAr={m.liveStatusAr}

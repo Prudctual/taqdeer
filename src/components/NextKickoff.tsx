@@ -10,6 +10,7 @@ import {
   topOutcome,
 } from "@/lib/format";
 import { ProbBar } from "./ProbBar";
+import { matchDisplay } from "@/lib/match-status";
 import type { MatchCard } from "@/lib/queries";
 
 const GLYPH: Record<string, string> = { H: "1", D: "X", A: "2", EQ: "⚖" };
@@ -54,7 +55,12 @@ function TeamLine({
 }
 
 export function NextKickoff({ m }: { m: MatchCard }) {
-  const isLive = ["IN_PLAY", "PAUSED", "LIVE", "1H", "2H", "HT", "ET", "P", "BREAK"].includes(m.status);
+  const { isLive, isFinished, score } = matchDisplay({
+    status: m.status,
+    utcDate: m.utcDate,
+    homeGoals: m.homeGoals,
+    awayGoals: m.awayGoals,
+  });
   const pick =
     m.pHome != null ? topOutcome(m.pHome, m.pDraw!, m.pAway!) : null;
   const relative = formatRelativeDay(m.utcDate);
@@ -124,10 +130,16 @@ export function NextKickoff({ m }: { m: MatchCard }) {
       <div className="motion-colors group-hover:bg-panel">
         <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 px-4 py-4 sm:px-5">
           <TeamLine name={m.homeNameAr} crestUrl={m.homeCrestUrl} side="home" />
-          {isLive || m.status === "FINISHED" ? (
-            <span className="text-xl sm:text-2xl font-mono font-black text-ink bg-panel border border-line px-3 py-1 rounded-xl shadow-xs tabular">
-              {m.homeGoals ?? 0} – {m.awayGoals ?? 0}
+          {score ? (
+            <span className={`text-xl sm:text-2xl font-mono font-black bg-panel border px-3 py-1 rounded-xl shadow-xs tabular ${
+              isLive
+                ? "text-emerald-600 dark:text-emerald-400 border-emerald-500/40"
+                : "text-ink border-line"
+            }`}>
+              {score.replace("–", " – ")}
             </span>
+          ) : isFinished ? (
+            <span className="text-[11px] font-bold text-muted">انتهت</span>
           ) : (
             <span className="text-[11px] text-faint">ضد</span>
           )}
