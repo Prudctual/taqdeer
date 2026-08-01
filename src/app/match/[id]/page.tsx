@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import { cache, type ReactNode } from "react";
 import {
   FormBars,
@@ -241,8 +241,13 @@ export default async function MatchPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const match = loadMatch(decodeURIComponent(id));
+  const requestedId = decodeURIComponent(id);
+  const match = loadMatch(requestedId);
   if (!match) notFound();
+  // روابط sch-/fin- القديمة بعد تغيّر المعرّف عند المزامنة
+  if (match.id !== requestedId) {
+    permanentRedirect(`/match/${encodeURIComponent(match.id)}`);
+  }
 
   const league = match.leagueId?.toLowerCase() || undefined;
 

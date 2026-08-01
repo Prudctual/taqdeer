@@ -161,9 +161,13 @@ export async function syncNorwayEliteserien() {
     matchStmt.run(matchId, homeId, awayId, "FINISHED", dateIso, 1, m.hg, m.ag);
   });
 
+  // معرّف ثابت حسب الجولة والفريقين — لا يتغيّر عند انتهاء المباراة
+  const fixtureId = (round: number, home: string, away: string) =>
+    `no1-2026-r${round}-${home.toLowerCase()}-${away.toLowerCase()}`;
+
   // Insert confirmed Round 16 results with full scores for the UI
   REAL_FINISHED_MATCHES.forEach((m) => {
-    const matchId = `no1-2026-r16-${m.home.toLowerCase()}-${m.away.toLowerCase()}`;
+    const matchId = fixtureId(m.round, m.home, m.away);
     const homeId = `no1-${m.home.toLowerCase()}`;
     const awayId = `no1-${m.away.toLowerCase()}`;
     matchStmt.run(matchId, homeId, awayId, "FINISHED", m.date, m.round, m.hg, m.ag);
@@ -171,7 +175,7 @@ export async function syncNorwayEliteserien() {
 
   // Insert remaining scheduled fixtures (Aug 2, Round 17 Aug 7-9)
   REAL_SCHEDULED_MATCHES.forEach((m) => {
-    const matchId = `no1-2026-sch-${m.home.toLowerCase()}-${m.away.toLowerCase()}`;
+    const matchId = fixtureId(m.round, m.home, m.away);
     const homeId = `no1-${m.home.toLowerCase()}`;
     const awayId = `no1-${m.away.toLowerCase()}`;
     matchStmt.run(matchId, homeId, awayId, "SCHEDULED", m.date, m.round, null, null);

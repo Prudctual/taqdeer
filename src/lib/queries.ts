@@ -349,12 +349,43 @@ export function getRecentFinishedByLeague(perLeague = 4, season = "2026"): {
     .filter((g) => g.matches.length > 0);
 }
 
+/** معرّفات النرويج كانت تتغيّر sch→r16→fin عند المزامنة — نحلّ البدائل */
+const LEGACY_MATCH_ID_RE =
+  /^([a-z0-9]+)-(\d+)-(sch|fin|r\d+)-([a-z0-9]+)-([a-z0-9]+)$/i;
+
 export function getMatchById(id: string): MatchRow | null {
   const db = getDb();
-  const row = db.prepare(`${DETAIL_SELECT} WHERE m.id = ?`).get(id) as
+  const byId = db.prepare(`${DETAIL_SELECT} WHERE m.id = ?`);
+  const row = byId.get(id) as
     | (MatchCard & { matchday: number | null })
     | undefined;
-  return row ? toLegacy(row) : null;
+  if (row) return toLegacy(row);
+
+  const legacy = id.match(LEGACY_MATCH_ID_RE);
+  if (!legacy) return null;
+
+  const league = legacy[1]!.toLowerCase();
+  const season = legacy[2]!;
+  const homeCode = legacy[4]!.toLowerCase();
+  const awayCode = legacy[5]!.toLowerCase();
+  const homeId = `${league}-${homeCode}`;
+  const awayId = `${league}-${awayCode}`;
+
+  const alt = db
+    .prepare(
+      `${DETAIL_SELECT}
+       WHERE m.league_id = ?
+         AND m.season = ?
+         AND m.home_team_id = ?
+         AND m.away_team_id = ?
+       ORDER BY m.utc_date DESC
+       LIMIT 1`,
+    )
+    .get(league, season, homeId, awayId) as
+    | (MatchCard & { matchday: number | null })
+    | undefined;
+
+  return alt ? toLegacy(alt) : null;
 }
 
 /**
