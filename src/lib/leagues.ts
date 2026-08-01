@@ -67,16 +67,6 @@ export const LEAGUES: LeagueDef[] = [
     fdOrgCode: "FL1",
     fdUkCode: "F1",
   },
-  {
-    id: "kl1",
-    code: "KL1",
-    nameAr: "الدوري الكوري",
-    nameEn: "K League 1",
-    countryAr: "كوريا الجنوبية",
-    // الدوري الكوري بتقويم سنوي — آخر أربع سنوات حتى السنة الجارية
-    wikiSeasons: kleagueSeasons(),
-    wikiTitle: (year) => `${year}_K_League_1`,
-  },
 ];
 
 export function leagueByCode(code: string) {
