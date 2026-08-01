@@ -713,19 +713,6 @@ export default async function MatchPage({
         refereeName={resolvedReferee}
         logistics={analytics?.components?.logistics as { travel_distance_km?: number; pitch_surface?: string; is_european_midweek?: boolean; logistics_summary?: string }}
       />
-
-      <SquadGridWidget
-        homeTeam={match.home_name_ar}
-        awayTeam={match.away_name_ar}
-        players={squadStars}
-      />
-
-      <PlayerRadarChart
-        homeTeam={match.home_name_ar}
-        awayTeam={match.away_name_ar}
-        homeStar={homeStar}
-        awayStar={awayStar}
-      />
     </div>
   );
 
@@ -1178,6 +1165,20 @@ export default async function MatchPage({
           />
         </div>
       )}
+
+      <div className="space-y-6">
+        <SquadGridWidget
+          homeTeam={match.home_name_ar}
+          awayTeam={match.away_name_ar}
+          players={squadStars}
+        />
+        <PlayerRadarChart
+          homeTeam={match.home_name_ar}
+          awayTeam={match.away_name_ar}
+          homeStar={homeStar}
+          awayStar={awayStar}
+        />
+      </div>
 
       <BackBar
         links={[
