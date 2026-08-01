@@ -55,11 +55,13 @@ function TeamLine({
 }
 
 export function NextKickoff({ m }: { m: MatchCard }) {
-  const { isLive, isFinished, score } = matchDisplay({
+  const { isLive, isScheduled, score, label } = matchDisplay({
     status: m.status,
     utcDate: m.utcDate,
     homeGoals: m.homeGoals,
     awayGoals: m.awayGoals,
+    minute: m.minute,
+    liveStatusAr: m.liveStatusAr,
   });
   const pick =
     m.pHome != null ? topOutcome(m.pHome, m.pDraw!, m.pAway!) : null;
@@ -138,10 +140,10 @@ export function NextKickoff({ m }: { m: MatchCard }) {
             }`}>
               {score.replace("–", " – ")}
             </span>
-          ) : isFinished ? (
-            <span className="text-[11px] font-bold text-muted">انتهت</span>
-          ) : (
+          ) : isScheduled ? (
             <span className="text-[11px] text-faint">ضد</span>
+          ) : (
+            <span className="text-[11px] font-bold text-muted">{label}</span>
           )}
           <TeamLine name={m.awayNameAr} crestUrl={m.awayCrestUrl} side="away" />
         </div>

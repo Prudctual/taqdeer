@@ -263,16 +263,25 @@ export function getUpcomingByLeague(perLeague = 6): {
     });
 }
 
-/** المباريات الجارية حالياً (Live In-Play) */
+/**
+ * المباريات الجارية حالياً (Live In-Play).
+ * لا يُدرج هنا إلا ما عليه دليل من المصدر: حالة مباشرة غير عالقة،
+ * أو دقيقة/وصف حيّ داخل زمن اللعب. مضيّ الموعد وحده لا يجعل المباراة جارية،
+ * وإلا ظهرت مباريات منتهية لم تُحدَّث حالتها بوصفها مباشرة.
+ */
 export function getLiveMatches(): MatchCard[] {
   const db = getDb();
   return db
     .prepare(
       `${LIST_SELECT}
-       WHERE (m.status IN ('IN_PLAY','PAUSED','LIVE','1H','2H','HT','ET','P','BREAK')
-              OR (m.status NOT IN ('FINISHED','POSTPONED','CANCELLED')
-                  AND m.utc_date <= datetime('now')
-                  AND m.utc_date >= datetime('now', '-3 hours')))
+       WHERE m.status NOT IN ('FINISHED','POSTPONED','CANCELLED')
+         AND m.utc_date <= datetime('now')
+         AND (
+           (m.status IN ('IN_PLAY','PAUSED','LIVE','1H','2H','HT','ET','P','BREAK')
+            AND m.utc_date >= datetime('now', '-4 hours'))
+           OR ((m.minute IS NOT NULL OR m.live_status_ar IS NOT NULL)
+               AND m.utc_date >= datetime('now', '-115 minutes'))
+         )
          AND m.source NOT IN ('preview-holdout','synthetic','demo')
        ORDER BY m.utc_date ASC`,
     )

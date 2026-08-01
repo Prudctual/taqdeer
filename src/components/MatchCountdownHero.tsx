@@ -8,6 +8,8 @@ interface MatchCountdownHeroProps {
   status?: string;
   homeGoals?: number | null;
   awayGoals?: number | null;
+  minute?: number | null;
+  liveStatusAr?: string | null;
 }
 
 export function MatchCountdownHero({
@@ -15,6 +17,8 @@ export function MatchCountdownHero({
   status = "SCHEDULED",
   homeGoals,
   awayGoals,
+  minute,
+  liveStatusAr,
 }: MatchCountdownHeroProps) {
   const [now, setNow] = useState(() => Date.now());
 
@@ -28,6 +32,8 @@ export function MatchCountdownHero({
     utcDate,
     homeGoals,
     awayGoals,
+    minute,
+    liveStatusAr,
     now,
   });
 
@@ -60,6 +66,15 @@ export function MatchCountdownHero({
             </>
           ) : null}
         </span>
+      </div>
+    );
+  }
+
+  if (phase === "awaiting") {
+    return (
+      <div className="inline-flex items-center gap-2 rounded-full bg-panel px-4 py-1.5 text-xs font-black text-muted">
+        <span className="h-2 w-2 rounded-full bg-amber-500" />
+        <span>انطلقت · بانتظار النتيجة</span>
       </div>
     );
   }

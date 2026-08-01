@@ -66,11 +66,19 @@ export function MatchRow({
 }) {
   const hasPred = m.pHome != null;
   const pick = hasPred ? topOutcome(m.pHome!, m.pDraw!, m.pAway!) : null;
-  const { isLive, isFinished, score: currentScore } = matchDisplay({
+  const {
+    isLive,
+    isFinished,
+    isAwaiting,
+    score: currentScore,
+    badge,
+  } = matchDisplay({
     status: m.status,
     utcDate: m.utcDate,
     homeGoals: m.homeGoals,
     awayGoals: m.awayGoals,
+    minute: m.minute,
+    liveStatusAr: m.liveStatusAr,
   });
   const hit =
     isFinished && pick && m.homeGoals != null && m.awayGoals != null
@@ -104,6 +112,7 @@ export function MatchRow({
           variant="row"
           finished={isFinished}
           isLive={isLive}
+          awaiting={isAwaiting}
           liveMinute={m.minute}
           liveStatusAr={m.liveStatusAr}
           hideRelative={hideRelative}
@@ -118,6 +127,7 @@ export function MatchRow({
           homeCrestUrl={m.homeCrestUrl}
           awayCrestUrl={m.awayCrestUrl}
           score={currentScore}
+          placeholder={badge}
         />
       </div>
 

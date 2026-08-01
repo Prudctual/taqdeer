@@ -272,15 +272,18 @@ export default async function MatchPage({
   const {
     isLive,
     isFinished: finished,
-    isScheduled,
+    isAwaiting,
     score: matchScore,
+    label: statusLabel,
   } = matchDisplay({
     status: match.status,
     utcDate: match.utc_date,
     homeGoals: match.home_goals,
     awayGoals: match.away_goals,
+    minute: match.minute,
+    liveStatusAr: match.liveStatusAr,
   });
-  const upcoming = isScheduled;
+  const upcoming = !finished;
   const form = analytics?.components?.form as
     | {
         home_pts?: number;
@@ -1069,6 +1072,8 @@ export default async function MatchPage({
                 status={match.status}
                 homeGoals={match.home_goals}
                 awayGoals={match.away_goals}
+                minute={match.minute}
+                liveStatusAr={match.liveStatusAr}
               />
             </div>
           </div>
@@ -1085,6 +1090,7 @@ export default async function MatchPage({
               variant="detail"
               finished={finished}
               isLive={isLive}
+              awaiting={isAwaiting}
               showCountdown={false}
             />
           </div>
@@ -1101,7 +1107,7 @@ export default async function MatchPage({
           homeMeta={homeMeta}
           awayMeta={awayMeta}
           score={matchScore}
-          placeholder={finished ? "انتهت" : "VS"}
+          placeholder={upcoming && !isAwaiting && !isLive ? "VS" : statusLabel}
           isLive={isLive}
         />
       </div>

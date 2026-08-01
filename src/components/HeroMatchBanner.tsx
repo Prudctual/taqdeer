@@ -7,11 +7,13 @@ import type { MatchCard } from "@/lib/queries";
 export function HeroMatchBanner({ match }: { match: MatchCard | null }) {
   if (!match) return null;
 
-  const { isLive, isFinished, score } = matchDisplay({
+  const { isLive, isScheduled, score, label } = matchDisplay({
     status: match.status,
     utcDate: match.utcDate,
     homeGoals: match.homeGoals,
     awayGoals: match.awayGoals,
+    minute: match.minute,
+    liveStatusAr: match.liveStatusAr,
   });
   const pHome = match.pHome ? Math.round(match.pHome * 100) : 48;
   const pDraw = match.pDraw ? Math.round(match.pDraw * 100) : 24;
@@ -51,10 +53,10 @@ export function HeroMatchBanner({ match }: { match: MatchCard | null }) {
               }`}>
                 {score.replace("–", " – ")}
               </span>
-            ) : isFinished ? (
-              <span className="text-xs font-bold text-muted">انتهت</span>
-            ) : (
+            ) : isScheduled ? (
               <span className="text-xs font-bold text-faint">ضد</span>
+            ) : (
+              <span className="text-xs font-bold text-muted">{label}</span>
             )}
 
             <div className="flex items-center gap-3">

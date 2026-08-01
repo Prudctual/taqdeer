@@ -204,7 +204,7 @@ export function ShadcnDataTable({
                         {/* Score or VS */}
                         <div className="w-13 shrink-0 text-center flex items-center justify-center mx-auto">
                           {(() => {
-                            const { isLive, isFinished, score } = matchDisplay({
+                            const { isLive, score, badge } = matchDisplay({
                               status: m.status,
                               utcDate: m.utcDate,
                               homeGoals: m.homeScore,
@@ -216,7 +216,7 @@ export function ShadcnDataTable({
                                   ? "bg-emerald-500/10 border-emerald-500/40 text-emerald-600 dark:text-emerald-400 animate-pulse"
                                   : "bg-panel border-line text-ink"
                               }`}>
-                                {score ?? (isFinished ? "انتهت" : "VS")}
+                                {score ?? badge}
                               </span>
                             );
                           })()}

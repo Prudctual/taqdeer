@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
 import { getLiveMatches, getUpcomingByLeague } from "@/lib/queries";
 import { syncRealLiveMatches } from "@/lib/live-sync";
+import { isLiveStatus, resolveMatchPhase } from "@/lib/match-status";
 import {
   checkRateLimit,
   createRateLimitErrorResponse,
@@ -68,19 +69,30 @@ export async function GET(request: Request) {
     // Sync real active live matches currently playing right now
     await syncRealLiveMatches();
 
-    const rawLiveMatches = getLiveMatches();
     const now = new Date();
+
+    // لا تُعرض إلا المباريات التي تثبت مرحلتها أنها جارية فعلاً،
+    // فحالة قديمة لم يحدّثها المصدر لا تُحوّل إلى بث مباشر.
+    const rawLiveMatches = getLiveMatches().filter(
+      (m) =>
+        resolveMatchPhase({
+          status: m.status,
+          utcDate: m.utcDate,
+          homeGoals: m.homeGoals,
+          awayGoals: m.awayGoals,
+          minute: m.minute,
+          liveStatusAr: m.liveStatusAr,
+          now,
+        }) === "live",
+    );
 
     // Map and enrich live matches
     const liveMatches = rawLiveMatches.map((m) => {
       let minute = m.minute;
       let liveStatusAr = m.liveStatusAr;
-      const isLiveStatus = ["IN_PLAY", "PAUSED", "LIVE", "1H", "2H", "HT", "ET", "P", "BREAK"].includes(
-        m.status,
-      );
 
-      // Auto-compute minute if match started recently and not finished
-      if (isLiveStatus || (!m.minute && Date.parse(m.utcDate) <= now.getTime())) {
+      // تقدير الدقيقة للمباريات ذات الحالة المباشرة التي لم يرسل مصدرها الدقيقة
+      if (minute == null && isLiveStatus(m.status)) {
         const elapsedMins = Math.floor((now.getTime() - Date.parse(m.utcDate)) / 60000);
         if (elapsedMins >= 0 && elapsedMins <= 120) {
           if (elapsedMins <= 45) {
@@ -120,9 +132,9 @@ export async function GET(request: Request) {
 
       return {
         ...m,
-        status: isLiveStatus ? "IN_PLAY" : m.status,
+        status: "IN_PLAY",
         minute: minute ?? null,
-        liveStatusAr: liveStatusAr || (isLiveStatus ? "مباشر الآن" : null),
+        liveStatusAr: liveStatusAr || "مباشر الآن",
         homeGoals,
         awayGoals,
         ...liveProbs,

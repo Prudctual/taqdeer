@@ -106,12 +106,14 @@ export function TeamNamesInline({
   homeCrestUrl,
   awayCrestUrl,
   score,
+  placeholder = "VS",
 }: {
   homeName: string;
   awayName: string;
   homeCrestUrl?: string | null;
   awayCrestUrl?: string | null;
   score?: string | null;
+  placeholder?: string;
 }) {
   return (
     <div className="grid grid-cols-[1fr_3.25rem_1fr] items-center gap-1.5 text-xs font-bold w-full">
@@ -124,7 +126,7 @@ export function TeamNamesInline({
       {/* VS / Score Badge - Exactly Centered Column */}
       <div className="w-13 shrink-0 text-center flex items-center justify-center mx-auto">
         <span className="inline-flex items-center justify-center px-1.5 py-0.5 rounded-md bg-panel border border-line font-mono font-black text-xs text-ink tabular min-w-[2.75rem]">
-          {score || "VS"}
+          {score || placeholder}
         </span>
       </div>
 
