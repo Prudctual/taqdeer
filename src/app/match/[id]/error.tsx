@@ -1,7 +1,9 @@
 "use client";
 
+import Link from "next/link";
+
 export default function MatchError({
-  error,
+  error: _error,
   reset,
 }: {
   error: Error & { digest?: string };
@@ -20,12 +22,12 @@ export default function MatchError({
         >
           إعادة المحاولة
         </button>
-        <a
+        <Link
           href="/"
           className="px-4 py-2 rounded-lg bg-accent/10 text-accent text-sm hover:bg-accent/20 transition-colors"
         >
           الصفحة الرئيسية
-        </a>
+        </Link>
       </div>
     </div>
   );
