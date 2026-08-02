@@ -29,6 +29,7 @@ export const ARGENTINA_TEAMS: Record<string, { nameAr: string; nameEn: string; c
   BAR: { nameAr: "باراكاس سنترال", nameEn: "Barracas Central", crestUrl: "https://media.api-sports.io/football/teams/2432.png" },
   UNI: { nameAr: "أونيون سانتا في", nameEn: "Unión Santa Fe", crestUrl: "https://media.api-sports.io/football/teams/441.png" },
   RIE: { nameAr: "ديبورتيفو ريسترا", nameEn: "Deportivo Riestra", crestUrl: "https://media.api-sports.io/football/teams/476.png" },
+  ALD: { nameAr: "ألدوسيفي", nameEn: "Aldosivi", crestUrl: "https://media.api-sports.io/football/teams/477.png" },
 };
 
 // 2026 Liga Profesional Argentina Standings
@@ -61,6 +62,7 @@ const STANDINGS_DATA = [
   { code: "BAR", pos: 26, pld: 15, w: 2, d: 3, l: 10, gf: 7, ga: 23, pts: 9 },
   { code: "UNI", pos: 27, pld: 15, w: 1, d: 5, l: 9, gf: 6, ga: 21, pts: 8 },
   { code: "RIE", pos: 28, pld: 15, w: 1, d: 4, l: 10, gf: 5, ga: 24, pts: 7 },
+  { code: "ALD", pos: 29, pld: 15, w: 1, d: 3, l: 11, gf: 4, ga: 26, pts: 6 },
 ];
 
 /** Historical finished matches for Dixon-Coles, Elo, Pi-Ratings, and Form calibration */
@@ -112,22 +114,29 @@ const FINISHED_MATCHES = [
   { home: "BAR", away: "RIE", hg: 0, ag: 0, date: "2026-07-31T18:00:00Z" },
   { home: "NOB", away: "SAR", hg: 1, ag: 0, date: "2026-07-31T20:15:00Z" },
   { home: "IRI", away: "ATU", hg: 0, ag: 1, date: "2026-08-01T18:00:00Z" },
+
+  // Round 4 - Sunday Aug 2 (FINISHED)
+  { home: "ALD", away: "GIM", hg: 1, ag: 2, date: "2026-08-02T16:30:00Z" },
+  { home: "RIE", away: "BAR", hg: 0, ag: 0, date: "2026-08-02T16:30:00Z" },
 ];
 
-/** Real Scheduled Fixtures for Round 3 (Aug 2 - Aug 4, 2026) */
+/** Real Scheduled Fixtures for Round 4 (Aug 2 - Aug 4, 2026)
+ *  Times verified from tycsports.com, lanacion.com.ar, deportv.gob.ar
+ *  Argentina local time = UTC-3
+ */
 const REAL_SCHEDULED_MATCHES = [
-  // Sunday 2 August / Early Monday 3 August (Tonight / Starting in ~30 mins)
-  { home: "RIV", away: "ROS", date: "2026-08-02T22:15:00Z", round: 3 },
-  { home: "NOB", away: "BOC", date: "2026-08-02T21:00:00Z", round: 3 },
-  { home: "RIE", away: "BAR", date: "2026-08-02T18:30:00Z", round: 3 },
-  { home: "LAN", away: "INS", date: "2026-08-03T01:30:00Z", round: 3 },
+  // Sunday 2 August 2026 (Argentina local → UTC)
+  // 13:30 ART = 16:30 UTC → MOVED TO FINISHED: ALD vs GIM (1-2), RIE vs BAR (0-0)
+  { home: "NOB", away: "BOC", date: "2026-08-02T20:00:00Z", round: 4 },  // 17:00 ART = 20:00 UTC = 23:00 Iraq
+  { home: "RIV", away: "ROS", date: "2026-08-02T22:15:00Z", round: 4 },  // 19:15 ART = 22:15 UTC = 01:15 Iraq
+  { home: "LAN", away: "INS", date: "2026-08-03T00:30:00Z", round: 4 },  // 21:30 ART = 00:30 UTC = 03:30 Iraq
   // Monday 3 August 2026
-  { home: "SAR", away: "IRI", date: "2026-08-03T19:45:00Z", round: 3 },
-  { home: "PLA", away: "TAL", date: "2026-08-03T22:00:00Z", round: 3 },
-  { home: "VEL", away: "IND", date: "2026-08-03T22:00:00Z", round: 3 },
-  // Tuesday 4 August 2026
-  { home: "CCO", away: "SLO", date: "2026-08-04T00:15:00Z", round: 3 },
-  { home: "HUR", away: "ATU", date: "2026-08-04T00:15:00Z", round: 3 },
+  { home: "SAR", away: "IRI", date: "2026-08-03T15:45:00Z", round: 4 },  // 12:45 ART = 15:45 UTC = 18:45 Iraq
+  { home: "PLA", away: "TAL", date: "2026-08-03T18:00:00Z", round: 4 },  // 15:00 ART = 18:00 UTC = 21:00 Iraq
+  { home: "VEL", away: "IND", date: "2026-08-03T18:00:00Z", round: 4 },  // 15:00 ART = 18:00 UTC = 21:00 Iraq
+  // Monday night / Tuesday early (Argentina local 21:15 = UTC 00:15 Aug 4)
+  { home: "CCO", away: "SLO", date: "2026-08-04T00:15:00Z", round: 4 },  // 21:15 ART = 00:15 UTC = 03:15 Iraq
+  { home: "HUR", away: "ATU", date: "2026-08-04T00:15:00Z", round: 4 },  // 21:15 ART = 00:15 UTC = 03:15 Iraq
 ];
 
 export async function syncArgentinaLigaProfesional() {
