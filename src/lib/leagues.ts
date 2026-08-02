@@ -75,6 +75,14 @@ export const LEAGUES: LeagueDef[] = [
     countryAr: "النرويج",
     fdOrgCode: "NO1",
   },
+  {
+    id: "arg1",
+    code: "ARG1",
+    nameAr: "الدوري الأرجنتيني",
+    nameEn: "Liga Profesional Argentina",
+    countryAr: "الأرجنتين",
+    fdOrgCode: "ARG1",
+  },
 ];
 
 export function leagueByCode(code: string) {

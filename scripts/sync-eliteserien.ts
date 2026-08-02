@@ -19,6 +19,22 @@ export const NORWAY_TEAMS: Record<string, { nameAr: string; nameEn: string; cres
   STA: { nameAr: "ستارتا", nameEn: "Start", crestUrl: "https://crests.football-data.org/STA.png" },
 };
 
+export const CODE_ALIAS_MAP: Record<string, string> = {
+  TIL: "TRO",
+  S08: "SAR",
+  VIF: "VAL",
+  RBK: "ROS",
+  LSK: "LIL",
+  KBK: "KRI",
+  FFK: "FRE",
+};
+
+export function normalizeCode(code: string): string {
+  const upper = code.toUpperCase();
+  return CODE_ALIAS_MAP[upper] || upper;
+}
+
+
 // Official 2026 Standings after Round 16 matches on 1 August 2026
 const STANDINGS_DATA = [
   { code: "BOD", pos: 1, pld: 16, w: 12, d: 2, l: 2, gf: 41, ga: 11, pts: 38 },
@@ -120,9 +136,11 @@ export async function syncNorwayEliteserien() {
   const finishedList: Array<{ home: string; away: string; hg: number; ag: number }> = [];
 
   while ((m = matchRegex.exec(html)) !== null) {
-    const homeCode = m[1];
-    const awayCode = m[2];
-    if (!homeCode || !awayCode || homeCode === awayCode) continue;
+    const rawHome = m[1];
+    const rawAway = m[2];
+    if (!rawHome || !rawAway || rawHome === rawAway) continue;
+    const homeCode = normalizeCode(rawHome);
+    const awayCode = normalizeCode(rawAway);
     if (!NORWAY_TEAMS[homeCode] || !NORWAY_TEAMS[awayCode]) continue;
 
     const val = m[3] ? m[3].trim() : "";
