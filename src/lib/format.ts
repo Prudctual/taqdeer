@@ -11,8 +11,8 @@ export function pctCss(p: number, digits = 2): string {
  * الصفحات تُرسم على الخادم وتُخزَّن مؤقتاً، فلا يوجد "توقيت محلي" للقارئ وقت الرسم.
  * نثبّت منطقة عرض واحدة معلنة بدل توقيت الخادم العشوائي.
  */
-export const DISPLAY_TZ = "Asia/Riyadh";
-export const DISPLAY_TZ_LABEL = "بتوقيت مكة";
+export const DISPLAY_TZ = "Asia/Baghdad";
+export const DISPLAY_TZ_LABEL = "بتوقيت العراق (GMT+3)";
 
 function parseDate(iso: string): Date {
   return new Date(iso);
