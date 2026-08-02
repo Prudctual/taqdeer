@@ -114,11 +114,18 @@ const FINISHED_MATCHES = [
   { home: "IRI", away: "ATU", hg: 0, ag: 1, date: "2026-08-01T18:00:00Z" },
 ];
 
-/** Real Scheduled Fixtures for Tomorrow Monday 3 August 2026 */
+/** Real Scheduled Fixtures for Round 3 (Aug 2 - Aug 4, 2026) */
 const REAL_SCHEDULED_MATCHES = [
+  // Sunday 2 August / Early Monday 3 August (Tonight / Starting in ~30 mins)
+  { home: "RIV", away: "ROS", date: "2026-08-02T22:15:00Z", round: 3 },
+  { home: "NOB", away: "BOC", date: "2026-08-02T21:00:00Z", round: 3 },
+  { home: "RIE", away: "BAR", date: "2026-08-02T18:30:00Z", round: 3 },
+  { home: "LAN", away: "INS", date: "2026-08-03T01:30:00Z", round: 3 },
+  // Monday 3 August 2026
   { home: "SAR", away: "IRI", date: "2026-08-03T19:45:00Z", round: 3 },
   { home: "PLA", away: "TAL", date: "2026-08-03T22:00:00Z", round: 3 },
   { home: "VEL", away: "IND", date: "2026-08-03T22:00:00Z", round: 3 },
+  // Tuesday 4 August 2026
   { home: "CCO", away: "SLO", date: "2026-08-04T00:15:00Z", round: 3 },
   { home: "HUR", away: "ATU", date: "2026-08-04T00:15:00Z", round: 3 },
 ];
