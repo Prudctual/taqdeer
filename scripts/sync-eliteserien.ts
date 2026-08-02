@@ -61,15 +61,14 @@ const REAL_FINISHED_MATCHES = [
   { home: "BOD", away: "LIL", date: "2026-07-31T17:00:00Z", round: 16, hg: 4, ag: 0 },
   { home: "FRE", away: "SAN", date: "2026-08-01T14:00:00Z", round: 16, hg: 1, ag: 0 },
   { home: "STA", away: "VIK", date: "2026-08-01T16:00:00Z", round: 16, hg: 0, ag: 3 },
+  { home: "MOL", away: "SAR", date: "2026-08-02T15:00:00Z", round: 16, hg: 3, ag: 3 },
+  { home: "KFU", away: "KRI", date: "2026-08-02T15:00:00Z", round: 16, hg: 2, ag: 1 },
+  { home: "AAL", away: "TRO", date: "2026-08-02T15:00:00Z", round: 16, hg: 2, ag: 6 },
+  { home: "BRA", away: "ROS", date: "2026-08-02T17:15:00Z", round: 16, hg: 3, ag: 2 },
 ];
 
-// Real Round 16 & Round 17 Fixtures still to play
+// Real Round 17 Fixtures still to play
 const REAL_SCHEDULED_MATCHES = [
-  // Round 16 - Sunday 2 August 2026
-  { home: "MOL", away: "SAR", date: "2026-08-02T15:00:00Z", round: 16 },
-  { home: "KFU", away: "KRI", date: "2026-08-02T15:00:00Z", round: 16 },
-  { home: "AAL", away: "TRO", date: "2026-08-02T15:00:00Z", round: 16 },
-  { home: "BRA", away: "ROS", date: "2026-08-02T17:15:00Z", round: 16 },
   // Round 17 - Friday 7 August 2026
   { home: "SAN", away: "KFU", date: "2026-08-07T17:00:00Z", round: 17 },
   // Round 17 - Saturday 8 August 2026
