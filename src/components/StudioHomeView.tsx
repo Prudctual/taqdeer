@@ -62,6 +62,9 @@ export function StudioHomeView({
     return liveUpdate ? { ...m, ...liveUpdate } : m;
   });
 
+  // Sort upcoming matches strictly by kickoff date ascending
+  upcomingMatchesList.sort((a, b) => a.utcDate.localeCompare(b.utcDate));
+
   const recentMatchesList: MatchCard[] = recentGroups.flatMap(
     (g) => g.matches || g.items || [],
   );

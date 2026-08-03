@@ -188,15 +188,19 @@ export function groupByDay<T extends { utcDate: string }>(
     if (list) list.push(item);
     else map.set(key, [item]);
   }
-  return [...map.entries()].map(([key, group]) => {
-    const sample = group[0]!.utcDate;
-    return {
-      key,
-      label: formatDayHeading(sample, now),
-      relative: formatRelativeDay(sample, now),
-      items: group,
-    };
-  });
+  return [...map.entries()]
+    .sort(([keyA], [keyB]) => keyA.localeCompare(keyB))
+    .map(([key, group]) => {
+      // Ensure matches inside each day are sorted by kickoff time ascending
+      group.sort((a, b) => a.utcDate.localeCompare(b.utcDate));
+      const sample = group[0]!.utcDate;
+      return {
+        key,
+        label: formatDayHeading(sample, now),
+        relative: formatRelativeDay(sample, now),
+        items: group,
+      };
+    });
 }
 
 /** بديل الشعار الغائب: أول حرفين من اسم النادي — يعرّف الفريق، بخلاف رمز 1/2 العام */
