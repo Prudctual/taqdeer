@@ -310,9 +310,14 @@ function importSeed(): number {
       sportsdb_id=excluded.sportsdb_id,
       updated_at=excluded.updated_at
   `);
+  const validTeamIds = new Set(
+    (db.prepare("SELECT id FROM teams").all() as { id: string }[]).map((r) => r.id),
+  );
+
   const now = new Date().toISOString();
   const tx = db.transaction(() => {
     for (const p of players) {
+      if (!validTeamIds.has(p.team_id)) continue;
       upsert.run(
         p.id,
         p.team_id,

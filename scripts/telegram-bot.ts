@@ -240,6 +240,8 @@ function getConciseHighlights(): string {
 }
 
 async function broadcastToAllSubscribers() {
+  // Automated notifications disabled as requested
+  return;
   try {
     const subscribers = db.query(`SELECT chat_id FROM telegram_subscribers`).all() as { chat_id: number }[];
     if (!subscribers.length) return;
@@ -797,9 +799,9 @@ async function pollUpdates() {
   }
 }
 
-// ⏰ Start 1-hour recurring broadcast loop (3,600,000 ms)
-const ONE_HOUR_MS = 60 * 60 * 1000;
-setInterval(broadcastToAllSubscribers, ONE_HOUR_MS);
+// ⏰ Recurring broadcast loop is completely disabled as requested
+// const ONE_HOUR_MS = 60 * 60 * 1000;
+// setInterval(broadcastToAllSubscribers, ONE_HOUR_MS);
 
 async function setupBotMetadata() {
   try {

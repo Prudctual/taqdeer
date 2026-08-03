@@ -1,4 +1,3 @@
-import http from "http";
 import https from "https";
 import { getDb } from "../src/lib/db";
 import { normalizeFotmobTime } from "../src/lib/timezone-normalizer";
@@ -6,7 +5,7 @@ import { normalizeFotmobTime } from "../src/lib/timezone-normalizer";
 const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY || "eba270730cmsh926c754a32cb815p1ec397jsnf771a5ebb722";
 const RAPIDAPI_HOST = "free-api-live-football-data.p.rapidapi.com";
 
-export async function fetchMatchesByDate(dateStr: string): Promise<any> {
+export async function fetchMatchesByDate(dateStr: string): Promise<Record<string, unknown>> {
   return new Promise((resolve, reject) => {
     const options = {
       method: "GET",
@@ -20,8 +19,8 @@ export async function fetchMatchesByDate(dateStr: string): Promise<any> {
     };
 
     const req = https.request(options, (res) => {
-      let chunks: any[] = [];
-      res.on("data", (chunk) => chunks.push(chunk));
+      const chunks: Buffer[] = [];
+      res.on("data", (chunk: Buffer) => chunks.push(chunk));
       res.on("end", () => {
         try {
           const body = Buffer.concat(chunks).toString();
