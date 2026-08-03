@@ -129,11 +129,11 @@ const FINISHED_MATCHES = [
  */
 const REAL_SCHEDULED_MATCHES = [
   // Monday 3 August 2026 / Tuesday 4 August 2026 (Live API UTC → Iraq UTC+3)
-  { home: "SAR", away: "IRI", date: "2026-08-03T21:45:00Z", round: 3 },  // 21:45 UTC = 00:45 Iraq (12:45 AM late night)
-  { home: "PLA", away: "TAL", date: "2026-08-04T00:00:00Z", round: 3 },  // 00:00 UTC = 03:00 Iraq (03:00 AM dawn Tuesday)
-  { home: "VEL", away: "IND", date: "2026-08-04T00:00:00Z", round: 3 },  // 00:00 UTC = 03:00 Iraq (03:00 AM dawn Tuesday)
-  { home: "CCO", away: "SLO", date: "2026-08-04T02:15:00Z", round: 3 },  // 02:15 UTC = 05:15 Iraq (05:15 AM dawn Tuesday)
-  { home: "HUR", away: "ATU", date: "2026-08-04T02:15:00Z", round: 3 },  // 02:15 UTC = 05:15 Iraq (05:15 AM dawn Tuesday)
+  { home: "SAR", away: "IRI", date: "2026-08-03T19:45:00Z", round: 3 },  // 19:45 UTC = 22:45 Iraq (10:45 PM TONIGHT Monday Aug 3)
+  { home: "PLA", away: "TAL", date: "2026-08-03T22:00:00Z", round: 3 },  // 22:00 UTC = 01:00 Iraq (01:00 AM dawn Tuesday Aug 4)
+  { home: "VEL", away: "IND", date: "2026-08-03T22:00:00Z", round: 3 },  // 22:00 UTC = 01:00 Iraq (01:00 AM dawn Tuesday Aug 4)
+  { home: "CCO", away: "SLO", date: "2026-08-04T00:15:00Z", round: 3 },  // 00:15 UTC = 03:15 Iraq (03:15 AM dawn Tuesday Aug 4)
+  { home: "HUR", away: "ATU", date: "2026-08-04T00:15:00Z", round: 3 },  // 00:15 UTC = 03:15 Iraq (03:15 AM dawn Tuesday Aug 4)
 
   // Fecha 4 — Friday 7 August to Sunday 9 August 2026
   { home: "ROS", away: "ALD", date: "2026-08-07T22:00:00Z", round: 4 },  // 22:00 UTC = 01:00 Iraq (1:00 AM Aug 8)

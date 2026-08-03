@@ -72,12 +72,13 @@ export async function syncLiveMatchesFromRapidAPI() {
           const statusId = m.statusId; // 1 = Scheduled, 6 = Finished
 
           if (homeName && awayName && timeStr) {
-            // Convert "DD.MM.YYYY HH:mm" to ISO string
+            // Convert FotMob CEST time "DD.MM.YYYY HH:mm" (UTC+2) to true UTC ISO string
             const [dPart, tPart] = timeStr.split(" ");
             if (dPart && tPart) {
-              const [day, month, year] = dPart.split(".");
-              const [hour, min] = tPart.split(":");
-              const utcDate = `${year}-${month}-${day}T${hour}:${min}:00Z`;
+              const [day, month, year] = dPart.split(".").map(Number);
+              const [hour, min] = tPart.split(":").map(Number);
+              const dateObj = new Date(Date.UTC(year!, month! - 1, day!, hour! - 2, min!));
+              const utcDate = dateObj.toISOString();
 
               const status = statusId === 6 ? "FINISHED" : "SCHEDULED";
 
