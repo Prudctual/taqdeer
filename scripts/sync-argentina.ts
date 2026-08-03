@@ -115,21 +115,19 @@ const FINISHED_MATCHES = [
   { home: "NOB", away: "SAR", hg: 1, ag: 0, date: "2026-07-31T20:15:00Z" },
   { home: "IRI", away: "ATU", hg: 0, ag: 1, date: "2026-08-01T18:00:00Z" },
 
-  // Round 4 - Sunday Aug 2 (FINISHED)
+  // Round 4 - Sunday Aug 2 & Monday Aug 3 (FINISHED)
   { home: "ALD", away: "GIM", hg: 1, ag: 2, date: "2026-08-02T16:30:00Z" },
   { home: "RIE", away: "BAR", hg: 0, ag: 0, date: "2026-08-02T16:30:00Z" },
+  { home: "NOB", away: "BOC", hg: 2, ag: 2, date: "2026-08-02T20:00:00Z" },
+  { home: "RIV", away: "ROS", hg: 0, ag: 1, date: "2026-08-02T22:15:00Z" },
+  { home: "LAN", away: "INS", hg: 0, ag: 1, date: "2026-08-03T00:30:00Z" },
 ];
 
-/** Real Scheduled Fixtures for Round 4 (Aug 2 - Aug 4, 2026)
+/** Real Scheduled Fixtures for Round 4 (Aug 3 - Aug 4, 2026)
  *  Times verified from tycsports.com, lanacion.com.ar, deportv.gob.ar
  *  Argentina local time = UTC-3
  */
 const REAL_SCHEDULED_MATCHES = [
-  // Sunday 2 August 2026 (Argentina local → UTC)
-  // 13:30 ART = 16:30 UTC → MOVED TO FINISHED: ALD vs GIM (1-2), RIE vs BAR (0-0)
-  { home: "NOB", away: "BOC", date: "2026-08-02T20:00:00Z", round: 4 },  // 17:00 ART = 20:00 UTC = 23:00 Iraq
-  { home: "RIV", away: "ROS", date: "2026-08-02T22:15:00Z", round: 4 },  // 19:15 ART = 22:15 UTC = 01:15 Iraq
-  { home: "LAN", away: "INS", date: "2026-08-03T00:30:00Z", round: 4 },  // 21:30 ART = 00:30 UTC = 03:30 Iraq
   // Monday 3 August 2026
   { home: "SAR", away: "IRI", date: "2026-08-03T15:45:00Z", round: 4 },  // 12:45 ART = 15:45 UTC = 18:45 Iraq
   { home: "PLA", away: "TAL", date: "2026-08-03T18:00:00Z", round: 4 },  // 15:00 ART = 18:00 UTC = 21:00 Iraq
