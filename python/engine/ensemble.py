@@ -242,9 +242,10 @@ def predict_match(
 
     # Tight contest detection: close Elo ratings & low goal disparity
     elo_diff = abs(elo_home - elo_away)
+    total_xg = lam + mu
     is_tight = elo_diff < 55 or abs(lam - mu) < 0.25
-    if is_tight:
-        # Tactical caution adjustment: slightly compress expected goals for tight clashes
+    if is_tight and total_xg >= 1.8:
+        # Tactical caution adjustment: compress expected goals only for high-scoring tight clashes
         lam *= 0.95
         mu *= 0.95
 
@@ -269,7 +270,7 @@ def predict_match(
     # map pts_gap (-3..3) to home lean
     home_lean = 1 / (1 + math.exp(-1.1 * pts_gap))
     form_draw = 0.24 + 0.06 * (1 - abs(pts_gap) / 3)
-    if is_tight:
+    if is_tight and total_xg >= 1.8:
         form_draw += 0.03
     form_p = _norm(home_lean * (1 - form_draw), form_draw, (1 - home_lean) * (1 - form_draw))
 
@@ -314,6 +315,16 @@ def predict_match(
     ) / 3
     confidence = float(min(0.95, max(0.18, 0.55 * conf + 0.35 * max(agree, 0))))
 
+    p_1x = float(calibrated[0] + calibrated[1])
+    p_x2 = float(calibrated[1] + calibrated[2])
+    p_12 = float(calibrated[0] + calibrated[2])
+    double_chance = {
+        "p_1x": p_1x,
+        "p_x2": p_x2,
+        "p_12": p_12,
+        "best": "1X" if p_1x >= max(p_x2, p_12) else ("X2" if p_x2 >= p_12 else "12"),
+    }
+
     return {
         "lambda_home": lam,
         "lambda_away": mu,
@@ -326,6 +337,7 @@ def predict_match(
         "confidence": confidence,
         "xpts_home": xpts_home,
         "xpts_away": xpts_away,
+        "double_chance": double_chance,
         "components": {
             # ما يدخل الخلط فعلاً بوزن 0.42: احتمالات λ المُمالة بالفورم وPi —
             # لا DC الخام، حتى يصدق تتبّع الرقم على صفحة المباراة
@@ -347,6 +359,8 @@ def predict_match(
             "away_sw": sw_away,
             "blended_pre_cal": blended,
             "temperature": temperature,
+            "double_chance": double_chance,
+            "is_low_scoring": bool(total_xg < 1.8),
         },
         "edge": edge,
         "value": value,

@@ -625,6 +625,7 @@ def main() -> None:
                 "value": pred["value"],
                 "weights": pred["weights"],
                 "xpts": [pred["xpts_home"], pred["xpts_away"]],
+                "double_chance": pred.get("double_chance"),
             }
             conn.execute(
                 """
