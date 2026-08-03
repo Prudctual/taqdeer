@@ -45,10 +45,20 @@ export function SiteSidebar() {
     {
       href: "/accuracy",
       label: "الدقة والسجل",
-      active: pathname.startsWith("/accuracy"),
+      active: pathname === "/accuracy",
       icon: (
         <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
           <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      ),
+    },
+    {
+      href: "/history",
+      label: "سجل حفظ التوقعات",
+      active: pathname.startsWith("/history"),
+      icon: (
+        <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
       ),
     },

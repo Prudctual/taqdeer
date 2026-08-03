@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { MatchList } from "@/components/MatchList";
 import { HeroMatchBanner } from "@/components/HeroMatchBanner";
+import { LiveInteractiveScores } from "@/components/LiveInteractiveScores";
 import { BankerPicksWidget, type BankerPick } from "@/components/BankerPicksWidget";
 import { LeagueTableWidget, type StandingTeam } from "@/components/LeagueTableWidget";
 import { NextKickoff } from "@/components/NextKickoff";
@@ -71,6 +72,9 @@ export function StudioHomeView({
 
   return (
     <div className="space-y-6">
+      {/* Real-time Interactive Live In-Play Scores Banner */}
+      <LiveInteractiveScores />
+
       {/* 1. Next Kickoff Bar */}
       {heroMatch && (
         <section aria-label="أول مباراة قادمة">

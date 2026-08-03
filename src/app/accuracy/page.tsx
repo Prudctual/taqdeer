@@ -8,8 +8,9 @@ import {
   SectionCard,
 } from "@/components/ui";
 import { LeagueAccuracyChart } from "@/components/LeagueAccuracyChart";
+import { PredictionArchiveLog } from "@/components/PredictionArchiveLog";
 import { formatMetaStamp, pct, pctCss } from "@/lib/format";
-import { getModelMetrics, getMeta } from "@/lib/queries";
+import { getModelMetrics, getMeta, getFinishedPredictionsHistory } from "@/lib/queries";
 
 export const metadata: Metadata = {
   title: "دقة النماذج والمعايرة",
@@ -55,6 +56,7 @@ type ValueBacktest = {
 export default function AccuracyPage() {
   const allMetrics = getModelMetrics();
   const lastFit = getMeta("last_fit");
+  const historyItems = getFinishedPredictionsHistory("all", 150);
 
   let vb: ValueBacktest | null = null;
   try {
@@ -351,6 +353,16 @@ export default function AccuracyPage() {
                   <p className="text-xs font-semibold text-muted leading-relaxed">{g.body}</p>
                 </div>
               ))}
+            </div>
+          </SectionCard>
+
+          {/* قسم سجل حفظ ومراجعة التوقعات الكامل */}
+          <SectionCard
+            title="سجل حفظ ومراجعة التوقعات الكامل (Predictions History Archive)"
+            subtitle="توثيق كامل للنتائج الفعلية مقارنة بالتوقعات المسبقة المسجلة قبل انطلاق المباريات"
+          >
+            <div className="p-4 sm:p-5">
+              <PredictionArchiveLog items={historyItems} />
             </div>
           </SectionCard>
 

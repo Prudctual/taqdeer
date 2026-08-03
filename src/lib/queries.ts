@@ -1242,6 +1242,99 @@ export function getTeamPlayers(teamId: string, limit = 24): DbPlayer[] {
   }
 }
 
+export type FinishedPredictionItem = MatchCard & {
+  predictedOutcome: "H" | "D" | "A";
+  actualOutcome: "H" | "D" | "A";
+  isHit: boolean;
+  topProb: number;
+  doubleChanceRec: string;
+  doubleChanceHit: boolean;
+  brierScore: number;
+};
+
+export const getFinishedPredictionsHistory = cache(
+  (leagueId?: string, limit = 100): FinishedPredictionItem[] => {
+    try {
+      const db = getDb();
+      let sql = `${LIST_SELECT}
+        WHERE m.status = 'FINISHED'
+          AND p.p_home IS NOT NULL
+      `;
+      const params: (string | number)[] = [];
+
+      if (leagueId && leagueId !== "all") {
+        sql += ` AND m.league_id = ?`;
+        params.push(leagueId);
+      }
+
+      sql += ` ORDER BY m.utc_date DESC LIMIT ?`;
+      params.push(limit);
+
+      const rows = db.prepare(sql).all(...params) as MatchCard[];
+
+      return rows.map((m) => {
+        const pHome = m.pHome ?? 0;
+        const pDraw = m.pDraw ?? 0;
+        const pAway = m.pAway ?? 0;
+
+        let predictedOutcome: "H" | "D" | "A" = "H";
+        let topProb = pHome;
+        if (pDraw > pHome && pDraw >= pAway) {
+          predictedOutcome = "D";
+          topProb = pDraw;
+        } else if (pAway > pHome && pAway > pDraw) {
+          predictedOutcome = "A";
+          topProb = pAway;
+        }
+
+        const hg = m.homeGoals ?? 0;
+        const ag = m.awayGoals ?? 0;
+        let actualOutcome: "H" | "D" | "A" = "H";
+        if (hg === ag) actualOutcome = "D";
+        else if (hg < ag) actualOutcome = "A";
+
+        const isHit = predictedOutcome === actualOutcome;
+
+        // Double chance calculation (1X, X2, 12)
+        const p1X = pHome + pDraw;
+        const pX2 = pDraw + pAway;
+        const p12 = pHome + pAway;
+        let doubleChanceRec = "1X";
+        let doubleChanceHit = actualOutcome === "H" || actualOutcome === "D";
+
+        if (pX2 > p1X && pX2 >= p12) {
+          doubleChanceRec = "X2";
+          doubleChanceHit = actualOutcome === "A" || actualOutcome === "D";
+        } else if (p12 > p1X && p12 > pX2) {
+          doubleChanceRec = "12";
+          doubleChanceHit = actualOutcome === "H" || actualOutcome === "A";
+        }
+
+        // Brier score calculation
+        const oH = actualOutcome === "H" ? 1 : 0;
+        const oD = actualOutcome === "D" ? 1 : 0;
+        const oA = actualOutcome === "A" ? 1 : 0;
+        const brierScore = (pHome - oH) ** 2 + (pDraw - oD) ** 2 + (pAway - oA) ** 2;
+
+        return {
+          ...m,
+          predictedOutcome,
+          actualOutcome,
+          isHit,
+          topProb,
+          doubleChanceRec,
+          doubleChanceHit,
+          brierScore,
+        };
+      });
+    } catch (e) {
+      console.error("Error in getFinishedPredictionsHistory:", e);
+      return [];
+    }
+  }
+);
+
+
 
 
 
