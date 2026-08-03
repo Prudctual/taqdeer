@@ -801,5 +801,46 @@ async function pollUpdates() {
 const ONE_HOUR_MS = 60 * 60 * 1000;
 setInterval(broadcastToAllSubscribers, ONE_HOUR_MS);
 
-// Start polling
-pollUpdates();
+async function setupBotMetadata() {
+  try {
+    await fetch(`${API_URL}/setMyDescription`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        description: "مرحباً بك في بوت منصة «تقدير» ⚽📊\n\nنظام التحليل الرياضي والتوقعات الخوارزمية المتقدمة لمباريات كرة القدم.",
+      }),
+    });
+    await fetch(`${API_URL}/setMyShortDescription`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        short_description: "بوت منصة «تقدير» للتحليلات والتوقعات الرياضية الخوارزمية ⚽",
+      }),
+    });
+    await fetch(`${API_URL}/setMyCommands`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        commands: [
+          { command: "start", description: "البدء واستعراض القائمة الرئيسية" },
+          { command: "today", description: "مباريات اليوم والتوقعات" },
+          { command: "upcoming", description: "المباريات القادمة" },
+          { command: "bankers", description: "أأمن التوقعات" },
+          { command: "value", description: "فرص القيمة (+EV)" },
+          { command: "leagues", description: "جدول ترتيب الدوريات" },
+          { command: "accuracy", description: "سجل الدقة والأداء" },
+          { command: "methodology", description: "المنهجية الحسابية" },
+        ],
+      }),
+    });
+    console.log("✅ Bot metadata and commands registered successfully.");
+  } catch (err) {
+    console.error("Error registering bot metadata:", err);
+  }
+}
+
+// Register metadata & start polling
+setupBotMetadata().then(() => {
+  pollUpdates();
+});
+
