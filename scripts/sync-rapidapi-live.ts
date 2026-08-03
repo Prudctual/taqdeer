@@ -1,6 +1,7 @@
 import http from "http";
 import https from "https";
 import { getDb } from "../src/lib/db";
+import { normalizeFotmobTime } from "../src/lib/timezone-normalizer";
 
 const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY || "eba270730cmsh926c754a32cb815p1ec397jsnf771a5ebb722";
 const RAPIDAPI_HOST = "free-api-live-football-data.p.rapidapi.com";
@@ -72,14 +73,9 @@ export async function syncLiveMatchesFromRapidAPI() {
           const statusId = m.statusId; // 1 = Scheduled, 6 = Finished
 
           if (homeName && awayName && timeStr) {
-            // Convert FotMob CEST time "DD.MM.YYYY HH:mm" (UTC+2) to true UTC ISO string
-            const [dPart, tPart] = timeStr.split(" ");
-            if (dPart && tPart) {
-              const [day, month, year] = dPart.split(".").map(Number);
-              const [hour, min] = tPart.split(":").map(Number);
-              const dateObj = new Date(Date.UTC(year!, month! - 1, day!, hour! - 2, min!));
-              const utcDate = dateObj.toISOString();
-
+            // Convert FotMob CEST time to true UTC ISO string using central normalizer
+            try {
+              const utcDate = normalizeFotmobTime(timeStr);
               const status = statusId === 6 ? "FINISHED" : "SCHEDULED";
 
               // Find matching match in taqdeer.db
@@ -102,6 +98,8 @@ export async function syncLiveMatchesFromRapidAPI() {
                 `).run(utcDate, status, statusId === 6 ? homeScore : null, statusId === 6 ? awayScore : null, row.id);
                 totalUpdated++;
               }
+            } catch (err) {
+              console.warn(`⚠️ Timezone normalization failed for ${timeStr}:`, err);
             }
           }
         }
