@@ -20,6 +20,7 @@ const LEAGUE_HINTS: Record<string, string[]> = {
   fl1: ["Ligue 1", "French Ligue 1"],
   no1: ["Eliteserien", "Norwegian"],
   kl1: ["K League", "South Korean", "Korea"],
+  arg1: ["Argentinian", "Primera Division", "Argentina"],
 };
 
 /** أسماء بحث بديلة عندما يفشل الاسم الإنجليزي في القاعدة */
