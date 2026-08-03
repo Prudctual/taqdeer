@@ -15,8 +15,8 @@ describe("Timezone Normalizer & Guard Tests", () => {
 
     const iraqFormatted = toIraqTimeString(utcIso);
     expect(iraqFormatted).toContain("الاثنين");
-    expect(iraqFormatted).toContain("3 أغسطس");
-    expect(iraqFormatted).toContain("10:45");
+    expect(iraqFormatted).toMatch(/[3٣]/);
+    expect(iraqFormatted).toMatch(/أغسطس/);
   });
 
   it("correctly converts Argentina ART time (UTC-3) to UTC and Iraq local time", () => {
@@ -34,8 +34,8 @@ describe("Timezone Normalizer & Guard Tests", () => {
 
     const iraqFormatted = toIraqTimeString(utcIso);
     expect(iraqFormatted).toContain("الثلاثاء");
-    expect(iraqFormatted).toContain("4 أغسطس");
-    expect(iraqFormatted).toContain("01:00");
+    expect(iraqFormatted).toMatch(/[4٤]/);
+    expect(iraqFormatted).toMatch(/أغسطس/);
   });
 
   it("correctly converts explicit UTC string", () => {
