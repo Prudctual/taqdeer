@@ -115,35 +115,35 @@ const FINISHED_MATCHES = [
   { home: "NOB", away: "SAR", hg: 1, ag: 0, date: "2026-07-31T20:15:00Z" },
   { home: "IRI", away: "ATU", hg: 0, ag: 1, date: "2026-08-01T18:00:00Z" },
 
-  // Round 4 - Sunday Aug 2 & Monday Aug 3 (FINISHED)
-  { home: "ALD", away: "GIM", hg: 1, ag: 2, date: "2026-08-02T16:30:00Z" },
-  { home: "RIE", away: "BAR", hg: 0, ag: 0, date: "2026-08-02T16:30:00Z" },
-  { home: "NOB", away: "BOC", hg: 2, ag: 2, date: "2026-08-02T20:00:00Z" },
-  { home: "RIV", away: "ROS", hg: 0, ag: 1, date: "2026-08-02T22:15:00Z" },
-  { home: "LAN", away: "INS", hg: 0, ag: 1, date: "2026-08-03T00:30:00Z" },
+  // Round 4 - Sunday Aug 2 & Monday Aug 3 (FINISHED - Real API Live Data)
+  { home: "ALD", away: "GIM", hg: 1, ag: 2, date: "2026-08-02T19:30:00Z" },
+  { home: "RIE", away: "BAR", hg: 0, ag: 1, date: "2026-08-02T19:30:00Z" },
+  { home: "NOB", away: "BOC", hg: 2, ag: 2, date: "2026-08-02T22:00:00Z" },
+  { home: "RIV", away: "ROS", hg: 0, ag: 1, date: "2026-08-03T00:15:00Z" },
+  { home: "LAN", away: "INS", hg: 0, ag: 1, date: "2026-08-03T02:30:00Z" },
 ];
 
-/** Real Scheduled Fixtures for Round 3 & Round 4 (Aug 3 - Aug 9, 2026)
- *  Times verified from Promiedos.com.ar & TyCSports.com
- *  Argentina local time = UTC-3 | Iraq local time (Asia/Baghdad) = UTC+3 (+6h from ART)
+/** Real Scheduled Fixtures from free-api-live-football-data RapidAPI
+ *  Times verified from live API feed (League 916957)
+ *  Iraq local time (Asia/Baghdad) = UTC+3
  */
 const REAL_SCHEDULED_MATCHES = [
-  // Fecha 3 — Monday 3 August 2026 (Argentina ART → UTC → Iraq UTC+3)
-  { home: "SAR", away: "IRI", date: "2026-08-03T19:45:00Z", round: 3 },  // 16:45 ART = 19:45 UTC = 22:45 Iraq (10:45 PM)
-  { home: "PLA", away: "TAL", date: "2026-08-03T22:00:00Z", round: 3 },  // 19:00 ART = 22:00 UTC = 01:00 Iraq (1:00 AM Aug 4)
-  { home: "VEL", away: "IND", date: "2026-08-03T22:00:00Z", round: 3 },  // 19:00 ART = 22:00 UTC = 01:00 Iraq (1:00 AM Aug 4)
-  { home: "CCO", away: "SLO", date: "2026-08-04T00:15:00Z", round: 3 },  // 21:15 ART = 00:15 UTC = 03:15 Iraq (3:15 AM Aug 4)
-  { home: "HUR", away: "ATU", date: "2026-08-04T00:15:00Z", round: 3 },  // 21:15 ART = 00:15 UTC = 03:15 Iraq (3:15 AM Aug 4)
+  // Monday 3 August 2026 / Tuesday 4 August 2026 (Live API UTC → Iraq UTC+3)
+  { home: "SAR", away: "IRI", date: "2026-08-03T21:45:00Z", round: 3 },  // 21:45 UTC = 00:45 Iraq (12:45 AM late night)
+  { home: "PLA", away: "TAL", date: "2026-08-04T00:00:00Z", round: 3 },  // 00:00 UTC = 03:00 Iraq (03:00 AM dawn Tuesday)
+  { home: "VEL", away: "IND", date: "2026-08-04T00:00:00Z", round: 3 },  // 00:00 UTC = 03:00 Iraq (03:00 AM dawn Tuesday)
+  { home: "CCO", away: "SLO", date: "2026-08-04T02:15:00Z", round: 3 },  // 02:15 UTC = 05:15 Iraq (05:15 AM dawn Tuesday)
+  { home: "HUR", away: "ATU", date: "2026-08-04T02:15:00Z", round: 3 },  // 02:15 UTC = 05:15 Iraq (05:15 AM dawn Tuesday)
 
   // Fecha 4 — Friday 7 August to Sunday 9 August 2026
-  { home: "ROS", away: "ALD", date: "2026-08-07T22:00:00Z", round: 4 },  // 19:00 ART = 22:00 UTC = 01:00 Iraq (1:00 AM Aug 8)
-  { home: "IRI", away: "EST", date: "2026-08-08T00:15:00Z", round: 4 },  // 21:15 ART = 00:15 UTC = 03:15 Iraq (3:15 AM Aug 8)
-  { home: "TIG", away: "RIV", date: "2026-08-08T20:00:00Z", round: 4 },  // 17:00 ART = 20:00 UTC = 23:00 Iraq (11:00 PM Aug 8)
-  { home: "BOC", away: "VEL", date: "2026-08-08T22:15:00Z", round: 4 },  // 19:15 ART = 22:15 UTC = 01:15 Iraq (1:15 AM Aug 9)
-  { home: "LAN", away: "PLA", date: "2026-08-09T00:30:00Z", round: 4 },  // 21:30 ART = 00:30 UTC = 03:30 Iraq (3:30 AM Aug 9)
-  { home: "SLO", away: "HUR", date: "2026-08-09T19:30:00Z", round: 4 },  // 16:30 ART = 19:30 UTC = 22:30 Iraq (10:30 PM Aug 9)
-  { home: "ARJ", away: "RAC", date: "2026-08-09T21:45:00Z", round: 4 },  // 18:45 ART = 21:45 UTC = 00:45 Iraq (12:45 AM Aug 10)
-  { home: "DYJ", away: "NOB", date: "2026-08-09T23:45:00Z", round: 4 },  // 20:45 ART = 23:45 UTC = 02:45 Iraq (2:45 AM Aug 10)
+  { home: "ROS", away: "ALD", date: "2026-08-07T22:00:00Z", round: 4 },  // 22:00 UTC = 01:00 Iraq (1:00 AM Aug 8)
+  { home: "IRI", away: "EST", date: "2026-08-08T00:15:00Z", round: 4 },  // 00:15 UTC = 03:15 Iraq (3:15 AM Aug 8)
+  { home: "TIG", away: "RIV", date: "2026-08-08T20:00:00Z", round: 4 },  // 20:00 UTC = 23:00 Iraq (11:00 PM Aug 8)
+  { home: "BOC", away: "VEL", date: "2026-08-08T22:15:00Z", round: 4 },  // 22:15 UTC = 01:15 Iraq (1:15 AM Aug 9)
+  { home: "LAN", away: "PLA", date: "2026-08-09T00:30:00Z", round: 4 },  // 00:30 UTC = 03:30 Iraq (3:30 AM Aug 9)
+  { home: "SLO", away: "HUR", date: "2026-08-09T19:30:00Z", round: 4 },  // 19:30 UTC = 22:30 Iraq (10:30 PM Aug 9)
+  { home: "ARJ", away: "RAC", date: "2026-08-09T21:45:00Z", round: 4 },  // 21:45 UTC = 00:45 Iraq (12:45 AM Aug 10)
+  { home: "DYJ", away: "NOB", date: "2026-08-09T23:45:00Z", round: 4 },  // 23:45 UTC = 02:45 Iraq (2:45 AM Aug 10)
 ];
 
 export async function syncArgentinaLigaProfesional() {
