@@ -2208,5 +2208,325 @@
     "shirt_number": 9,
     "photo_url": null,
     "sportsdb_id": null
+  },
+  {
+    "id": "arg1-tal-22",
+    "team_id": "arg1-tal",
+    "name_en": "Guido Herrera",
+    "name_ar": "غيدو هيريرا",
+    "position": "Goalkeeper",
+    "shirt_number": 22,
+    "photo_url": null,
+    "sportsdb_id": null
+  },
+  {
+    "id": "arg1-tal-29",
+    "team_id": "arg1-tal",
+    "name_en": "Gastón Benavídez",
+    "name_ar": "غاستون بينافيديز",
+    "position": "Right-Back",
+    "shirt_number": 29,
+    "photo_url": null,
+    "sportsdb_id": null
+  },
+  {
+    "id": "arg1-tal-4",
+    "team_id": "arg1-tal",
+    "name_en": "Matías Catalán",
+    "name_ar": "ماتياس كاتالان",
+    "position": "Centre-Back",
+    "shirt_number": 4,
+    "photo_url": null,
+    "sportsdb_id": null
+  },
+  {
+    "id": "arg1-tal-27",
+    "team_id": "arg1-tal",
+    "name_en": "Juan Portilla",
+    "name_ar": "خوان بورتيلا",
+    "position": "Central Midfield",
+    "shirt_number": 27,
+    "photo_url": null,
+    "sportsdb_id": null
+  },
+  {
+    "id": "arg1-tal-10",
+    "team_id": "arg1-tal",
+    "name_en": "Rubén Botta",
+    "name_ar": "روبين بوتا",
+    "position": "Attacking Midfield",
+    "shirt_number": 10,
+    "photo_url": null,
+    "sportsdb_id": null
+  },
+  {
+    "id": "arg1-tal-9",
+    "team_id": "arg1-tal",
+    "name_en": "Federico Girotti",
+    "name_ar": "فيديريكو خيروتي",
+    "position": "Centre-Forward",
+    "shirt_number": 9,
+    "photo_url": null,
+    "sportsdb_id": null
+  },
+  {
+    "id": "arg1-tal-11",
+    "team_id": "arg1-tal",
+    "name_en": "Sebastián Palacios",
+    "name_ar": "سيباستيان بالاسيوس",
+    "position": "Right Winger",
+    "shirt_number": 11,
+    "photo_url": null,
+    "sportsdb_id": null
+  },
+  {
+    "id": "arg1-tal-7",
+    "team_id": "arg1-tal",
+    "name_en": "Ramiro Ruíz Rodríguez",
+    "name_ar": "راميرو رويز رودريغيز",
+    "position": "Left Winger",
+    "shirt_number": 7,
+    "photo_url": null,
+    "sportsdb_id": null
+  },
+  {
+    "id": "arg1-ind-33",
+    "team_id": "arg1-ind",
+    "name_en": "Rodrigo Rey",
+    "name_ar": "رودريغو ري",
+    "position": "Goalkeeper",
+    "shirt_number": 33,
+    "photo_url": null,
+    "sportsdb_id": null
+  },
+  {
+    "id": "arg1-ind-4",
+    "team_id": "arg1-ind",
+    "name_en": "Federico Vera",
+    "name_ar": "فيديريكو فيرا",
+    "position": "Right-Back",
+    "shirt_number": 4,
+    "photo_url": null,
+    "sportsdb_id": null
+  },
+  {
+    "id": "arg1-ind-26",
+    "team_id": "arg1-ind",
+    "name_en": "Kevin Lomónaco",
+    "name_ar": "كيفين لوموناكو",
+    "position": "Centre-Back",
+    "shirt_number": 26,
+    "photo_url": null,
+    "sportsdb_id": null
+  },
+  {
+    "id": "arg1-ind-23",
+    "team_id": "arg1-ind",
+    "name_en": "Iván Marcone",
+    "name_ar": "إيفان ماركوني",
+    "position": "Defensive Midfield",
+    "shirt_number": 23,
+    "photo_url": null,
+    "sportsdb_id": null
+  },
+  {
+    "id": "arg1-ind-5",
+    "team_id": "arg1-ind",
+    "name_en": "Felipe Loyola",
+    "name_ar": "فيليبي لويولا",
+    "position": "Central Midfield",
+    "shirt_number": 5,
+    "photo_url": null,
+    "sportsdb_id": null
+  },
+  {
+    "id": "arg1-ind-11",
+    "team_id": "arg1-ind",
+    "name_en": "Lucas González",
+    "name_ar": "لوكاس غونزاليس",
+    "position": "Attacking Midfield",
+    "shirt_number": 11,
+    "photo_url": null,
+    "sportsdb_id": null
+  },
+  {
+    "id": "arg1-ind-9",
+    "team_id": "arg1-ind",
+    "name_en": "Gabriel Ávalos",
+    "name_ar": "غابرييل أفالوس",
+    "position": "Centre-Forward",
+    "shirt_number": 9,
+    "photo_url": null,
+    "sportsdb_id": null
+  },
+  {
+    "id": "arg1-ind-7",
+    "team_id": "arg1-ind",
+    "name_en": "Santiago Montiel",
+    "name_ar": "سانتياغو مونتيل",
+    "position": "Left Winger",
+    "shirt_number": 7,
+    "photo_url": null,
+    "sportsdb_id": null
+  },
+  {
+    "id": "arg1-slo-12",
+    "team_id": "arg1-slo",
+    "name_en": "Gastón Gómez",
+    "name_ar": "غاستون غوميز",
+    "position": "Goalkeeper",
+    "shirt_number": 12,
+    "photo_url": null,
+    "sportsdb_id": null
+  },
+  {
+    "id": "arg1-slo-4",
+    "team_id": "arg1-slo",
+    "name_en": "Jhohan Romaña",
+    "name_ar": "يوهان رومانيا",
+    "position": "Centre-Back",
+    "shirt_number": 4,
+    "photo_url": null,
+    "sportsdb_id": null
+  },
+  {
+    "id": "arg1-slo-21",
+    "team_id": "arg1-slo",
+    "name_en": "Malcom Braida",
+    "name_ar": "مالكوم برايدا",
+    "position": "Left-Back",
+    "shirt_number": 21,
+    "photo_url": null,
+    "sportsdb_id": null
+  },
+  {
+    "id": "arg1-slo-5",
+    "team_id": "arg1-slo",
+    "name_en": "Eric Remedi",
+    "name_ar": "إريك ريميدي",
+    "position": "Defensive Midfield",
+    "shirt_number": 5,
+    "photo_url": null,
+    "sportsdb_id": null
+  },
+  {
+    "id": "arg1-slo-17",
+    "team_id": "arg1-slo",
+    "name_en": "Elían Irala",
+    "name_ar": "إليان إيرالا",
+    "position": "Central Midfield",
+    "shirt_number": 17,
+    "photo_url": null,
+    "sportsdb_id": null
+  },
+  {
+    "id": "arg1-slo-10",
+    "team_id": "arg1-slo",
+    "name_en": "Nahuel Barrios",
+    "name_ar": "ناهويل باريوس",
+    "position": "Left Winger",
+    "shirt_number": 10,
+    "photo_url": null,
+    "sportsdb_id": null
+  },
+  {
+    "id": "arg1-slo-9",
+    "team_id": "arg1-slo",
+    "name_en": "Alexis Cuello",
+    "name_ar": "أليكسيس كويلو",
+    "position": "Centre-Forward",
+    "shirt_number": 9,
+    "photo_url": null,
+    "sportsdb_id": null
+  },
+  {
+    "id": "arg1-slo-7",
+    "team_id": "arg1-slo",
+    "name_en": "Ezequiel Cerutti",
+    "name_ar": "إيزيكيل سيروتي",
+    "position": "Right Winger",
+    "shirt_number": 7,
+    "photo_url": null,
+    "sportsdb_id": null
+  },
+  {
+    "id": "arg1-cco-1",
+    "team_id": "arg1-cco",
+    "name_en": "Luis Ingolotti",
+    "name_ar": "لويس إينغولوتي",
+    "position": "Goalkeeper",
+    "shirt_number": 1,
+    "photo_url": null,
+    "sportsdb_id": null
+  },
+  {
+    "id": "arg1-cco-2",
+    "team_id": "arg1-cco",
+    "name_en": "Lucas Abascia",
+    "name_ar": "لوكاس أباسيا",
+    "position": "Centre-Back",
+    "shirt_number": 2,
+    "photo_url": null,
+    "sportsdb_id": null
+  },
+  {
+    "id": "arg1-cco-6",
+    "team_id": "arg1-cco",
+    "name_en": "Yonatthan Rak",
+    "name_ar": "يوناتان راك",
+    "position": "Centre-Back",
+    "shirt_number": 6,
+    "photo_url": null,
+    "sportsdb_id": null
+  },
+  {
+    "id": "arg1-cco-5",
+    "team_id": "arg1-cco",
+    "name_en": "Kevin Vázquez",
+    "name_ar": "كيفين فاسكيز",
+    "position": "Central Midfield",
+    "shirt_number": 5,
+    "photo_url": null,
+    "sportsdb_id": null
+  },
+  {
+    "id": "arg1-cco-10",
+    "team_id": "arg1-cco",
+    "name_en": "Rodrigo Atencio",
+    "name_ar": "رودريغو أتينسيو",
+    "position": "Attacking Midfield",
+    "shirt_number": 10,
+    "photo_url": null,
+    "sportsdb_id": null
+  },
+  {
+    "id": "arg1-cco-7",
+    "team_id": "arg1-cco",
+    "name_en": "Matías Godoy",
+    "name_ar": "ماتياس غودوي",
+    "position": "Right Winger",
+    "shirt_number": 7,
+    "photo_url": null,
+    "sportsdb_id": null
+  },
+  {
+    "id": "arg1-cco-9",
+    "team_id": "arg1-cco",
+    "name_en": "Favio Cabral",
+    "name_ar": "فافيو كابرال",
+    "position": "Centre-Forward",
+    "shirt_number": 9,
+    "photo_url": null,
+    "sportsdb_id": null
+  },
+  {
+    "id": "arg1-cco-11",
+    "team_id": "arg1-cco",
+    "name_en": "Matías Benítez",
+    "name_ar": "ماتياس بينيتيز",
+    "position": "Left Winger",
+    "shirt_number": 11,
+    "photo_url": null,
+    "sportsdb_id": null
   }
 ]
