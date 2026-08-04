@@ -46,9 +46,11 @@ def evaluate_logistics_and_external_factors(
     match_date: Optional[str] = None,
     is_european_midweek: bool = False,
     stadium_name: Optional[str] = None,
+    rest_days_home: Optional[int] = None,
+    rest_days_away: Optional[int] = None,
 ) -> Dict[str, float | str | bool]:
     """
-    Evaluate travel fatigue, pitch surface type, and midweek European fixture pressure.
+    Evaluate travel fatigue, pitch surface type, rest days, and midweek European fixture pressure.
     Returns lambda multipliers and logistics description.
     """
     home_mult = 1.0
@@ -64,13 +66,30 @@ def evaluate_logistics_and_external_factors(
         away_mult *= 0.98
         factors.append(f"تنقل سفر متوسط (~{int(travel_km)} كم)")
 
-    # 2. European Midweek Match Congestion
+    # 2. Rest Days & Fixture Congestion
+    if rest_days_home is not None:
+        if rest_days_home <= 2:
+            home_mult *= 0.92
+            factors.append("إرهاق شديد للمضيف (راحة ≤ 2 يوم)")
+        elif rest_days_home <= 3:
+            home_mult *= 0.96
+            factors.append("ضغط مباريات للمضيف (راحة ≤ 3 أيام)")
+
+    if rest_days_away is not None:
+        if rest_days_away <= 2:
+            away_mult *= 0.89
+            factors.append("إرهاق شديد للضيف (راحة ≤ 2 يوم)")
+        elif rest_days_away <= 3:
+            away_mult *= 0.94
+            factors.append("ضغط مباريات للضيف (راحة ≤ 3 أيام)")
+
+    # 3. European Midweek Match Congestion
     if is_european_midweek:
         home_mult *= 0.96
         away_mult *= 0.95
-        factors.append("ضغط مبارات أوروبية منتصف الأسبوع (إرهاق البطولات القارية)")
+        factors.append("ضغط مباريات قارية منتصف الأسبوع")
 
-    # 3. Pitch Surface
+    # 4. Pitch Surface
     pitch = PITCH_SURFACE_MAP.get(stadium_name.lower() if stadium_name else "", "عشب طبيعي ممتاز")
 
     label = " • ".join(factors) if factors else "لوجستيات سفر مريحة وأجواء ملعب مثالية"

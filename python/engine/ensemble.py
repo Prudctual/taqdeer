@@ -211,8 +211,13 @@ def predict_match(
     lam *= float(tactics["home_lambda_mult"])
     mu *= float(tactics["away_lambda_mult"])
 
-    # Logistics & External Travel Adjustments
-    logistics = evaluate_logistics_and_external_factors(home_team=home, away_team=away)
+    # Logistics & External Travel Adjustments (including rest_days & congestion)
+    logistics = evaluate_logistics_and_external_factors(
+        home_team=home,
+        away_team=away,
+        rest_days_home=form_home.rest_days,
+        rest_days_away=form_away.rest_days,
+    )
     lam *= float(logistics["home_lambda_mult"])
     mu *= float(logistics["away_lambda_mult"])
 
@@ -240,14 +245,18 @@ def predict_match(
         rest_days=form_away.rest_days,
     )
 
-    # Tight contest detection: close Elo ratings & low goal disparity
+    # Tight & Low-Scoring contest detection
     elo_diff = abs(elo_home - elo_away)
     total_xg = lam + mu
-    is_tight = elo_diff < 55 or abs(lam - mu) < 0.25
-    if is_tight and total_xg >= 1.8:
-        # Tactical caution adjustment: compress expected goals only for high-scoring tight clashes
-        lam *= 0.95
-        mu *= 0.95
+    is_low_scoring = total_xg <= 1.75
+    is_tight = elo_diff < 60 or abs(lam - mu) < 0.28 or is_low_scoring
+    if is_tight:
+        if is_low_scoring:
+            lam *= 0.94
+            mu *= 0.94
+        elif total_xg >= 1.8:
+            lam *= 0.95
+            mu *= 0.95
 
     mat = score_matrix(lam, mu, dc.rho)
 
@@ -270,8 +279,10 @@ def predict_match(
     # map pts_gap (-3..3) to home lean
     home_lean = 1 / (1 + math.exp(-1.1 * pts_gap))
     form_draw = 0.24 + 0.06 * (1 - abs(pts_gap) / 3)
-    if is_tight and total_xg >= 1.8:
+    if is_tight:
         form_draw += 0.03
+    if is_low_scoring:
+        form_draw += 0.04
     form_p = _norm(home_lean * (1 - form_draw), form_draw, (1 - home_lean) * (1 - form_draw))
 
     parts: list[tuple[Prob3, float]] = [
