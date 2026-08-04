@@ -15,6 +15,18 @@ TEAM_STYLE_MAP: Dict[str, Dict[str, str]] = {
     "bayern": {"formation": "4-2-3-1", "style": "الهجوم الضاغط والأطراف السريعة"},
     "inter": {"formation": "3-5-2", "style": "التكتل المحكم والمرتدات الخاطفة"},
     "atletico": {"formation": "5-3-2", "style": "الدفاع المنخفض والتكتل المباشر"},
+    # Argentine Liga Profesional
+    "river_plate": {"formation": "4-1-3-2", "style": "الضغط العالي والاستحواذ الهجومي"},
+    "boca_juniors": {"formation": "4-4-2", "style": "الصلابة الدفاعية والهجمات المباشرة"},
+    "velez": {"formation": "4-2-3-1", "style": "التكتل الدفاعي والتحول السريع"},
+    "talleres": {"formation": "4-3-3", "style": "الضغط العالي والأطراف السريعة"},
+    "independiente": {"formation": "4-2-3-1", "style": "الضغط المنظم والاستحواذ المتوسط"},
+    # Norwegian Eliteserien
+    "bodo": {"formation": "4-3-3", "style": "الضغط العالي الكثيف والاستحواذ الهجومي"},
+    "brann": {"formation": "4-3-3", "style": "الهجوم السريع والضغط المتواصل"},
+    "molde": {"formation": "3-5-2", "style": "الاستحواذ والمرتدات على الأطراف"},
+    "viking": {"formation": "4-3-3", "style": "اللعب المباشر والقوة البدنية"},
+    "rosenborg": {"formation": "4-3-3", "style": "البناء المتوازن والسيطرة"},
 }
 
 

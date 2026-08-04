@@ -15,6 +15,7 @@ from .dixon_coles import (
 )
 from .elo import elo_outcome_probs
 from .form import TeamForm, form_lambda_adjust
+from .h2h_engine import evaluate_h2h_advantage
 from .logistics_engine import evaluate_logistics_and_external_factors
 from .pi_ratings import PiState, pi_expected_goals
 from .player_impact import apply_rapm_to_xg
@@ -162,6 +163,7 @@ def predict_match(
     dc_shots: Optional[DixonColesResult] = None,
     home_missing: Optional[list] = None,
     away_missing: Optional[list] = None,
+    h2h_matches: Optional[list] = None,
 ) -> Dict:
     w = weights or dict(DEFAULT_WEIGHTS)
 
@@ -205,6 +207,11 @@ def predict_match(
     # RAPM Player Impact adjustment for key missing starters
     if home_missing or away_missing:
         lam, mu = apply_rapm_to_xg(lam, mu, home_missing, away_missing)
+
+    # Head-to-Head (H2H) Historical Dominance Adjustment
+    h2h_res = evaluate_h2h_advantage(home, away, h2h_matches)
+    lam *= float(h2h_res["home_lambda_mult"])
+    mu *= float(h2h_res["away_lambda_mult"])
 
     # Tactical Style Clash & Compatibility Adjustment
     tactics = evaluate_tactical_matchup(home, away)
