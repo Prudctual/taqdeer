@@ -16,6 +16,7 @@ from .dixon_coles import (
 from .elo import elo_outcome_probs
 from .form import TeamForm, form_lambda_adjust
 from .h2h_engine import evaluate_h2h_advantage
+from .league_profiles import get_league_profile
 from .logistics_engine import evaluate_logistics_and_external_factors
 from .pi_ratings import PiState, pi_expected_goals
 from .player_impact import apply_rapm_to_xg
@@ -164,8 +165,10 @@ def predict_match(
     home_missing: Optional[list] = None,
     away_missing: Optional[list] = None,
     h2h_matches: Optional[list] = None,
+    league_id: Optional[str] = None,
 ) -> Dict:
     w = weights or dict(DEFAULT_WEIGHTS)
+    profile = get_league_profile(league_id)
 
     # --- Dixon-Coles base λ ---
     lam_dc, mu_dc = dc_xg(dc, home, away)
@@ -213,6 +216,11 @@ def predict_match(
     lam *= float(h2h_res["home_lambda_mult"])
     mu *= float(h2h_res["away_lambda_mult"])
 
+    # Artificial Turf Advantage (e.g. Norwegian Eliteserien teams like Bodø/Glimt, Tromsø, KFUM)
+    clean_home = home.lower().replace(" ", "").replace("-", "")
+    if any(t in clean_home for t in profile.turf_teams):
+        lam *= 1.05  # +5% goal expectation bonus on artificial turf
+
     # Tactical Style Clash & Compatibility Adjustment
     tactics = evaluate_tactical_matchup(home, away)
     lam *= float(tactics["home_lambda_mult"])
@@ -255,7 +263,7 @@ def predict_match(
     # Tight & Low-Scoring contest detection
     elo_diff = abs(elo_home - elo_away)
     total_xg = lam + mu
-    is_low_scoring = total_xg <= 1.75
+    is_low_scoring = total_xg <= (profile.avg_match_goals * 0.70)
     is_tight = elo_diff < 60 or abs(lam - mu) < 0.28 or is_low_scoring
     if is_tight:
         if is_low_scoring:
@@ -285,7 +293,7 @@ def predict_match(
     pts_gap = form_home.pts - form_away.pts  # per-match avg points last 5
     # map pts_gap (-3..3) to home lean
     home_lean = 1 / (1 + math.exp(-1.1 * pts_gap))
-    form_draw = 0.24 + 0.06 * (1 - abs(pts_gap) / 3)
+    form_draw = profile.draw_baseline + 0.05 * (1 - abs(pts_gap) / 3)
     if is_tight:
         form_draw += 0.03
     if is_low_scoring:

@@ -466,6 +466,7 @@ def main() -> None:
                     market_odds=odds,
                     temperature=1.0,
                     dc_shots=eval_model_shots,
+                    league_id=lid,
                 )
                 comps.append(
                     {
@@ -689,6 +690,7 @@ def main() -> None:
                 dc_shots=model_shots,
                 home_missing=get_missing_players(t["home_team_id"]),
                 away_missing=get_missing_players(t["away_team_id"]),
+                league_id=lid,
             )
 
             write_prediction(

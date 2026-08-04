@@ -11,6 +11,9 @@ from scipy.optimize import minimize
 from scipy.special import gammaln
 
 
+from .league_profiles import get_league_profile
+
+
 @dataclass
 class MatchObs:
     home: str
@@ -80,6 +83,7 @@ def fit_dixon_coles(
     teams = sorted({m.home for m in matches} | {m.away for m in matches})
     n = len(teams)
     idx = {t: i for i, t in enumerate(teams)}
+    profile = get_league_profile(league_id)
 
     home_i = np.array([idx[m.home] for m in matches], dtype=int)
     away_i = np.array([idx[m.away] for m in matches], dtype=int)
@@ -93,8 +97,9 @@ def fit_dixon_coles(
         defense = theta[n : 2 * n].copy()
         home_adv = float(theta[2 * n])
         if league_id == "kl1":
-            # K League home advantage is historically much weaker (~0.08 vs 0.25 in Europe)
             home_adv = float(np.clip(home_adv, 0.02, 0.12))
+        elif profile.home_advantage > 0:
+            home_adv = float(np.clip(home_adv, profile.home_advantage * 0.5, profile.home_advantage * 1.5))
         rho = float(np.clip(theta[2 * n + 1], -0.3, 0.3))
         intercept = float(theta[2 * n + 2])
         attack = attack - attack.mean()
@@ -114,7 +119,7 @@ def fit_dixon_coles(
         return total
 
     x0 = np.zeros(2 * n + 3)
-    x0[2 * n] = 0.08 if league_id == "kl1" else 0.25
+    x0[2 * n] = profile.home_advantage
     x0[2 * n + 1] = -0.05
     x0[2 * n + 2] = 0.1
 
