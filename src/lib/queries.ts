@@ -1298,6 +1298,7 @@ export const getFinishedPredictionsHistory = cache(
         LEFT JOIN predictions p ON p.match_id = m.id
         LEFT JOIN prediction_snapshots ps ON ps.match_id = m.id
         WHERE m.status = 'FINISHED'
+          AND m.utc_date >= '2026-08-07'
           AND (p.p_home IS NOT NULL OR ps.p_home IS NOT NULL)
       `;
       const params: (string | number)[] = [];
@@ -1374,6 +1375,42 @@ export const getFinishedPredictionsHistory = cache(
     }
   }
 );
+
+export const getUpcomingSnapshotMatches = cache((limit = 40): MatchCard[] => {
+  try {
+    const db = getDb();
+    const sql = `
+      SELECT 
+        m.id, m.league_id AS leagueId, l.name_ar AS leagueNameAr, m.season, m.matchday,
+        m.utc_date AS utcDate, m.status, m.home_goals AS homeGoals, m.away_goals AS awayGoals,
+        m.home_team_id AS homeTeamId, m.away_team_id AS awayTeamId,
+        th.name_ar AS homeNameAr, th.name_en AS homeNameEn, th.crest_url AS homeCrestUrl,
+        ta.name_ar AS awayNameAr, ta.name_en AS awayNameEn, ta.crest_url AS awayCrestUrl,
+        COALESCE(ps.p_home, p.p_home) AS pHome,
+        COALESCE(ps.p_draw, p.p_draw) AS pDraw,
+        COALESCE(ps.p_away, p.p_away) AS pAway,
+        COALESCE(ps.p_btts_yes, p.p_btts_yes) AS pBttsYes,
+        COALESCE(ps.p_over25, p.p_over25) AS pOver25,
+        COALESCE(ps.lambda_home, p.lambda_home) AS lambdaHome,
+        COALESCE(ps.lambda_away, p.lambda_away) AS lambdaAway,
+        COALESCE(ps.confidence, p.confidence) AS confidence
+      FROM matches m
+      JOIN leagues l ON l.id = m.league_id
+      JOIN teams th ON th.id = m.home_team_id
+      JOIN teams ta ON ta.id = m.away_team_id
+      JOIN prediction_snapshots ps ON ps.match_id = m.id
+      LEFT JOIN predictions p ON p.match_id = m.id
+      WHERE m.status IN ('SCHEDULED', 'TIMED')
+        AND m.utc_date >= '2026-08-07'
+      ORDER BY m.utc_date ASC
+      LIMIT ?
+    `;
+    return db.prepare(sql).all(limit) as MatchCard[];
+  } catch (e) {
+    console.error("Error in getUpcomingSnapshotMatches:", e);
+    return [];
+  }
+});
 
 
 
