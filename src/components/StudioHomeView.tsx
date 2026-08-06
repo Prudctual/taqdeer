@@ -90,7 +90,6 @@ export function StudioHomeView({
         <section aria-label="مواجهة البث الرئيسية" className="space-y-2">
           <div className="flex items-center justify-between px-1">
             <span className="text-xs font-black text-ink uppercase tracking-wide flex items-center gap-2">
-              <span className="h-2 w-2 rounded-full bg-accent animate-pulse" />
               مباراة القمة القادمة
             </span>
             <span className="text-[11px] font-bold text-muted tabular">مواجهة قادمة</span>
@@ -176,7 +175,6 @@ export function StudioHomeView({
               <div className="space-y-3 rounded-2xl border-2 border-live/40 bg-live-dim p-4 sm:p-5 shadow-xs">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <span className="h-3 w-3 rounded-full bg-live animate-ping shrink-0" />
                     <h3 className="text-sm font-black text-ink">
                       🔴 مباشر الآن — نتائج حية لحظية ({liveMatches.length})
                     </h3>
@@ -194,7 +192,6 @@ export function StudioHomeView({
             {/* Upcoming Matches Header Bar */}
             <div className="flex flex-wrap items-center justify-between gap-3 bg-panel p-3 rounded-2xl border border-line">
               <div className="flex items-center gap-2">
-                <span className="h-2 w-2 rounded-full bg-live animate-pulse" />
                 <h3 className="text-xs font-black text-ink">
                   المباريات القادمة
                 </h3>
@@ -216,25 +213,7 @@ export function StudioHomeView({
               </div>
             )}
 
-            {/* أحدث النتائج المنتهية بالنتيجة الكاملة */}
-            {recentMatchesList.length > 0 ? (
-              <div className="space-y-3">
-                <div className="flex flex-wrap items-center justify-between gap-3 bg-panel p-3 rounded-2xl border border-line">
-                  <div className="flex items-center gap-2">
-                    <span className="h-2 w-2 rounded-full bg-ink/40" />
-                    <h3 className="text-xs font-black text-ink">
-                      أحدث النتائج — النتيجة الكاملة
-                    </h3>
-                  </div>
-                  <span className="px-3 py-1 rounded-xl bg-surface border border-line text-xs font-black text-muted">
-                    {recentMatchesList.length} مباراة منتهية
-                  </span>
-                </div>
-                <div className="rounded-2xl border border-line bg-surface p-4 sm:p-6 shadow-2xs">
-                  <MatchList matches={recentMatchesList} groupDays showLeague />
-                </div>
-              </div>
-            ) : null}
+
           </div>
         )}
 

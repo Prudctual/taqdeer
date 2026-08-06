@@ -96,19 +96,19 @@ export function OddsMovementChart({
           <div className="grid grid-cols-3 gap-2 text-center pt-2 border-t border-line/60">
             <div className="space-y-0.5">
               <span className="text-[10px] text-faint font-bold flex items-center justify-center gap-1">
-                <span className="h-2 w-2 rounded-full bg-home" /> {homeTeam}
+                {homeTeam}
               </span>
               <div className="font-bold text-ink tabular">{cH.toFixed(2)} <span className="text-[10px] text-muted">({(cH - oH) > 0 ? "+" : ""}{(cH - oH).toFixed(2)})</span></div>
             </div>
             <div className="space-y-0.5">
               <span className="text-[10px] text-faint font-bold flex items-center justify-center gap-1">
-                <span className="h-2 w-2 rounded-full bg-draw" /> التعادل
+                التعادل
               </span>
               <div className="font-bold text-ink tabular">{cD.toFixed(2)} <span className="text-[10px] text-muted">({(cD - oD) > 0 ? "+" : ""}{(cD - oD).toFixed(2)})</span></div>
             </div>
             <div className="space-y-0.5">
               <span className="text-[10px] text-faint font-bold flex items-center justify-center gap-1">
-                <span className="h-2 w-2 rounded-full bg-away" /> {awayTeam}
+                {awayTeam}
               </span>
               <div className="font-bold text-ink tabular">{cA.toFixed(2)} <span className="text-[10px] text-muted">({(cA - oA) > 0 ? "+" : ""}{(cA - oA).toFixed(2)})</span></div>
             </div>

@@ -106,7 +106,6 @@ export function DynamicMatchSection({ groups }: DynamicMatchSectionProps) {
                   href={`/leagues/${group.leagueId}`}
                   className="flex items-center gap-2 text-base font-black text-ink no-underline hover:text-accent motion-colors"
                 >
-                  <span className="h-2.5 w-2.5 rounded-full bg-accent" />
                   <span>{group.leagueNameAr}</span>
                 </Link>
                 <span className="text-xs font-extrabold text-muted bg-panel px-3 py-1 rounded-full border border-line">

@@ -64,10 +64,6 @@ export function UpsetAlertBadge({
       {/* Header bar - ultra clear text contrast */}
       <div className="bg-warn-dim border-b border-warn/30 px-4 py-3 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2.5">
-          <span className="relative flex h-2.5 w-2.5">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-warn opacity-75" />
-            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-warn" />
-          </span>
           <span className="font-black text-ink text-xs sm:text-sm">
             تنبيه مفاجأة متوقعة في المباراة
           </span>

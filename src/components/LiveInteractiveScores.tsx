@@ -95,10 +95,6 @@ export function LiveInteractiveScores() {
       <div className="rounded-2xl border border-emerald-500/30 bg-panel p-4 sm:p-5 space-y-4 shadow-md">
         <div className="flex items-center justify-between border-b border-line pb-3">
           <div className="flex items-center gap-2">
-            <span className="relative flex h-3 w-3">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
-            </span>
             <span className="text-xs sm:text-sm font-black text-ink">
               بث النتائج الحية والتحليل اللحظي المباشر ({liveMatches.length} مباراة جارية)
             </span>
@@ -121,7 +117,6 @@ export function LiveInteractiveScores() {
               <div className="flex items-center justify-between text-xs">
                 <span className="font-bold text-muted">{m.leagueNameAr}</span>
                 <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-mono font-black text-[11px] inline-flex items-center gap-1">
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
                   {m.liveStatusAr || `د ${m.minute}'`}
                 </span>
               </div>

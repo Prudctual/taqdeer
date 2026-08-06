@@ -41,7 +41,6 @@ export function EvAreaChart({ match }: { match?: MatchCard | null }) {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
-            <span className="h-2.5 w-2.5 rounded-full bg-success animate-pulse" />
             <h3 className="text-base sm:text-lg font-black text-ink">
               مقارنة القيمة المتوقعة (+EV) لأسعار هذه المباراة
             </h3>

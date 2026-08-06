@@ -87,10 +87,6 @@ export function AutomatedModelAdjustments({
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line pb-4">
         <div className="flex items-center gap-3">
-          <span className="relative flex h-3.5 w-3.5">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent/60 opacity-75" />
-            <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-accent" />
-          </span>
           <h3 className="text-base font-black text-ink tracking-tight leading-snug">
             التعديلات والمعاملات المحسوبة آلياً 100% (AUTOMATED ALGORITHMIC VECTORS)
           </h3>

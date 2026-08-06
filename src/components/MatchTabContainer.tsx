@@ -114,9 +114,6 @@ export function MatchTabContainer({
                 }`}
               >
                 <span>{sec.title.split(". ")[1]?.split(" ")[0] || sec.title}</span>
-                {isOpen && (
-                  <span className="h-1.5 w-1.5 rounded-full bg-accent animate-pulse" />
-                )}
               </button>
             );
           })}

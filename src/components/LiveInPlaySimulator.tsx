@@ -81,12 +81,7 @@ export function LiveInPlaySimulator({
             <span className="inline-flex items-center justify-center h-5 px-2 rounded-full bg-raised text-[10px] font-bold text-zinc-300 border border-zinc-700">
               أداة محاكاة
             </span>
-          ) : (
-            <span className="relative flex h-3 w-3">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-3 w-3 bg-success"></span>
-            </span>
-          )}
+          ) : null}
           <div>
             <h3 className="font-semibold text-zinc-100 text-base">
               {isFinished

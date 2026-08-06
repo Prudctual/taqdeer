@@ -33,7 +33,6 @@ export function StrengthsWeaknessesWidget({
         <div className="rounded-2xl border border-blue-500/20 bg-surface overflow-hidden space-y-0 shadow-2xs">
           <div className="flex items-center justify-between bg-blue-500/10 border-b border-blue-500/20 px-4 py-3 sm:px-5 sm:py-3.5">
             <div className="flex items-center gap-2">
-              <span className="h-2.5 w-2.5 rounded-full bg-home" />
               <span className="font-black text-home text-sm sm:text-base">
                 {homeTeam}
               </span>
@@ -58,7 +57,6 @@ export function StrengthsWeaknessesWidget({
                     key={idx}
                     className="flex items-center gap-1.5 rounded-lg border border-line bg-panel px-3 py-1.5 text-xs font-semibold text-ink"
                   >
-                    <span className="h-1.5 w-1.5 rounded-full bg-home" />
                     <span>{item}</span>
                   </div>
                 ))}
@@ -79,7 +77,6 @@ export function StrengthsWeaknessesWidget({
                     key={idx}
                     className="flex items-center gap-1.5 rounded-lg border border-line bg-panel px-3 py-1.5 text-xs font-semibold text-muted"
                   >
-                    <span className="h-1.5 w-1.5 rounded-full bg-draw" />
                     <span>{item}</span>
                   </div>
                 ))}
@@ -92,7 +89,6 @@ export function StrengthsWeaknessesWidget({
         <div className="rounded-2xl border border-danger/25 bg-surface overflow-hidden space-y-0 shadow-2xs">
           <div className="flex items-center justify-between bg-danger-dim border-b border-danger/25 px-4 py-3 sm:px-5 sm:py-3.5">
             <div className="flex items-center gap-2">
-              <span className="h-2.5 w-2.5 rounded-full bg-danger" />
               <span className="font-black text-danger text-sm sm:text-base">
                 {awayTeam}
               </span>
@@ -117,7 +113,6 @@ export function StrengthsWeaknessesWidget({
                     key={idx}
                     className="flex items-center gap-1.5 rounded-lg border border-line bg-panel px-3 py-1.5 text-xs font-semibold text-ink"
                   >
-                    <span className="h-1.5 w-1.5 rounded-full bg-danger" />
                     <span>{item}</span>
                   </div>
                 ))}
@@ -138,7 +133,6 @@ export function StrengthsWeaknessesWidget({
                     key={idx}
                     className="flex items-center gap-1.5 rounded-lg border border-line bg-panel px-3 py-1.5 text-xs font-semibold text-muted"
                   >
-                    <span className="h-1.5 w-1.5 rounded-full bg-draw" />
                     <span>{item}</span>
                   </div>
                 ))}

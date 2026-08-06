@@ -41,7 +41,6 @@ export default function ChartsPage() {
         <div className="rounded-2xl border border-line bg-panel p-6 sm:p-8 space-y-4 shadow-2xs mt-2">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-accent-dim border border-line text-accent font-black text-xs">
-              <span className="h-2 w-2 rounded-full bg-accent" />
               مركز المخططات والرسوم البيانية للمباريات
             </span>
 

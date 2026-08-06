@@ -91,7 +91,6 @@ export function ValueMatchesView({ matches }: { matches: ValueMatchItem[] }) {
       <div className="rounded-2xl border border-success/30 bg-panel p-4 sm:p-5 space-y-4 shadow-2xs">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-success-dim border border-success/25 text-success font-black text-[11px]">
-            <span className="h-1.5 w-1.5 rounded-full bg-success animate-pulse" />
             تحليل فرص القيمة والسيولة (+EV)
           </span>
 

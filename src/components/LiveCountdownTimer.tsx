@@ -87,7 +87,6 @@ export function LiveCountdownTimer({
     <div className={`flex flex-wrap items-center gap-2.5 ${className}`}>
       {showBadge ? (
         <div className="inline-flex items-center gap-2 rounded-full bg-accent-dim px-3.5 py-1 text-xs font-black text-accent border border-line">
-          <span className="h-2 w-2 rounded-full bg-accent" />
           ينطلق خلال:
         </div>
       ) : null}

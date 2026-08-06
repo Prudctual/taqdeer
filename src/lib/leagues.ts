@@ -120,15 +120,38 @@ export function leagueToneId(idOrCode?: string | null): string | undefined {
   return hit?.id;
 }
 
-const LEAGUE_EMBLEM_FALLBACK: Record<string, string> = {
+const LEAGUE_EMBLEM_MAP: Record<string, string> = {
+  PL: "https://crests.football-data.org/PL.png",
+  PD: "https://crests.football-data.org/PD.png",
+  BL1: "https://crests.football-data.org/BL1.png",
+  SA: "https://crests.football-data.org/SA.png",
+  FL1: "https://crests.football-data.org/FL1.png",
+  PPD: "https://crests.football-data.org/PPL.png",
+  DED: "https://crests.football-data.org/ED.png",
+  TR1: "https://flagcdn.com/w40/tr.png",
+  TUR1: "https://flagcdn.com/w40/tr.png",
+  NO1: "https://flagcdn.com/w40/no.png",
+  SPL: "https://flagcdn.com/w40/sa.png",
+  BSA: "https://flagcdn.com/w40/br.png",
+  ARG: "https://flagcdn.com/w40/ar.png",
+  UEL: "https://crests.football-data.org/EL.png",
+  UCL: "https://crests.football-data.org/CL.png",
   KL1: "/crests/kl1-league.png",
 };
 
-/** شعار الدوري (football-data.org أو مصدر بديل) */
-export function leagueEmblemUrl(code: string) {
-  const upper = code.toUpperCase();
-  if (LEAGUE_EMBLEM_FALLBACK[upper]) return LEAGUE_EMBLEM_FALLBACK[upper];
-  return `https://crests.football-data.org/${upper}.png`;
+/** شعار الدوري المعزز والموثوق بكافة المعرفات */
+export function leagueEmblemUrl(codeOrId: string) {
+  if (!codeOrId) return "https://crests.football-data.org/PL.png";
+  const upper = codeOrId.toUpperCase();
+  const hit = LEAGUES.find(
+    (l) => l.id.toUpperCase() === upper || l.code.toUpperCase() === upper || l.fdOrgCode?.toUpperCase() === upper
+  );
+  const targetCode = hit?.code || hit?.fdOrgCode || upper;
+  
+  if (LEAGUE_EMBLEM_MAP[targetCode]) return LEAGUE_EMBLEM_MAP[targetCode];
+  if (LEAGUE_EMBLEM_MAP[upper]) return LEAGUE_EMBLEM_MAP[upper];
+  
+  return `https://crests.football-data.org/${targetCode}.png`;
 }
 
 export type TournamentType = "ucl" | "uel" | "acl_elite" | "acl_2";

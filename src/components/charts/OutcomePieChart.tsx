@@ -39,7 +39,6 @@ export function OutcomePieChart({ match }: { match?: MatchCard | null }) {
       <div className="rounded-2xl border border-line bg-panel p-5 sm:p-6 space-y-4 shadow-2xs">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
-            <span className="h-2.5 w-2.5 rounded-full bg-home animate-pulse" />
             <h3 className="text-base sm:text-lg font-black text-ink">
               توزيع احتمالات النتيجة (1X2) لهذه المباراة
             </h3>
@@ -91,7 +90,6 @@ export function OutcomePieChart({ match }: { match?: MatchCard | null }) {
       <div className="rounded-2xl border border-line bg-panel p-5 sm:p-6 space-y-4 shadow-2xs">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
-            <span className="h-2.5 w-2.5 rounded-full bg-success animate-pulse" />
             <h3 className="text-base sm:text-lg font-black text-ink">
               احتمالية أهداف المباراة (Over / Under 2.5)
             </h3>

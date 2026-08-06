@@ -106,7 +106,6 @@ export default function AccuracyPage() {
         <div className="rounded-2xl border border-line bg-panel p-6 sm:p-8 space-y-4 shadow-2xs mt-2">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-home font-black text-xs">
-              <span className="h-2 w-2 rounded-full bg-home animate-pulse" />
               سجل المعايرة واختبار النماذج
             </span>
 
@@ -171,38 +170,38 @@ export default function AccuracyPage() {
             title="ملخص أداء النماذج عبر الدوريات"
             subtitle="متوسط نتائج التقييم في آخر نافذة اختبار زمني مستقلة"
           >
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 sm:p-5">
-              <div className="rounded-2xl border border-blue-500/30 bg-surface p-4 space-y-1 shadow-2xs">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-4 sm:p-5">
+              <div className="rounded-xl border border-line bg-surface p-4 space-y-1.5 transition-colors hover:border-line-strong">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-black text-home">متوسط دقة 1X2</span>
-                  <span className="text-[10px] font-extrabold bg-home text-on-fill px-2 py-0.5 rounded-full">الأعلى أفضل</span>
+                  <span className="text-xs font-medium text-muted font-sans">متوسط دقة 1X2</span>
+                  <span className="text-[10px] font-medium text-faint font-sans bg-panel px-2 py-0.5 rounded border border-line/60">الأعلى أفضل</span>
                 </div>
-                <div className="text-2xl sm:text-3xl font-black text-home font-mono tabular">
+                <div className="text-2xl font-bold text-ink font-mono tabular-nums tracking-tight pt-0.5">
                   {avgAcc != null ? pct(avgAcc, 1) : "—"}
                 </div>
-                <p className="text-[11px] font-bold text-muted">نسبة التوقع الصحيح للنتيجة النهائية</p>
+                <p className="text-xs font-medium text-faint font-sans">نسبة التوقع الصحيح للنتيجة النهائية</p>
               </div>
 
-              <div className="rounded-2xl border border-line bg-surface p-4 space-y-1 shadow-2xs">
+              <div className="rounded-xl border border-line bg-surface p-4 space-y-1.5 transition-colors hover:border-line-strong">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-black text-ink">متوسط Brier Score</span>
-                  <span className="text-[10px] font-bold text-muted bg-panel border border-line px-2 py-0.5 rounded-full">الأقل أفضل</span>
+                  <span className="text-xs font-medium text-muted font-sans">متوسط Brier Score</span>
+                  <span className="text-[10px] font-medium text-faint font-sans bg-panel px-2 py-0.5 rounded border border-line/60">الأقل أفضل</span>
                 </div>
-                <div className="text-2xl sm:text-3xl font-black text-ink font-mono tabular">
+                <div className="text-2xl font-bold text-ink font-mono tabular-nums tracking-tight pt-0.5">
                   {avgBrier != null ? avgBrier.toFixed(3) : "—"}
                 </div>
-                <p className="text-[11px] font-bold text-muted font-mono">معايير الدقة والاحتمال الثلاثي</p>
+                <p className="text-xs font-medium text-faint font-sans">معايير الدقة والاحتمال الثلاثي</p>
               </div>
 
-              <div className="rounded-2xl border border-line bg-surface p-4 space-y-1 shadow-2xs">
+              <div className="rounded-xl border border-line bg-surface p-4 space-y-1.5 transition-colors hover:border-line-strong">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-black text-ink">متوسط Log-loss</span>
-                  <span className="text-[10px] font-bold text-muted bg-panel border border-line px-2 py-0.5 rounded-full">الأقل أفضل</span>
+                  <span className="text-xs font-medium text-muted font-sans">متوسط Log-loss</span>
+                  <span className="text-[10px] font-bold text-muted bg-panel border border-line/60 px-2 py-0.5 rounded font-sans">الأقل أفضل</span>
                 </div>
-                <div className="text-2xl sm:text-3xl font-black text-ink font-mono tabular">
+                <div className="text-2xl font-bold text-ink font-mono tabular-nums tracking-tight pt-0.5">
                   {avgLogLoss != null ? avgLogLoss.toFixed(3) : "—"}
                 </div>
-                <p className="text-[11px] font-bold text-muted">مقياس الثقة والمجازفة بالاحتمال</p>
+                <p className="text-xs font-medium text-faint font-sans">مقياس الثقة والمجازفة بالاحتمال</p>
               </div>
             </div>
           </SectionCard>
