@@ -92,9 +92,12 @@ function teamId(leagueId: string, teamName: string): string {
 
 function seedLeagues(db: ReturnType<typeof getDb>) {
   const activeIds = LEAGUES.map((l) => `'${l.id}'`).join(",");
+  db.prepare(`DELETE FROM players WHERE team_id IN (SELECT id FROM teams WHERE league_id NOT IN (${activeIds}))`).run();
+  db.prepare(`DELETE FROM elo_snapshots WHERE team_id IN (SELECT id FROM teams WHERE league_id NOT IN (${activeIds}))`).run();
   db.prepare(`DELETE FROM predictions WHERE match_id IN (SELECT id FROM matches WHERE league_id NOT IN (${activeIds}))`).run();
   db.prepare(`DELETE FROM matches WHERE league_id NOT IN (${activeIds})`).run();
   db.prepare(`DELETE FROM standings WHERE league_id NOT IN (${activeIds})`).run();
+  db.prepare(`DELETE FROM team_strengths WHERE league_id NOT IN (${activeIds})`).run();
   db.prepare(`DELETE FROM teams WHERE league_id NOT IN (${activeIds})`).run();
   db.prepare(`DELETE FROM model_metrics WHERE league_id NOT IN (${activeIds})`).run();
   db.prepare(`DELETE FROM leagues WHERE id NOT IN (${activeIds})`).run();
