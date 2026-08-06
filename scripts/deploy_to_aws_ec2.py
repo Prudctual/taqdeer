@@ -27,11 +27,10 @@ def deploy(host_ip):
     cmd = f"""
     export PATH="$HOME/.bun/bin:$PATH"
     
-    # 1. Vacuum journal logs and clear build caches to free disk space
+    # 1. Clear build caches to free disk space
     echo "🧹 Cleaning up EC2 build caches and logs to free disk space..."
     rm -rf ~/.cache ~/.bun/install/cache /tmp/* 2>/dev/null || true
     rm -rf {REMOTE_DIR}/.next/cache 2>/dev/null || true
-    sudo journalctl --vacuum-size=50M 2>/dev/null || true
 
     # 2. Fetch and deploy latest code
     mkdir -p {REMOTE_DIR}

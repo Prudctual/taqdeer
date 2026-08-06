@@ -88,6 +88,30 @@ def ensure_columns(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE model_metrics ADD COLUMN model_version TEXT")
     if "rps" not in mcols:
         conn.execute("ALTER TABLE model_metrics ADD COLUMN rps REAL")
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS prediction_snapshots (
+          id TEXT PRIMARY KEY,
+          match_id TEXT UNIQUE NOT NULL REFERENCES matches(id),
+          league_id TEXT NOT NULL,
+          utc_date TEXT NOT NULL,
+          p_home REAL NOT NULL,
+          p_draw REAL NOT NULL,
+          p_away REAL NOT NULL,
+          p_btts_yes REAL NOT NULL,
+          p_over25 REAL NOT NULL,
+          lambda_home REAL NOT NULL,
+          lambda_away REAL NOT NULL,
+          elo_home REAL NOT NULL,
+          elo_away REAL NOT NULL,
+          confidence REAL NOT NULL,
+          model_version TEXT NOT NULL,
+          snapshot_at TEXT NOT NULL
+        )
+        """
+    )
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_snapshots_match ON prediction_snapshots(match_id)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_snapshots_league ON prediction_snapshots(league_id)")
 
 
 def empty_form() -> TeamForm:
@@ -664,6 +688,40 @@ def main() -> None:
                     market[0] if market else None,
                     market[1] if market else None,
                     market[2] if market else None,
+                ),
+            )
+
+            # Lock in prediction snapshot (never overwritten once recorded)
+            conn.execute(
+                """
+                INSERT INTO prediction_snapshots (
+                  id, match_id, league_id, utc_date,
+                  p_home, p_draw, p_away, p_btts_yes, p_over25,
+                  lambda_home, lambda_away, elo_home, elo_away,
+                  confidence, model_version, snapshot_at
+                ) SELECT
+                    ?, m.id, m.league_id, m.utc_date,
+                    ?, ?, ?, ?, ?,
+                    ?, ?, ?, ?,
+                    ?, ?, ?
+                FROM matches m WHERE m.id = ?
+                ON CONFLICT(match_id) DO NOTHING
+                """,
+                (
+                    str(uuid.uuid4()),
+                    pred["p_home"],
+                    pred["p_draw"],
+                    pred["p_away"],
+                    pred["p_btts_yes"],
+                    pred["p_over25"],
+                    pred["lambda_home"],
+                    pred["lambda_away"],
+                    elo_h,
+                    elo_a,
+                    pred["confidence"],
+                    MODEL_VERSION,
+                    ts,
+                    match_id,
                 ),
             )
 

@@ -247,6 +247,14 @@ export function PredictionArchiveLog({
                     <span className="px-2.5 py-0.5 rounded-full bg-surface border border-line font-black text-ink">
                       {item.leagueNameAr}
                     </span>
+                    {item.isSnapshotLocked && (
+                      <span
+                        className="px-2 py-0.5 rounded-full bg-blue-500/10 border border-blue-500/30 font-black text-[10px] text-blue-600 dark:text-blue-400"
+                        title="تم تجميد التوقع الصادر رسمياً قبل بداية المباراة بجدول غير قابل للتعديل"
+                      >
+                        🔒 مجمد قبل المباراة
+                      </span>
+                    )}
                     <span className="text-muted font-mono">
                       {new Date(item.utcDate).toLocaleDateString("ar-IQ", {
                         year: "numeric",

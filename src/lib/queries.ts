@@ -1268,15 +1268,37 @@ export type FinishedPredictionItem = MatchCard & {
   doubleChanceRec: string;
   doubleChanceHit: boolean;
   brierScore: number;
+  isSnapshotLocked?: boolean;
 };
 
 export const getFinishedPredictionsHistory = cache(
   (leagueId?: string, limit = 100): FinishedPredictionItem[] => {
     try {
       const db = getDb();
-      let sql = `${LIST_SELECT}
+      let sql = `
+        SELECT 
+          m.id, m.league_id AS leagueId, l.name_ar AS leagueNameAr, m.season, m.matchday,
+          m.utc_date AS utcDate, m.status, m.home_goals AS homeGoals, m.away_goals AS awayGoals,
+          m.home_team_id AS homeTeamId, m.away_team_id AS awayTeamId,
+          th.name_ar AS homeTeamName, th.name_en AS homeTeamNameEn, th.crest_url AS homeCrestUrl,
+          ta.name_ar AS awayTeamName, ta.name_en AS awayTeamNameEn, ta.crest_url AS awayCrestUrl,
+          COALESCE(ps.p_home, p.p_home) AS pHome,
+          COALESCE(ps.p_draw, p.p_draw) AS pDraw,
+          COALESCE(ps.p_away, p.p_away) AS pAway,
+          COALESCE(ps.p_btts_yes, p.p_btts_yes) AS pBttsYes,
+          COALESCE(ps.p_over25, p.p_over25) AS pOver25,
+          COALESCE(ps.lambda_home, p.lambda_home) AS lambdaHome,
+          COALESCE(ps.lambda_away, p.lambda_away) AS lambdaAway,
+          COALESCE(ps.confidence, p.confidence) AS confidence,
+          CASE WHEN ps.id IS NOT NULL THEN 1 ELSE 0 END AS isSnapshotLocked
+        FROM matches m
+        JOIN leagues l ON l.id = m.league_id
+        JOIN teams th ON th.id = m.home_team_id
+        JOIN teams ta ON ta.id = m.away_team_id
+        LEFT JOIN predictions p ON p.match_id = m.id
+        LEFT JOIN prediction_snapshots ps ON ps.match_id = m.id
         WHERE m.status = 'FINISHED'
-          AND p.p_home IS NOT NULL
+          AND (p.p_home IS NOT NULL OR ps.p_home IS NOT NULL)
       `;
       const params: (string | number)[] = [];
 
@@ -1288,7 +1310,7 @@ export const getFinishedPredictionsHistory = cache(
       sql += ` ORDER BY m.utc_date DESC LIMIT ?`;
       params.push(limit);
 
-      const rows = db.prepare(sql).all(...params) as MatchCard[];
+      const rows = db.prepare(sql).all(...params) as (MatchCard & { isSnapshotLocked: number })[];
 
       return rows.map((m) => {
         const pHome = m.pHome ?? 0;
@@ -1343,6 +1365,7 @@ export const getFinishedPredictionsHistory = cache(
           doubleChanceRec,
           doubleChanceHit,
           brierScore,
+          isSnapshotLocked: Boolean(m.isSnapshotLocked),
         };
       });
     } catch (e) {

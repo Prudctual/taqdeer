@@ -104,6 +104,27 @@ function initSchema(db: Database.Database) {
     );
     CREATE INDEX IF NOT EXISTS idx_predictions_match ON predictions(match_id);
 
+    CREATE TABLE IF NOT EXISTS prediction_snapshots (
+      id TEXT PRIMARY KEY,
+      match_id TEXT UNIQUE NOT NULL REFERENCES matches(id),
+      league_id TEXT NOT NULL,
+      utc_date TEXT NOT NULL,
+      p_home REAL NOT NULL,
+      p_draw REAL NOT NULL,
+      p_away REAL NOT NULL,
+      p_btts_yes REAL NOT NULL,
+      p_over25 REAL NOT NULL,
+      lambda_home REAL NOT NULL,
+      lambda_away REAL NOT NULL,
+      elo_home REAL NOT NULL,
+      elo_away REAL NOT NULL,
+      confidence REAL NOT NULL,
+      model_version TEXT NOT NULL,
+      snapshot_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_snapshots_match ON prediction_snapshots(match_id);
+    CREATE INDEX IF NOT EXISTS idx_snapshots_league ON prediction_snapshots(league_id);
+
     CREATE TABLE IF NOT EXISTS elo_snapshots (
       id TEXT PRIMARY KEY,
       team_id TEXT NOT NULL REFERENCES teams(id),
