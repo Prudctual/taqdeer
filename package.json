@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "sync": "tsx scripts/sync-data.ts && tsx scripts/sync-articles.ts && tsx scripts/sync-news.ts && tsx scripts/sync-players.ts",
+    "sync": "tsx scripts/sync-data.ts && tsx scripts/sync-sportsdb-schedule.ts && tsx scripts/sync-articles.ts && tsx scripts/sync-news.ts && tsx scripts/sync-players.ts",
     "sync:articles": "tsx scripts/sync-articles.ts",
     "sync:news": "tsx scripts/sync-news.ts",
     "sync:players": "tsx scripts/sync-players.ts",

@@ -289,13 +289,20 @@ export function getLiveMatches(): MatchCard[] {
     .all() as MatchCard[];
 }
 
-/** أحدث النتائج الحقيقية للموسم الحالي 2026 */
-export function getRecentFinished(limit = 20, season = "2026"): MatchCard[] {
+/** أحدث النتائج الحقيقية — يحدّد آخر موسم متاح تلقائياً لكل دوري */
+export function getRecentFinished(limit = 20, _season?: string): MatchCard[] {
   const db = getDb();
   const leagues = getLeagues();
   if (leagues.length === 0) return [];
 
   const perLeague = Math.max(2, Math.ceil(limit / leagues.length));
+
+  const latestSeasonStmt = db.prepare(
+    `SELECT season FROM matches
+     WHERE league_id = ? AND status = 'FINISHED' AND home_goals IS NOT NULL
+     ORDER BY season DESC LIMIT 1`,
+  );
+
   const stmt = db.prepare(
     `${LIST_SELECT}
      WHERE m.status = 'FINISHED'
@@ -303,13 +310,13 @@ export function getRecentFinished(limit = 20, season = "2026"): MatchCard[] {
        AND m.season = ?
        AND m.home_goals IS NOT NULL
        AND m.away_goals IS NOT NULL
-       AND m.source IN ('football-data.co.uk','uk-csv','football-data.org','wikipedia','real-eliteserien')
      ORDER BY m.utc_date DESC
      LIMIT ?`,
   );
 
   const rows: MatchCard[] = [];
   for (const league of leagues) {
+    const season = _season ?? (latestSeasonStmt.get(league.id) as { season: string } | undefined)?.season ?? "2026";
     rows.push(...(stmt.all(league.id, season, perLeague) as MatchCard[]));
   }
 
@@ -318,14 +325,22 @@ export function getRecentFinished(limit = 20, season = "2026"): MatchCard[] {
   return rows.slice(0, limit);
 }
 
-/** آخر نتائج كل دوري للموسم الحالي (للعرض المجمّع) */
-export function getRecentFinishedByLeague(perLeague = 4, season = "2026"): {
+/** آخر نتائج كل دوري — يحدّد آخر موسم متاح تلقائياً لكل دوري */
+export function getRecentFinishedByLeague(perLeague = 4, _season?: string): {
   leagueId: string;
   leagueNameAr: string;
   matches: MatchCard[];
 }[] {
   const db = getDb();
   const leagues = getLeagues();
+
+  // استعلام يعثر على آخر موسم له نتائج فعلية لكل دوري
+  const latestSeasonStmt = db.prepare(
+    `SELECT season FROM matches
+     WHERE league_id = ? AND status = 'FINISHED' AND home_goals IS NOT NULL
+     ORDER BY season DESC LIMIT 1`,
+  );
+
   const stmt = db.prepare(
     `${LIST_SELECT}
      WHERE m.status = 'FINISHED'
@@ -333,13 +348,13 @@ export function getRecentFinishedByLeague(perLeague = 4, season = "2026"): {
        AND m.season = ?
        AND m.home_goals IS NOT NULL
        AND m.away_goals IS NOT NULL
-       AND m.source IN ('football-data.co.uk','uk-csv','football-data.org','wikipedia','real-eliteserien')
      ORDER BY m.utc_date DESC
      LIMIT ?`,
   );
 
   return leagues
     .map((league) => {
+      const season = _season ?? (latestSeasonStmt.get(league.id) as { season: string } | undefined)?.season ?? "2026";
       const matches = stmt.all(league.id, season, perLeague) as MatchCard[];
       return {
         leagueId: league.id,

@@ -13,6 +13,10 @@ export function SiteHeader() {
     { href: "/value", label: "فرص القيمة", active: pathname.startsWith("/value") },
     { href: "/leagues", label: "الدوريات", active: pathname.startsWith("/leagues") },
     { href: "/accuracy", label: "الدقة والسجل", active: pathname.startsWith("/accuracy") },
+    { href: "/history", label: "حفظ التوقعات", active: pathname.startsWith("/history") },
+    { href: "/charts", label: "الرسوم", active: pathname.startsWith("/charts") },
+    { href: "/news", label: "الأخبار", active: pathname.startsWith("/news") },
+    { href: "/articles", label: "المقالات", active: pathname.startsWith("/articles") },
     { href: "/methodology", label: "المنهجية", active: pathname.startsWith("/methodology") },
   ];
 

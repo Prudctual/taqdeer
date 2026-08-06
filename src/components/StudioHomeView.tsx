@@ -116,7 +116,7 @@ export function StudioHomeView({
             <svg className="h-4 w-4 shrink-0 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
               <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
             </svg>
-            <span>مواعيد ومباريات الجولة ({upcomingCount || upcomingMatchesList.length})</span>
+            <span>المباريات القادمة ({upcomingCount || upcomingMatchesList.length})</span>
           </button>
 
           {/* Tab 2: Value (+EV) */}
@@ -196,7 +196,7 @@ export function StudioHomeView({
               <div className="flex items-center gap-2">
                 <span className="h-2 w-2 rounded-full bg-live animate-pulse" />
                 <h3 className="text-xs font-black text-ink">
-                  مواعيد ومباريات الجولة القادمة المباشرة
+                  المباريات القادمة
                 </h3>
               </div>
 

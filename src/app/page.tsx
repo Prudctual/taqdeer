@@ -34,8 +34,8 @@ function toTableStatus(m: MatchCard): MatchTableRow["status"] {
 
 export default function HomePage() {
   const count = matchCount();
-  const upcomingByLeague = getUpcomingByLeague(6);
-  const recentByLeague = getRecentFinishedByLeague(5);
+  const upcomingByLeague = getUpcomingByLeague(10);
+  const recentByLeague = getRecentFinishedByLeague(8);
   const lastFit = getMeta("last_fit");
   const leagues = getLeagues();
   const bankerPicks = getBankerPicks(4);

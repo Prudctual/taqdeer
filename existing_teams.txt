@@ -1,0 +1,236 @@
+bl1-m-gladbach|bl1|M'gladbach|غلادباخ
+bl1-bayern-munich|bl1|Bayern Munich|بايرن ميونخ
+bl1-augsburg|bl1|Augsburg|أوغسبورغ
+bl1-hoffenheim|bl1|Hoffenheim|هوفنهايم
+bl1-bielefeld|bl1|Bielefeld|بيليفيلد
+bl1-freiburg|bl1|Freiburg|فرايبورغ
+bl1-stuttgart|bl1|Stuttgart|شتوتغارت
+bl1-greuther-furth|bl1|Greuther Furth|غرويتر فورت
+bl1-union-berlin|bl1|Union Berlin|يونيون برلين
+bl1-leverkusen|bl1|Leverkusen|باير ليفركوزن
+bl1-wolfsburg|bl1|Wolfsburg|فولفسبورغ
+bl1-bochum|bl1|Bochum|بوخوم
+bl1-dortmund|bl1|Dortmund|دورتموند
+bl1-ein-frankfurt|bl1|Ein Frankfurt|فرانكفورت
+bl1-mainz|bl1|Mainz|ماينز
+bl1-rb-leipzig|bl1|RB Leipzig|لايبزيغ
+bl1-fc-koln|bl1|FC Koln|كولن
+bl1-hertha|bl1|Hertha|Hertha
+bl1-werder-bremen|bl1|Werder Bremen|فيردر بريمن
+bl1-schalke-04|bl1|Schalke 04|شالكه
+bl1-heidenheim|bl1|Heidenheim|هايدنهايم
+bl1-darmstadt|bl1|Darmstadt|دارمشتات
+bl1-holstein-kiel|bl1|Holstein Kiel|هولشتاين كيل
+bl1-st-pauli|bl1|St Pauli|سانت باولي
+bl1-hamburg|bl1|Hamburg|هامبورغ
+bl1-bayer-leverkusen|bl1|Bayer Leverkusen|Bayer Leverkusen
+bl1-fsv-mainz-05|bl1|FSV Mainz 05|FSV Mainz 05
+bl1-1899-hoffenheim|bl1|1899 Hoffenheim|1899 Hoffenheim
+bl1-vfl-bochum|bl1|VfL Bochum|VfL Bochum
+bl1-bayern-m-nchen|bl1|Bayern München|Bayern München
+bl1-fc-st-pauli|bl1|FC St. Pauli|FC St. Pauli
+bl1-1-fc-heidenheim|bl1|1. FC Heidenheim|1. FC Heidenheim
+bl1-sv-elversberg|bl1|SV Elversberg|SV Elversberg
+ded-heerenveen|ded|Heerenveen|هيرنفين
+ded-sparta-rotterdam|ded|Sparta Rotterdam|سبارتا روتردام
+ded-for-sittard|ded|For Sittard|For Sittard
+ded-ajax|ded|Ajax|أياكس
+ded-cambuur|ded|Cambuur|Cambuur
+ded-excelsior|ded|Excelsior|Excelsior
+ded-psv-eindhoven|ded|PSV Eindhoven|بي إس في آيندهوفن
+ded-fc-emmen|ded|FC Emmen|FC Emmen
+ded-waalwijk|ded|Waalwijk|Waalwijk
+ded-utrecht|ded|Utrecht|أوترخت
+ded-groningen|ded|Groningen|غرونينغن
+ded-volendam|ded|Volendam|Volendam
+ded-nijmegen|ded|Nijmegen|إن إي سي نيميخن
+ded-twente|ded|Twente|تفينتي
+ded-vitesse|ded|Vitesse|فيتيس أرنهم
+ded-feyenoord|ded|Feyenoord|فينورد
+ded-az-alkmaar|ded|AZ Alkmaar|إيه زد ألكنار
+ded-go-ahead-eagles|ded|Go Ahead Eagles|غو أهد إيغلز
+ded-heracles|ded|Heracles|هيراكليس
+ded-zwolle|ded|Zwolle|بي إي سي زفوله
+ded-almere-city|ded|Almere City|ألميري سيتي
+ded-nac-breda|ded|NAC Breda|إن إيه سي بريدا
+ded-willem-ii|ded|Willem II|فيلم 2
+ded-telstar|ded|Telstar|Telstar
+fl1-monaco|fl1|Monaco|موناكو
+fl1-nantes|fl1|Nantes|نانت
+fl1-lyon|fl1|Lyon|ليون
+fl1-brest|fl1|Brest|بريست
+fl1-troyes|fl1|Troyes|تروا
+fl1-paris-sg|fl1|Paris SG|باريس سان جيرمان
+fl1-rennes|fl1|Rennes|رين
+fl1-lens|fl1|Lens|لانس
+fl1-bordeaux|fl1|Bordeaux|بوردو
+fl1-clermont|fl1|Clermont|كليرمون
+fl1-nice|fl1|Nice|نيس
+fl1-reims|fl1|Reims|ريمس
+fl1-st-etienne|fl1|St Etienne|سانت إتيان
+fl1-lorient|fl1|Lorient|لوريان
+fl1-strasbourg|fl1|Strasbourg|ستراسبورغ
+fl1-angers|fl1|Angers|أنجيه
+fl1-metz|fl1|Metz|ميتز
+fl1-lille|fl1|Lille|ليل
+fl1-montpellier|fl1|Montpellier|مونبلييه
+fl1-marseille|fl1|Marseille|مارسيليا
+fl1-ajaccio|fl1|Ajaccio|أجاكسيو
+fl1-toulouse|fl1|Toulouse|تولوز
+fl1-auxerre|fl1|Auxerre|أوكسير
+fl1-le-havre|fl1|Le Havre|لوهافر
+fl1-paris-fc|fl1|Paris FC|باريس إف سي
+fl1-paris-saint-germain|fl1|Paris Saint Germain|باريس سان جيرمان
+fl1-saint-etienne|fl1|Saint Etienne|Saint Etienne
+pd-valencia|pd|Valencia|فالنسيا
+pd-getafe|pd|Getafe|خيتافي
+pd-cadiz|pd|Cadiz|Cadiz
+pd-levante|pd|Levante|ليفانتي
+pd-mallorca|pd|Mallorca|مايوركا
+pd-betis|pd|Betis|ريال بيتيس
+pd-alaves|pd|Alaves|ألافيس
+pd-real-madrid|pd|Real Madrid|ريال مدريد
+pd-osasuna|pd|Osasuna|أوساسونا
+pd-espanol|pd|Espanol|إسبانيول
+pd-celta|pd|Celta|سيلتا فيغو
+pd-ath-madrid|pd|Ath Madrid|أتلتيكو مدريد
+pd-barcelona|pd|Barcelona|برشلونة
+pd-sociedad|pd|Sociedad|ريال سوسيداد
+pd-sevilla|pd|Sevilla|إشبيلية
+pd-vallecano|pd|Vallecano|رايو فاليكانو
+pd-villarreal|pd|Villarreal|فياريال
+pd-granada|pd|Granada|Granada
+pd-elche|pd|Elche|إلتشي
+pd-ath-bilbao|pd|Ath Bilbao|أتلتيك بلباو
+pd-valladolid|pd|Valladolid|بلد الوليد
+pd-girona|pd|Girona|جيرونا
+pd-almeria|pd|Almeria|Almeria
+pd-las-palmas|pd|Las Palmas|لاس بالماس
+pd-leganes|pd|Leganes|ليغانيس
+pd-oviedo|pd|Oviedo|أوفييدو
+pd-real-betis|pd|Real Betis|ريال بيتيس
+pd-celta-vigo|pd|Celta Vigo|سيلتا فيغو
+pd-real-sociedad|pd|Real Sociedad|ريال سوسيداد
+pd-rayo-vallecano|pd|Rayo Vallecano|رايو فاليكانو
+pd-espanyol|pd|Espanyol|إسبانيول
+pd-atletico-madrid|pd|Atletico Madrid|أتلتيكو مدريد
+pd-ayr|pd|Ayr|Ayr
+pd-arbroath|pd|Arbroath|Arbroath
+pd-inverness-c|pd|Inverness C|Inverness C
+pd-dunfermline|pd|Dunfermline|Dunfermline
+pd-livingston|pd|Livingston|Livingston
+pd-queens-park|pd|Queens Park|Queens Park
+pd-morton|pd|Morton|Morton
+pd-partick|pd|Partick|Partick
+pd-raith-rvs|pd|Raith Rvs|Raith Rvs
+pd-stenhousemuir|pd|Stenhousemuir|Stenhousemuir
+pl-brentford|pl|Brentford|برينتفورد
+pl-arsenal|pl|Arsenal|آرسنال
+pl-man-united|pl|Man United|مانشستر يونايتد
+pl-leeds|pl|Leeds|ليدز
+pl-burnley|pl|Burnley|Burnley
+pl-brighton|pl|Brighton|برايتون
+pl-chelsea|pl|Chelsea|تشيلسي
+pl-crystal-palace|pl|Crystal Palace|كريستال بالاس
+pl-everton|pl|Everton|إيفرتون
+pl-southampton|pl|Southampton|ساوثهامبتون
+pl-leicester|pl|Leicester|ليستر
+pl-wolves|pl|Wolves|وولفرهامبتون
+pl-watford|pl|Watford|Watford
+pl-aston-villa|pl|Aston Villa|أستون فيلا
+pl-norwich|pl|Norwich|Norwich
+pl-liverpool|pl|Liverpool|ليفربول
+pl-newcastle|pl|Newcastle|نيوكاسل
+pl-west-ham|pl|West Ham|وست هام
+pl-tottenham|pl|Tottenham|توتنهام
+pl-man-city|pl|Man City|مانشستر سيتي
+pl-fulham|pl|Fulham|فولهام
+pl-bournemouth|pl|Bournemouth|بورنموث
+pl-nott-m-forest|pl|Nott'm Forest|نوتينغهام فورست
+pl-luton|pl|Luton|Luton
+pl-sheffield-united|pl|Sheffield United|Sheffield United
+pl-ipswich|pl|Ipswich|إيبسويتش
+pl-sunderland|pl|Sunderland|سندرلاند
+pl-manchester-united|pl|Manchester United|مانشستر يونايتد
+pl-nottingham-forest|pl|Nottingham Forest|نوتينغهام فورست
+pl-manchester-city|pl|Manchester City|مانشستر سيتي
+ppd-benfica|ppd|Benfica|بنفيكا
+ppd-arouca|ppd|Arouca|أروكا
+ppd-rio-ave|ppd|Rio Ave|ريو أفي
+ppd-vizela|ppd|Vizela|Vizela
+ppd-estoril|ppd|Estoril|إستوريل
+ppd-famalicao|ppd|Famalicao|فاماليساو
+ppd-porto|ppd|Porto|بورتو
+ppd-maritimo|ppd|Maritimo|Maritimo
+ppd-santa-clara|ppd|Santa Clara|سانتا كلارا
+ppd-casa-pia|ppd|Casa Pia|كاسا بيا
+ppd-sp-braga|ppd|Sp Braga|براغا
+ppd-sp-lisbon|ppd|Sp Lisbon|Sp Lisbon
+ppd-chaves|ppd|Chaves|Chaves
+ppd-guimaraes|ppd|Guimaraes|Guimaraes
+ppd-portimonense|ppd|Portimonense|Portimonense
+ppd-boavista|ppd|Boavista|بوافيستا
+ppd-gil-vicente|ppd|Gil Vicente|جيل فيسينتي
+ppd-pacos-ferreira|ppd|Pacos Ferreira|Pacos Ferreira
+ppd-farense|ppd|Farense|فارينسي
+ppd-estrela|ppd|Estrela|Estrela
+ppd-moreirense|ppd|Moreirense|موريرينسي
+ppd-avs|ppd|AVS|أفاي إف سي
+ppd-nacional|ppd|Nacional|ناسيونال ماديرا
+ppd-alverca|ppd|Alverca|Alverca
+ppd-tondela|ppd|Tondela|Tondela
+sa-inter|sa|Inter|إنتر ميلان
+sa-genoa|sa|Genoa|جنوى
+sa-verona|sa|Verona|فيرونا
+sa-sassuolo|sa|Sassuolo|ساسولو
+sa-empoli|sa|Empoli|إمبولي
+sa-lazio|sa|Lazio|لاتسيو
+sa-torino|sa|Torino|تورينو
+sa-atalanta|sa|Atalanta|أتالانتا
+sa-bologna|sa|Bologna|بولونيا
+sa-salernitana|sa|Salernitana|ساليرنيتانا
+sa-udinese|sa|Udinese|أودينيزي
+sa-juventus|sa|Juventus|يوفنتوس
+sa-napoli|sa|Napoli|نابولي
+sa-venezia|sa|Venezia|فينيسيا
+sa-roma|sa|Roma|روما
+sa-fiorentina|sa|Fiorentina|فيورنتينا
+sa-cagliari|sa|Cagliari|كالياري
+sa-spezia|sa|Spezia|سبيتسيا
+sa-sampdoria|sa|Sampdoria|سامبدوريا
+sa-milan|sa|Milan|ميلان
+sa-lecce|sa|Lecce|ليتشي
+sa-monza|sa|Monza|مونزا
+sa-cremonese|sa|Cremonese|كريمونيسي
+sa-frosinone|sa|Frosinone|فروزينوني
+sa-parma|sa|Parma|بارما
+sa-como|sa|Como|كومو
+sa-pisa|sa|Pisa|بيزا
+sa-hellas-verona|sa|Hellas Verona|Hellas Verona
+tur1-istanbulspor|tur1|Istanbulspor|Istanbulspor
+tur1-trabzonspor|tur1|Trabzonspor|طرابزون سبور
+tur1-sivasspor|tur1|Sivasspor|سيفاسبور
+tur1-gaziantep|tur1|Gaziantep|غازي عنتاب
+tur1-besiktas|tur1|Besiktas|بيشكتاش
+tur1-kayserispor|tur1|Kayserispor|قايسري سبور
+tur1-giresunspor|tur1|Giresunspor|Giresunspor
+tur1-ad-demirspor|tur1|Ad. Demirspor|Ad. Demirspor
+tur1-karagumruk|tur1|Karagumruk|Karagumruk
+tur1-alanyaspor|tur1|Alanyaspor|ألانيا سبور
+tur1-antalyaspor|tur1|Antalyaspor|أنطاليا سبور
+tur1-galatasaray|tur1|Galatasaray|غالاتاسراي
+tur1-buyuksehyr|tur1|Buyuksehyr|Buyuksehyr
+tur1-kasimpasa|tur1|Kasimpasa|قاسم باشا
+tur1-ankaragucu|tur1|Ankaragucu|Ankaragucu
+tur1-konyaspor|tur1|Konyaspor|قونية سبور
+tur1-fenerbahce|tur1|Fenerbahce|فنربخشة
+tur1-umraniyespor|tur1|Umraniyespor|Umraniyespor
+tur1-hatayspor|tur1|Hatayspor|هاتاي سبور
+tur1-pendikspor|tur1|Pendikspor|Pendikspor
+tur1-samsunspor|tur1|Samsunspor|سامسون سبور
+tur1-rizespor|tur1|Rizespor|ريزي سبور
+tur1-goztep|tur1|Goztep|Goztep
+tur1-eyupspor|tur1|Eyupspor|أيوب سبور
+tur1-bodrumspor|tur1|Bodrumspor|Bodrumspor
+tur1-genclerbirligi|tur1|Genclerbirligi|Genclerbirligi
+tur1-kocaelispor|tur1|Kocaelispor|Kocaelispor
