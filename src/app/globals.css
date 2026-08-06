@@ -465,6 +465,15 @@ a {
 [data-league="fl1"] {
   --league: oklch(0.55 0.12 155);
 }
+[data-league="ppd"] {
+  --league: oklch(0.55 0.18 140);
+}
+[data-league="ded"] {
+  --league: oklch(0.60 0.20 50);
+}
+[data-league="tur1"] {
+  --league: oklch(0.55 0.20 25);
+}
 [data-league="no1"] {
   --league: oklch(0.55 0.14 250);
 }

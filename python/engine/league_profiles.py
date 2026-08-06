@@ -80,6 +80,42 @@ LEAGUE_PROFILES: Dict[str, LeagueProfile] = {
         elo_weight_mult=1.00,
         form_weight_mult=1.00,
     ),
+    # 🇵🇹 Primeira Liga (Portugal)
+    "ppd": LeagueProfile(
+        league_id="ppd",
+        name_ar="الدوري البرتغالي",
+        home_advantage=0.24,
+        draw_baseline=0.24,
+        avg_match_goals=2.70,
+        turf_teams=[],
+        noise_factor=0.95,
+        elo_weight_mult=1.15,
+        form_weight_mult=1.05,
+    ),
+    # 🇳🇱 Eredivisie (Netherlands)
+    "ded": LeagueProfile(
+        league_id="ded",
+        name_ar="الدوري الهولندي",
+        home_advantage=0.22,
+        draw_baseline=0.21,
+        avg_match_goals=3.15,
+        turf_teams=["heracles", "excelsior"],
+        noise_factor=1.05,
+        elo_weight_mult=1.10,
+        form_weight_mult=1.10,
+    ),
+    # 🇹🇷 Süper Lig (Turkey)
+    "tur1": LeagueProfile(
+        league_id="tur1",
+        name_ar="الدوري التركي",
+        home_advantage=0.29,
+        draw_baseline=0.24,
+        avg_match_goals=2.80,
+        turf_teams=[],
+        noise_factor=1.10,
+        elo_weight_mult=1.05,
+        form_weight_mult=1.15,
+    ),
     # 🇳🇴 Eliteserien
     "no1": LeagueProfile(
         league_id="no1",
@@ -91,18 +127,6 @@ LEAGUE_PROFILES: Dict[str, LeagueProfile] = {
         noise_factor=0.88,
         elo_weight_mult=0.95,
         form_weight_mult=1.25,
-    ),
-    # 🇦🇷 Liga Profesional Argentina
-    "arg1": LeagueProfile(
-        league_id="arg1",
-        name_ar="الدوري الأرجنتيني",
-        home_advantage=0.32,
-        draw_baseline=0.31,
-        avg_match_goals=2.10,
-        turf_teams=[],
-        noise_factor=0.85,
-        elo_weight_mult=0.90,
-        form_weight_mult=1.20,
     ),
 }
 

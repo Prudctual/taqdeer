@@ -27,6 +27,9 @@ const LEAGUES_CONFIG = [
   { id: "bl1", name: "الدوري الألماني", icon: "🇩🇪" },
   { id: "sa", name: "الدوري الإيطالي", icon: "🇮🇹" },
   { id: "fl1", name: "الدوري الفرنسي", icon: "🇫🇷" },
+  { id: "ppd", name: "الدوري البرتغالي", icon: "🇵🇹" },
+  { id: "ded", name: "الدوري الهولندي", icon: "🇳🇱" },
+  { id: "tur1", name: "الدوري التركي", icon: "🇹🇷" },
   { id: "no1", name: "الدوري النرويجي", icon: "🇳🇴" },
 ];
 

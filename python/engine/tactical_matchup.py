@@ -15,12 +15,21 @@ TEAM_STYLE_MAP: Dict[str, Dict[str, str]] = {
     "bayern": {"formation": "4-2-3-1", "style": "الهجوم الضاغط والأطراف السريعة"},
     "inter": {"formation": "3-5-2", "style": "التكتل المحكم والمرتدات الخاطفة"},
     "atletico": {"formation": "5-3-2", "style": "الدفاع المنخفض والتكتل المباشر"},
-    # Argentine Liga Profesional
-    "river_plate": {"formation": "4-1-3-2", "style": "الضغط العالي والاستحواذ الهجومي"},
-    "boca_juniors": {"formation": "4-4-2", "style": "الصلابة الدفاعية والهجمات المباشرة"},
-    "velez": {"formation": "4-2-3-1", "style": "التكتل الدفاعي والتحول السريع"},
-    "talleres": {"formation": "4-3-3", "style": "الضغط العالي والأطراف السريعة"},
-    "independiente": {"formation": "4-2-3-1", "style": "الضغط المنظم والاستحواذ المتوسط"},
+    # Portuguese Primeira Liga
+    "benfica": {"formation": "4-2-3-1", "style": "الضغط العالي والاستحواذ الهجومي"},
+    "porto": {"formation": "4-4-2", "style": "القوة البدنية والضغط المتواصل"},
+    "sporting": {"formation": "3-4-3", "style": "الاستحواذ على الأطراف والتحول السريع"},
+    "braga": {"formation": "4-3-3", "style": "اللعب الهجومي المباشر"},
+    # Dutch Eredivisie
+    "ajax": {"formation": "4-3-3", "style": "الاستحواذ الكثيف والبناء من الخلف"},
+    "psv": {"formation": "4-3-3", "style": "الضغط الهجومي العالي والأطراف الخاطفة"},
+    "feyenoord": {"formation": "4-2-3-1", "style": "الضغط المكثف والتحول السريع"},
+    "az_alkmaar": {"formation": "4-3-3", "style": "السيطرة التكتيكية والشباب السريع"},
+    # Turkish Süper Lig
+    "galatasaray": {"formation": "4-2-3-1", "style": "الضغط العالي والسيطرة الهجومية"},
+    "fenerbahce": {"formation": "4-3-3", "style": "الهجوم السريع والضغط المتواصل"},
+    "besiktas": {"formation": "4-2-3-1", "style": "التوازن الهجومي والصلابة"},
+    "trabzonspor": {"formation": "4-3-3", "style": "المرتدات السريعة والتكتل الإقليمي"},
     # Norwegian Eliteserien
     "bodo": {"formation": "4-3-3", "style": "الضغط العالي الكثيف والاستحواذ الهجومي"},
     "brann": {"formation": "4-3-3", "style": "الهجوم السريع والضغط المتواصل"},

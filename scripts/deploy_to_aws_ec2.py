@@ -42,10 +42,8 @@ def deploy(host_ip):
     fi
     git fetch origin main
     git reset --hard origin/main
-    bun install
     bun run sync
     npx tsx scripts/sync-eliteserien.ts
-    npx tsx scripts/sync-argentina.ts
     .venv/bin/python scripts/fit-and-predict.py || true
     bun run build
     pm2 startOrReload ecosystem.config.js --update-env || pm2 start ecosystem.config.js
