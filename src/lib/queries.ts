@@ -1,5 +1,6 @@
 import { cache } from "react";
 import { getDb } from "./db";
+import { LEAGUES } from "./leagues";
 
 export type MatchCard = {
   id: string;
@@ -709,6 +710,8 @@ export function getModelMetrics() {
 
 export const getLeagues = cache(function getLeagues() {
   const db = getDb();
+  const validIds = LEAGUES.map((l) => l.id);
+  const placeholders = validIds.map(() => "?").join(",");
   return db
     .prepare(
       `SELECT l.*,
@@ -720,10 +723,10 @@ export const getLeagues = cache(function getLeagues() {
           LIMIT 1
         ) AS crest_url
        FROM leagues l
-       WHERE l.id NOT IN ('kl1', 'kl2')
+       WHERE l.id IN (${placeholders})
        ORDER BY l.name_ar`,
     )
-    .all() as Array<{
+    .all(...validIds) as Array<{
     id: string;
     code: string;
     name_ar: string;
