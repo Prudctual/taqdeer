@@ -47,7 +47,14 @@ def main() -> None:
     # 3. مزوج المكونات وتعلّم الأوزان
     u = (1 / 3, 1 / 3, 1 / 3)
     p = blend_components(
-        {"dc": (0.5, 0.3, 0.2), "pi": u, "elo": u, "form": u, "market": None},
+        {
+            "dc": (0.5, 0.3, 0.2),
+            "pi": u,
+            "elo": u,
+            "form": u,
+            "market": None,
+            "context": (0.45, 0.3, 0.25),
+        },
         DEFAULT_WEIGHTS,
     )
     assert abs(sum(p) - 1.0) < 1e-9
@@ -56,7 +63,16 @@ def main() -> None:
     for i in range(120):
         o = "H" if i % 2 == 0 else "A"
         truth = (0.8, 0.1, 0.1) if o == "H" else (0.1, 0.1, 0.8)
-        comps.append({"dc": truth, "pi": u, "elo": u, "form": u, "market": None})
+        comps.append(
+            {
+                "dc": truth,
+                "pi": u,
+                "elo": u,
+                "form": u,
+                "market": None,
+                "context": truth,
+            }
+        )
         outs.append(o)
     w = fit_weights(comps, outs)
     assert abs(sum(w.values()) - 1.0) < 1e-9

@@ -1,9 +1,4 @@
-/**
- * Map football-data.org official names → football-data.co.uk CSV short names.
- * Unknown/promoted clubs keep their API name (new team id).
- */
-const ALIASES: Record<string, string> = {
-  // Premier League
+{
   "Arsenal FC": "Arsenal",
   "Aston Villa FC": "Aston Villa",
   "AFC Bournemouth": "Bournemouth",
@@ -31,8 +26,6 @@ const ALIASES: Record<string, string> = {
   "Sheffield United FC": "Sheffield United",
   "Watford FC": "Watford",
   "Norwich City FC": "Norwich",
-
-  // La Liga
   "Athletic Club": "Ath Bilbao",
   "Club Atlético de Madrid": "Ath Madrid",
   "FC Barcelona": "Barcelona",
@@ -59,8 +52,6 @@ const ALIASES: Record<string, string> = {
   "Cádiz CF": "Cadiz",
   "Real Valladolid CF": "Valladolid",
   "UD Almería": "Almeria",
-
-  // Bundesliga
   "FC Augsburg": "Augsburg",
   "FC Bayern München": "Bayern Munich",
   "Borussia Dortmund": "Dortmund",
@@ -83,8 +74,6 @@ const ALIASES: Record<string, string> = {
   "VfL Bochum 1848": "Bochum",
   "SV Darmstadt 98": "Darmstadt",
   "Holstein Kiel": "Holstein Kiel",
-
-  // Serie A
   "Atalanta BC": "Atalanta",
   "Bologna FC 1909": "Bologna",
   "Cagliari Calcio": "Cagliari",
@@ -112,8 +101,6 @@ const ALIASES: Record<string, string> = {
   "Udinese Calcio": "Udinese",
   "Venezia FC": "Venezia",
   "Hellas Verona FC": "Verona",
-
-  // Ligue 1
   "AC Ajaccio": "Ajaccio",
   "Angers SCO": "Angers",
   "AJ Auxerre": "Auxerre",
@@ -139,9 +126,6 @@ const ALIASES: Record<string, string> = {
   "RC Strasbourg Alsace": "Strasbourg",
   "Toulouse FC": "Toulouse",
   "ES Troyes AC": "Troyes",
-
-  // أسماء API-Football/التغذيات بصيغ مختلفة عن أسماء CSV القياسية —
-  // غيابها كان ينشئ فرقاً مكررة بهويات موازية (Bayern München ≠ Bayern Munich)
   "Manchester City": "Man City",
   "Manchester United": "Man United",
   "Nottingham Forest": "Nott'm Forest",
@@ -162,8 +146,6 @@ const ALIASES: Record<string, string> = {
   "Paris Saint Germain": "Paris SG",
   "Saint Etienne": "St Etienne",
   "SV Elversberg": "Elversberg",
-
-  // أسماء API-Football للمباريات القادمة (Eredivisie / Primeira / إلخ)
   "Famalicão": "Famalicao",
   "Guimaraes": "Guimaraes",
   "Vitoria Guimaraes": "Guimaraes",
@@ -192,27 +174,7 @@ const ALIASES: Record<string, string> = {
   "Başakşehir": "Buyuksehyr",
   "Goztepe": "Goztep",
   "Gaziantep FK": "Gaziantep",
-};
-
-function normalizeKey(name: string): string {
-  return name
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/&/g, " and ")
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim()
-    .replace(/\s+/g, " ");
-}
-
-const ALIAS_BY_NORM = new Map(
-  Object.entries(ALIASES).map(([k, v]) => [normalizeKey(k), v]),
-);
-
-/** Resolve an API/display name to the CSV canonical short name when known. */
-export function resolveTeamName(english: string): string {
-  if (ALIASES[english]) return ALIASES[english]!;
-  const byNorm = ALIAS_BY_NORM.get(normalizeKey(english));
-  if (byNorm) return byNorm;
-  return english;
+  "For Sittard": "Fortuna Sittard",
+  "Sp Lisbon": "Sporting CP",
+  "Academico": "Academico Viseu"
 }

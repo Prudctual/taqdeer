@@ -29,13 +29,14 @@ from .weather_engine import apply_weather_to_lambdas
 
 Prob3 = Tuple[float, float, float]
 
-WEIGHT_KEYS = ("dc", "pi", "elo", "form", "market")
+WEIGHT_KEYS = ("dc", "pi", "elo", "form", "market", "context")
 DEFAULT_WEIGHTS: Dict[str, float] = {
-    "dc": 0.42,
-    "pi": 0.18,
-    "elo": 0.18,
+    "dc": 0.38,
+    "pi": 0.16,
+    "elo": 0.16,
     "form": 0.10,
     "market": 0.12,
+    "context": 0.08,
 }
 
 
@@ -173,8 +174,16 @@ def predict_match(
     referee_profile: Optional[Dict] = None,
     open_odds: Optional[tuple[float, float, float]] = None,
 ) -> Dict:
-    w = weights or dict(DEFAULT_WEIGHTS)
     profile = get_league_profile(league_id)
+    w = dict(weights or DEFAULT_WEIGHTS)
+    # تفعيل مضاعفات ملف الدوري على Elo/Form قبل التطبيع
+    w["elo"] = float(w.get("elo", DEFAULT_WEIGHTS["elo"])) * float(profile.elo_weight_mult)
+    w["form"] = float(w.get("form", DEFAULT_WEIGHTS["form"])) * float(profile.form_weight_mult)
+    w.setdefault("context", DEFAULT_WEIGHTS["context"])
+    s_w = sum(max(0.0, float(w.get(k, 0.0))) for k in WEIGHT_KEYS) or 1.0
+    w = {k: max(0.0, float(w.get(k, 0.0))) / s_w for k in WEIGHT_KEYS}
+    # حرارة أعلى في الدوريات الصاخبة
+    temperature = float(temperature) * float(profile.noise_factor)
 
     # --- Dixon-Coles base λ ---
     lam_dc, mu_dc = dc_xg(dc, home, away)
@@ -296,8 +305,9 @@ def predict_match(
             mu *= 0.95
 
     mat = score_matrix(lam, mu, dc.rho)
+    mk_ctx = markets_from_matrix(mat)
+    context_p: Prob3 = (mk_ctx["p_home"], mk_ctx["p_draw"], mk_ctx["p_away"])
 
-    mk = markets_from_matrix(mat)
     # dc_p uses raw DC lambdas — NOT the blended lam/mu which already contain
     # Pi and Form signals. Using blended lambdas here would double-count those
     # signals when dc_p is later blended with pi_p and form_p in _blend_many.
@@ -327,6 +337,7 @@ def predict_match(
         (pi_p, w["pi"]),
         (elo_p, w["elo"]),
         (form_p, w["form"]),
+        (context_p, w["context"]),
     ]
 
     market_p = None
@@ -342,15 +353,27 @@ def predict_match(
     mat = align_matrix_to_probs(mat, calibrated)
     mk = markets_from_matrix(mat)
 
+    # EV صادق: احتمالات بلا مكوّن السوق مقابل خط الأودز (تفضيل open إن وُجد)
     edge = None
     value = None
-    if market_p:
-        edge = {
-            "home": calibrated[0] - market_p[0],
-            "draw": calibrated[1] - market_p[1],
-            "away": calibrated[2] - market_p[2],
-        }
-        value = value_signal(calibrated, market_odds)
+    fair_parts = [
+        (dc_p, w["dc"]),
+        (pi_p, w["pi"]),
+        (elo_p, w["elo"]),
+        (form_p, w["form"]),
+        (context_p, w["context"]),
+    ]
+    fair = apply_temperature(_blend_many(fair_parts), temperature)
+    value_odds = open_odds if open_odds else market_odds
+    if value_odds:
+        value_market = odds_to_probs(*value_odds)
+        if value_market:
+            edge = {
+                "home": fair[0] - value_market[0],
+                "draw": fair[1] - value_market[1],
+                "away": fair[2] - value_market[2],
+            }
+            value = value_signal(fair, value_odds)
 
     # Expected points for home/away
     xpts_home = 3 * calibrated[0] + calibrated[1]
@@ -416,6 +439,7 @@ def predict_match(
             "player_impact": player_res,
             "referee": referee_res,
             "sharp": steam_res,
+            "context": {"p": context_p, "lambda": [lam, mu]},
             "home_sw": sw_home,
             "away_sw": sw_away,
             "blended_pre_cal": blended,

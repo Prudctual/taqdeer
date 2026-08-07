@@ -25,6 +25,7 @@ from fotmob_client import (  # noqa: E402
     match_details,
     matches_by_date,
 )
+from name_match import names_match, slugify as _slug  # noqa: E402
 from team_matcher import get_mapped, put_mapped  # noqa: E402
 from engine.sharp_market import detect_steam  # noqa: E402
 from engine.weather_engine import weather_goal_multiplier  # noqa: E402
@@ -35,8 +36,10 @@ if DB_PATH.startswith("file:"):
 if not os.path.isabs(DB_PATH):
     DB_PATH = str(ROOT / DB_PATH.lstrip("./"))
 
-LOCK_PATH = Path(os.environ.get("TAQDEER_ENRICH_LOCK", "/tmp/taqdeer-enrich.lock"))
+LOCK_PATH = Path(os.environ.get("TAQDEER_ENRICH_LOCK", str(ROOT / "data" / "enrich.lock")))
 STADIUMS_PATH = ROOT / "scripts" / "data" / "stadiums.json"
+# كاش دائم تحت data/ — لا يُمسح مع /tmp في النشر
+os.environ.setdefault("TAQDEER_ENRICH_CACHE", str(ROOT / "data" / "enrich-cache"))
 META_PREFIX = "enrich_"
 
 # فترات الطبقات (ثوانٍ)
@@ -232,19 +235,15 @@ DIV_TO_LEAGUE = {
 }
 
 
-def _slug(s: str) -> str:
-    import re
-
-    s = s.lower().strip()
-    s = re.sub(r"[^a-z0-9]+", "-", s)
-    return s.strip("-")
+def _norm_csv_row(r: dict) -> dict:
+    return {(k or "").lstrip("\ufeff").strip(): v for k, v in r.items()}
 
 
 def tier_a_odds_steam(conn: sqlite3.Connection) -> None:
     print("[A] fixtures.csv + steam…", flush=True)
     try:
         with urllib.request.urlopen(UK_FIXTURES, timeout=40) as resp:
-            text = resp.read().decode("utf-8", errors="replace")
+            text = resp.read().decode("utf-8-sig", errors="replace")
     except Exception as e:
         print(f"  [A] fetch failed: {e}", flush=True)
         meta_set(conn, "tier_a", time.time())
@@ -252,7 +251,8 @@ def tier_a_odds_steam(conn: sqlite3.Connection) -> None:
 
     reader = csv.DictReader(io.StringIO(text))
     updated = 0
-    for r in reader:
+    for raw in reader:
+        r = _norm_csv_row(raw)
         div = (r.get("Div") or "").strip()
         lid = DIV_TO_LEAGUE.get(div)
         if not lid:
@@ -278,9 +278,6 @@ def tier_a_odds_steam(conn: sqlite3.Connection) -> None:
         if not oh or not od or not oa:
             continue
 
-        # طابق مباراة SCHEDULED بنفس اليوم تقريباً وأسماء الفرق
-        home_slug = _slug(home)
-        away_slug = _slug(away)
         rows = conn.execute(
             """
             SELECT m.id, m.home_team_id, m.away_team_id, t1.name_en AS hn, t2.name_en AS an,
@@ -295,25 +292,19 @@ def tier_a_odds_steam(conn: sqlite3.Connection) -> None:
             (lid,),
         ).fetchall()
 
-        def name_hit(db_name: str, csv_name: str) -> bool:
-            a, b = _slug(db_name), _slug(csv_name)
-            return a == b or a in b or b in a
-
         match_row = None
         for m in rows:
-            if name_hit(m["hn"], home) and name_hit(m["an"], away):
-                match_row = m
-                break
-            if home_slug in _slug(m["hn"]) and away_slug in _slug(m["an"]):
+            if names_match(m["hn"], home) and names_match(m["an"], away):
                 match_row = m
                 break
         if not match_row:
             continue
 
         mid = match_row["id"]
-        open_h = match_row["odds_open_home"] or oh
-        open_d = match_row["odds_open_draw"] or od
-        open_a = match_row["odds_open_away"] or oa
+        # تجميد الافتتاح: لا نمرّر القيمة الحالية لـ COALESCE كبديل — NULL يُملأ مرة واحدة
+        open_h = match_row["odds_open_home"]
+        open_d = match_row["odds_open_draw"]
+        open_a = match_row["odds_open_away"]
         conn.execute(
             """
             UPDATE matches SET
@@ -323,9 +314,15 @@ def tier_a_odds_steam(conn: sqlite3.Connection) -> None:
               odds_open_away=COALESCE(odds_open_away, ?)
             WHERE id=?
             """,
-            (oh, od, oa, open_h, open_d, open_a, mid),
+            (oh, od, oa, oh, od, oa, mid),
         )
-        steam = detect_steam((float(open_h), float(open_d), float(open_a)), (oh, od, oa))
+        # بعد التحديث: إن كان open فارغاً قبلها فهو الآن = oh (أول لمسة)
+        use_open = (
+            (float(open_h) if open_h is not None else oh),
+            (float(open_d) if open_d is not None else od),
+            (float(open_a) if open_a is not None else oa),
+        )
+        steam = detect_steam(use_open, (oh, od, oa))
         upsert_enrichment(
             conn,
             mid,
@@ -477,11 +474,8 @@ def find_local_match_for_fotmob(
         """,
         (league_id, day, day),
     ).fetchall()
-    hs, as_ = _slug(hn), _slug(an)
     for m in rows:
-        if (hs in _slug(m["hn"]) or _slug(m["hn"]) in hs) and (
-            as_ in _slug(m["an"]) or _slug(m["an"]) in as_
-        ):
+        if names_match(m["hn"], hn) and names_match(m["an"], an):
             if fm.get("home_id"):
                 put_mapped(conn, "team", m["home_team_id"], str(fm["home_id"]), hn)
             if fm.get("away_id"):
@@ -576,7 +570,8 @@ def apply_fotmob_to_match(
     return confirmed
 
 
-def iter_fotmob_matches(days: int = 7):
+def iter_fotmob_matches(days: int = 8):
+    """اليوم + (days-1) أيام قادمة — يغطي نافذة SQL لـ 7 أيام كاملة."""
     today = now_utc().date()
     for i in range(days):
         d = (today + timedelta(days=i)).strftime("%Y%m%d")
@@ -585,11 +580,11 @@ def iter_fotmob_matches(days: int = 7):
 
 
 def tier_c_injuries(conn: sqlite3.Connection) -> None:
-    print("[C] FotMob injuries/missing (7d)…", flush=True)
+    print("[C] FotMob injuries/missing (8d window)…", flush=True)
     n = 0
     errors = 0
     seen = set()
-    for fm in iter_fotmob_matches(7):
+    for fm in iter_fotmob_matches(8):
         fid = fm.get("fotmob_id")
         if not fid or fid in seen:
             continue
@@ -645,6 +640,22 @@ def tier_d_lineups_imminent(conn: sqlite3.Connection) -> None:
     if newly_confirmed:
         meta_set(conn, "repredict_matches", ",".join(newly_confirmed))
         print(f"  [D] flag repredict: {newly_confirmed[:5]}", flush=True)
+        # إعادة توقع فورية خفيفة (لا walk-forward)
+        try:
+            import subprocess
+
+            subprocess.run(
+                [
+                    str(ROOT / ".venv" / "bin" / "python"),
+                    str(ROOT / "scripts" / "fit-and-predict.py"),
+                    "--repredict-flagged",
+                ],
+                cwd=str(ROOT),
+                timeout=600,
+                check=False,
+            )
+        except Exception as e:
+            print(f"  [D] narrow repredict spawn failed: {e}", flush=True)
     meta_set(conn, "tier_d", time.time())
 
 

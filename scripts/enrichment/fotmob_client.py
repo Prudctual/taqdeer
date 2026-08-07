@@ -9,7 +9,8 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 BASE = "https://www.fotmob.com/api/data"
-CACHE_DIR = Path(os.environ.get("TAQDEER_ENRICH_CACHE", "/tmp/taqdeer-enrich-cache"))
+_DEFAULT_CACHE = Path(__file__).resolve().parents[2] / "data" / "enrich-cache"
+CACHE_DIR = Path(os.environ.get("TAQDEER_ENRICH_CACHE", str(_DEFAULT_CACHE)))
 MIN_INTERVAL = float(os.environ.get("FOTMOB_MIN_INTERVAL", "1.2"))
 
 # primaryId لدورياتنا الثمانية

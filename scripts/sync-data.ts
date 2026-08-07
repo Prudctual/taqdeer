@@ -40,6 +40,24 @@ async function download(url: string): Promise<string | null> {
   }
 }
 
+/** إزالة BOM وتطبيع مفاتيح صفوف CSV من football-data.co.uk */
+function parseCsvRows(csvText: string): Record<string, string>[] {
+  const text = csvText.replace(/^\uFEFF/, "");
+  const rows = parse(text, {
+    columns: true,
+    skip_empty_lines: true,
+    relax_column_count: true,
+    trim: true,
+  }) as Record<string, string>[];
+  return rows.map((r) => {
+    const out: Record<string, string> = {};
+    for (const [k, v] of Object.entries(r)) {
+      out[k.replace(/^\uFEFF/, "").trim()] = v;
+    }
+    return out;
+  });
+}
+
 const londonOffset = new Intl.DateTimeFormat("en-GB", {
   timeZone: "Europe/London",
   timeZoneName: "longOffset",
@@ -195,11 +213,12 @@ function upsertTeam(
   english: string,
   crestUrl?: string | null,
 ) {
-  const id = teamId(leagueId, english);
+  const resolved = resolveTeamName(english);
+  const id = teamId(leagueId, resolved);
   db.prepare(
     `INSERT INTO teams (id, league_id, name_ar, name_en, short_name, crest_url)
      VALUES (?, ?, ?, ?, ?, ?)
-     ON CONFLICT(id) DO UPDATE SET
+    ON CONFLICT(id) DO UPDATE SET
        name_en=excluded.name_en,
        name_ar=excluded.name_ar,
        short_name=excluded.short_name,
@@ -207,9 +226,9 @@ function upsertTeam(
   ).run(
     id,
     leagueId,
-    nameAr(english),
-    english,
-    english.slice(0, 12),
+    nameAr(resolved),
+    resolved,
+    resolved.slice(0, 12),
     crestUrl ?? null,
   );
   return id;
@@ -527,12 +546,7 @@ function ingestCsv(
   csvText: string,
   expectedDiv?: string,
 ) {
-  const rows = parse(csvText, {
-    columns: true,
-    skip_empty_lines: true,
-    relax_column_count: true,
-    trim: true,
-  }) as Record<string, string>[];
+  const rows = parseCsvRows(csvText);
 
   // football-data.co.uk يعيد توجيه ملفات الموسم غير المنشورة لملف دوري آخر
   // (مثال: 2627/SP1.csv → SC1.csv الاسكتلندي) — صفوف Div الغريبة تُرفض بالكامل
@@ -889,15 +903,10 @@ export async function syncUpcomingOdds(db: ReturnType<typeof getDb>) {
   loadEnv();
   const text = await download("https://www.football-data.co.uk/fixtures.csv");
   let fromCsv = 0;
-  if (!text || !text.includes("HomeTeam")) {
+  if (!text || !text.replace(/^\uFEFF/, "").includes("HomeTeam")) {
     console.warn("  fixtures.csv غير متاح");
   } else {
-    const rows = parse(text, {
-      columns: true,
-      skip_empty_lines: true,
-      relax_column_count: true,
-      trim: true,
-    }) as Record<string, string>[];
+    const rows = parseCsvRows(text);
 
     const byCode = new Map(
       LEAGUES.filter((l) => l.fdUkCode).map((l) => [l.fdUkCode!, l.id]),
@@ -929,9 +938,11 @@ export async function syncUpcomingOdds(db: ReturnType<typeof getDb>) {
       for (const r of rows) {
         const leagueId = byCode.get(r.Div ?? "");
         if (!leagueId) continue;
-        const home = r.HomeTeam || r.Home || r["Home Team"];
-        const away = r.AwayTeam || r.Away || r["Away Team"];
-        if (!home || !away || !r.Date) continue;
+        const homeRaw = r.HomeTeam || r.Home || r["Home Team"];
+        const awayRaw = r.AwayTeam || r.Away || r["Away Team"];
+        if (!homeRaw || !awayRaw || !r.Date) continue;
+        const home = resolveTeamName(homeRaw);
+        const away = resolveTeamName(awayRaw);
         const utc = parseUkDate(r.Date, r.Time);
         if (!utc) continue;
         const oh = num(r.AvgH) ?? num(r.B365H) ?? num(r.PSH);

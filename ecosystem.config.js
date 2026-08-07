@@ -40,6 +40,8 @@ module.exports = {
         PYTHONUNBUFFERED: "1",
         PATH: "/home/ubuntu/.bun/bin:/usr/local/bin:/usr/bin:/bin",
         DATABASE_URL: "file:./data/taqdeer.db",
+        TAQDEER_ENRICH_CACHE: "/home/ubuntu/taqdeer/data/enrich-cache",
+        TAQDEER_ENRICH_LOCK: "/home/ubuntu/taqdeer/data/enrich.lock",
       },
     },
   ],

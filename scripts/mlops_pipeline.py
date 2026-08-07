@@ -185,8 +185,14 @@ def scan_and_alert_value_bets():
 def run_full_mlops_cycle():
     log("🚀 Launching Automated MLOps Cycle...")
     bun = resolve_bun()
+    py = str(ROOT / ".venv" / "bin" / "python")
     ok_sync = run_step([bun, "run", "sync"], "Data Synchronization")
     ok_fit = run_step([bun, "run", "fit"], "Model Fitting & Temperature Calibration")
+    # إعادة توقع ضيقة إن أكّد enrich تشكيلات بين الدورات
+    run_step(
+        [py, "scripts/fit-and-predict.py", "--repredict-flagged"],
+        "Narrow repredict (lineup-confirmed)",
+    )
     if ok_sync and ok_fit:
         scan_and_alert_value_bets()
         log("🎉 MLOps Cycle Finished cleanly.")

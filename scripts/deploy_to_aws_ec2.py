@@ -29,7 +29,8 @@ def deploy(host_ip):
     
     # 1. Clear build caches to free disk space
     echo "🧹 Cleaning up EC2 build caches and logs to free disk space..."
-    rm -rf ~/.cache ~/.bun/install/cache /tmp/* 2>/dev/null || true
+    rm -rf ~/.cache ~/.bun/install/cache 2>/dev/null || true
+    # لا تمسح /tmp بالكامل — قد يُستخدم مؤقتاً؛ كاش الإثراء تحت data/enrich-cache
     rm -rf {REMOTE_DIR}/.next/cache 2>/dev/null || true
 
     # 2. Fetch and deploy latest code

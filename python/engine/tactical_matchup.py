@@ -91,12 +91,14 @@ def evaluate_tactical_matchup(
 
     commentary = " • ".join(notes) if notes else "صراع تكتيكي متوازن في خط الوسط والأطراف"
 
+    # مضاعفات λ = 1.0 حتى تتوفر أنماط PPDA حقيقية — النص للواجهة فقط
+    _ = (h_mult, a_mult)
     return {
         "home_formation": h_form,
         "away_formation": a_form,
         "home_style": h_style,
         "away_style": a_style,
-        "home_lambda_mult": round(h_mult, 3),
-        "away_lambda_mult": round(a_mult, 3),
+        "home_lambda_mult": 1.0,
+        "away_lambda_mult": 1.0,
         "matchup_commentary": commentary,
     }

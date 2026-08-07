@@ -1,112 +1,807 @@
 {
-  "pl-liverpool": { "lat": 53.4308, "lon": -2.9608, "name": "Anfield" },
-  "pl-arsenal": { "lat": 51.5549, "lon": -0.1084, "name": "Emirates Stadium" },
-  "pl-manchester-city": { "lat": 53.4831, "lon": -2.2004, "name": "Etihad Stadium" },
-  "pl-man-city": { "lat": 53.4831, "lon": -2.2004, "name": "Etihad Stadium" },
-  "pl-manchester-united": { "lat": 53.4631, "lon": -2.2913, "name": "Old Trafford" },
-  "pl-man-united": { "lat": 53.4631, "lon": -2.2913, "name": "Old Trafford" },
-  "pl-chelsea": { "lat": 51.4816, "lon": -0.1910, "name": "Stamford Bridge" },
-  "pl-tottenham": { "lat": 51.6043, "lon": -0.0665, "name": "Tottenham Hotspur Stadium" },
-  "pl-aston-villa": { "lat": 52.5091, "lon": -1.8848, "name": "Villa Park" },
-  "pl-newcastle": { "lat": 54.9756, "lon": -1.6217, "name": "St James' Park" },
-  "pl-brighton": { "lat": 50.8618, "lon": -0.0833, "name": "Amex Stadium" },
-  "pl-west-ham": { "lat": 51.5387, "lon": -0.0166, "name": "London Stadium" },
-  "pl-fulham": { "lat": 51.4749, "lon": -0.2216, "name": "Craven Cottage" },
-  "pl-brentford": { "lat": 51.4908, "lon": -0.2887, "name": "Gtech Community Stadium" },
-  "pl-crystal-palace": { "lat": 51.3983, "lon": -0.0855, "name": "Selhurst Park" },
-  "pl-everton": { "lat": 53.4388, "lon": -2.9663, "name": "Goodison Park" },
-  "pl-wolves": { "lat": 52.5902, "lon": -2.1304, "name": "Molineux" },
-  "pl-bournemouth": { "lat": 50.7352, "lon": -1.8383, "name": "Vitality Stadium" },
-  "pl-nottingham-forest": { "lat": 52.9399, "lon": -1.1325, "name": "City Ground" },
-  "pl-leicester": { "lat": 52.6203, "lon": -1.1422, "name": "King Power Stadium" },
-  "pl-ipswich": { "lat": 52.0551, "lon": 1.1450, "name": "Portman Road" },
-  "pl-southampton": { "lat": 50.9058, "lon": -1.3911, "name": "St Mary's Stadium" },
-  "pd-real-madrid": { "lat": 40.4531, "lon": -3.6883, "name": "Santiago Bernabéu" },
-  "pd-barcelona": { "lat": 41.3809, "lon": 2.1228, "name": "Spotify Camp Nou" },
-  "pd-atletico-madrid": { "lat": 40.4362, "lon": -3.5995, "name": "Cívitas Metropolitano" },
-  "pd-real-betis": { "lat": 37.3565, "lon": -5.9817, "name": "Benito Villamarín" },
-  "pd-sevilla": { "lat": 37.3841, "lon": -5.9706, "name": "Ramón Sánchez-Pizjuán" },
-  "pd-athletic-club": { "lat": 43.2642, "lon": -2.9494, "name": "San Mamés" },
-  "pd-girona": { "lat": 41.9614, "lon": 2.8283, "name": "Montilivi" },
-  "pd-valencia": { "lat": 39.4747, "lon": -0.3585, "name": "Mestalla" },
-  "pd-real-sociedad": { "lat": 43.3015, "lon": -1.9736, "name": "Reale Arena" },
-  "pd-villarreal": { "lat": 39.9441, "lon": -0.1035, "name": "Estadio de la Cerámica" },
-  "pd-getafe": { "lat": 40.3257, "lon": -3.7149, "name": "Coliseum Alfonso Pérez" },
-  "pd-osasuna": { "lat": 42.7967, "lon": -1.6369, "name": "El Sadar" },
-  "pd-celta": { "lat": 42.2119, "lon": -8.7397, "name": "Balaídos" },
-  "pd-mallorca": { "lat": 39.5900, "lon": 2.6301, "name": "Son Moix" },
-  "pd-las-palmas": { "lat": 28.0999, "lon": -15.4567, "name": "Gran Canaria" },
-  "pd-alaves": { "lat": 42.8371, "lon": -2.6881, "name": "Mendizorroza" },
-  "pd-rayo-vallecano": { "lat": 40.3919, "lon": -3.6587, "name": "Vallecas" },
-  "pd-espanyol": { "lat": 41.3479, "lon": 2.0756, "name": "RCDE Stadium" },
-  "pd-valladolid": { "lat": 41.6446, "lon": -4.7612, "name": "José Zorrilla" },
-  "bl1-bayern-munich": { "lat": 48.2188, "lon": 11.6247, "name": "Allianz Arena" },
-  "bl1-dortmund": { "lat": 51.4926, "lon": 7.4519, "name": "Signal Iduna Park" },
-  "bl1-leverkusen": { "lat": 51.0383, "lon": 7.0022, "name": "BayArena" },
-  "bl1-rb-leipzig": { "lat": 51.3456, "lon": 12.3483, "name": "Red Bull Arena" },
-  "bl1-eintracht-frankfurt": { "lat": 50.0686, "lon": 8.6455, "name": "Deutsche Bank Park" },
-  "bl1-wolfsburg": { "lat": 52.4328, "lon": 10.8039, "name": "Volkswagen Arena" },
-  "bl1-gladbach": { "lat": 51.1746, "lon": 6.3855, "name": "Borussia-Park" },
-  "bl1-stuttgart": { "lat": 48.7923, "lon": 9.2320, "name": "MHPArena" },
-  "bl1-freiburg": { "lat": 47.9889, "lon": 7.8920, "name": "Europa-Park Stadion" },
-  "bl1-hoffenheim": { "lat": 49.2390, "lon": 8.8875, "name": "PreZero Arena" },
-  "bl1-werder-bremen": { "lat": 53.0665, "lon": 8.8375, "name": "Weserstadion" },
-  "bl1-mainz": { "lat": 49.9842, "lon": 8.2244, "name": "MEWA Arena" },
-  "bl1-augsburg": { "lat": 48.3233, "lon": 10.8859, "name": "WWK Arena" },
-  "bl1-union-berlin": { "lat": 52.4574, "lon": 13.5681, "name": "Stadion An der Alten Försterei" },
-  "bl1-heidenheim": { "lat": 48.6685, "lon": 10.1400, "name": "Voith-Arena" },
-  "bl1-bochum": { "lat": 51.4899, "lon": 7.2365, "name": "Vonovia Ruhrstadion" },
-  "bl1-st-pauli": { "lat": 53.5547, "lon": 9.9677, "name": "Millerntor-Stadion" },
-  "sa-inter": { "lat": 45.4781, "lon": 9.1240, "name": "San Siro" },
-  "sa-milan": { "lat": 45.4781, "lon": 9.1240, "name": "San Siro" },
-  "sa-juventus": { "lat": 45.1096, "lon": 7.6413, "name": "Allianz Stadium" },
-  "sa-roma": { "lat": 41.9341, "lon": 12.4547, "name": "Stadio Olimpico" },
-  "sa-lazio": { "lat": 41.9341, "lon": 12.4547, "name": "Stadio Olimpico" },
-  "sa-napoli": { "lat": 40.8279, "lon": 14.1931, "name": "Diego Armando Maradona" },
-  "sa-atalanta": { "lat": 45.7092, "lon": 9.6808, "name": "Gewiss Stadium" },
-  "sa-fiorentina": { "lat": 43.7808, "lon": 11.2823, "name": "Artemio Franchi" },
-  "sa-bologna": { "lat": 44.4922, "lon": 11.3097, "name": "Renato Dall'Ara" },
-  "sa-torino": { "lat": 45.0418, "lon": 7.6500, "name": "Stadio Olimpico Grande Torino" },
-  "sa-udinese": { "lat": 46.0815, "lon": 13.2001, "name": "Dacia Arena" },
-  "sa-genoa": { "lat": 44.4164, "lon": 8.9525, "name": "Luigi Ferraris" },
-  "sa-monza": { "lat": 45.5828, "lon": 9.2742, "name": "U-Power Stadium" },
-  "sa-empoli": { "lat": 43.7265, "lon": 10.9550, "name": "Carlo Castellani" },
-  "sa-cagliari": { "lat": 39.1995, "lon": 9.1360, "name": "Unipol Domus" },
-  "sa-lecce": { "lat": 40.3651, "lon": 18.2086, "name": "Via del Mare" },
-  "sa-verona": { "lat": 45.4352, "lon": 10.9687, "name": "Marcantonio Bentegodi" },
-  "sa-venezia": { "lat": 45.4279, "lon": 12.3637, "name": "Pier Luigi Penzo" },
-  "sa-como": { "lat": 45.8145, "lon": 9.0724, "name": "Giuseppe Sinigaglia" },
-  "sa-parma": { "lat": 44.7948, "lon": 10.3383, "name": "Ennio Tardini" },
-  "fl1-paris-saint-germain": { "lat": 48.8414, "lon": 2.2530, "name": "Parc des Princes" },
-  "fl1-marseille": { "lat": 43.2698, "lon": 5.3959, "name": "Orange Vélodrome" },
-  "fl1-lyon": { "lat": 45.7652, "lon": 4.9821, "name": "Groupama Stadium" },
-  "fl1-monaco": { "lat": 43.7275, "lon": 7.4156, "name": "Stade Louis II" },
-  "fl1-lille": { "lat": 50.6119, "lon": 3.1305, "name": "Pierre Mauroy" },
-  "fl1-nice": { "lat": 43.7051, "lon": 7.1926, "name": "Allianz Riviera" },
-  "fl1-rennes": { "lat": 48.1075, "lon": -1.7129, "name": "Roazhon Park" },
-  "fl1-lens": { "lat": 50.4329, "lon": 2.8151, "name": "Bollaert-Delelis" },
-  "fl1-strasbourg": { "lat": 48.5601, "lon": 7.7550, "name": "La Meinau" },
-  "fl1-nantes": { "lat": 47.2561, "lon": -1.5247, "name": "La Beaujoire" },
-  "fl1-reims": { "lat": 49.2466, "lon": 4.0251, "name": "August-Delaune" },
-  "fl1-toulouse": { "lat": 43.5833, "lon": 1.4340, "name": "Stadium de Toulouse" },
-  "fl1-brest": { "lat": 48.4028, "lon": -4.4617, "name": "Francis-Le Blé" },
-  "fl1-montpellier": { "lat": 43.6220, "lon": 3.8121, "name": "Stade de la Mosson" },
-  "fl1-le-havre": { "lat": 49.4970, "lon": 0.1698, "name": "Stade Océane" },
-  "fl1-auxerre": { "lat": 47.7868, "lon": 3.5887, "name": "Abbé-Deschamps" },
-  "fl1-angers": { "lat": 47.4605, "lon": -0.5308, "name": "Raymond Kopa" },
-  "fl1-saint-etienne": { "lat": 45.4607, "lon": 4.3903, "name": "Geoffroy-Guichard" },
-  "ppd-porto": { "lat": 41.1618, "lon": -8.5839, "name": "Estádio do Dragão" },
-  "ppd-benfica": { "lat": 38.7527, "lon": -9.1847, "name": "Estádio da Luz" },
-  "ppd-sporting": { "lat": 38.7612, "lon": -9.1608, "name": "Estádio José Alvalade" },
-  "ppd-braga": { "lat": 41.5625, "lon": -8.4298, "name": "Estádio Municipal de Braga" },
-  "ppd-vitoria": { "lat": 41.4514, "lon": -8.3016, "name": "Estádio D. Afonso Henriques" },
-  "ded-ajax": { "lat": 52.3142, "lon": 4.9419, "name": "Johan Cruijff ArenA" },
-  "ded-psv": { "lat": 51.4418, "lon": 5.4676, "name": "Philips Stadion" },
-  "ded-feyenoord": { "lat": 51.8939, "lon": 4.5232, "name": "De Kuip" },
-  "ded-az": { "lat": 52.6131, "lon": 4.7424, "name": "AFAS Stadion" },
-  "ded-twente": { "lat": 52.2365, "lon": 6.8375, "name": "De Grolsch Veste" },
-  "tur1-galatasaray": { "lat": 41.1034, "lon": 28.9902, "name": "RAMS Park" },
-  "tur1-fenerbahce": { "lat": 40.9878, "lon": 29.0369, "name": "Ülker Stadium" },
-  "tur1-besiktas": { "lat": 41.0393, "lon": 28.9944, "name": "Tüpraş Stadium" },
-  "tur1-trabzonspor": { "lat": 41.0037, "lon": 39.7055, "name": "Şenol Güneş Stadium" }
+  "pl-liverpool": {
+    "lat": 53.4308,
+    "lon": -2.9608,
+    "name": "Anfield"
+  },
+  "pl-arsenal": {
+    "lat": 51.5549,
+    "lon": -0.1084,
+    "name": "Emirates Stadium"
+  },
+  "pl-manchester-city": {
+    "lat": 53.4831,
+    "lon": -2.2004,
+    "name": "Etihad Stadium"
+  },
+  "pl-man-city": {
+    "lat": 53.4831,
+    "lon": -2.2004,
+    "name": "Etihad Stadium"
+  },
+  "pl-manchester-united": {
+    "lat": 53.4631,
+    "lon": -2.2913,
+    "name": "Old Trafford"
+  },
+  "pl-man-united": {
+    "lat": 53.4631,
+    "lon": -2.2913,
+    "name": "Old Trafford"
+  },
+  "pl-chelsea": {
+    "lat": 51.4816,
+    "lon": -0.191,
+    "name": "Stamford Bridge"
+  },
+  "pl-tottenham": {
+    "lat": 51.6043,
+    "lon": -0.0665,
+    "name": "Tottenham Hotspur Stadium"
+  },
+  "pl-aston-villa": {
+    "lat": 52.5091,
+    "lon": -1.8848,
+    "name": "Villa Park"
+  },
+  "pl-newcastle": {
+    "lat": 54.9756,
+    "lon": -1.6217,
+    "name": "St James' Park"
+  },
+  "pl-brighton": {
+    "lat": 50.8618,
+    "lon": -0.0833,
+    "name": "Amex Stadium"
+  },
+  "pl-west-ham": {
+    "lat": 51.5387,
+    "lon": -0.0166,
+    "name": "London Stadium"
+  },
+  "pl-fulham": {
+    "lat": 51.4749,
+    "lon": -0.2216,
+    "name": "Craven Cottage"
+  },
+  "pl-brentford": {
+    "lat": 51.4908,
+    "lon": -0.2887,
+    "name": "Gtech Community Stadium"
+  },
+  "pl-crystal-palace": {
+    "lat": 51.3983,
+    "lon": -0.0855,
+    "name": "Selhurst Park"
+  },
+  "pl-everton": {
+    "lat": 53.4388,
+    "lon": -2.9663,
+    "name": "Goodison Park"
+  },
+  "pl-wolves": {
+    "lat": 52.5902,
+    "lon": -2.1304,
+    "name": "Molineux"
+  },
+  "pl-bournemouth": {
+    "lat": 50.7352,
+    "lon": -1.8383,
+    "name": "Vitality Stadium"
+  },
+  "pl-nottingham-forest": {
+    "lat": 52.9399,
+    "lon": -1.1325,
+    "name": "City Ground"
+  },
+  "pl-leicester": {
+    "lat": 52.6203,
+    "lon": -1.1422,
+    "name": "King Power Stadium"
+  },
+  "pl-ipswich": {
+    "lat": 52.0551,
+    "lon": 1.145,
+    "name": "Portman Road"
+  },
+  "pl-southampton": {
+    "lat": 50.9058,
+    "lon": -1.3911,
+    "name": "St Mary's Stadium"
+  },
+  "pd-real-madrid": {
+    "lat": 40.4531,
+    "lon": -3.6883,
+    "name": "Santiago Bernabéu"
+  },
+  "pd-barcelona": {
+    "lat": 41.3809,
+    "lon": 2.1228,
+    "name": "Spotify Camp Nou"
+  },
+  "pd-atletico-madrid": {
+    "lat": 40.4362,
+    "lon": -3.5995,
+    "name": "Cívitas Metropolitano"
+  },
+  "pd-real-betis": {
+    "lat": 37.3565,
+    "lon": -5.9817,
+    "name": "Benito Villamarín"
+  },
+  "pd-sevilla": {
+    "lat": 37.3841,
+    "lon": -5.9706,
+    "name": "Ramón Sánchez-Pizjuán"
+  },
+  "pd-athletic-club": {
+    "lat": 43.2642,
+    "lon": -2.9494,
+    "name": "San Mamés"
+  },
+  "pd-girona": {
+    "lat": 41.9614,
+    "lon": 2.8283,
+    "name": "Montilivi"
+  },
+  "pd-valencia": {
+    "lat": 39.4747,
+    "lon": -0.3585,
+    "name": "Mestalla"
+  },
+  "pd-real-sociedad": {
+    "lat": 43.3015,
+    "lon": -1.9736,
+    "name": "Reale Arena"
+  },
+  "pd-villarreal": {
+    "lat": 39.9441,
+    "lon": -0.1035,
+    "name": "Estadio de la Cerámica"
+  },
+  "pd-getafe": {
+    "lat": 40.3257,
+    "lon": -3.7149,
+    "name": "Coliseum Alfonso Pérez"
+  },
+  "pd-osasuna": {
+    "lat": 42.7967,
+    "lon": -1.6369,
+    "name": "El Sadar"
+  },
+  "pd-celta": {
+    "lat": 42.2119,
+    "lon": -8.7397,
+    "name": "Balaídos"
+  },
+  "pd-mallorca": {
+    "lat": 39.59,
+    "lon": 2.6301,
+    "name": "Son Moix"
+  },
+  "pd-las-palmas": {
+    "lat": 28.0999,
+    "lon": -15.4567,
+    "name": "Gran Canaria"
+  },
+  "pd-alaves": {
+    "lat": 42.8371,
+    "lon": -2.6881,
+    "name": "Mendizorroza"
+  },
+  "pd-rayo-vallecano": {
+    "lat": 40.3919,
+    "lon": -3.6587,
+    "name": "Vallecas"
+  },
+  "pd-espanyol": {
+    "lat": 41.3479,
+    "lon": 2.0756,
+    "name": "RCDE Stadium"
+  },
+  "pd-valladolid": {
+    "lat": 41.6446,
+    "lon": -4.7612,
+    "name": "José Zorrilla"
+  },
+  "bl1-bayern-munich": {
+    "lat": 48.2188,
+    "lon": 11.6247,
+    "name": "Allianz Arena"
+  },
+  "bl1-dortmund": {
+    "lat": 51.4926,
+    "lon": 7.4519,
+    "name": "Signal Iduna Park"
+  },
+  "bl1-leverkusen": {
+    "lat": 51.0383,
+    "lon": 7.0022,
+    "name": "BayArena"
+  },
+  "bl1-rb-leipzig": {
+    "lat": 51.3456,
+    "lon": 12.3483,
+    "name": "Red Bull Arena"
+  },
+  "bl1-eintracht-frankfurt": {
+    "lat": 50.0686,
+    "lon": 8.6455,
+    "name": "Deutsche Bank Park"
+  },
+  "bl1-wolfsburg": {
+    "lat": 52.4328,
+    "lon": 10.8039,
+    "name": "Volkswagen Arena"
+  },
+  "bl1-gladbach": {
+    "lat": 51.1746,
+    "lon": 6.3855,
+    "name": "Borussia-Park"
+  },
+  "bl1-stuttgart": {
+    "lat": 48.7923,
+    "lon": 9.232,
+    "name": "MHPArena"
+  },
+  "bl1-freiburg": {
+    "lat": 47.9889,
+    "lon": 7.892,
+    "name": "Europa-Park Stadion"
+  },
+  "bl1-hoffenheim": {
+    "lat": 49.239,
+    "lon": 8.8875,
+    "name": "PreZero Arena"
+  },
+  "bl1-werder-bremen": {
+    "lat": 53.0665,
+    "lon": 8.8375,
+    "name": "Weserstadion"
+  },
+  "bl1-mainz": {
+    "lat": 49.9842,
+    "lon": 8.2244,
+    "name": "MEWA Arena"
+  },
+  "bl1-augsburg": {
+    "lat": 48.3233,
+    "lon": 10.8859,
+    "name": "WWK Arena"
+  },
+  "bl1-union-berlin": {
+    "lat": 52.4574,
+    "lon": 13.5681,
+    "name": "Stadion An der Alten Försterei"
+  },
+  "bl1-heidenheim": {
+    "lat": 48.6685,
+    "lon": 10.14,
+    "name": "Voith-Arena"
+  },
+  "bl1-bochum": {
+    "lat": 51.4899,
+    "lon": 7.2365,
+    "name": "Vonovia Ruhrstadion"
+  },
+  "bl1-st-pauli": {
+    "lat": 53.5547,
+    "lon": 9.9677,
+    "name": "Millerntor-Stadion"
+  },
+  "sa-inter": {
+    "lat": 45.4781,
+    "lon": 9.124,
+    "name": "San Siro"
+  },
+  "sa-milan": {
+    "lat": 45.4781,
+    "lon": 9.124,
+    "name": "San Siro"
+  },
+  "sa-juventus": {
+    "lat": 45.1096,
+    "lon": 7.6413,
+    "name": "Allianz Stadium"
+  },
+  "sa-roma": {
+    "lat": 41.9341,
+    "lon": 12.4547,
+    "name": "Stadio Olimpico"
+  },
+  "sa-lazio": {
+    "lat": 41.9341,
+    "lon": 12.4547,
+    "name": "Stadio Olimpico"
+  },
+  "sa-napoli": {
+    "lat": 40.8279,
+    "lon": 14.1931,
+    "name": "Diego Armando Maradona"
+  },
+  "sa-atalanta": {
+    "lat": 45.7092,
+    "lon": 9.6808,
+    "name": "Gewiss Stadium"
+  },
+  "sa-fiorentina": {
+    "lat": 43.7808,
+    "lon": 11.2823,
+    "name": "Artemio Franchi"
+  },
+  "sa-bologna": {
+    "lat": 44.4922,
+    "lon": 11.3097,
+    "name": "Renato Dall'Ara"
+  },
+  "sa-torino": {
+    "lat": 45.0418,
+    "lon": 7.65,
+    "name": "Stadio Olimpico Grande Torino"
+  },
+  "sa-udinese": {
+    "lat": 46.0815,
+    "lon": 13.2001,
+    "name": "Dacia Arena"
+  },
+  "sa-genoa": {
+    "lat": 44.4164,
+    "lon": 8.9525,
+    "name": "Luigi Ferraris"
+  },
+  "sa-monza": {
+    "lat": 45.5828,
+    "lon": 9.2742,
+    "name": "U-Power Stadium"
+  },
+  "sa-empoli": {
+    "lat": 43.7265,
+    "lon": 10.955,
+    "name": "Carlo Castellani"
+  },
+  "sa-cagliari": {
+    "lat": 39.1995,
+    "lon": 9.136,
+    "name": "Unipol Domus"
+  },
+  "sa-lecce": {
+    "lat": 40.3651,
+    "lon": 18.2086,
+    "name": "Via del Mare"
+  },
+  "sa-verona": {
+    "lat": 45.4352,
+    "lon": 10.9687,
+    "name": "Marcantonio Bentegodi"
+  },
+  "sa-venezia": {
+    "lat": 45.4279,
+    "lon": 12.3637,
+    "name": "Pier Luigi Penzo"
+  },
+  "sa-como": {
+    "lat": 45.8145,
+    "lon": 9.0724,
+    "name": "Giuseppe Sinigaglia"
+  },
+  "sa-parma": {
+    "lat": 44.7948,
+    "lon": 10.3383,
+    "name": "Ennio Tardini"
+  },
+  "fl1-paris-saint-germain": {
+    "lat": 48.8414,
+    "lon": 2.253,
+    "name": "Parc des Princes"
+  },
+  "fl1-marseille": {
+    "lat": 43.2698,
+    "lon": 5.3959,
+    "name": "Orange Vélodrome"
+  },
+  "fl1-lyon": {
+    "lat": 45.7652,
+    "lon": 4.9821,
+    "name": "Groupama Stadium"
+  },
+  "fl1-monaco": {
+    "lat": 43.7275,
+    "lon": 7.4156,
+    "name": "Stade Louis II"
+  },
+  "fl1-lille": {
+    "lat": 50.6119,
+    "lon": 3.1305,
+    "name": "Pierre Mauroy"
+  },
+  "fl1-nice": {
+    "lat": 43.7051,
+    "lon": 7.1926,
+    "name": "Allianz Riviera"
+  },
+  "fl1-rennes": {
+    "lat": 48.1075,
+    "lon": -1.7129,
+    "name": "Roazhon Park"
+  },
+  "fl1-lens": {
+    "lat": 50.4329,
+    "lon": 2.8151,
+    "name": "Bollaert-Delelis"
+  },
+  "fl1-strasbourg": {
+    "lat": 48.5601,
+    "lon": 7.755,
+    "name": "La Meinau"
+  },
+  "fl1-nantes": {
+    "lat": 47.2561,
+    "lon": -1.5247,
+    "name": "La Beaujoire"
+  },
+  "fl1-reims": {
+    "lat": 49.2466,
+    "lon": 4.0251,
+    "name": "August-Delaune"
+  },
+  "fl1-toulouse": {
+    "lat": 43.5833,
+    "lon": 1.434,
+    "name": "Stadium de Toulouse"
+  },
+  "fl1-brest": {
+    "lat": 48.4028,
+    "lon": -4.4617,
+    "name": "Francis-Le Blé"
+  },
+  "fl1-montpellier": {
+    "lat": 43.622,
+    "lon": 3.8121,
+    "name": "Stade de la Mosson"
+  },
+  "fl1-le-havre": {
+    "lat": 49.497,
+    "lon": 0.1698,
+    "name": "Stade Océane"
+  },
+  "fl1-auxerre": {
+    "lat": 47.7868,
+    "lon": 3.5887,
+    "name": "Abbé-Deschamps"
+  },
+  "fl1-angers": {
+    "lat": 47.4605,
+    "lon": -0.5308,
+    "name": "Raymond Kopa"
+  },
+  "fl1-saint-etienne": {
+    "lat": 45.4607,
+    "lon": 4.3903,
+    "name": "Geoffroy-Guichard"
+  },
+  "ppd-porto": {
+    "lat": 41.1618,
+    "lon": -8.5839,
+    "name": "Estádio do Dragão"
+  },
+  "ppd-benfica": {
+    "lat": 38.7527,
+    "lon": -9.1847,
+    "name": "Estádio da Luz"
+  },
+  "ppd-sporting": {
+    "lat": 38.7612,
+    "lon": -9.1608,
+    "name": "Estádio José Alvalade"
+  },
+  "ppd-braga": {
+    "lat": 41.5625,
+    "lon": -8.4298,
+    "name": "Estádio Municipal de Braga"
+  },
+  "ppd-vitoria": {
+    "lat": 41.4514,
+    "lon": -8.3016,
+    "name": "Estádio D. Afonso Henriques"
+  },
+  "ded-ajax": {
+    "lat": 52.3142,
+    "lon": 4.9419,
+    "name": "Johan Cruijff ArenA"
+  },
+  "ded-psv": {
+    "lat": 51.4418,
+    "lon": 5.4676,
+    "name": "Philips Stadion"
+  },
+  "ded-feyenoord": {
+    "lat": 51.8939,
+    "lon": 4.5232,
+    "name": "De Kuip"
+  },
+  "ded-az": {
+    "lat": 52.6131,
+    "lon": 4.7424,
+    "name": "AFAS Stadion"
+  },
+  "ded-twente": {
+    "lat": 52.2365,
+    "lon": 6.8375,
+    "name": "De Grolsch Veste"
+  },
+  "tur1-galatasaray": {
+    "lat": 41.1034,
+    "lon": 28.9902,
+    "name": "RAMS Park"
+  },
+  "tur1-fenerbahce": {
+    "lat": 40.9878,
+    "lon": 29.0369,
+    "name": "Ülker Stadium"
+  },
+  "tur1-besiktas": {
+    "lat": 41.0393,
+    "lon": 28.9944,
+    "name": "Tüpraş Stadium"
+  },
+  "tur1-trabzonspor": {
+    "lat": 41.0037,
+    "lon": 39.7055,
+    "name": "Şenol Güneş Stadium"
+  },
+  "ded-psv-eindhoven": {
+    "lat": 51.4418,
+    "lon": 5.4676,
+    "name": "Philips Stadion"
+  },
+  "ded-for-sittard": {
+    "lat": 51.0016,
+    "lon": 5.8556,
+    "name": "Fortuna Sittard Stadion"
+  },
+  "ded-fortuna-sittard": {
+    "lat": 51.0016,
+    "lon": 5.8556,
+    "name": "Fortuna Sittard Stadion"
+  },
+  "ded-nec": {
+    "lat": 51.8456,
+    "lon": 5.8372,
+    "name": "Goffertstadion"
+  },
+  "ded-nijmegen": {
+    "lat": 51.8456,
+    "lon": 5.8372,
+    "name": "Goffertstadion"
+  },
+  "ded-sparta-rotterdam": {
+    "lat": 51.9197,
+    "lon": 4.4333,
+    "name": "Het Kasteel"
+  },
+  "ded-heerenveen": {
+    "lat": 52.9586,
+    "lon": 5.9461,
+    "name": "Abe Lenstra"
+  },
+  "ded-utrecht": {
+    "lat": 52.0785,
+    "lon": 5.1458,
+    "name": "Galgenwaard"
+  },
+  "ded-groningen": {
+    "lat": 53.2065,
+    "lon": 6.5914,
+    "name": "Euroborg"
+  },
+  "ded-go-ahead-eagles": {
+    "lat": 52.2369,
+    "lon": 6.1725,
+    "name": "De Adelaarshorst"
+  },
+  "ded-fortuna": {
+    "lat": 51.0016,
+    "lon": 5.8556,
+    "name": "Fortuna Sittard Stadion"
+  },
+  "ded-excelsior": {
+    "lat": 51.917,
+    "lon": 4.52,
+    "name": "Van Donge & De Roo"
+  },
+  "ded-heracles": {
+    "lat": 52.3544,
+    "lon": 6.65,
+    "name": "Erve Asito"
+  },
+  "ded-zwolle": {
+    "lat": 52.516,
+    "lon": 6.082,
+    "name": "MAC³PARK"
+  },
+  "ded-telstar": {
+    "lat": 52.455,
+    "lon": 4.645,
+    "name": "BUKO Stadion"
+  },
+  "ded-cambuur": {
+    "lat": 53.205,
+    "lon": 5.814,
+    "name": "Kooi Stadion"
+  },
+  "ded-willem-ii": {
+    "lat": 51.544,
+    "lon": 5.067,
+    "name": "Koning Willem II"
+  },
+  "ppd-sp-lisbon": {
+    "lat": 38.7612,
+    "lon": -9.1608,
+    "name": "José Alvalade"
+  },
+  "ppd-sporting-cp": {
+    "lat": 38.7612,
+    "lon": -9.1608,
+    "name": "José Alvalade"
+  },
+  "ppd-famalicao": {
+    "lat": 41.405,
+    "lon": -8.521,
+    "name": "Municipal 22 de Junho"
+  },
+  "ppd-estrela": {
+    "lat": 38.748,
+    "lon": -9.227,
+    "name": "José Gomes"
+  },
+  "ppd-guimaraes": {
+    "lat": 41.4514,
+    "lon": -8.3016,
+    "name": "D. Afonso Henriques"
+  },
+  "ppd-vitoria-guimaraes": {
+    "lat": 41.4514,
+    "lon": -8.3016,
+    "name": "D. Afonso Henriques"
+  },
+  "ppd-moreirense": {
+    "lat": 41.375,
+    "lon": -8.355,
+    "name": "Comendador Joaquim"
+  },
+  "ppd-rio-ave": {
+    "lat": 41.362,
+    "lon": -8.74,
+    "name": "Dos Arcos"
+  },
+  "ppd-casa-pia": {
+    "lat": 38.736,
+    "lon": -9.2,
+    "name": "Pina Manique"
+  },
+  "ppd-estoril": {
+    "lat": 38.715,
+    "lon": -9.396,
+    "name": "António Coimbra da Mota"
+  },
+  "ppd-nacional": {
+    "lat": 32.67,
+    "lon": -16.91,
+    "name": "Da Madeira"
+  },
+  "ppd-santa-clara": {
+    "lat": 37.767,
+    "lon": -25.485,
+    "name": "São Miguel"
+  },
+  "ppd-gil-vicente": {
+    "lat": 41.533,
+    "lon": -8.422,
+    "name": "Cidade de Barcelos"
+  },
+  "ppd-academico": {
+    "lat": 40.666,
+    "lon": -7.91,
+    "name": "Fontelo"
+  },
+  "ppd-alverca": {
+    "lat": 38.897,
+    "lon": -9.04,
+    "name": "Complexo Desportivo"
+  },
+  "ppd-arouca": {
+    "lat": 40.928,
+    "lon": -8.245,
+    "name": "Municipal de Arouca"
+  },
+  "ppd-farense": {
+    "lat": 37.022,
+    "lon": -7.928,
+    "name": "São Luís"
+  },
+  "ppd-avs": {
+    "lat": 41.366,
+    "lon": -8.476,
+    "name": "Clube Desportivo"
+  },
+  "tur1-kasimpasa": {
+    "lat": 41.042,
+    "lon": 28.973,
+    "name": "Recep Tayyip Erdoğan"
+  },
+  "tur1-basaksehir": {
+    "lat": 41.087,
+    "lon": 28.785,
+    "name": "Başakşehir Fatih Terim"
+  },
+  "tur1-buyuksehyr": {
+    "lat": 41.087,
+    "lon": 28.785,
+    "name": "Başakşehir Fatih Terim"
+  },
+  "tur1-samsunspor": {
+    "lat": 41.316,
+    "lon": 36.31,
+    "name": "Samsun 19 Mayıs"
+  },
+  "tur1-goztepe": {
+    "lat": 38.427,
+    "lon": 27.128,
+    "name": "Gürsel Aksel"
+  },
+  "tur1-alanyaspor": {
+    "lat": 36.552,
+    "lon": 32.018,
+    "name": "Alanya Oba"
+  },
+  "tur1-antalyaspor": {
+    "lat": 36.888,
+    "lon": 30.67,
+    "name": "Corendon Antalya"
+  },
+  "tur1-konyaspor": {
+    "lat": 37.869,
+    "lon": 32.468,
+    "name": "Konya Büyükşehir"
+  },
+  "tur1-sivasspor": {
+    "lat": 39.742,
+    "lon": 37.003,
+    "name": "Yeni 4 Eylül"
+  },
+  "tur1-eyupspor": {
+    "lat": 41.048,
+    "lon": 28.933,
+    "name": "Eyüp Stadı"
+  },
+  "tur1-rizespor": {
+    "lat": 41.042,
+    "lon": 40.528,
+    "name": "Çaykur Didi"
+  },
+  "tur1-kayserispor": {
+    "lat": 38.737,
+    "lon": 35.37,
+    "name": "Kadir Has"
+  },
+  "tur1-hatayspor": {
+    "lat": 36.242,
+    "lon": 36.165,
+    "name": "Mersin"
+  },
+  "tur1-adana-demirspor": {
+    "lat": 36.999,
+    "lon": 35.325,
+    "name": "Yeni Adana"
+  },
+  "tur1-bodrumspor": {
+    "lat": 37.035,
+    "lon": 27.43,
+    "name": "Bodrum İlçe"
+  },
+  "tur1-gaziantep": {
+    "lat": 37.066,
+    "lon": 37.378,
+    "name": "Kalyon"
+  }
 }

@@ -200,6 +200,190 @@ def empty_form() -> TeamForm:
     return TeamForm(0, 0, 0, 0, 0, 0, 0)
 
 
+def repredict_flagged(conn: sqlite3.Connection) -> int:
+    """إعادة توقع ضيقة للمباريات المؤكَّد تشكيلتها — بلا walk-forward كامل."""
+    row = conn.execute(
+        "SELECT value FROM app_meta WHERE key='enrich_repredict_matches'"
+    ).fetchone()
+    if not row or not (row["value"] or "").strip():
+        return 0
+    ids = [x.strip() for x in str(row["value"]).split(",") if x.strip()]
+    if not ids:
+        return 0
+    print(f"narrow repredict: {len(ids)} matches…", flush=True)
+    placeholders = ",".join("?" * len(ids))
+    matches = conn.execute(
+        f"""
+        SELECT id, league_id, home_team_id, away_team_id,
+               odds_home, odds_draw, odds_away, referee_name
+        FROM matches WHERE id IN ({placeholders})
+        """,
+        ids,
+    ).fetchall()
+    by_league: dict[str, list] = {}
+    for m in matches:
+        by_league.setdefault(m["league_id"], []).append(m)
+
+    n_written = 0
+    for lid, targets in by_league.items():
+        finished = conn.execute(
+            """
+            SELECT id, home_team_id, away_team_id, home_goals, away_goals, utc_date,
+                   odds_home, odds_draw, odds_away,
+                   shots_home, shots_away, sot_home, sot_away,
+                   fouls_home, fouls_away, corners_home, corners_away, season
+            FROM matches
+            WHERE league_id = ? AND status = 'FINISHED'
+              AND home_goals IS NOT NULL AND away_goals IS NOT NULL
+            ORDER BY utc_date ASC
+            """,
+            (lid,),
+        ).fetchall()
+        if len(finished) < 20:
+            continue
+        # إعادة استخدام مسار التدريب المبسط عبر استدعاء predict بعد fit سريع
+        # — نحدّث predictions لهذه الـids فقط
+        train = finished[-MAX_TRAIN:]
+        ref = datetime.now(timezone.utc)
+
+        def days_ago(utc: str) -> float:
+            try:
+                dt = datetime.fromisoformat(utc.replace("Z", "+00:00"))
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=timezone.utc)
+                return max(0.0, (ref - dt).total_seconds() / 86400.0)
+            except Exception:
+                return 0.0
+
+        obs = [
+            MatchObs(
+                home=m["home_team_id"],
+                away=m["away_team_id"],
+                home_goals=int(m["home_goals"]),
+                away_goals=int(m["away_goals"]),
+                days_ago=days_ago(m["utc_date"]),
+            )
+            for m in train
+        ]
+        model = fit_dixon_coles(obs, half_life_days=HALF_LIFE, league_id=lid)
+
+        elo_matches = [
+            EloMatch(
+                home=m["home_team_id"],
+                away=m["away_team_id"],
+                home_goals=int(m["home_goals"]),
+                away_goals=int(m["away_goals"]),
+                date=m["utc_date"],
+            )
+            for m in train
+        ]
+        ratings, _ = update_elo(elo_matches)
+        pi_matches = [
+            PiMatch(
+                home=m["home_team_id"],
+                away=m["away_team_id"],
+                home_goals=int(m["home_goals"]),
+                away_goals=int(m["away_goals"]),
+            )
+            for m in train
+        ]
+        pi_state = update_pi(pi_matches)
+        form_matches = [
+            FormMatch(
+                home=m["home_team_id"],
+                away=m["away_team_id"],
+                home_goals=int(m["home_goals"]),
+                away_goals=int(m["away_goals"]),
+                sot_home=m["sot_home"],
+                sot_away=m["sot_away"],
+                date=m["utc_date"],
+            )
+            for m in train
+        ]
+        forms = rolling_form(form_matches, window=5)
+        ts = now_iso()
+        for t in targets:
+            odds = None
+            if t["odds_home"] and t["odds_draw"] and t["odds_away"]:
+                odds = (float(t["odds_home"]), float(t["odds_draw"]), float(t["odds_away"]))
+            enrich = load_live_enrichment(conn, t["id"], t["referee_name"])
+            pred = predict_match(
+                home=t["home_team_id"],
+                away=t["away_team_id"],
+                dc=model,
+                elo_home=ratings.get(t["home_team_id"], 1500.0),
+                elo_away=ratings.get(t["away_team_id"], 1500.0),
+                pi=pi_state,
+                form_home=forms.get(t["home_team_id"], empty_form()),
+                form_away=forms.get(t["away_team_id"], empty_form()),
+                market_odds=odds,
+                temperature=1.0,
+                dc_shots=None,
+                league_id=lid,
+                weather=enrich["weather"],
+                home_missing=enrich["home_missing"],
+                away_missing=enrich["away_missing"],
+                referee_profile=enrich["referee_profile"],
+                open_odds=enrich["open_odds"],
+            )
+            conn.execute("DELETE FROM predictions WHERE match_id=?", (t["id"],))
+            market = pred["components"]["market"]["p"]
+            analytics = {
+                "version": MODEL_VERSION,
+                "components": json.loads(json.dumps(pred["components"], default=list)),
+                "edge": pred["edge"],
+                "value": pred["value"],
+                "weights": pred["weights"],
+                "xpts": [pred["xpts_home"], pred["xpts_away"]],
+                "double_chance": pred.get("double_chance"),
+                "narrow_repredict": True,
+            }
+            tops = top_scores(pred["matrix"], 8)
+            conn.execute(
+                """
+                INSERT INTO predictions (
+                  id, match_id, lambda_home, lambda_away,
+                  p_home, p_draw, p_away, p_btts_yes, p_over25,
+                  top_scores_json, score_matrix_json,
+                  elo_home, elo_away, confidence, model_version,
+                  created_at, updated_at,
+                  analytics_json, xpts_home, xpts_away,
+                  market_home, market_draw, market_away
+                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                """,
+                (
+                    str(uuid.uuid4()),
+                    t["id"],
+                    pred["lambda_home"],
+                    pred["lambda_away"],
+                    pred["p_home"],
+                    pred["p_draw"],
+                    pred["p_away"],
+                    pred["p_btts_yes"],
+                    pred["p_over25"],
+                    json.dumps(tops),
+                    json.dumps(pred["matrix"].tolist()),
+                    ratings.get(t["home_team_id"], 1500.0),
+                    ratings.get(t["away_team_id"], 1500.0),
+                    pred["confidence"],
+                    MODEL_VERSION,
+                    ts,
+                    ts,
+                    json.dumps(analytics, ensure_ascii=False),
+                    pred["xpts_home"],
+                    pred["xpts_away"],
+                    market[0] if market else None,
+                    market[1] if market else None,
+                    market[2] if market else None,
+                ),
+            )
+            n_written += 1
+    conn.execute("DELETE FROM app_meta WHERE key='enrich_repredict_matches'")
+    conn.commit()
+    print(f"narrow repredict wrote {n_written}", flush=True)
+    return n_written
+
+
 def main() -> None:
     if not DB_PATH.exists():
         print("DB missing. Run: bun run sync")
@@ -210,6 +394,11 @@ def main() -> None:
     conn.execute("PRAGMA journal_mode = WAL")
     conn.execute("PRAGMA busy_timeout = 10000")
     ensure_columns(conn)
+
+    if "--repredict-flagged" in sys.argv:
+        repredict_flagged(conn)
+        conn.close()
+        return
 
     leagues = conn.execute("SELECT id, code, name_ar FROM leagues").fetchall()
     print(f"{MODEL_VERSION} fitting {len(leagues)} leagues…")
@@ -229,6 +418,7 @@ def main() -> None:
             """
             SELECT id, home_team_id, away_team_id, home_goals, away_goals, utc_date,
                    odds_home, odds_draw, odds_away,
+                   odds_open_home, odds_open_draw, odds_open_away,
                    shots_home, shots_away, sot_home, sot_away,
                    fouls_home, fouls_away, corners_home, corners_away, season
             FROM matches
@@ -536,11 +726,13 @@ def main() -> None:
         eval_model_shots = None
         wf_ctx: dict[str, dict] = {}  # match_id → مدخلات التوقع عند نقطة الزمن الصادقة
         if cut >= 60:
-            eval_model = fit_dixon_coles(obs[:cut], half_life_days=HALF_LIFE)
+            eval_model = fit_dixon_coles(
+                obs[:cut], half_life_days=HALF_LIFE, league_id=lid
+            )
             eval_obs_shots = build_obs_shots(train[:cut], obs[:cut])
             if eval_obs_shots:
                 eval_model_shots = fit_dixon_coles(
-                    eval_obs_shots, half_life_days=HALF_LIFE
+                    eval_obs_shots, half_life_days=HALF_LIFE, league_id=lid
                 )
             cut_full = len(elo_source) - eval_n
 
@@ -551,12 +743,12 @@ def main() -> None:
                 if k and k % 50 == 0:
                     # إنعاش نموذجي DC داخل النافذة — بيانات حتى ما قبل هذه المباراة فقط
                     eval_model = fit_dixon_coles(
-                        obs[: cut + k], half_life_days=HALF_LIFE
+                        obs[: cut + k], half_life_days=HALF_LIFE, league_id=lid
                     )
                     prefix_shots = build_obs_shots(train[: cut + k], obs[: cut + k])
                     if prefix_shots:
                         eval_model_shots = fit_dixon_coles(
-                            prefix_shots, half_life_days=HALF_LIFE
+                            prefix_shots, half_life_days=HALF_LIFE, league_id=lid
                         )
                 # حالات Elo/Pi/الفورم تتقدّم زمنياً حتى ما قبل هذه المباراة فقط
                 elo_k, _ = update_elo(elo_matches[: cut_full + k], seeds=elo_seeds)
@@ -608,6 +800,7 @@ def main() -> None:
                         "elo": pred["components"]["elo"]["p"],
                         "form": pred["components"]["form"]["p"],
                         "market": pred["components"]["market"]["p"],
+                        "context": pred["components"].get("context", {}).get("p"),
                     }
                 )
                 hg, ag = int(m["home_goals"]), int(m["away_goals"])
@@ -650,17 +843,15 @@ def main() -> None:
             # كيلي ربعي بوحدات ثابتة (بلا مضاعفة) — يجيب «هل +EV يربح فعلاً؟»
             bt = {"n_bets": 0, "hits": 0, "staked": 0.0, "pnl": 0.0}
             for p_cal, m_row, oc in zip(cal_probs, train[cut + half :], seg_outcomes):
-                if not (
-                    m_row["odds_home"] and m_row["odds_draw"] and m_row["odds_away"]
-                ):
+                # تفضيل خط أسبق (open) للـbacktest عند التوفر
+                oh = m_row["odds_open_home"] or m_row["odds_home"]
+                od = m_row["odds_open_draw"] or m_row["odds_draw"]
+                oa = m_row["odds_open_away"] or m_row["odds_away"]
+                if not (oh and od and oa):
                     continue
                 v = value_signal(
                     p_cal,
-                    (
-                        float(m_row["odds_home"]),
-                        float(m_row["odds_draw"]),
-                        float(m_row["odds_away"]),
-                    ),
+                    (float(oh), float(od), float(oa)),
                 )
                 if not v or not v["bet"]:
                     continue
