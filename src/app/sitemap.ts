@@ -1,22 +1,21 @@
 import { getLeagues } from "@/lib/queries";
-
-const BASE = "https://taqdeer.app";
+import { SITE_URL } from "@/lib/site";
 
 export default async function sitemap() {
   const leagues = getLeagues();
 
   const staticRoutes = [
-    { url: BASE, lastModified: new Date(), changeFrequency: "hourly" as const, priority: 1.0 },
-    { url: `${BASE}/leagues`, lastModified: new Date(), changeFrequency: "daily" as const, priority: 0.9 },
-    { url: `${BASE}/accuracy`, lastModified: new Date(), changeFrequency: "weekly" as const, priority: 0.7 },
-    { url: `${BASE}/methodology`, lastModified: new Date(), changeFrequency: "monthly" as const, priority: 0.5 },
-    { url: `${BASE}/value`, lastModified: new Date(), changeFrequency: "hourly" as const, priority: 0.8 },
-    { url: `${BASE}/articles`, lastModified: new Date(), changeFrequency: "daily" as const, priority: 0.7 },
-    { url: `${BASE}/news`, lastModified: new Date(), changeFrequency: "hourly" as const, priority: 0.6 },
+    { url: SITE_URL, lastModified: new Date(), changeFrequency: "hourly" as const, priority: 1.0 },
+    { url: `${SITE_URL}/leagues`, lastModified: new Date(), changeFrequency: "daily" as const, priority: 0.9 },
+    { url: `${SITE_URL}/accuracy`, lastModified: new Date(), changeFrequency: "weekly" as const, priority: 0.7 },
+    { url: `${SITE_URL}/methodology`, lastModified: new Date(), changeFrequency: "monthly" as const, priority: 0.5 },
+    { url: `${SITE_URL}/value`, lastModified: new Date(), changeFrequency: "hourly" as const, priority: 0.8 },
+    { url: `${SITE_URL}/articles`, lastModified: new Date(), changeFrequency: "daily" as const, priority: 0.7 },
+    { url: `${SITE_URL}/news`, lastModified: new Date(), changeFrequency: "hourly" as const, priority: 0.6 },
   ];
 
   const leagueRoutes = leagues.map((l) => ({
-    url: `${BASE}/leagues/${l.id}`,
+    url: `${SITE_URL}/leagues/${l.id}`,
     lastModified: new Date(),
     changeFrequency: "daily" as const,
     priority: 0.8,

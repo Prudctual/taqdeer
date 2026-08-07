@@ -6,6 +6,7 @@ import { SiteSidebar } from "@/components/SiteSidebar";
 import { ThemeProvider } from "@/components/ThemeContext";
 import { AdvancedModeProvider } from "@/components/AdvancedModeContext";
 import { CommandMenu } from "@/components/CommandMenu";
+import { SITE_URL } from "@/lib/site";
 import "./globals.css";
 
 const arabic = IBM_Plex_Sans_Arabic({
@@ -22,11 +23,11 @@ export const metadata: Metadata = {
   },
   description:
     "احتمالات 1X2 وتوزيع النتائج للدوريات الأوروبية الخمس الكبرى بنماذج Dixon–Coles وElo معايرة على نتائج حقيقية.",
-  metadataBase: new URL("https://taqdeer.app"),
+  metadataBase: new URL(SITE_URL),
   openGraph: {
     type: "website",
     locale: "ar_SA",
-    url: "https://taqdeer.app",
+    url: SITE_URL,
     siteName: "تقدير",
     title: "تقدير — منصة وتوقعات كرة القدم العالمية",
     description:

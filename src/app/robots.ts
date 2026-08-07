@@ -1,3 +1,5 @@
+import { SITE_URL } from "@/lib/site";
+
 export default function robots() {
   return {
     rules: [
@@ -7,6 +9,6 @@ export default function robots() {
         disallow: ["/api/"],
       },
     ],
-    sitemap: "https://taqdeer.app/sitemap.xml",
+    sitemap: `${SITE_URL}/sitemap.xml`,
   };
 }
