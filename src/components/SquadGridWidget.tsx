@@ -34,7 +34,7 @@ export function SquadGridWidget({
       : `تشكيلة ونجوم ${homeTeam}`;
   const subtitle = lineupConfirmed
     ? "تشكيلة مؤكدة من المصدر الحي"
-    : "أسماء حقيقية من قاعدة التشكيلات — الغيابات عند توفرها من Sofascore";
+    : "أسماء حقيقية من قاعدة التشكيلات — الغيابات عند توفرها من FotMob";
 
   return (
     <SectionCard title={title} subtitle={subtitle}>

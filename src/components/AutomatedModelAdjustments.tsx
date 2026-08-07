@@ -114,7 +114,7 @@ export function AutomatedModelAdjustments({
         ? players.summary
         : `لا غيابات مسجّلة · ${awayTeam} / ${homeTeam}`,
       impact: players?.applied ? "تعديل RAPM على λ" : "غير مفعّل",
-      detail: "مصدر Sofascore (missingPlayers) — بلا قوائم مصابة مخترعة.",
+      detail: "مصدر FotMob (unavailable) — بلا قوائم مصابة مخترعة.",
       positive: !!players?.applied,
     },
     {
