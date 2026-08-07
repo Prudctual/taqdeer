@@ -20,9 +20,10 @@ import {
   getStrengthTable,
   getBankerPicks,
 } from "@/lib/queries";
-import { leagueEmblemUrl, tournamentEmblemUrl, type TournamentType } from "@/lib/leagues";
+import { latestSeasonStartYear, leagueEmblemUrl, tournamentEmblemUrl, type TournamentType } from "@/lib/leagues";
 
-export const revalidate = 300;
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 type Zone = {
   color: string;
@@ -189,6 +190,10 @@ export default async function LeaguePage({
   const matches = getLeagueMatches(id, 400, 24);
   const counts = getLeagueMatchCounts(id);
   const n = standings.length;
+  const currentSeasonYear = String(latestSeasonStartYear());
+  const isCurrentSeason = activeSeason === currentSeasonYear;
+  const seasonPrep = n === 0 && isCurrentSeason;
+  const seasonLabel = `${activeSeason}/${Number(activeSeason) + 1}`;
 
   const totalFinishedMatchesInSeason =
     standings.reduce((acc, r) => acc + r.played, 0) / 2;
@@ -298,15 +303,15 @@ export default async function LeaguePage({
           <div className="flex flex-wrap items-center justify-between gap-3">
             <span className="text-xs font-black text-ink">المواسم المتاحة:</span>
             <span className="text-xs font-black text-accent bg-accent-dim/40 px-3 py-1 rounded-full border border-accent/20">
-              {activeSeason === "2026"
-                ? "التحضير للموسم القادم (2026/2027)"
+              {seasonPrep
+                ? `بداية الموسم ${seasonLabel} — بانتظار جدول الترتيب`
                 : `جدول الترتيب الرسمي — موسم ${activeSeason}`}
             </span>
           </div>
           <div className="flex flex-wrap items-center gap-2 pt-1">
             {availableSeasons.map((s) => {
               const isActive = s === activeSeason;
-              const isUpcoming = s === "2026";
+              const isLatest = s === currentSeasonYear;
               return (
                 <Link
                   key={s}
@@ -314,12 +319,12 @@ export default async function LeaguePage({
                   className={`px-4 py-2 rounded-full text-xs font-mono font-black no-underline transition-all ${
                     isActive
                       ? "bg-accent !text-on-fill shadow-sm border-0 scale-105"
-                      : isUpcoming
+                      : isLatest
                       ? "bg-success-dim text-success border border-success/30 hover:bg-success-dim"
                       : "bg-panel text-ink hover:bg-panel/80 border border-line"
                   }`}
                 >
-                  {isUpcoming ? "التحضير للموسم القادم 2026 ⏳" : `موسم ${s}`}
+                  {isLatest ? `الموسم الجاري ${s}` : `موسم ${s}`}
                 </Link>
               );
             })}
@@ -332,20 +337,20 @@ export default async function LeaguePage({
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line pb-3">
           <div className="space-y-0.5">
             <h2 className="text-base sm:text-lg font-black text-ink tracking-tight">
-              {activeSeason === "2026"
-                ? "التحضير للموسم القادم (2026/2027)"
-                : "جدول ترتيب الفرق"}
+              {seasonPrep ? `موسم ${seasonLabel}` : "جدول ترتيب الفرق"}
             </h2>
             <p className="text-xs text-muted font-medium">
-              {activeSeason === "2026"
-                ? "جاهزية النموذج وتصنيفات القوة الأولية والمباريات التحضيرية"
+              {seasonPrep
+                ? counts.scheduled > 0
+                  ? `${counts.scheduled} مباراة مجدولة — الترتيب يظهر بعد انطلاق الموسم`
+                  : "تصنيفات القوة الأولية والمباريات المجدولة"
                 : leader
                 ? `الصدارة: ${leader.name_ar} برصيد ${leader.points} نقطة`
                 : `المواسم الرسمية وتقييم Elo النماذج`}
             </p>
           </div>
           <span className="text-xs font-black text-muted bg-panel px-3 py-1 rounded-full border border-line">
-            {activeSeason === "2026" ? "التحضير للموسم الجاري" : "محدث أوتوماتيكياً"}
+            {seasonPrep ? "قبل انطلاق الترتيب" : "محدث أوتوماتيكياً"}
           </span>
         </div>
 
@@ -356,10 +361,14 @@ export default async function LeaguePage({
             </div>
             <div className="max-w-md mx-auto space-y-2">
               <h3 className="text-lg font-black text-ink">
-                التحضير للموسم القادم (2026/2027)
+                {seasonPrep
+                  ? `لا يوجد ترتيب رسمي بعد لموسم ${seasonLabel}`
+                  : `لا يتوفر ترتيب لموسم ${activeSeason}`}
               </h3>
               <p className="text-xs font-semibold text-muted leading-relaxed">
-                يجري حالياً تجهيز جداول المباريات والمعايرة النهائية لمعاملات قوة الهجوم والدفاع وتقييمات Elo الافتتاحية للموسم الجاري.
+                {counts.scheduled > 0
+                  ? "المباريات المجدولة وتصنيفات Elo متاحة بالأسفل؛ جدول النقاط يُبنى بعد اكتمال الجولات."
+                  : "جرّب موسماً سابقاً من الشريط أعلاه، أو انتظر مزامنة الترتيب."}
               </p>
             </div>
 

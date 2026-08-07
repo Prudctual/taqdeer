@@ -1,23 +1,20 @@
 import type { Metadata } from "next";
 import { PageNav } from "@/components/ui";
 import { PredictionArchiveLog } from "@/components/PredictionArchiveLog";
-import {
-  getFinishedPredictionsHistory,
-  getUpcomingSnapshotMatches,
-} from "@/lib/queries";
+import { getUpcomingSnapshotMatches } from "@/lib/queries";
 
 export const metadata: Metadata = {
   title: "سجل حفظ التوقعات | منصة تقدير",
   description:
-    "توقعات محفوظة للمباريات القادمة، وتنتقل تلقائياً إلى تبويب النتائج المكتملة بعد انتهاء المباراة.",
+    "توقعات محفوظة للمباريات القادمة من اليوم فصاعداً.",
 };
 
-export const revalidate = 120;
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export default function HistoryPage() {
+  // نبدأ من اليوم: القادمة فقط — بدون أرشيف النتائج المكتملة السابقة
   const upcomingSnapshots = getUpcomingSnapshotMatches(20);
-  // المنتهية ذات التوقعات المحفوظة — تظهر في تبويب منفصل عند اكتمال النتائج
-  const finishedItems = getFinishedPredictionsHistory("all", 300);
 
   return (
     <div className="space-y-6">
@@ -28,8 +25,9 @@ export default function HistoryPage() {
       />
 
       <PredictionArchiveLog
-        items={finishedItems}
+        items={[]}
         upcomingSnapshots={upcomingSnapshots}
+        showFinished={false}
       />
     </div>
   );

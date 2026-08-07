@@ -323,8 +323,12 @@ export async function syncFixtureSchedule() {
 
       for (const f of fixtures) {
         if (!f.HomeTeam || !f.AwayTeam || !f.DateUtc) continue;
-        const iso = f.DateUtc.trim().replace(" ", "T");
-        if (Number.isNaN(Date.parse(iso))) continue;
+        // DateUtc من المصدر يجب أن يُعامل كـ UTC دائماً — بلا منطقة زمنية يُلحق Z
+        let iso = f.DateUtc.trim().replace(" ", "T");
+        if (!/[zZ]|[+-]\d{2}:?\d{2}$/.test(iso)) iso += "Z";
+        const parsed = Date.parse(iso);
+        if (Number.isNaN(parsed)) continue;
+        iso = new Date(parsed).toISOString();
 
         const homeId = findOrCreateTeam(feed.id, f.HomeTeam);
         const awayId = findOrCreateTeam(feed.id, f.AwayTeam);

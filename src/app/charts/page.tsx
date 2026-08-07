@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { PageNav, BackBar, EmptyState } from "@/components/ui";
-import { getUpcomingByLeague, getValueMatches, getMeta } from "@/lib/queries";
+import { getUpcomingByLeague, getValueMatches, getMeta, type MatchCard } from "@/lib/queries";
 import { formatMetaStamp } from "@/lib/format";
 import { MatchChartsInteractiveContainer } from "@/components/MatchChartsInteractiveContainer";
 
@@ -9,20 +9,70 @@ export const metadata: Metadata = {
   description: "مركز المخططات والرسوم البيانية التفاعلية المربوطة مباشرة ببيانات وحالة كل مباراة في قاعدة البيانات.",
 };
 
-export const revalidate = 300;
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
+function valueRowToMatchCard(v: ReturnType<typeof getValueMatches>[number]): MatchCard {
+  return {
+    id: v.id,
+    leagueId: v.league_id,
+    leagueNameAr: v.league_name_ar,
+    utcDate: v.utc_date,
+    status: "SCHEDULED",
+    homeNameAr: v.home_name_ar,
+    awayNameAr: v.away_name_ar,
+    homeNameEn: "",
+    awayNameEn: "",
+    homeCrestUrl: null,
+    awayCrestUrl: null,
+    homeId: "",
+    awayId: "",
+    homeGoals: null,
+    awayGoals: null,
+    pHome: v.p_home,
+    pDraw: v.p_draw,
+    pAway: v.p_away,
+    pBttsYes: null,
+    pOver25: null,
+    confidence: null,
+    lambdaHome: null,
+    lambdaAway: null,
+    topScoresJson: null,
+    scoreMatrixJson: null,
+    eloHome: null,
+    eloAway: null,
+    season: "",
+    analyticsJson: v.analytics_json,
+    xptsHome: null,
+    xptsAway: null,
+    marketHome: null,
+    marketDraw: null,
+    marketAway: null,
+    modelVersion: null,
+    oddsHome: v.odds_home,
+    oddsDraw: v.odds_draw,
+    oddsAway: v.odds_away,
+    shotsHome: null,
+    shotsAway: null,
+    sotHome: null,
+    sotAway: null,
+  };
+}
 
 export default function ChartsPage() {
   const lastFit = getMeta("last_fit");
   const upcomingGroups = getUpcomingByLeague(9);
   const valueMatches = getValueMatches();
 
-  // Combine upcoming matches and value matches into a clean list for the interactive selector
-  const upcomingList = upcomingGroups.flatMap((g) => g.matches || []);
-  const combinedMap = new Map();
+  const combinedMap = new Map<string, MatchCard>();
 
-  for (const m of [...valueMatches, ...upcomingList]) {
-    if (m && m.id && !combinedMap.has(m.id)) {
-      combinedMap.set(m.id, m);
+  // MatchCard أولاً حتى لا تُستبدل بصفوف snake_case من فرص القيمة
+  for (const m of upcomingGroups.flatMap((g) => g.matches || [])) {
+    if (m?.id) combinedMap.set(m.id, m);
+  }
+  for (const v of valueMatches) {
+    if (v?.id && !combinedMap.has(v.id)) {
+      combinedMap.set(v.id, valueRowToMatchCard(v));
     }
   }
 
@@ -32,7 +82,6 @@ export default function ChartsPage() {
     topScoresJson: null,
     scoreMatrixJson: null,
     analyticsJson: null,
-    analytics_json: null,
     liveEventsJson: null,
     liveStatsJson: null,
   }));

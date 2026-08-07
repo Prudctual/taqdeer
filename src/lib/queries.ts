@@ -134,7 +134,8 @@ const LIST_SELECT = `
   JOIN leagues l ON l.id = m.league_id
   JOIN teams ht ON ht.id = m.home_team_id
   JOIN teams at ON at.id = m.away_team_id
-  LEFT JOIN predictions p ON p.match_id = m.id
+  LEFT JOIN predictions p
+    ON p.match_id = m.id AND COALESCE(p.model_version, '') != 'live-v1'
 `;
 
 /** تفاصيل المباراة — يشمل مصفوفات الأهداف والتحليل */
@@ -176,7 +177,8 @@ const DETAIL_SELECT = `
   JOIN leagues l ON l.id = m.league_id
   JOIN teams ht ON ht.id = m.home_team_id
   JOIN teams at ON at.id = m.away_team_id
-  LEFT JOIN predictions p ON p.match_id = m.id
+  LEFT JOIN predictions p
+    ON p.match_id = m.id AND COALESCE(p.model_version, '') != 'live-v1'
 `;
 
 function toLegacy(m: MatchCard & { matchday?: number | null }): MatchRow {
@@ -303,16 +305,17 @@ const LIVE_SELECT = LIST_SELECT.replace(
 
 export function getLiveMatches(): MatchCard[] {
   const db = getDb();
+  // datetime(m.utc_date) ضروري — مقارنة النص ISO (...T17:00Z) مع datetime('now') تفشل معجمياً
   return db
     .prepare(
       `${LIVE_SELECT}
        WHERE m.status NOT IN ('FINISHED','POSTPONED','CANCELLED')
-         AND m.utc_date <= datetime('now')
+         AND datetime(m.utc_date) <= datetime('now')
          AND (
            (m.status IN ('IN_PLAY','PAUSED','LIVE','1H','2H','HT','ET','P','BREAK')
-            AND m.utc_date >= datetime('now', '-4 hours'))
+            AND datetime(m.utc_date) >= datetime('now', '-4 hours'))
            OR ((m.minute IS NOT NULL OR m.live_status_ar IS NOT NULL)
-               AND m.utc_date >= datetime('now', '-115 minutes'))
+               AND datetime(m.utc_date) >= datetime('now', '-115 minutes'))
          )
          AND m.source NOT IN ('preview-holdout','synthetic','demo')
        ORDER BY m.utc_date ASC`,
@@ -911,8 +914,8 @@ export const getValueMatches = cache(function getValueMatches(): Array<{
       JOIN leagues l ON l.id = m.league_id
       JOIN teams ht ON ht.id = m.home_team_id
       JOIN teams at ON at.id = m.away_team_id
-      WHERE m.utc_date >= datetime('now')
-        AND m.utc_date <= datetime('now', '+21 days')
+      WHERE substr(m.utc_date, 1, 19) >= strftime('%Y-%m-%dT%H:%M:%S', 'now')
+        AND substr(m.utc_date, 1, 19) <= strftime('%Y-%m-%dT%H:%M:%S', 'now', '+21 days')
         AND m.status IN ('SCHEDULED', 'TIMED', 'IN_PLAY', 'PAUSED')
         AND m.odds_home IS NOT NULL
         AND m.odds_draw IS NOT NULL
@@ -964,8 +967,8 @@ export const getValueMatches = cache(function getValueMatches(): Array<{
       const ev_a = r.p_away * r.odds_away - 1;
 
       const maxEv = Math.max(ev_h, ev_d, ev_a);
-      // نفس نطاق محرك التوقعات: أقل من 3% ضجيج، وأكثر من 15% غالباً خطأ نموذج أو أودز قديمة
-      if (maxEv < 0.03 || maxEv > 0.15) continue;
+      // أقل من 3% ضجيج سوق؛ سقف 40% يستبعد أودز فاسدة دون إفراغ الصفحة عند شحّ الأودز
+      if (maxEv < 0.03 || maxEv > 0.4) continue;
 
       const side: "home" | "draw" | "away" =
         maxEv === ev_h ? "home" : maxEv === ev_d ? "draw" : "away";
@@ -1017,7 +1020,7 @@ export const getBankerPicks = cache(function getBankerPicks(limit = 4, leagueId?
     const leagueFilter = leagueId ? "AND m.league_id = ?" : "";
     const params: unknown[] = leagueId ? [leagueId, limit] : [limit];
 
-    let rows = db.prepare(`
+    const rows = db.prepare(`
       SELECT m.id as matchId, l.name_ar as leagueName,
              ht.name_ar as homeTeam, at.name_ar as awayTeam,
              p.p_home, p.p_draw, p.p_away, p.confidence, m.utc_date
@@ -1026,7 +1029,8 @@ export const getBankerPicks = cache(function getBankerPicks(limit = 4, leagueId?
       JOIN teams ht ON ht.id = m.home_team_id
       JOIN teams at ON at.id = m.away_team_id
       JOIN predictions p ON p.match_id = m.id
-      WHERE (m.status IN ('SCHEDULED', 'TIMED') OR m.utc_date >= date('now'))
+      WHERE m.status IN ('SCHEDULED', 'TIMED')
+        AND substr(m.utc_date, 1, 19) >= strftime('%Y-%m-%dT%H:%M:%S', 'now')
         AND (p.p_home IS NOT NULL OR p.p_away IS NOT NULL)
       ${leagueFilter}
       ORDER BY m.utc_date ASC, MAX(COALESCE(p.p_home, 0), COALESCE(p.p_away, 0)) DESC
@@ -1043,23 +1047,7 @@ export const getBankerPicks = cache(function getBankerPicks(limit = 4, leagueId?
       utc_date: string;
     }>;
 
-    if (rows.length === 0) {
-      rows = db.prepare(`
-        SELECT m.id as matchId, l.name_ar as leagueName,
-               ht.name_ar as homeTeam, at.name_ar as awayTeam,
-               p.p_home, p.p_draw, p.p_away, p.confidence, m.utc_date
-        FROM matches m
-        JOIN leagues l ON l.id = m.league_id
-        JOIN teams ht ON ht.id = m.home_team_id
-        JOIN teams at ON at.id = m.away_team_id
-        JOIN predictions p ON p.match_id = m.id
-        WHERE (p.p_home IS NOT NULL OR p.p_away IS NOT NULL)
-        ${leagueFilter}
-        ORDER BY m.utc_date DESC
-        LIMIT ?
-      `).all(...params) as typeof rows;
-    }
-
+    // لا نُرجع مباريات منتهية كـ «ترشيحات بنكر» — الواجهة تفضّل الفراغ على التضليل
     return rows.map((r) => {
       const pH = r.p_home ?? 0.5;
       const pA = r.p_away ?? 0.3;
@@ -1306,7 +1294,7 @@ export const getFinishedPredictionsHistory = cache(
   (leagueId?: string, limit = 200): FinishedPredictionItem[] => {
     try {
       const db = getDb();
-      let sql = `
+      const sql = `
         SELECT 
           m.id, m.league_id AS leagueId, l.name_ar AS leagueNameAr, m.season, m.matchday,
           m.utc_date AS utcDate, m.status, m.home_goals AS homeGoals, m.away_goals AS awayGoals,
@@ -1334,18 +1322,23 @@ export const getFinishedPredictionsHistory = cache(
           AND m.utc_date >= ?
           AND (p.p_home IS NOT NULL OR ps.p_home IS NOT NULL)
       `;
-      // بداية الموسم الجاري تُشتق من التاريخ — لا قيمة مكتوبة تتقادم مع المواسم
-      const params: (string | number)[] = [`${latestSeasonStartYear()}-08-01`];
+      // الموسم الجاري؛ إن لم تُسجَّل نتائج بعد نرجع لموسم سابق لملء الأرشيف
+      const run = (from: string) => {
+        const params: (string | number)[] = [from];
+        let q = sql;
+        if (leagueId && leagueId !== "all") {
+          q += ` AND m.league_id = ?`;
+          params.push(leagueId);
+        }
+        q += ` ORDER BY m.utc_date DESC LIMIT ?`;
+        params.push(limit);
+        return db.prepare(q).all(...params) as (MatchCard & { isSnapshotLocked: number })[];
+      };
 
-      if (leagueId && leagueId !== "all") {
-        sql += ` AND m.league_id = ?`;
-        params.push(leagueId);
+      let rows = run(`${latestSeasonStartYear()}-08-01`);
+      if (rows.length === 0) {
+        rows = run(`${latestSeasonStartYear() - 1}-08-01`);
       }
-
-      sql += ` ORDER BY m.utc_date DESC LIMIT ?`;
-      params.push(limit);
-
-      const rows = db.prepare(sql).all(...params) as (MatchCard & { isSnapshotLocked: number })[];
 
       return rows.map((m) => {
         const pHome = m.pHome ?? 0;
@@ -1417,30 +1410,34 @@ export const getFinishedPredictionsHistory = cache(
 export const getUpcomingSnapshotMatches = cache((perLeague = 20): MatchCard[] => {
   try {
     const db = getDb();
+    // القادمة: نسب النموذج الحيّة أولاً (تُحدَّث مع كل fit) — اللقطة احتياط فقط
     const stmt = db.prepare(`
-      SELECT 
+      SELECT
         m.id, m.league_id AS leagueId, l.name_ar AS leagueNameAr, m.season, m.matchday,
         m.utc_date AS utcDate, m.status, m.home_goals AS homeGoals, m.away_goals AS awayGoals,
         m.home_team_id AS homeId, m.away_team_id AS awayId,
         th.name_ar AS homeNameAr, th.name_en AS homeNameEn, th.crest_url AS homeCrestUrl,
         ta.name_ar AS awayNameAr, ta.name_en AS awayNameEn, ta.crest_url AS awayCrestUrl,
-        COALESCE(ps.p_home, p.p_home) AS pHome,
-        COALESCE(ps.p_draw, p.p_draw) AS pDraw,
-        COALESCE(ps.p_away, p.p_away) AS pAway,
-        COALESCE(ps.p_btts_yes, p.p_btts_yes) AS pBttsYes,
-        COALESCE(ps.p_over25, p.p_over25) AS pOver25,
-        COALESCE(ps.lambda_home, p.lambda_home) AS lambdaHome,
-        COALESCE(ps.lambda_away, p.lambda_away) AS lambdaAway,
-        COALESCE(ps.confidence, p.confidence) AS confidence
+        COALESCE(p.p_home, ps.p_home) AS pHome,
+        COALESCE(p.p_draw, ps.p_draw) AS pDraw,
+        COALESCE(p.p_away, ps.p_away) AS pAway,
+        COALESCE(p.p_btts_yes, ps.p_btts_yes) AS pBttsYes,
+        COALESCE(p.p_over25, ps.p_over25) AS pOver25,
+        COALESCE(p.lambda_home, ps.lambda_home) AS lambdaHome,
+        COALESCE(p.lambda_away, ps.lambda_away) AS lambdaAway,
+        COALESCE(p.confidence, ps.confidence) AS confidence
       FROM matches m
       JOIN leagues l ON l.id = m.league_id
       JOIN teams th ON th.id = m.home_team_id
       JOIN teams ta ON ta.id = m.away_team_id
-      JOIN prediction_snapshots ps ON ps.match_id = m.id
-      LEFT JOIN predictions p ON p.match_id = m.id
+      LEFT JOIN predictions p
+        ON p.match_id = m.id AND COALESCE(p.model_version, '') != 'live-v1'
+      LEFT JOIN prediction_snapshots ps
+        ON ps.match_id = m.id AND COALESCE(ps.model_version, '') != 'live-v1'
       WHERE m.status IN ('SCHEDULED', 'TIMED')
         AND date(m.utc_date) >= date('now')
         AND m.league_id = ?
+        AND (p.p_home IS NOT NULL OR ps.p_home IS NOT NULL)
       ORDER BY m.utc_date ASC
       LIMIT ?
     `);

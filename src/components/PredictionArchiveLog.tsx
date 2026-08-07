@@ -128,6 +128,18 @@ function getCountryCardTheme(leagueId?: string) {
     };
   }
 
+  if (id === "no1" || id.includes("norway") || id.includes("eliteserien")) {
+    return {
+      countryAr: "النرويج",
+      leagueName: "الدوري النرويجي",
+      cardBg: "bg-gradient-to-r from-blue-950 via-indigo-900 to-red-950 text-white",
+      flagSplitGradient: "linear-gradient(135deg, #1e3a8a 0%, #ef4444 50%, #1e3a8a 100%)",
+      accentText: "text-sky-300 font-extrabold",
+      tagHit: "bg-emerald-500/25 border-emerald-400/50 text-emerald-200",
+      tagMiss: "bg-rose-500/25 border-rose-400/50 text-rose-200",
+    };
+  }
+
   if (id === "uel" || id === "el" || id.includes("europa")) {
     // UEFA Europa League: Europa Orange & Charcoal
     return {
@@ -211,6 +223,11 @@ function getCountryPatternSvg(leagueId?: string) {
     return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
   }
 
+  if (id === "no1" || id.includes("norway") || id.includes("eliteserien")) {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" fill="none" opacity="0.55"><path d="M8 12h48v40H8z" stroke="%23ffffff" stroke-width="2"/><path d="M24 12v40M8 28h48" stroke="%23ffffff" stroke-width="3"/></svg>`;
+    return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
+  }
+
   if (id === "uel" || id === "el" || id.includes("europa")) {
     // Europa League: Geometric Waves pattern
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" fill="none" opacity="0.6"><path d="M0 32 Q 16 16 32 32 T 64 32" stroke="%23ffffff" stroke-width="2.5"/><path d="M0 44 Q 16 28 32 44 T 64 44" stroke="%23ffffff" stroke-width="2.5"/></svg>`;
@@ -225,12 +242,16 @@ function getCountryPatternSvg(leagueId?: string) {
 export function PredictionArchiveLog({
   items,
   upcomingSnapshots = [],
+  showFinished = true,
 }: {
   items: FinishedPredictionItem[];
   upcomingSnapshots?: MatchCard[];
+  /** عند false تُخفى تبويب النتائج المكتملة (مثلاً سجل التوقعات يبدأ من اليوم) */
+  showFinished?: boolean;
 }) {
   const [activeTab, setActiveTab] = useState<"upcoming" | "finished">(
-    () => (upcomingSnapshots.length > 0 ? "upcoming" : "finished"),
+    () =>
+      !showFinished || upcomingSnapshots.length > 0 ? "upcoming" : "finished",
   );
   const [selectedLeague, setSelectedLeague] = useState<string>("all");
   const [selectedStatus, setSelectedStatus] = useState<"all" | "hit" | "miss" | "dc_hit">("all");
@@ -312,8 +333,12 @@ export function PredictionArchiveLog({
     [filteredUpcoming],
   );
 
+  const visibleTab: "upcoming" | "finished" = showFinished
+    ? activeTab
+    : "upcoming";
+
   const tabLeagueCount = (leagueId: string) => {
-    if (activeTab === "upcoming") {
+    if (visibleTab === "upcoming") {
       return upcomingSnapshots.filter(
         (u) => u.leagueId.toLowerCase() === leagueId.toLowerCase(),
       ).length;
@@ -324,17 +349,18 @@ export function PredictionArchiveLog({
   };
 
   const tabTotal =
-    activeTab === "upcoming" ? upcomingSnapshots.length : items.length;
+    visibleTab === "upcoming" ? upcomingSnapshots.length : items.length;
 
   return (
     <div className="space-y-6">
-      {/* تبويب رأس الصفحة: قادمة لم تُلعب بعد ↔ نتائج مكتملة محفوظة */}
+      {/* تبويب رأس الصفحة: قادمة ↔ نتائج مكتملة (يُخفى المكتمل عند البداية من اليوم) */}
+      {showFinished ? (
       <div className="flex items-center gap-2 overflow-x-auto scrollbar-none rounded-2xl bg-panel p-1.5 border border-line">
         <button
           type="button"
           onClick={() => setActiveTab("upcoming")}
           className={`press-scale flex flex-1 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
-            activeTab === "upcoming"
+            visibleTab === "upcoming"
               ? "bg-surface text-ink border border-accent/40 shadow-xs"
               : "text-muted hover:text-ink hover:bg-surface/50 border border-transparent"
           }`}
@@ -342,7 +368,7 @@ export function PredictionArchiveLog({
           <span>لم تُلعب بعد</span>
           <span
             className={`px-2 py-0.5 rounded-lg font-mono text-[11px] font-black ${
-              activeTab === "upcoming"
+              visibleTab === "upcoming"
                 ? "bg-accent-dim text-accent"
                 : "bg-panel text-muted border border-line"
             }`}
@@ -354,7 +380,7 @@ export function PredictionArchiveLog({
           type="button"
           onClick={() => setActiveTab("finished")}
           className={`press-scale flex flex-1 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
-            activeTab === "finished"
+            visibleTab === "finished"
               ? "bg-surface text-ink border border-accent/40 shadow-xs"
               : "text-muted hover:text-ink hover:bg-surface/50 border border-transparent"
           }`}
@@ -362,7 +388,7 @@ export function PredictionArchiveLog({
           <span>نتائج مكتملة</span>
           <span
             className={`px-2 py-0.5 rounded-lg font-mono text-[11px] font-black ${
-              activeTab === "finished"
+              visibleTab === "finished"
                 ? "bg-success-dim text-success"
                 : "bg-panel text-muted border border-line"
             }`}
@@ -371,6 +397,7 @@ export function PredictionArchiveLog({
           </span>
         </button>
       </div>
+      ) : null}
 
       {/* Control Bar: Filters & Search */}
       <div className="rounded-2xl bg-gradient-to-br from-slate-900/80 via-zinc-900/90 to-black p-4 space-y-3 shadow-xl backdrop-blur-md">
@@ -383,12 +410,12 @@ export function PredictionArchiveLog({
             </div>
             <div>
               <h3 className="text-xs sm:text-sm font-black text-white tracking-wide">
-                {activeTab === "upcoming"
+                {visibleTab === "upcoming"
                   ? "تصفية المباريات القادمة حسب الدوري"
                   : "تصفية النتائج المكتملة حسب الدوري"}
               </h3>
               <p className="text-[10px] font-semibold text-zinc-400">
-                {activeTab === "upcoming"
+                {visibleTab === "upcoming"
                   ? "توقعات محفوظة قبل انطلاق المباراة"
                   : "تُحفظ تلقائياً هنا بعد انتهاء المباراة مع مقارنة النتيجة"}
               </p>
@@ -488,7 +515,7 @@ export function PredictionArchiveLog({
           </div>
         </div>
 
-        {activeTab === "finished" && items.length > 0 && (
+        {visibleTab === "finished" && items.length > 0 && (
           <div className="flex flex-wrap items-center gap-2 pt-3 border-t border-white/10">
             <span className="text-[11px] font-bold text-white/60 me-1">تصفية النتائج:</span>
             <button
@@ -540,7 +567,7 @@ export function PredictionArchiveLog({
       </div>
 
       {/* Finished Matches — تبويب النتائج المكتملة فقط */}
-      {activeTab === "finished" && filtered.length > 0 && (
+      {visibleTab === "finished" && filtered.length > 0 && (
         <div className="space-y-4">
           {filtered.map((item) => {
             const pHome = item.pHome ?? 0;
@@ -705,7 +732,7 @@ export function PredictionArchiveLog({
         </div>
       )}
 
-      {activeTab === "finished" && filtered.length === 0 && (
+      {visibleTab === "finished" && filtered.length === 0 && (
         <div className="rounded-2xl border border-line bg-surface p-8 text-center space-y-2">
           <h3 className="text-sm font-black text-ink">لا نتائج مكتملة بعد</h3>
           <p className="text-xs text-muted leading-relaxed max-w-md mx-auto">
@@ -715,7 +742,7 @@ export function PredictionArchiveLog({
       )}
 
       {/* Upcoming Snapshots — تبويب لم تُلعب بعد */}
-      {activeTab === "upcoming" && filteredUpcoming.length > 0 && (
+      {visibleTab === "upcoming" && filteredUpcoming.length > 0 && (
         <div className="space-y-6 pt-2">
           <div className="flex flex-wrap items-center justify-between gap-2 px-1">
             <h3 className="text-sm font-black text-ink">
@@ -885,7 +912,7 @@ export function PredictionArchiveLog({
         </div>
       )}
 
-      {activeTab === "upcoming" && filteredUpcoming.length === 0 && (
+      {visibleTab === "upcoming" && filteredUpcoming.length === 0 && (
         <div className="rounded-2xl border border-line bg-surface p-8 text-center space-y-2">
           <h3 className="text-sm font-black text-ink">لا مباريات قادمة في هذه التصفية</h3>
           <p className="text-xs text-muted leading-relaxed max-w-md mx-auto">
