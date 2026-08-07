@@ -34,7 +34,8 @@ function toTableStatus(m: MatchCard): MatchTableRow["status"] {
 
 export default function HomePage() {
   const count = matchCount();
-  const upcomingByLeague = getUpcomingByLeague(10);
+  // جولة كاملة قادمة لكل دوري — لا تُقصّ الجولات في منتصفها
+  const upcomingByLeague = getUpcomingByLeague(9);
   const recentByLeague = getRecentFinishedByLeague(8);
   const lastFit = getMeta("last_fit");
   const leagues = getLeagues();
@@ -101,9 +102,10 @@ export default function HomePage() {
         awayTeamAr: m.awayNameAr,
         homeScore: m.homeGoals,
         awayScore: m.awayGoals,
-        pHome: m.pHome ?? 0.33,
-        pDraw: m.pDraw ?? 0.34,
-        pAway: m.pAway ?? 0.33,
+        // null = بانتظار التوقع؛ لا تُعرض احتمالات وهمية 33/34/33
+        pHome: m.pHome,
+        pDraw: m.pDraw,
+        pAway: m.pAway,
         homeElo: m.eloHome ?? undefined,
         awayElo: m.eloAway ?? undefined,
       });
@@ -127,9 +129,9 @@ export default function HomePage() {
         awayTeamAr: m.awayNameAr,
         homeScore: m.homeGoals,
         awayScore: m.awayGoals,
-        pHome: m.pHome ?? 0.33,
-        pDraw: m.pDraw ?? 0.34,
-        pAway: m.pAway ?? 0.33,
+        pHome: m.pHome,
+        pDraw: m.pDraw,
+        pAway: m.pAway,
         homeElo: m.eloHome ?? undefined,
         awayElo: m.eloAway ?? undefined,
       });

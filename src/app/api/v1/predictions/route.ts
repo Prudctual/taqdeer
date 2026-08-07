@@ -46,7 +46,7 @@ export async function GET(request: Request) {
              p.market_home, p.market_draw, p.market_away,
              p.model_version,
              m.odds_home, m.odds_draw, m.odds_away,
-             m.sharp_steam_side, m.referee_name, m.weather_condition
+             m.referee_name
       FROM matches m
       JOIN leagues l ON l.id = m.league_id
       JOIN teams ht ON ht.id = m.home_team_id

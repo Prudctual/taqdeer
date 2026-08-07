@@ -13,7 +13,7 @@ export const revalidate = 300;
 
 export default function ChartsPage() {
   const lastFit = getMeta("last_fit");
-  const upcomingGroups = getUpcomingByLeague(10);
+  const upcomingGroups = getUpcomingByLeague(9);
   const valueMatches = getValueMatches();
 
   // Combine upcoming matches and value matches into a clean list for the interactive selector
@@ -26,7 +26,16 @@ export default function ChartsPage() {
     }
   }
 
-  const allMatches = Array.from(combinedMap.values());
+  // DTO نحيف: مخططات الصفحة لا تستهلك سلاسل JSON الثقيلة — تُزال قبل تمريرها للعميل
+  const allMatches = Array.from(combinedMap.values()).map((m) => ({
+    ...m,
+    topScoresJson: null,
+    scoreMatrixJson: null,
+    analyticsJson: null,
+    analytics_json: null,
+    liveEventsJson: null,
+    liveStatsJson: null,
+  }));
 
   return (
     <div className="space-y-8">
@@ -46,7 +55,7 @@ export default function ChartsPage() {
 
             {lastFit && (
               <span className="text-[11px] font-bold text-muted bg-surface px-3 py-1 rounded-full border border-line">
-                تأريج المعايرة: {formatMetaStamp(lastFit)}
+                تاريخ المعايرة: {formatMetaStamp(lastFit)}
               </span>
             )}
           </div>

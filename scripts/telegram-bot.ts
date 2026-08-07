@@ -317,7 +317,7 @@ const MAIN_KEYBOARD = {
       { text: "🛡️ أأمن التوقعات (Bankers)", callback_data: "cmd_bankers" },
     ],
     [
-      { text: "🏆 ترتيب الدوريات الـ 6", callback_data: "cmd_leagues" },
+      { text: "🏆 ترتيب الدوريات الـ 8", callback_data: "cmd_leagues" },
       { text: "📊 سجل الدقة والأداء", callback_data: "cmd_accuracy" },
     ],
     [
@@ -339,7 +339,11 @@ const LEAGUES_KEYBOARD = {
     ],
     [
       { text: "🇫🇷 الدوري الفرنسي", callback_data: "cmd_league_fl1" },
-      { text: "🇰🇷 الدوري الكوري", callback_data: "cmd_league_kl1" },
+      { text: "🇵🇹 الدوري البرتغالي", callback_data: "cmd_league_ppd" },
+    ],
+    [
+      { text: "🇳🇱 الدوري الهولندي", callback_data: "cmd_league_ded" },
+      { text: "🇹🇷 الدوري التركي", callback_data: "cmd_league_tur1" },
     ],
     [
       { text: "🔙 القائمة الرئيسية", callback_data: "cmd_main_menu" },

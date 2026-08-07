@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { Crest } from "./Crest";
-import { formatMatchTime, formatShortDate, pct } from "@/lib/format";
+import { formatMatchTime, formatShortDate, formatLongDate, groupByDay, pct } from "@/lib/format";
 import { leagueEmblemUrl } from "@/lib/leagues";
 import type { FinishedPredictionItem, MatchCard } from "@/lib/queries";
 
@@ -128,58 +128,6 @@ function getCountryCardTheme(leagueId?: string) {
     };
   }
 
-  if (id === "no1" || id.includes("norway") || id.includes("eliteserien")) {
-    // Norway: Norwegian Crimson Red (Home 50%) | Nordic Navy Cross (Away 50%)
-    return {
-      countryAr: "النرويج",
-      leagueName: "الدوري النرويجي",
-      cardBg: "bg-gradient-to-r from-red-950 via-slate-900 to-blue-950 text-white",
-      flagSplitGradient: "linear-gradient(135deg, #991b1b 0%, #be123c 45%, #1e3a8a 55%, #0f172a 100%)",
-      accentText: "text-sky-300 font-extrabold",
-      tagHit: "bg-emerald-500/25 border-emerald-400/50 text-emerald-200",
-      tagMiss: "bg-rose-500/25 border-rose-400/50 text-rose-200",
-    };
-  }
-
-  if (id === "bsa" || id.includes("brazil") || id.includes("brasileiro")) {
-    // Brazil: Forest Green (Home) | Yellow Diamond (Center) | Celestial Blue (Away)
-    return {
-      countryAr: "البرازيل",
-      leagueName: "الدوري البرازيلي",
-      cardBg: "bg-gradient-to-r from-emerald-950 via-amber-950 to-blue-950 text-white",
-      flagSplitGradient: "linear-gradient(135deg, #064e3b 0%, #047857 38%, #78350f 50%, #1e3a8a 62%, #172554 100%)",
-      accentText: "text-amber-300 font-extrabold",
-      tagHit: "bg-emerald-500/25 border-emerald-400/50 text-emerald-200",
-      tagMiss: "bg-rose-500/25 border-rose-400/50 text-rose-200",
-    };
-  }
-
-  if (id === "arg" || id.includes("argentina")) {
-    // Argentina: Sky Blue (Home) | Sun Gold (Center) | Sky Blue (Away)
-    return {
-      countryAr: "الأرجنتين",
-      leagueName: "الدوري الأرجنتيني",
-      cardBg: "bg-gradient-to-r from-sky-950 via-amber-950 to-sky-950 text-white",
-      flagSplitGradient: "linear-gradient(135deg, #075985 0%, #0284c7 38%, #78350f 50%, #0284c7 62%, #0369a1 100%)",
-      accentText: "text-amber-300 font-extrabold",
-      tagHit: "bg-emerald-500/25 border-emerald-400/50 text-emerald-200",
-      tagMiss: "bg-rose-500/25 border-rose-400/50 text-rose-200",
-    };
-  }
-
-  if (id === "spl" || id.includes("saudi")) {
-    // Saudi Arabia: Saudi Forest Green & Palm Gold
-    return {
-      countryAr: "السعودية",
-      leagueName: "الدوري السعودي للمحترفين",
-      cardBg: "bg-gradient-to-r from-emerald-950 via-emerald-900 to-emerald-950 text-white",
-      flagSplitGradient: "linear-gradient(135deg, #064e3b 0%, #047857 50%, #022c22 100%)",
-      accentText: "text-emerald-300 font-extrabold",
-      tagHit: "bg-emerald-500/25 border-emerald-400/50 text-emerald-200",
-      tagMiss: "bg-rose-500/25 border-rose-400/50 text-rose-200",
-    };
-  }
-
   if (id === "uel" || id === "el" || id.includes("europa")) {
     // UEFA Europa League: Europa Orange & Charcoal
     return {
@@ -263,30 +211,6 @@ function getCountryPatternSvg(leagueId?: string) {
     return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
   }
 
-  if (id === "no1" || id.includes("norway") || id.includes("eliteserien")) {
-    // Norway: Nordic Cross pattern
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" fill="none" opacity="0.6"><path d="M20 0v64M0 20h64M24 0v64M0 24h64" stroke="%23ffffff" stroke-width="2.5"/></svg>`;
-    return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
-  }
-
-  if (id === "bsa" || id.includes("brazil") || id.includes("brasileiro")) {
-    // Brazil: Diamond & Celestial Globe pattern
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" fill="none" opacity="0.6"><path d="M32 8L56 32L32 56L8 32Z" stroke="%23ffffff" stroke-width="2"/><circle cx="32" cy="32" r="10" stroke="%23ffffff" stroke-width="2"/></svg>`;
-    return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
-  }
-
-  if (id === "arg" || id.includes("argentina")) {
-    // Argentina: Sun of May pattern
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" fill="none" opacity="0.6"><circle cx="32" cy="32" r="8" fill="%23ffffff"/><path d="M32 10v6M32 48v6M10 32h6M48 32h6M16 16l4 4M44 44l4 4M16 48l4-4M44 20l4-4" stroke="%23ffffff" stroke-width="2"/></svg>`;
-    return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
-  }
-
-  if (id === "spl" || id.includes("saudi")) {
-    // Saudi Arabia: Crossed Swords & Palm pattern
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" fill="none" opacity="0.6"><path d="M20 44l24-24M44 44L20 20" stroke="%23ffffff" stroke-width="2.5"/><path d="M32 12c-4 4-8 12-8 18h16c0-6-4-14-8-18z" fill="%23ffffff"/></svg>`;
-    return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
-  }
-
   if (id === "uel" || id === "el" || id.includes("europa")) {
     // Europa League: Geometric Waves pattern
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" fill="none" opacity="0.6"><path d="M0 32 Q 16 16 32 32 T 64 32" stroke="%23ffffff" stroke-width="2.5"/><path d="M0 44 Q 16 28 32 44 T 64 44" stroke="%23ffffff" stroke-width="2.5"/></svg>`;
@@ -305,6 +229,9 @@ export function PredictionArchiveLog({
   items: FinishedPredictionItem[];
   upcomingSnapshots?: MatchCard[];
 }) {
+  const [activeTab, setActiveTab] = useState<"upcoming" | "finished">(
+    () => (upcomingSnapshots.length > 0 ? "upcoming" : "finished"),
+  );
   const [selectedLeague, setSelectedLeague] = useState<string>("all");
   const [selectedStatus, setSelectedStatus] = useState<"all" | "hit" | "miss" | "dc_hit">("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
@@ -379,34 +306,75 @@ export function PredictionArchiveLog({
     });
   }, [upcomingSnapshots, selectedLeague, searchQuery]);
 
-  // Summary Metrics
-  const stats = useMemo(() => {
-    const total = filtered.length;
-    if (total === 0)
-      return { total: 0, hits: 0, hitRate: 0, dcHits: 0, dcHitRate: 0, avgBrier: 0 };
+  // تجميع القادمة حسب اليوم — كل تاريخ يعرض مبارياته كاملة
+  const upcomingByDay = useMemo(
+    () => groupByDay(filteredUpcoming),
+    [filteredUpcoming],
+  );
 
-    const hits = filtered.filter((i) => i.isHit).length;
-    const dcHits = filtered.filter((i) => i.doubleChanceHit).length;
-    const totalBrier = filtered.reduce((acc, i) => acc + i.brierScore, 0);
+  const tabLeagueCount = (leagueId: string) => {
+    if (activeTab === "upcoming") {
+      return upcomingSnapshots.filter(
+        (u) => u.leagueId.toLowerCase() === leagueId.toLowerCase(),
+      ).length;
+    }
+    return items.filter(
+      (i) => i.leagueId.toLowerCase() === leagueId.toLowerCase(),
+    ).length;
+  };
 
-    return {
-      total,
-      hits,
-      hitRate: hits / total,
-      dcHits,
-      dcHitRate: dcHits / total,
-      avgBrier: totalBrier / total,
-    };
-  }, [filtered]);
+  const tabTotal =
+    activeTab === "upcoming" ? upcomingSnapshots.length : items.length;
 
   return (
     <div className="space-y-6">
+      {/* تبويب رأس الصفحة: قادمة لم تُلعب بعد ↔ نتائج مكتملة محفوظة */}
+      <div className="flex items-center gap-2 overflow-x-auto scrollbar-none rounded-2xl bg-panel p-1.5 border border-line">
+        <button
+          type="button"
+          onClick={() => setActiveTab("upcoming")}
+          className={`press-scale flex flex-1 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+            activeTab === "upcoming"
+              ? "bg-surface text-ink border border-accent/40 shadow-xs"
+              : "text-muted hover:text-ink hover:bg-surface/50 border border-transparent"
+          }`}
+        >
+          <span>لم تُلعب بعد</span>
+          <span
+            className={`px-2 py-0.5 rounded-lg font-mono text-[11px] font-black ${
+              activeTab === "upcoming"
+                ? "bg-accent-dim text-accent"
+                : "bg-panel text-muted border border-line"
+            }`}
+          >
+            {upcomingSnapshots.length}
+          </span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab("finished")}
+          className={`press-scale flex flex-1 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+            activeTab === "finished"
+              ? "bg-surface text-ink border border-accent/40 shadow-xs"
+              : "text-muted hover:text-ink hover:bg-surface/50 border border-transparent"
+          }`}
+        >
+          <span>نتائج مكتملة</span>
+          <span
+            className={`px-2 py-0.5 rounded-lg font-mono text-[11px] font-black ${
+              activeTab === "finished"
+                ? "bg-success-dim text-success"
+                : "bg-panel text-muted border border-line"
+            }`}
+          >
+            {items.length}
+          </span>
+        </button>
+      </div>
 
-
-      {/* Control Bar: Filters & Search (Borderless) */}
+      {/* Control Bar: Filters & Search */}
       <div className="rounded-2xl bg-gradient-to-br from-slate-900/80 via-zinc-900/90 to-black p-4 space-y-3 shadow-xl backdrop-blur-md">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-3">
-          {/* Header Title */}
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-xl bg-white/10 flex items-center justify-center text-white shrink-0">
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
@@ -415,15 +383,18 @@ export function PredictionArchiveLog({
             </div>
             <div>
               <h3 className="text-xs sm:text-sm font-black text-white tracking-wide">
-                تصفية المباريات حسب الدوري ({leagues.length + 1})
+                {activeTab === "upcoming"
+                  ? "تصفية المباريات القادمة حسب الدوري"
+                  : "تصفية النتائج المكتملة حسب الدوري"}
               </h3>
               <p className="text-[10px] font-semibold text-zinc-400">
-                اختر البطولة لعرض المباريات والتوقعات الخاصة بها
+                {activeTab === "upcoming"
+                  ? "توقعات محفوظة قبل انطلاق المباراة"
+                  : "تُحفظ تلقائياً هنا بعد انتهاء المباراة مع مقارنة النتيجة"}
               </p>
             </div>
           </div>
 
-          {/* Search Input */}
           <div className="relative shrink-0 sm:w-64">
             <input
               type="text"
@@ -444,15 +415,11 @@ export function PredictionArchiveLog({
           </div>
         </div>
 
-        {/* Permanent Static Leagues Grid */}
         <div className="pt-1 space-y-3">
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
-            {/* Option 1: All Leagues Card */}
             <button
               type="button"
-              onClick={() => {
-                setSelectedLeague("all");
-              }}
+              onClick={() => setSelectedLeague("all")}
               className={`p-3 rounded-2xl border transition-all duration-300 cursor-pointer flex items-center justify-between gap-2.5 group backdrop-blur-md ${
                 selectedLeague === "all"
                   ? "bg-white text-zinc-950 border-white shadow-xl shadow-white/10 font-black scale-[1.02] ring-2 ring-white/50"
@@ -472,13 +439,12 @@ export function PredictionArchiveLog({
               <span className={`px-2 py-0.5 rounded-lg text-[11px] font-mono font-black shrink-0 ${
                 selectedLeague === "all" ? "bg-black/10 text-zinc-900" : "bg-white/10 text-white/70"
               }`}>
-                {items.length + upcomingSnapshots.length}
+                {tabTotal}
               </span>
             </button>
 
-            {/* Option 2: Individual League Cards */}
             {leagues.map((l) => {
-              const count = items.filter((i) => i.leagueId.toLowerCase() === l.id.toLowerCase()).length + upcomingSnapshots.filter((u) => u.leagueId.toLowerCase() === l.id.toLowerCase()).length;
+              const count = tabLeagueCount(l.id);
               const isSelected = selectedLeague === l.id;
               const theme = getCountryCardTheme(l.id);
 
@@ -486,9 +452,7 @@ export function PredictionArchiveLog({
                 <button
                   key={l.id}
                   type="button"
-                  onClick={() => {
-                    setSelectedLeague(l.id);
-                  }}
+                  onClick={() => setSelectedLeague(l.id)}
                   className={`p-3 rounded-2xl border transition-all duration-300 cursor-pointer flex items-center justify-between gap-2.5 group backdrop-blur-md ${
                     isSelected
                       ? "bg-white text-zinc-950 border-white shadow-xl shadow-white/10 font-black scale-[1.02] ring-2 ring-white/50"
@@ -503,7 +467,7 @@ export function PredictionArchiveLog({
                       className="w-6 h-6 sm:w-7 sm:h-7 object-contain filter drop-shadow-md shrink-0 group-hover:scale-110 transition-transform duration-300"
                       onError={(e) => {
                         e.currentTarget.onerror = null;
-                        e.currentTarget.src = "https://flagcdn.com/w40/gb.png";
+                        e.currentTarget.src = "/icon.svg";
                       }}
                     />
                     <div className="text-start min-w-0">
@@ -524,17 +488,16 @@ export function PredictionArchiveLog({
           </div>
         </div>
 
-        {/* Outcome Filter */}
-        {filtered.length > 0 && (
-          <div className="flex flex-wrap items-center gap-2 pt-3 border-t border-line">
-            <span className="text-[11px] font-bold text-muted me-1">تصفية النتائج:</span>
+        {activeTab === "finished" && items.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2 pt-3 border-t border-white/10">
+            <span className="text-[11px] font-bold text-white/60 me-1">تصفية النتائج:</span>
             <button
               type="button"
               onClick={() => setSelectedStatus("all")}
               className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                 selectedStatus === "all"
-                  ? "bg-ink text-surface"
-                  : "bg-surface text-muted hover:text-ink border border-line"
+                  ? "bg-white text-zinc-950"
+                  : "bg-white/10 text-white/70 hover:bg-white/20 border border-white/10"
               }`}
             >
               الكل
@@ -545,7 +508,7 @@ export function PredictionArchiveLog({
               className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                 selectedStatus === "hit"
                   ? "bg-emerald-600 text-white shadow-2xs"
-                  : "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 hover:bg-emerald-500/20"
+                  : "bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 hover:bg-emerald-500/20"
               }`}
             >
               توقع صائب
@@ -556,7 +519,7 @@ export function PredictionArchiveLog({
               className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                 selectedStatus === "miss"
                   ? "bg-rose-600 text-white shadow-2xs"
-                  : "bg-rose-500/10 text-rose-600 border border-rose-500/20 hover:bg-rose-500/20"
+                  : "bg-rose-500/10 text-rose-300 border border-rose-500/20 hover:bg-rose-500/20"
               }`}
             >
               توقع غير صائب
@@ -567,7 +530,7 @@ export function PredictionArchiveLog({
               className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                 selectedStatus === "dc_hit"
                   ? "bg-blue-600 text-white shadow-2xs"
-                  : "bg-blue-500/10 text-blue-600 border border-blue-500/20 hover:bg-blue-500/20"
+                  : "bg-blue-500/10 text-blue-300 border border-blue-500/20 hover:bg-blue-500/20"
               }`}
             >
               نجاح الفرصة المزدوجة
@@ -576,8 +539,8 @@ export function PredictionArchiveLog({
         )}
       </div>
 
-      {/* Finished Matches List - Clean Country Cards without Cliché Borders */}
-      {filtered.length > 0 && (
+      {/* Finished Matches — تبويب النتائج المكتملة فقط */}
+      {activeTab === "finished" && filtered.length > 0 && (
         <div className="space-y-4">
           {filtered.map((item) => {
             const pHome = item.pHome ?? 0;
@@ -611,7 +574,7 @@ export function PredictionArchiveLog({
                 <div className="relative z-10 space-y-4.5">
                   {/* Header info */}
                   <div className="flex flex-wrap items-center justify-between gap-2 text-xs border-b border-white/15 pb-3.5">
-                    <div className="flex items-center gap-2.5">
+                    <div className="flex items-center gap-2">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src={leagueEmblemUrl(item.leagueId || "")}
@@ -621,6 +584,11 @@ export function PredictionArchiveLog({
                       <span className="font-extrabold text-sm sm:text-base text-white tracking-wide">
                         {item.leagueNameAr}
                       </span>
+                      {item.matchday != null ? (
+                        <span className="px-2 py-0.5 rounded-md bg-black/35 border border-white/15 text-[10px] font-black font-mono">
+                          الجولة {item.matchday}
+                        </span>
+                      ) : null}
                     </div>
 
                     <div className="flex items-center gap-2">
@@ -737,125 +705,192 @@ export function PredictionArchiveLog({
         </div>
       )}
 
-      {/* Upcoming Snapshots Section - Clean Country Cards */}
-      {filteredUpcoming.length > 0 && (
-        <div className="space-y-4 pt-2">
+      {activeTab === "finished" && filtered.length === 0 && (
+        <div className="rounded-2xl border border-line bg-surface p-8 text-center space-y-2">
+          <h3 className="text-sm font-black text-ink">لا نتائج مكتملة بعد</h3>
+          <p className="text-xs text-muted leading-relaxed max-w-md mx-auto">
+            عند انتهاء أي مباراة كانت توقعاتها محفوظة، تُنقل تلقائياً إلى هذا التبويب مع مقارنة النتيجة بالتوقع.
+          </p>
+        </div>
+      )}
 
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {filteredUpcoming.map((item) => {
-              const pHome = item.pHome ?? 0;
-              const pDraw = item.pDraw ?? 0;
-              const pAway = item.pAway ?? 0;
-              const theme = getCountryCardTheme(item.leagueId);
-
-              return (
-                <div
-                  key={item.id}
-                  style={{ background: theme.flagSplitGradient }}
-                  className="relative overflow-hidden rounded-3xl p-4 sm:p-5 shadow-lg transition-all duration-300 hover:shadow-xl text-white"
-                >
-                  {/* National Symbol Pattern Watermark Overlay */}
-                  <div
-                    className="absolute inset-0 opacity-25 pointer-events-none"
-                    style={{
-                      backgroundImage: getCountryPatternSvg(item.leagueId),
-                      backgroundRepeat: "repeat",
-                      backgroundSize: "64px 64px",
-                    }}
-                  />
-
-                  <div className="relative z-10 space-y-4">
-                    <div className="flex items-center justify-between text-xs border-b border-white/15 pb-3">
-                      <div className="flex items-center gap-2">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={leagueEmblemUrl(item.leagueId || "")}
-                          alt=""
-                          className="w-5 h-5 object-contain filter drop-shadow-md"
-                        />
-                        <span className="font-extrabold text-xs sm:text-sm text-white tracking-wide">
-                          {item.leagueNameAr}
-                        </span>
-                      </div>
-
-                      <div className="flex items-center gap-2 text-xs font-semibold text-white/90 font-sans">
-                        {/* Date Badge */}
-                        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-black/35 backdrop-blur-md border border-white/15 shadow-2xs">
-                          <svg className="w-3.5 h-3.5 text-white/80 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                          </svg>
-                          <span>{formatShortDate(item.utcDate)}</span>
-                        </div>
-
-                        {/* Time Badge */}
-                        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-black/35 backdrop-blur-md border border-white/15 shadow-2xs">
-                          <svg className="w-3.5 h-3.5 text-white/80 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                          </svg>
-                          <span>{formatMatchTime(item.utcDate)}</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 py-1">
-                      <div className="flex items-center justify-end gap-3 min-w-0">
-                        <span className="font-bold text-sm sm:text-base text-white truncate text-end">
-                          {item.homeNameAr}
-                        </span>
-                        <Crest src={item.homeCrestUrl} alt={item.homeNameAr} size="lg" className="shrink-0 drop-shadow-md" />
-                      </div>
-                      <span className="text-xs font-bold text-white/80 px-3 py-1 rounded-xl bg-black/25 font-sans">
-                        VS
-                      </span>
-                      <div className="flex items-center gap-3 min-w-0">
-                        <Crest src={item.awayCrestUrl} alt={item.awayNameAr} size="lg" className="shrink-0 drop-shadow-md" />
-                        <span className="font-bold text-sm sm:text-base text-white truncate">
-                          {item.awayNameAr}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="rounded-2xl bg-black/35 backdrop-blur-md border border-white/15 p-3 space-y-2 shadow-lg shadow-black/20">
-                      <div className="flex items-center justify-between text-xs font-semibold text-white/90 font-sans">
-                        <span className="font-bold text-white/90 drop-shadow-xs">توزيع الاحتمالات (1X2)</span>
-                        <div className="flex items-center gap-2 text-xs font-bold">
-                          <span className="text-emerald-300 drop-shadow-xs">مضيف</span>
-                          <span className="text-white/40 font-normal">•</span>
-                          <span className="text-amber-300 drop-shadow-xs">تعادل</span>
-                          <span className="text-white/40 font-normal">•</span>
-                          <span className="text-rose-300 drop-shadow-xs">ضيف</span>
-                        </div>
-                      </div>
-                      <div className="h-4 sm:h-5 w-full rounded-full bg-black/50 overflow-hidden flex gap-1 p-0.5 shadow-inner border border-white/10">
-                        <div
-                          style={{ width: `${Math.max(pHome * 100, 4)}%` }}
-                          className="h-full bg-emerald-400 rounded-s-full flex items-center justify-center font-mono font-black text-[10px] text-emerald-950 px-1 truncate transition-all duration-300"
-                          title={`فوز المضيف: ${pct(pHome)}`}
-                        >
-                          {pct(pHome)}
-                        </div>
-                        <div
-                          style={{ width: `${Math.max(pDraw * 100, 4)}%` }}
-                          className="h-full bg-amber-400 flex items-center justify-center font-mono font-black text-[10px] text-amber-950 px-1 truncate transition-all duration-300"
-                          title={`التعادل: ${pct(pDraw)}`}
-                        >
-                          {pct(pDraw)}
-                        </div>
-                        <div
-                          style={{ width: `${Math.max(pAway * 100, 4)}%` }}
-                          className="h-full bg-rose-400 rounded-e-full flex items-center justify-center font-mono font-black text-[10px] text-rose-950 px-1 truncate transition-all duration-300"
-                          title={`فوز الضيف: ${pct(pAway)}`}
-                        >
-                          {pct(pAway)}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
+      {/* Upcoming Snapshots — تبويب لم تُلعب بعد */}
+      {activeTab === "upcoming" && filteredUpcoming.length > 0 && (
+        <div className="space-y-6 pt-2">
+          <div className="flex flex-wrap items-center justify-between gap-2 px-1">
+            <h3 className="text-sm font-black text-ink">
+              التوقعات المحفوظة للجولات القادمة
+            </h3>
+            <span className="text-[11px] font-bold text-muted bg-panel px-3 py-1 rounded-full border border-line">
+              {filteredUpcoming.length} مباراة · جولات كاملة
+            </span>
           </div>
+
+          {upcomingByDay.map((day) => {
+            const first = day.items[0];
+            const uniformRound =
+              first?.matchday != null &&
+              day.items.every(
+                (x) => x.matchday === first.matchday && x.leagueId === first.leagueId,
+              )
+                ? first.matchday
+                : null;
+            const roundLabel =
+              first?.matchday != null &&
+              day.items.every((x) => x.matchday === first.matchday)
+                ? first.matchday
+                : null;
+
+            return (
+              <section key={day.key} className="space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-panel px-4 py-2.5 border border-line">
+                  <div className="flex flex-wrap items-center gap-2">
+                    {day.relative ? (
+                      <span className="bg-accent-dim text-accent px-3 py-0.5 rounded-full text-xs font-black border border-accent/20">
+                        {day.relative}
+                      </span>
+                    ) : null}
+                    {(uniformRound ?? roundLabel) != null ? (
+                      <span className="bg-surface text-ink px-2.5 py-0.5 rounded-md text-[11px] font-black font-mono border border-line">
+                        الجولة {uniformRound ?? roundLabel}
+                      </span>
+                    ) : null}
+                    <h4 className="text-xs sm:text-sm font-black text-ink tracking-tight">
+                      {formatLongDate(day.items[0]!.utcDate)}
+                    </h4>
+                  </div>
+                  <span className="text-[11px] font-extrabold text-muted bg-surface px-3 py-1 rounded-full border border-line">
+                    {day.items.length === 1
+                      ? "مباراة واحدة"
+                      : day.items.length === 2
+                        ? "مباراتان"
+                        : day.items.length <= 10
+                          ? `${day.items.length} مباريات`
+                          : `${day.items.length} مباراة`}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {day.items.map((item) => {
+                    const pHome = item.pHome ?? 0;
+                    const pDraw = item.pDraw ?? 0;
+                    const pAway = item.pAway ?? 0;
+                    const theme = getCountryCardTheme(item.leagueId);
+
+                    return (
+                      <div
+                        key={item.id}
+                        style={{ background: theme.flagSplitGradient }}
+                        className="relative overflow-hidden rounded-3xl p-4 sm:p-5 shadow-lg transition-all duration-300 hover:shadow-xl text-white"
+                      >
+                        <div
+                          className="absolute inset-0 opacity-25 pointer-events-none"
+                          style={{
+                            backgroundImage: getCountryPatternSvg(item.leagueId),
+                            backgroundRepeat: "repeat",
+                            backgroundSize: "64px 64px",
+                          }}
+                        />
+
+                        <div className="relative z-10 space-y-4">
+                          <div className="flex items-center justify-between text-xs border-b border-white/15 pb-3">
+                            <div className="flex items-center gap-2">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={leagueEmblemUrl(item.leagueId || "")}
+                                alt=""
+                                className="w-5 h-5 object-contain filter drop-shadow-md"
+                              />
+                              <span className="font-extrabold text-xs sm:text-sm text-white tracking-wide">
+                                {item.leagueNameAr}
+                              </span>
+                              {item.matchday != null ? (
+                                <span className="px-2 py-0.5 rounded-md bg-black/35 border border-white/15 text-[10px] font-black font-mono">
+                                  ج{item.matchday}
+                                </span>
+                              ) : null}
+                            </div>
+
+                            <div className="flex items-center gap-2 text-xs font-semibold text-white/90 font-sans">
+                              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-black/35 backdrop-blur-md border border-white/15 shadow-2xs">
+                                <span>{formatShortDate(item.utcDate)}</span>
+                              </div>
+                              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-black/35 backdrop-blur-md border border-white/15 shadow-2xs">
+                                <span>{formatMatchTime(item.utcDate)}</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 py-1">
+                            <div className="flex items-center justify-end gap-3 min-w-0">
+                              <span className="font-bold text-sm sm:text-base text-white truncate text-end">
+                                {item.homeNameAr}
+                              </span>
+                              <Crest src={item.homeCrestUrl} alt={item.homeNameAr} size="lg" className="shrink-0 drop-shadow-md" />
+                            </div>
+                            <span className="text-xs font-bold text-white/80 px-3 py-1 rounded-xl bg-black/25 font-sans">
+                              VS
+                            </span>
+                            <div className="flex items-center gap-3 min-w-0">
+                              <Crest src={item.awayCrestUrl} alt={item.awayNameAr} size="lg" className="shrink-0 drop-shadow-md" />
+                              <span className="font-bold text-sm sm:text-base text-white truncate">
+                                {item.awayNameAr}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="rounded-2xl bg-black/35 backdrop-blur-md border border-white/15 p-3 space-y-2 shadow-lg shadow-black/20">
+                            <div className="flex items-center justify-between text-xs font-semibold text-white/90 font-sans">
+                              <span className="font-bold text-white/90 drop-shadow-xs">توزيع الاحتمالات (1X2)</span>
+                              <div className="flex items-center gap-2 text-xs font-bold">
+                                <span className="text-emerald-300 drop-shadow-xs">مضيف</span>
+                                <span className="text-white/40 font-normal">•</span>
+                                <span className="text-amber-300 drop-shadow-xs">تعادل</span>
+                                <span className="text-white/40 font-normal">•</span>
+                                <span className="text-rose-300 drop-shadow-xs">ضيف</span>
+                              </div>
+                            </div>
+                            <div className="h-4 sm:h-5 w-full rounded-full bg-black/50 overflow-hidden flex gap-1 p-0.5 shadow-inner border border-white/10">
+                              <div
+                                style={{ width: `${Math.max(pHome * 100, 4)}%` }}
+                                className="h-full bg-emerald-400 rounded-s-full flex items-center justify-center font-mono font-black text-[10px] text-emerald-950 px-1 truncate transition-all duration-300"
+                                title={`فوز المضيف: ${pct(pHome)}`}
+                              >
+                                {pct(pHome)}
+                              </div>
+                              <div
+                                style={{ width: `${Math.max(pDraw * 100, 4)}%` }}
+                                className="h-full bg-amber-400 flex items-center justify-center font-mono font-black text-[10px] text-amber-950 px-1 truncate transition-all duration-300"
+                                title={`التعادل: ${pct(pDraw)}`}
+                              >
+                                {pct(pDraw)}
+                              </div>
+                              <div
+                                style={{ width: `${Math.max(pAway * 100, 4)}%` }}
+                                className="h-full bg-rose-400 rounded-e-full flex items-center justify-center font-mono font-black text-[10px] text-rose-950 px-1 truncate transition-all duration-300"
+                                title={`فوز الضيف: ${pct(pAway)}`}
+                              >
+                                {pct(pAway)}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+            );
+          })}
+        </div>
+      )}
+
+      {activeTab === "upcoming" && filteredUpcoming.length === 0 && (
+        <div className="rounded-2xl border border-line bg-surface p-8 text-center space-y-2">
+          <h3 className="text-sm font-black text-ink">لا مباريات قادمة في هذه التصفية</h3>
+          <p className="text-xs text-muted leading-relaxed max-w-md mx-auto">
+            جرّب دورياً آخر أو امسح البحث. المباريات ذات التوقعات المحفوظة تظهر هنا قبل انطلاقها.
+          </p>
         </div>
       )}
 

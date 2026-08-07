@@ -22,7 +22,6 @@ import { OddsMovementChart } from "@/components/OddsMovementChart";
 import { MatchCountdownHero } from "@/components/MatchCountdownHero";
 import { UpsetAlertBadge } from "@/components/UpsetAlertBadge";
 import { LiveMatchDataSync } from "@/components/LiveMatchDataSync";
-import { PlayerRadarChart } from "@/components/PlayerRadarChart";
 import { LiveInPlaySimulator } from "@/components/LiveInPlaySimulator";
 import { getMatchDetailedInfo } from "@/lib/match-details";
 
@@ -256,10 +255,9 @@ export default async function MatchPage({
   const matchDetails = getMatchDetailedInfo(
     match.home_id,
     match.home_name_ar,
-    match.id,
     match.refereeName,
-    match.leagueId
   );
+  // الحكم الحقيقي فقط من مصدر البيانات — لا أسماء مولّدة
   const resolvedReferee = matchDetails.refereeName;
 
   const homeSquad = toSquadStars(
@@ -275,8 +273,6 @@ export default async function MatchPage({
     4,
   );
   const squadStars = [...homeSquad, ...awaySquad];
-  const homeStar = homeSquad[0] ?? null;
-  const awayStar = awaySquad[0] ?? null;
 
   const matrixRaw = parseJson<number[][]>(match.score_matrix_json, []);
   const matrix = Array.isArray(matrixRaw) ? matrixRaw : [];
@@ -362,11 +358,10 @@ export default async function MatchPage({
   );
   const hasVenueSplit = homeVenue.played > 0 && awayVenue.played > 0;
 
-  const { shotsHome, shotsAway, sotHome, sotAway, xgHome, xgAway, xaHome, xaAway, ppdaHome, ppdaAway } = match;
+  const { shotsHome, shotsAway, sotHome, sotAway, xgHome, xgAway, ppdaHome, ppdaAway } = match;
   const hasShots = finished && shotsHome != null && shotsAway != null;
   const hasSot = hasShots && sotHome != null && sotAway != null;
   const hasXg = finished && xgHome != null && xgAway != null;
-  const hasXa = finished && xaHome != null && xaAway != null;
   const hasPpda = finished && ppdaHome != null && ppdaAway != null;
 
   // قراءة ما بعد المباراة: ماذا أعطى النموذج لما وقع فعلاً؟
@@ -545,7 +540,6 @@ export default async function MatchPage({
         eloAway={match.elo_away}
         pHome={match.p_home}
         pAway={match.p_away}
-        sharpSteamSide={match.sharpSteamSide}
         restHome={homeRest}
         restAway={awayRest}
         homeTeam={match.home_name_ar}
@@ -564,9 +558,9 @@ export default async function MatchPage({
         </div>
       ) : null}
 
-      {/* 4 مؤشرات سريعة ومبسطة للمباراة */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-        {/* Card 1 */}
+      {/* مؤشران سريعان من بيانات حقيقية فقط */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+        {/* توقع الأهداف — من احتمال +2.5 المعاير */}
         <div className="rounded-2xl border border-success/30 bg-surface overflow-hidden shadow-2xs">
           <div className="bg-success-dim border-b border-success/25 px-3.5 py-2 flex items-center justify-between">
             <span className="text-xs font-black text-success">
@@ -578,33 +572,16 @@ export default async function MatchPage({
           </div>
           <div className="p-3.5 bg-surface text-start">
             <p className="text-xs sm:text-sm font-black text-ink">
-              {match.p_over25 != null && match.p_over25 > 0.5 ? "مباراة هجومية (أهداف)" : "مباراة هادئة (توازن)"}
+              {match.p_over25 == null ? "بانتظار توقع النموذج" : match.p_over25 > 0.5 ? "مباراة هجومية (أهداف)" : "مباراة هادئة (توازن)"}
             </p>
           </div>
         </div>
 
-        {/* Card 2 */}
-        <div className="rounded-2xl border border-blue-500/30 bg-surface overflow-hidden shadow-2xs">
-          <div className="bg-blue-500/10 border-b border-blue-500/20 px-3.5 py-2 flex items-center justify-between">
-            <span className="text-xs font-black text-home">
-              اتجاه المراهنات
-            </span>
-            <span className="rounded-full bg-home text-on-fill px-2 py-0.5 text-[10px] font-extrabold">
-              السيولة
-            </span>
-          </div>
-          <div className="p-3.5 bg-surface text-start">
-            <p className="text-xs sm:text-sm font-black text-ink truncate">
-              {match.sharpSteamSide ? `إقبال على ${match.sharpSteamSide === "home" ? match.home_name_ar : match.sharpSteamSide === "away" ? match.away_name_ar : "التعادل"}` : "أسعار هادئة ومتوازنة"}
-            </p>
-          </div>
-        </div>
-
-        {/* Card 3 */}
+        {/* الحكم — الاسم الحقيقي من مصدر البيانات أو لم يُعلن */}
         <div className="rounded-2xl border border-rose-500/30 bg-surface overflow-hidden shadow-2xs">
           <div className="bg-danger-dim border-b border-danger/25 px-3.5 py-2 flex items-center justify-between">
             <span className="text-xs font-black text-danger">
-              صرامة الحكم
+              حكم المباراة
             </span>
             <span className="rounded-full bg-danger text-on-fill px-2 py-0.5 text-[10px] font-extrabold">
               التحكيم
@@ -612,24 +589,7 @@ export default async function MatchPage({
           </div>
           <div className="p-3.5 bg-surface text-start">
             <p className="text-xs sm:text-sm font-black text-ink truncate">
-              {resolvedReferee}
-            </p>
-          </div>
-        </div>
-
-        {/* Card 4 */}
-        <div className="rounded-2xl border border-sky-500/30 bg-surface overflow-hidden shadow-2xs">
-          <div className="bg-accent-dim border-b border-accent/25 px-3.5 py-2 flex items-center justify-between">
-            <span className="text-xs font-black text-sky-600 dark:text-sky-400">
-              حالة الطقس والملعب
-            </span>
-            <span className="rounded-full bg-accent text-on-fill px-2 py-0.5 text-[10px] font-extrabold">
-              الطقس
-            </span>
-          </div>
-          <div className="p-3.5 bg-surface text-start">
-            <p className="text-xs sm:text-sm font-black text-ink truncate">
-              {match.weatherCondition ?? "ممتازة للعب"}
+              {resolvedReferee ?? "لم يُعلن الحكم بعد"}
             </p>
           </div>
         </div>
@@ -656,23 +616,18 @@ export default async function MatchPage({
         <SectionCard
           leagueId={match.leagueId}
           title="تفاصيل الفرص والتسديدات"
-          subtitle="الأهداف المتوقعة والفرص المصنوعة للطرفين"
+          subtitle="مؤشرات مشتقة من إحصاءات التسديد الرسمية — لسنا مزودي xG تتبّعي"
           quiet
         >
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {hasXg ? (
               <div className="card-interactive p-4">
-                <ShotsPair label="الأهداف المتوقعة (xG)" home={xgHome!} away={xgAway!} />
-              </div>
-            ) : null}
-            {hasXa ? (
-              <div className="card-interactive p-4">
-                <ShotsPair label="التمريرات المتوقعة (xA)" home={xaHome!} away={xaAway!} />
+                <ShotsPair label="مؤشر التسديدات الموزون (بديل xG)" home={xgHome!} away={xgAway!} />
               </div>
             ) : null}
             {hasPpda ? (
               <div className="card-interactive p-4">
-                <ShotsPair label="مؤشر الضغط العالي (PPDA)" home={ppdaHome!} away={ppdaAway!} />
+                <ShotsPair label="مؤشر الضغط التقديري (PPDA تقريبي)" home={ppdaHome!} away={ppdaAway!} />
               </div>
             ) : null}
             <div className="card-interactive p-4">
@@ -706,12 +661,10 @@ export default async function MatchPage({
       />
 
       <LogisticsWidget
-        matchId={match.id}
-        leagueId={match.leagueId}
         homeTeamId={match.home_id}
         homeTeamNameAr={match.home_name_ar}
         refereeName={resolvedReferee}
-        logistics={analytics?.components?.logistics as { travel_distance_km?: number; pitch_surface?: string; is_european_midweek?: boolean; logistics_summary?: string }}
+        logistics={analytics?.components?.logistics as { travel_distance_km?: number; rest_days_home?: number; rest_days_away?: number; is_european_midweek?: boolean; logistics_summary?: string }}
       />
     </div>
   );
@@ -857,25 +810,24 @@ export default async function MatchPage({
       <OddsMovementChart
         oddsOpen={{ home: match.oddsOpenHome, draw: match.oddsOpenDraw, away: match.oddsOpenAway }}
         oddsCurrent={{ home: match.oddsHome, draw: match.oddsDraw, away: match.oddsAway }}
-        sharpSteamSide={match.sharpSteamSide}
         homeTeam={match.home_name_ar}
         awayTeam={match.away_name_ar}
       />
 
-      <AutomatedModelAdjustments
-        homeTeam={match.home_name_ar}
-        awayTeam={match.away_name_ar}
-        homeP={match.p_home ?? 0.38}
-        drawP={match.p_draw ?? 0.32}
-        awayP={match.p_away ?? 0.30}
-        lambdaHome={match.lambda_home ?? 1.25}
-        lambdaAway={match.lambda_away ?? 0.95}
-        sharpSteamSide={match.sharpSteamSide}
-        refereeName={resolvedReferee}
-        weatherCondition={match.weatherCondition}
-        homeVenueRecord={homeVenue}
-        awayVenueRecord={awayVenue}
-      />
+      {hasPred && match.lambda_home != null && match.lambda_away != null ? (
+        <AutomatedModelAdjustments
+          homeTeam={match.home_name_ar}
+          awayTeam={match.away_name_ar}
+          homeP={match.p_home!}
+          drawP={match.p_draw!}
+          awayP={match.p_away!}
+          lambdaHome={match.lambda_home}
+          lambdaAway={match.lambda_away}
+          hasMarketOdds={match.oddsHome != null && match.oddsDraw != null && match.oddsAway != null}
+          homeVenueRecord={homeVenue}
+          awayVenueRecord={awayVenue}
+        />
+      ) : null}
 
       {analytics?.components ? (
         <SectionCard
@@ -1171,12 +1123,6 @@ export default async function MatchPage({
           homeTeam={match.home_name_ar}
           awayTeam={match.away_name_ar}
           players={squadStars}
-        />
-        <PlayerRadarChart
-          homeTeam={match.home_name_ar}
-          awayTeam={match.away_name_ar}
-          homeStar={homeStar}
-          awayStar={awayStar}
         />
       </div>
 

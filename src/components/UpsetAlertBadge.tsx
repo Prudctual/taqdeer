@@ -3,7 +3,6 @@ interface UpsetAlertProps {
   eloAway?: number | null;
   pHome?: number | null;
   pAway?: number | null;
-  sharpSteamSide?: string | null;
   restHome?: number | null;
   restAway?: number | null;
   homeTeam: string;
@@ -15,7 +14,6 @@ export function UpsetAlertBadge({
   eloAway,
   pHome,
   pAway,
-  sharpSteamSide,
   restHome,
   restAway,
   homeTeam,
@@ -36,9 +34,6 @@ export function UpsetAlertBadge({
     if (restHome != null && restHome < 3.5) {
       upsetDetected = true;
       reason = `${homeTeam} يواجه ضغط إرهاق سريع (راحة أقل من 84 ساعة) مما يرفع احتمالية التعثر.`;
-    } else if (sharpSteamSide === "away" || sharpSteamSide === "draw") {
-      upsetDetected = true;
-      reason = `أموال المحترفين تتجه ضد المفضل (${homeTeam}) لصالح ${awayTeam}.`;
     } else if (pHome != null && pHome < 0.52) {
       upsetDetected = true;
       reason = `احتمال الفوز الحقيقي لا يتجاوز 52% برغم فارق الأسماء، مما يجعل الرهان على المفضل محفوفاً بالمخاطر.`;
@@ -48,9 +43,6 @@ export function UpsetAlertBadge({
     if (restAway != null && restAway < 3.5) {
       upsetDetected = true;
       reason = `${awayTeam} يسافر بظروف إرهاق بدني قد تمنح المضيف فرصة اقتناص نقاط المباراة.`;
-    } else if (sharpSteamSide === "home" || sharpSteamSide === "draw") {
-      upsetDetected = true;
-      reason = `حركة السيولة الذكية تتجه نحو المضيف ${homeTeam}.`;
     } else if (pAway != null && pAway < 0.52) {
       upsetDetected = true;
       reason = `فارق التقييم لا ينعكس بحسم على الأهداف المتوقعة.`;

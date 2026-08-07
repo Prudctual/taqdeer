@@ -44,7 +44,19 @@ export function MatchList({
     <div>
       <MatchListHeader leagueId={leagueId} />
       <div className="space-y-4 pt-2">
-        {days.map((day) => (
+        {days.map((day) => {
+          // شارة الجولة تظهر فقط عندما تتفق كل مباريات اليوم على جولة ودوري واحد —
+          // خلط الدوريات في يوم واحد يجعل رقم جولة واحد مضللاً
+          const first = day.items[0];
+          const uniformRound =
+            first?.matchday != null &&
+            day.items.every(
+              (x) => x.matchday === first.matchday && x.leagueId === first.leagueId,
+            )
+              ? first.matchday
+              : null;
+
+          return (
           <section key={day.key} aria-label={day.label} className="space-y-1">
             <DayRail>
               <div className="bg-panel rounded-2xl px-4 py-2.5 flex items-center justify-between border border-line">
@@ -54,9 +66,9 @@ export function MatchList({
                       {day.relative}
                     </span>
                   ) : null}
-                  {day.items[0]?.matchday ? (
+                  {uniformRound ? (
                     <span className="bg-panel text-ink px-2.5 py-0.5 rounded-md text-[11px] font-black font-mono border border-line">
-                      الجولة {day.items[0].matchday}
+                      الجولة {uniformRound}
                     </span>
                   ) : null}
                   <h3 className="text-xs sm:text-sm font-black text-ink tracking-tight">
@@ -80,7 +92,8 @@ export function MatchList({
               ))}
             </ul>
           </section>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

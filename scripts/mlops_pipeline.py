@@ -1,15 +1,20 @@
 #!/usr/bin/env python3
 """
 Taqdeer Automated MLOps & Real-Time +EV Value Bet Alerting Pipeline.
-Executes data sync, model training, lineup updates, and dispatches Telegram notifications.
+Executes data sync, model training, and dispatches Telegram notifications on failure.
 """
+
+from __future__ import annotations
 
 import sys
 import os
 import time
 import sqlite3
 import subprocess
+import shutil
 import datetime
+import json
+import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -17,22 +22,104 @@ sys.path.insert(0, str(ROOT / "python"))
 
 DB_PATH = ROOT / "data" / "taqdeer.db"
 
+
 def log(msg: str):
     now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     print(f"[{now}] 🤖 Taqdeer MLOps: {msg}", flush=True)
 
-def run_step(cmd: list[str], label: str):
+
+def _load_env_file() -> None:
+    env_path = ROOT / ".env"
+    if not env_path.exists():
+        return
+    for line in env_path.read_text().splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        k, _, v = line.partition("=")
+        os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
+
+
+def _ensure_path() -> None:
+    """PM2 لا يرث PATH المستخدم — أضف مواقع bun الشائعة."""
+    extras = [
+        str(Path.home() / ".bun" / "bin"),
+        "/usr/local/bin",
+        "/home/ubuntu/.bun/bin",
+    ]
+    path = os.environ.get("PATH", "")
+    for p in extras:
+        if p and p not in path and Path(p).exists():
+            path = f"{p}:{path}"
+    os.environ["PATH"] = path
+
+
+def resolve_bun() -> str:
+    found = shutil.which("bun")
+    if found:
+        return found
+    for candidate in (
+        Path.home() / ".bun" / "bin" / "bun",
+        Path("/home/ubuntu/.bun/bin/bun"),
+        Path("/usr/local/bin/bun"),
+    ):
+        if candidate.exists():
+            return str(candidate)
+    raise FileNotFoundError(
+        "bun غير موجود في PATH — ثبّته أو أضف $HOME/.bun/bin إلى ecosystem.config.js"
+    )
+
+
+def notify_failure(step: str, detail: str) -> None:
+    token = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
+    chat_id = os.environ.get("TELEGRAM_CHAT_ID", "").strip()
+    if not token or not chat_id:
+        log("⚠️ لا إعدادات Telegram — الفشل مسجل في اللوج فقط")
+        return
+    text = f"🚨 تقدير: فشل {step}\n{detail[:600]}"
+    try:
+        req = urllib.request.Request(
+            f"https://api.telegram.org/bot{token}/sendMessage",
+            data=json.dumps({"chat_id": chat_id, "text": text}).encode(),
+            headers={"Content-Type": "application/json"},
+        )
+        urllib.request.urlopen(req, timeout=15)
+    except Exception as e:  # noqa: BLE001
+        log(f"⚠️ تعذر إرسال إشعار Telegram: {e}")
+
+
+def run_step(cmd: list[str], label: str) -> bool:
     log(f"⚡ Starting step: {label}...")
     try:
-        res = subprocess.run(cmd, cwd=str(ROOT), capture_output=True, text=True, check=True)
+        # errors=replace: مخرجات العربية من السكربتات قد تصل ببايتات غير UTF-8 عبر بعض الأنابيب
+        subprocess.run(
+            cmd,
+            cwd=str(ROOT),
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            check=True,
+        )
         log(f"✅ {label} completed successfully.")
         return True
+    except FileNotFoundError as e:
+        log(f"⚠️ {label} failed: {e}")
+        notify_failure(label, str(e))
+        return False
     except subprocess.CalledProcessError as e:
-        log(f"⚠️ {label} failed: {e.stderr[:300]}")
+        tail = (e.stderr or e.stdout or "")[-400:]
+        log(f"⚠️ {label} failed: {tail}")
+        notify_failure(label, tail)
+        return False
+    except Exception as e:  # noqa: BLE001
+        log(f"⚠️ {label} failed: {e}")
+        notify_failure(label, str(e))
         return False
 
+
 def scan_and_alert_value_bets():
-    """Scan database for high +EV bets and alert subscribers via Telegram if available."""
+    """Scan database for high +EV bets (real odds only)."""
     if not DB_PATH.exists():
         return
 
@@ -44,8 +131,7 @@ def scan_and_alert_value_bets():
                ht.name_ar as home_team, at.name_ar as away_team,
                l.name_ar as league_name,
                p.p_home, p.p_draw, p.p_away, p.confidence,
-               m.odds_home, m.odds_draw, m.odds_away,
-               p.analytics_json
+               m.odds_home, m.odds_draw, m.odds_away
         FROM matches m
         JOIN leagues l ON l.id = m.league_id
         JOIN teams ht ON ht.id = m.home_team_id
@@ -54,8 +140,10 @@ def scan_and_alert_value_bets():
         WHERE m.status IN ('SCHEDULED', 'TIMED')
           AND m.utc_date >= datetime('now')
           AND m.odds_home IS NOT NULL
-        ORDER BY p.confidence DESC
-        LIMIT 10;
+          AND m.odds_draw IS NOT NULL
+          AND m.odds_away IS NOT NULL
+        ORDER BY m.utc_date ASC
+        LIMIT 40;
     """
 
     matches = conn.execute(query).fetchall()
@@ -63,68 +151,66 @@ def scan_and_alert_value_bets():
 
     high_value_bets = []
     for m in matches:
-        p_home = m["p_home"] or 0.33
-        p_draw = m["p_draw"] or 0.33
-        p_away = m["p_away"] or 0.33
-        oh = m["odds_home"]
-        od = m["odds_draw"]
-        oa = m["odds_away"]
-
-        if not (oh and od and oa):
-          continue
-
-        sides = [("مضيف", p_home, oh), ("تعادل", p_draw, od), ("ضيف", p_away, oa)]
+        sides = [
+            ("مضيف", m["p_home"] or 0, m["odds_home"]),
+            ("تعادل", m["p_draw"] or 0, m["odds_draw"]),
+            ("ضيف", m["p_away"] or 0, m["odds_away"]),
+        ]
         for name, p, odds in sides:
-            b = odds - 1.0
-            if b <= 0:
+            if not odds or odds <= 1:
                 continue
+            b = odds - 1.0
             ev = p * odds - 1.0
             kelly = (p * b - (1 - p)) / b
-            if ev >= 0.05 and kelly >= 0.02:
-                high_value_bets.append({
-                    "match": f"{m['home_team']} × {m['away_team']}",
-                    "league": m["league_name"],
-                    "side": name,
-                    "odds": odds,
-                    "prob": f"{int(p * 100)}%",
-                    "ev": f"+{int(ev * 100)}%",
-                    "kelly": f"{round(0.25 * kelly * 100, 2)}%"
-                })
+            if 0.03 <= ev <= 0.15 and kelly >= 0.02:
+                high_value_bets.append(
+                    {
+                        "match": f"{m['home_team']} × {m['away_team']}",
+                        "league": m["league_name"],
+                        "side": name,
+                        "odds": odds,
+                        "ev": f"+{int(ev * 100)}%",
+                        "kelly": f"{round(0.25 * kelly * 100, 2)}%",
+                    }
+                )
 
-    log(f"📊 MLOps Value Bet Scan complete: Found {len(high_value_bets)} high-EV bets.")
-    for bet in high_value_bets:
-        log(f"  💎 Value Signal: {bet['match']} ({bet['league']}) -> {bet['side']} @ {bet['odds']} (EV: {bet['ev']}, Kelly Stake: {bet['kelly']})")
+    log(f"📊 MLOps Value Bet Scan: {len(high_value_bets)} high-EV bets.")
+    for bet in high_value_bets[:8]:
+        log(
+            f"  💎 {bet['match']} ({bet['league']}) -> {bet['side']} @ {bet['odds']} "
+            f"(EV: {bet['ev']}, Kelly: {bet['kelly']})"
+        )
+
 
 def run_full_mlops_cycle():
     log("🚀 Launching Automated MLOps Cycle...")
-    
-    # 1. Sync data sources
-    run_step(["bun", "run", "sync"], "Data Synchronization")
+    bun = resolve_bun()
+    ok_sync = run_step([bun, "run", "sync"], "Data Synchronization")
+    ok_fit = run_step([bun, "run", "fit"], "Model Fitting & Temperature Calibration")
+    if ok_sync and ok_fit:
+        scan_and_alert_value_bets()
+        log("🎉 MLOps Cycle Finished cleanly.")
+    else:
+        log("⚠️ MLOps Cycle finished with errors — انظر إشعار Telegram/اللوج")
 
-    # 2. Fit models and compute predictions
-    run_step(["bun", "run", "fit"], "Model Fitting & Temperature Calibration")
-
-    # 3. Check for lineups ($T-50$)
-    run_step(["python3", "scripts/lineup-scheduler.py"], "Lineup Automation Scan")
-
-    # 4. Value Bet Scan & Alerting
-    scan_and_alert_value_bets()
-
-    log("🎉 MLOps Cycle Finished cleanly.")
 
 def main():
+    _load_env_file()
+    _ensure_path()
+
     if "--once" in sys.argv:
         run_full_mlops_cycle()
         return
 
     log("🌟 Taqdeer MLOps Daemon Running 24/7 (Cycle interval: 1 hour)")
     run_full_mlops_cycle()
-    
-    INTERVAL = 3600  # 1 hour
+
+    INTERVAL = 3600
     while True:
         log(f"⏳ Sleeping for {INTERVAL} seconds until next scheduled run...")
         time.sleep(INTERVAL)
         run_full_mlops_cycle()
+
 
 if __name__ == "__main__":
     main()

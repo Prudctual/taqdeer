@@ -93,44 +93,16 @@ export function starRank(position: string | null | undefined): number {
   return 40;
 }
 
-export function metricsForPosition(position: string | null | undefined): {
-  scoring: number;
-  playmaking: number;
-  pressing: number;
-  control: number;
-  fitness: number;
-} {
-  const rank = starRank(position);
-  if (rank >= 100) {
-    return { scoring: 92, playmaking: 74, pressing: 78, control: 80, fitness: 90 };
-  }
-  if (rank >= 90) {
-    return { scoring: 82, playmaking: 94, pressing: 80, control: 91, fitness: 88 };
-  }
-  if (rank >= 70) {
-    return { scoring: 72, playmaking: 86, pressing: 84, control: 88, fitness: 89 };
-  }
-  if (rank >= 45) {
-    return { scoring: 55, playmaking: 70, pressing: 88, control: 78, fitness: 91 };
-  }
-  if (rank >= 35) {
-    return { scoring: 48, playmaking: 58, pressing: 86, control: 82, fitness: 90 };
-  }
-  return { scoring: 30, playmaking: 45, pressing: 70, control: 75, fitness: 92 };
-}
-
+/** بيانات لاعب حقيقية فقط: اسم ومركز ورقم وصورة — بلا تقييمات أو xG مختلقة */
 export type SquadStar = {
   id: string;
   name: string;
-  number: string;
+  number: string | null;
   position: string;
-  rating: string;
-  xg: string;
   initials: string;
   photoUrl?: string;
   team: string;
   isHome: boolean;
-  metrics: ReturnType<typeof metricsForPosition>;
 };
 
 export function toSquadStars(
@@ -149,22 +121,17 @@ export function toSquadStars(
       return an - bn;
     })
     .slice(0, limit)
-    .map((p, idx) => {
+    .map((p) => {
       const name = displayPlayerName(p);
-      const metrics = metricsForPosition(p.position);
-      const base = isHome ? 1760 : 1740;
       return {
         id: p.id,
         name,
-        number: p.shirtNumber != null ? String(p.shirtNumber) : String(10 - idx),
+        number: p.shirtNumber != null ? String(p.shirtNumber) : null,
         position: positionLabelAr(p.position),
-        rating: String(base + starRank(p.position) + (p.shirtNumber ?? 0) % 7),
-        xg: `+${(1.6 + starRank(p.position) / 50 + idx * 0.15).toFixed(2)}`,
         initials: playerInitials(name),
         photoUrl: p.photoUrl ?? undefined,
         team: teamLabel,
         isHome,
-        metrics,
       };
     });
 }

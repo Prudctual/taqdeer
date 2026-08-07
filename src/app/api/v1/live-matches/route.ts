@@ -111,13 +111,19 @@ export async function GET(request: Request) {
       const homeGoals = m.homeGoals ?? 0;
       const awayGoals = m.awayGoals ?? 0;
 
-      // In-Play Live Probabilities Recalculation
-      let liveProbs = {
-        pHome: m.pHome ?? 0.33,
-        pDraw: m.pDraw ?? 0.34,
-        pAway: m.pAway ?? 0.33,
-        pBttsYes: m.pBttsYes ?? 0.5,
-        pOver25: m.pOver25 ?? 0.5,
+      // إعادة حساب الاحتمالات اللحظية — وعند غياب توقع النموذج تبقى null بلا اختلاق
+      let liveProbs: {
+        pHome: number | null;
+        pDraw: number | null;
+        pAway: number | null;
+        pBttsYes: number | null;
+        pOver25: number | null;
+      } = {
+        pHome: m.pHome ?? null,
+        pDraw: m.pDraw ?? null,
+        pAway: m.pAway ?? null,
+        pBttsYes: m.pBttsYes ?? null,
+        pOver25: m.pOver25 ?? null,
       };
 
       if (minute != null && minute > 0 && m.lambdaHome && m.lambdaAway) {

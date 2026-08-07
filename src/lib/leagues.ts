@@ -8,18 +8,7 @@ export type LeagueDef = {
   fdOrgCode?: string;
   /** football-data.co.uk CSV code (European Big Five) */
   fdUkCode?: string;
-  /**
-   * Calendar-year seasons synced from Wikipedia football-box fixtures
-   * (e.g. K League 1 pages: `2026_K_League_1`).
-   */
-  wikiSeasons?: number[];
-  wikiTitle?: (year: number) => string;
 };
-
-function kleagueSeasons(now = new Date()): number[] {
-  const y = now.getUTCFullYear();
-  return [y - 3, y - 2, y - 1, y];
-}
 
 export const LEAGUES: LeagueDef[] = [
   {
@@ -94,14 +83,6 @@ export const LEAGUES: LeagueDef[] = [
     fdOrgCode: "TR1",
     fdUkCode: "T1",
   },
-  {
-    id: "no1",
-    code: "NO1",
-    nameAr: "الدوري النرويجي",
-    nameEn: "Eliteserien",
-    countryAr: "النرويج",
-    fdOrgCode: "NO1",
-  },
 ];
 
 export function leagueByCode(code: string) {
@@ -130,13 +111,8 @@ const LEAGUE_EMBLEM_MAP: Record<string, string> = {
   DED: "https://crests.football-data.org/ED.png",
   TR1: "https://flagcdn.com/w40/tr.png",
   TUR1: "https://flagcdn.com/w40/tr.png",
-  NO1: "https://flagcdn.com/w40/no.png",
-  SPL: "https://flagcdn.com/w40/sa.png",
-  BSA: "https://flagcdn.com/w40/br.png",
-  ARG: "https://flagcdn.com/w40/ar.png",
   UEL: "https://crests.football-data.org/EL.png",
   UCL: "https://crests.football-data.org/CL.png",
-  KL1: "/crests/kl1-league.png",
 };
 
 /** شعار الدوري المعزز والموثوق بكافة المعرفات */

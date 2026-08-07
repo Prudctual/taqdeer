@@ -5,47 +5,43 @@ from __future__ import annotations
 from typing import Dict, Tuple
 
 
-# Known tactical styles per common European club profile
+# المفاتيح مقاطع من slug معرف الفريق الفعلي بعد إزالة الشرطات
+# (مثال: pl-man-city → plmancity يطابق المفتاح mancity)
 TEAM_STYLE_MAP: Dict[str, Dict[str, str]] = {
-    "real_madrid": {"formation": "4-3-3", "style": "الهجمات المرتدة والتحول السريع"},
-    "man_city": {"formation": "3-2-4-1", "style": "الاستحواذ الكثيف والضغط العالي"},
+    "realmadrid": {"formation": "4-3-3", "style": "الهجمات المرتدة والتحول السريع"},
+    "mancity": {"formation": "3-2-4-1", "style": "الاستحواذ الكثيف والضغط العالي"},
     "liverpool": {"formation": "4-3-3", "style": "الضغط العالي واللعب المباشر"},
     "barcelona": {"formation": "4-3-3", "style": "الاستحواذ والبناء من الخلف"},
     "arsenal": {"formation": "4-3-3", "style": "الضغط المنظم والسيطرة"},
     "bayern": {"formation": "4-2-3-1", "style": "الهجوم الضاغط والأطراف السريعة"},
     "inter": {"formation": "3-5-2", "style": "التكتل المحكم والمرتدات الخاطفة"},
     "atletico": {"formation": "5-3-2", "style": "الدفاع المنخفض والتكتل المباشر"},
+    "athmadrid": {"formation": "5-3-2", "style": "الدفاع المنخفض والتكتل المباشر"},
     # Portuguese Primeira Liga
     "benfica": {"formation": "4-2-3-1", "style": "الضغط العالي والاستحواذ الهجومي"},
     "porto": {"formation": "4-4-2", "style": "القوة البدنية والضغط المتواصل"},
-    "sporting": {"formation": "3-4-3", "style": "الاستحواذ على الأطراف والتحول السريع"},
+    "splisbon": {"formation": "3-4-3", "style": "الاستحواذ على الأطراف والتحول السريع"},
     "braga": {"formation": "4-3-3", "style": "اللعب الهجومي المباشر"},
     # Dutch Eredivisie
     "ajax": {"formation": "4-3-3", "style": "الاستحواذ الكثيف والبناء من الخلف"},
     "psv": {"formation": "4-3-3", "style": "الضغط الهجومي العالي والأطراف الخاطفة"},
     "feyenoord": {"formation": "4-2-3-1", "style": "الضغط المكثف والتحول السريع"},
-    "az_alkmaar": {"formation": "4-3-3", "style": "السيطرة التكتيكية والشباب السريع"},
+    "azalkmaar": {"formation": "4-3-3", "style": "السيطرة التكتيكية والشباب السريع"},
     # Turkish Süper Lig
     "galatasaray": {"formation": "4-2-3-1", "style": "الضغط العالي والسيطرة الهجومية"},
     "fenerbahce": {"formation": "4-3-3", "style": "الهجوم السريع والضغط المتواصل"},
     "besiktas": {"formation": "4-2-3-1", "style": "التوازن الهجومي والصلابة"},
     "trabzonspor": {"formation": "4-3-3", "style": "المرتدات السريعة والتكتل الإقليمي"},
-    # Norwegian Eliteserien
-    "bodo": {"formation": "4-3-3", "style": "الضغط العالي الكثيف والاستحواذ الهجومي"},
-    "brann": {"formation": "4-3-3", "style": "الهجوم السريع والضغط المتواصل"},
-    "molde": {"formation": "3-5-2", "style": "الاستحواذ والمرتدات على الأطراف"},
-    "viking": {"formation": "4-3-3", "style": "اللعب المباشر والقوة البدنية"},
-    "rosenborg": {"formation": "4-3-3", "style": "البناء المتوازن والسيطرة"},
 }
 
 
 def get_team_tactics(team_key: str) -> Dict[str, str]:
     """Retrieve formation and primary tactical playing style for a team."""
-    clean_key = team_key.lower().replace(" ", "").replace("-", "")
+    clean_key = team_key.lower().replace(" ", "").replace("-", "").replace("_", "")
     for k, info in TEAM_STYLE_MAP.items():
-        if k in clean_key or clean_key in k:
+        if k in clean_key:
             return info
-    
+
     # Generic default for unknown teams
     return {"formation": "4-3-3", "style": "أسلوب متوازن بين الاستحواذ والتراجع"}
 

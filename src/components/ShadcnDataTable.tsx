@@ -19,9 +19,10 @@ export interface MatchTableRow {
   awayTeamAr: string;
   homeScore?: number | null;
   awayScore?: number | null;
-  pHome: number;
-  pDraw: number;
-  pAway: number;
+  /** null = لا توقع بعد للنموذج — تُعرض حالة صادقة بدل احتمالات وهمية */
+  pHome: number | null;
+  pDraw: number | null;
+  pAway: number | null;
   homeElo?: number;
   awayElo?: number;
 }
@@ -72,8 +73,8 @@ export function ShadcnDataTable({
       return matchesQuery && matchesLeague && matchesStatus;
     }).sort((a, b) => {
       if (sortBy === "confidence") {
-        const maxA = Math.max(a.pHome, a.pDraw, a.pAway);
-        const maxB = Math.max(b.pHome, b.pDraw, b.pAway);
+        const maxA = Math.max(a.pHome ?? 0, a.pDraw ?? 0, a.pAway ?? 0);
+        const maxB = Math.max(b.pHome ?? 0, b.pDraw ?? 0, b.pAway ?? 0);
         return maxB - maxA;
       }
       return new Date(a.utcDate).getTime() - new Date(b.utcDate).getTime();
@@ -170,11 +171,19 @@ export function ShadcnDataTable({
           <tbody className="divide-y divide-line">
             {paginatedMatches.length > 0 ? (
               paginatedMatches.map((m) => {
-                const maxProb = Math.max(m.pHome, m.pDraw, m.pAway);
-                const pickKey: "H" | "D" | "A" =
-                  maxProb === m.pHome ? "H" : maxProb === m.pDraw ? "D" : "A";
+                const hasPrediction =
+                  m.pHome != null && m.pDraw != null && m.pAway != null;
+                const maxProb = hasPrediction
+                  ? Math.max(m.pHome!, m.pDraw!, m.pAway!)
+                  : null;
                 const pickLabel =
-                  pickKey === "H" ? "فوز المضيف 1" : pickKey === "D" ? "تعادل X" : "فوز الضيف 2";
+                  maxProb == null
+                    ? null
+                    : maxProb === m.pHome
+                      ? "فوز المضيف 1"
+                      : maxProb === m.pDraw
+                        ? "تعادل X"
+                        : "فوز الضيف 2";
 
                 return (
                   <tr
@@ -233,20 +242,30 @@ export function ShadcnDataTable({
                     {/* Probabilities Bar */}
                     <td className="px-4 py-3 text-center align-middle">
                       <div className="mx-auto max-w-[180px]">
-                        <ProbBar
-                          pHome={m.pHome}
-                          pDraw={m.pDraw}
-                          pAway={m.pAway}
-                          compact
-                        />
+                        {hasPrediction ? (
+                          <ProbBar
+                            pHome={m.pHome!}
+                            pDraw={m.pDraw!}
+                            pAway={m.pAway!}
+                            compact
+                          />
+                        ) : (
+                          <span className="text-[11px] font-bold text-faint">
+                            بانتظار التوقع
+                          </span>
+                        )}
                       </div>
                     </td>
 
                     {/* Verdict */}
                     <td className="px-4 py-3 text-center align-middle">
-                      <span className="inline-flex items-center rounded-full border border-line bg-panel px-2.5 py-1 text-[11px] font-bold text-ink shadow-2xs">
-                        {pickLabel} ({(maxProb * 100).toFixed(0)}٪)
-                      </span>
+                      {pickLabel && maxProb != null ? (
+                        <span className="inline-flex items-center rounded-full border border-line bg-panel px-2.5 py-1 text-[11px] font-bold text-ink shadow-2xs">
+                          {pickLabel} ({(maxProb * 100).toFixed(0)}٪)
+                        </span>
+                      ) : (
+                        <span className="text-[11px] font-bold text-faint">—</span>
+                      )}
                     </td>
 
                     {/* Actions */}

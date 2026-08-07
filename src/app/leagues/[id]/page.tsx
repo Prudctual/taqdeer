@@ -35,46 +35,7 @@ type Zone = {
   tournamentType?: TournamentType;
 };
 
-function zoneOf(leagueId: string, position: number, total: number): Zone | null {
-  if (leagueId === "kl1") {
-    if (position === 1) {
-      return {
-        color: "var(--accent)",
-        bgColor: "bg-accent-dim hover:bg-accent-dim",
-        textColor: "text-sky-500 font-black",
-        positionBgColor: "bg-accent-dim",
-        positionTextColor: "text-sky-500",
-        borderColor: "border-accent/30",
-        label: "دوري أبطال آسيا للنخبة",
-        tournamentType: "acl_elite",
-      };
-    }
-    if (position === 2 || position === 3) {
-      return {
-        color: "var(--success)",
-        bgColor: "bg-teal-500/10 hover:bg-teal-500/20",
-        textColor: "text-teal-500 font-black",
-        positionBgColor: "bg-teal-500/20",
-        positionTextColor: "text-teal-500",
-        borderColor: "border-teal-500/30",
-        label: "دوري أبطال آسيا 2",
-        tournamentType: "acl_2",
-      };
-    }
-    if (total >= 6 && position >= total - 1) {
-      return {
-        color: "var(--danger)",
-        bgColor: "bg-danger-dim hover:bg-danger-dim",
-        textColor: "text-rose-500 font-black",
-        positionBgColor: "bg-danger-dim",
-        positionTextColor: "text-rose-500",
-        borderColor: "border-rose-500/30",
-        label: "مرحلة الهبوط / التصفيات",
-      };
-    }
-    return null;
-  }
-
+function zoneOf(position: number, total: number): Zone | null {
   if (position <= 4) {
     return {
       color: "var(--home)",
@@ -224,7 +185,8 @@ export default async function LeaguePage({
 
   const standings = getStandings(id, activeSeason);
   const strengths = getStrengthTable(id);
-  const matches = getLeagueMatches(id, 40, 20);
+  // الجدول القادم كاملاً (يستوعب موسماً كاملاً) + آخر النتائج
+  const matches = getLeagueMatches(id, 400, 24);
   const counts = getLeagueMatchCounts(id);
   const n = standings.length;
 
@@ -447,7 +409,7 @@ export default async function LeaguePage({
                 </thead>
                 <tbody className="divide-y divide-line">
                   {standings.map((r) => {
-                    const zone = zoneOf(id, r.position, n);
+                    const zone = zoneOf(r.position, n);
                     const isRelegation = zone?.label === "منطقة الهبوط" || zone?.label === "مرحلة الهبوط / التصفيات";
                     const isQualified = !!zone && !isRelegation;
 
@@ -527,7 +489,7 @@ export default async function LeaguePage({
               {(() => {
                 const seen = new Map<string, string>();
                 standings.forEach((r) => {
-                  const z = zoneOf(id, r.position, n);
+                  const z = zoneOf(r.position, n);
                   if (z && !seen.has(z.label)) seen.set(z.label, z.color);
                 });
                 return Array.from(seen.entries()).map(([label, color]) => (

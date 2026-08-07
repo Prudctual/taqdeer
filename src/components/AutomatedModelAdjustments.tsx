@@ -18,13 +18,16 @@ interface AutomatedModelAdjustmentsProps {
   awayP: number;
   lambdaHome: number;
   lambdaAway: number;
-  sharpSteamSide?: "home" | "draw" | "away" | string | null;
-  refereeName?: string | null;
-  weatherCondition?: string | null;
+  /** أودز سوق حقيقية متوفرة لهذه المباراة (تُمزج كمكوّن في النموذج) */
+  hasMarketOdds?: boolean;
   homeVenueRecord?: { played: number; w?: number; d?: number; l?: number } | null;
   awayVenueRecord?: { played: number; w?: number; d?: number; l?: number } | null;
 }
 
+/**
+ * وصف صادق للمحركات المدمجة فعلاً في النموذج — لا ادعاءات عن معاملات
+ * (حكم، طقس…) غير موجودة في الحساب.
+ */
 export function AutomatedModelAdjustments({
   homeTeam,
   awayTeam,
@@ -33,51 +36,52 @@ export function AutomatedModelAdjustments({
   awayP,
   lambdaHome,
   lambdaAway,
-  sharpSteamSide,
-  refereeName,
-  weatherCondition,
+  hasMarketOdds,
   homeVenueRecord,
   awayVenueRecord,
 }: AutomatedModelAdjustmentsProps) {
   const adjustments: AdjustmentItem[] = [
     {
       Icon: HomeIcon,
-      label: "معامل الأرض والأفضلية الهجومية (Home Pitch Vector)",
+      label: "أفضلية الأرض (Dixon-Coles Home Advantage)",
       value:
         homeVenueRecord && homeVenueRecord.played > 0
-          ? `سجل ${homeTeam}: ${homeVenueRecord.w ?? 0} فوز في ${homeVenueRecord.played} مباراة`
-          : "محسوب أوتوماتيكياً من خوارزمية Dixon-Coles",
-      impact: `+${(lambdaHome * 0.12).toFixed(2)} هدف متوقع`,
-      detail: `تأثير أرضية الملعب ودعم الجمهور تم تقديره رياضياً تلقائياً ودمجه في قيمة λ المضيف (${lambdaHome.toFixed(2)}).`,
+          ? `سجل ${homeTeam} على أرضه: ${homeVenueRecord.w ?? 0} فوز في ${homeVenueRecord.played} مباراة`
+          : "تُقدَّر أفضلية الأرض لكل دوري من واقع نتائجه التاريخية",
+      impact: `مدمجة في λ المضيف (${lambdaHome.toFixed(2)})`,
+      detail: `معامل أفضلية الأرض يُتعلَّم رياضياً لكل دوري ضمن نموذج Dixon-Coles ويرفع شدة أهداف المضيف مباشرة.`,
       positive: true,
     },
     {
       Icon: ZapIcon,
-      label: "مؤشر سيولة أسعار المحترفين (Sharp Money Line Flow)",
-      value: sharpSteamSide
-        ? `انحياز السيولة الذكية نحو ${sharpSteamSide === "home" ? homeTeam : sharpSteamSide === "away" ? awayTeam : "التعادل"}`
-        : "توازن أسعار الأسواق العالمية دون انحياز",
-      impact: sharpSteamSide ? "تعديل وزن خوارزمية السوق (+4.5%)" : "حيادي (0.0%)",
-      detail: "تتبع آلي لفرص القيمة وملاءمة الأسعار مقارنة بأسواق آسيا وبيناكل.",
-      positive: !!sharpSteamSide,
+      label: "مزج أسعار السوق (Market Blend)",
+      value: hasMarketOdds
+        ? "أودز إغلاق حقيقية متوفرة — مُزجت كمكوّن في التوقع بعد إزالة هامش المراهن"
+        : "لا أودز سوق متاحة لهذه المباراة — التوقع من المحركات الإحصائية فقط",
+      impact: hasMarketOdds ? "وزن يُتعلَّم لكل دوري" : "غير مفعّل",
+      detail:
+        "عند توفر أسعار السوق تُحوَّل لاحتمالات نقية (بطريقة Power مع تصحيح انحياز المرشح/البعيد) وتدخل المزيج بوزن مُتعلَّم.",
+      positive: !!hasMarketOdds,
     },
     {
       Icon: RefereeIcon,
-      label: "معامل حزم الحكم وتأثير الأخطاء (Referee Strictness Factor)",
-      value: refereeName ? `الحكم: ${refereeName}` : "معدل الحكام القياسي للدوري",
-      impact: "مُدرج تلقائياً في حساب التوقع",
-      detail: "يؤثر أوتوماتيكياً على معدل الاحتكاكات والبطاقات والضربات الثابتة المتوقعة.",
+      label: "الفورمة وأيام الراحة (Form & Rest)",
+      value:
+        awayVenueRecord && awayVenueRecord.played > 0
+          ? `سجل ${awayTeam} خارج أرضه: ${awayVenueRecord.w ?? 0} فوز في ${awayVenueRecord.played} مباراة`
+          : "نافذة آخر 5 مباريات: نقاط وفارق أهداف وتسديدات",
+      impact: "تعديل λ في نطاق ×0.70–1.35",
+      detail:
+        "الفورمة الأخيرة تعدّل شدة الأهداف المتوقعة صعوداً أو هبوطاً، مع خصم إرهاق عند راحة أقل من 3.5 يوم.",
       positive: true,
     },
     {
       Icon: WeatherIcon,
-      label: "معامل الطقس وسرعة الكرة (Weather & Pitch Speed)",
-      value: weatherCondition || "طقس مميز وأرضية جافة",
-      impact: "معامل سرعة اللعب 1.00×",
+      label: "المعايرة الحرارية (Temperature Calibration)",
+      value: "تُعاير الاحتمالات النهائية لكل دوري على بيانات اختبار مستقلة",
+      impact: "احتمالات صادقة قابلة للمقارنة",
       detail:
-        awayVenueRecord && awayVenueRecord.played > 0
-          ? `سجل خارج الأرض لـ ${awayTeam}: ${awayVenueRecord.w ?? 0} فوز`
-          : "مُدخلات درجة الحرارة وسرعة الرياح مدمجة أوتوماتيكياً في شجرة احتمالات الأهداف.",
+        "المعايرة تمنع الثقة الزائدة: دوري بلا إشارة واضحة تُسطَّح احتمالاته تلقائياً بدل ادعاء يقين زائف.",
       positive: true,
     },
   ];
@@ -88,7 +92,7 @@ export function AutomatedModelAdjustments({
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line pb-4">
         <div className="flex items-center gap-3">
           <h3 className="text-base font-black text-ink tracking-tight leading-snug">
-            التعديلات والمعاملات المحسوبة آلياً 100% (AUTOMATED ALGORITHMIC VECTORS)
+            المحركات والمعاملات المحسوبة آلياً (ALGORITHMIC VECTORS)
           </h3>
         </div>
         <span className="text-xs font-black text-accent bg-accent-dim px-4 py-1.5 rounded-full border-0">
@@ -97,13 +101,13 @@ export function AutomatedModelAdjustments({
       </div>
 
       <p className="text-xs sm:text-sm font-medium text-muted leading-relaxed">
-        جميع الأرقام والتوقعات أدناه مستخرجة ومشتقة <strong className="text-ink font-black">أوتوماتيكياً بالكامل</strong> بواسطة نماذج الرياضيات والإحصاء الخاصة بـ «تقدير» بدون أي تدخل يدوي:
+        جميع الأرقام أدناه مستخرجة <strong className="text-ink font-black">أوتوماتيكياً بالكامل</strong> من محركات «تقدير» الإحصائية بدون أي تدخل يدوي:
       </p>
 
       {/* Grid of prominent borderless inner cards */}
       <div className="grid gap-5 sm:grid-cols-2">
         {adjustments.map((adj, i) => {
-          const isNeutral = adj.impact.includes("حيادي") || adj.impact.includes("0.0%");
+          const isNeutral = adj.impact.includes("غير مفعّل");
           const IconComp = adj.Icon;
           return (
             <div
@@ -155,7 +159,7 @@ export function AutomatedModelAdjustments({
       <div className="rounded-2xl border-0 bg-panel/80 p-5 flex flex-wrap items-center justify-between gap-4 shadow-none">
         <div className="space-y-1">
           <span className="block text-sm font-black text-ink">
-            النتيجة التلقائية النهائية المحسوبة من النماذج الستة:
+            النتيجة التلقائية النهائية المحسوبة من مزيج المحركات:
           </span>
           <span className="text-xs sm:text-sm text-muted font-medium">
             أهداف متوقعة λ: <strong className="text-ink font-black">{homeTeam} {lambdaHome.toFixed(2)}</strong> - <strong className="text-ink font-black">{lambdaAway.toFixed(2)} {awayTeam}</strong>

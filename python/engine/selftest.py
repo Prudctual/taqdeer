@@ -1,4 +1,4 @@
-"""فحص ذاتي كامل لمنطق v3 ومكونات المحرك الرياضي الـ 16 — يفشل بصوت عالٍ إن انكسر المنطق."""
+"""فحص ذاتي كامل لمنطق v3 ومكونات المحرك الرياضي — يفشل بصوت عالٍ إن انكسر المنطق."""
 
 import numpy as np
 from .dixon_coles import DixonColesResult, MatchObs, fit_dixon_coles, score_matrix, tau_vec
@@ -6,14 +6,11 @@ from .elo import EloMatch, update_elo
 from .ensemble import DEFAULT_WEIGHTS, align_matrix_to_probs, blend_components, fit_weights, predict_match, value_signal
 from .evaluate import rps, summarize
 from .form import FormMatch, TeamForm, form_lambda_adjust, rolling_form
-from .logistics_engine import calculate_travel_distance_km, evaluate_logistics_and_external_factors
+from .h2h_engine import evaluate_h2h_advantage
+from .logistics_engine import evaluate_logistics_and_external_factors
 from .pi_ratings import PiMatch, update_pi
-from .player_impact import apply_rapm_to_xg, calculate_lineup_penalties
-from .referee_engine import calculate_strictness_index, predict_referee_impact
-from .sharp_market import detect_sharp_movement, evaluate_sharp_value_alignment
 from .strengths_weaknesses import analyze_team_strengths_weaknesses
 from .tactical_matchup import evaluate_tactical_matchup
-from .weather_engine import adjust_lambdas_for_weather, calculate_weather_impact
 from .xg_engine import compute_advanced_metrics
 
 
@@ -97,40 +94,31 @@ def main() -> None:
     adv = compute_advanced_metrics(2, 1, 12.0, 8.0, 5.0, 3.0, 10.0, 14.0, 6.0, 4.0)
     assert adv["xg_home"] > 0.5 and adv["xa_home"] > 0.0 and 5.0 <= adv["ppda_home"] <= 25.0
 
-    # 9. Referee engine
-    ref = predict_referee_impact("Michael Oliver", yellow_pg=4.8, fouls_pg=24.0)
-    assert ref["strictness_index"] > 1.0 and ("حزم" in str(ref["strictness_label"]) or "صارم" in str(ref["strictness_label"]))
-
-    # 10. Weather engine
-    w_impact = calculate_weather_impact(temperature_c=-5.0, precipitation_mm=12.0, wind_speed_kmh=45.0)
-    assert w_impact["is_adverse"] and w_impact["goal_multiplier"] < 1.0
-    l_h, l_a = adjust_lambdas_for_weather(1.5, 1.0, temperature_c=-5.0, precipitation_mm=12.0)
-    assert l_h < 1.5 and l_a < 1.0
-
-    # 11. Sharp market alignment
-    sm = detect_sharp_movement((2.10, 3.40, 3.60), (1.90, 3.50, 4.20))
-    assert sm["is_sharp"] and sm["steam_side"] == "home"
-    sm_align = evaluate_sharp_value_alignment((0.55, 0.25, 0.20), (2.10, 3.40, 3.60), (1.90, 3.50, 4.20))
-    assert sm_align["sharp_aligned"] and sm_align["sharp_bonus"] == 0.04
-
-    # 12. Tactical matchup
-    tactics = evaluate_tactical_matchup("real_madrid", "man_city")
+    # 9. Tactical matchup — بمعرفات الفرق الفعلية (slug) لضمان مطابقة المفاتيح
+    tactics = evaluate_tactical_matchup("pd-real-madrid", "pl-man-city")
     assert "home_formation" in tactics and "away_style" in tactics
+    assert tactics["home_formation"] == "4-3-3" and tactics["away_formation"] == "3-2-4-1", tactics
 
-    # 13. RAPM player impact penalties
-    missing = [{"name": "Mbappe", "position": "FW", "importance": 1.0}]
-    att_m, def_m = calculate_lineup_penalties(missing)
-    assert att_m < 1.0 and def_m >= 1.0
-    adj_l, adj_m = apply_rapm_to_xg(1.8, 1.2, home_missing=missing)
-    assert adj_l < 1.8
+    # 10. H2H المواجهات المباشرة: تفوق تاريخي يرفع مضاعف صاحب التفوق
+    h2h = evaluate_h2h_advantage(
+        "teamA",
+        "teamB",
+        [
+            {"home_team": "teamA", "away_team": "teamB", "home_goals": 2, "away_goals": 0},
+            {"home_team": "teamB", "away_team": "teamA", "home_goals": 0, "away_goals": 1},
+            {"home_team": "teamA", "away_team": "teamB", "home_goals": 3, "away_goals": 1},
+        ],
+    )
+    assert h2h["h2h_matches_count"] == 3 and h2h["home_lambda_mult"] > 1.0
 
-    # 14. Logistics & travel distance
-    dist = calculate_travel_distance_km("london", "madrid")
-    assert dist > 1000.0
-    logis = evaluate_logistics_and_external_factors(home_team="madrid", away_team="london", is_european_midweek=True)
-    assert logis["away_lambda_mult"] < 1.0
+    # 11. ملخص الراحة: نصي فقط بلا مضاعفات λ (الخصم الكمي في الفورم وحده)
+    logis = evaluate_logistics_and_external_factors(
+        home_team="teamA", away_team="teamB", rest_days_home=2.5, rest_days_away=8.0
+    )
+    assert "home_lambda_mult" not in logis
+    assert "ضغط جدول للمضيف" in str(logis["logistics_summary"])
 
-    # 15. Strengths and weaknesses generator
+    # 12. Strengths and weaknesses generator
     sw = analyze_team_strengths_weaknesses(
         team_name="real_madrid",
         gf_avg=2.3,
@@ -144,7 +132,7 @@ def main() -> None:
     )
     assert len(sw["strengths"]) > 0 and len(sw["weaknesses"]) > 0
 
-    # 16. Full integrated prediction pipeline (predict_match)
+    # 13. Full integrated prediction pipeline (predict_match)
     full_pred = predict_match(
         home="teamA",
         away="teamB",
@@ -156,12 +144,15 @@ def main() -> None:
         form_away=leaky,
         market_odds=(1.90, 3.40, 4.00),
         temperature=1.1,
-        home_missing=missing,
+        h2h_matches=[
+            {"home_team": "teamA", "away_team": "teamB", "home_goals": 2, "away_goals": 0},
+        ],
     )
     assert 0.0 < full_pred["p_home"] < 1.0 and abs(full_pred["p_home"] + full_pred["p_draw"] + full_pred["p_away"] - 1.0) < 1e-5
     assert full_pred["xpts_home"] > 0 and full_pred["xpts_away"] > 0
+    assert full_pred["components"]["h2h"]["h2h_matches_count"] == 1
 
-    print("selftest ok — All 16 mathematical engine components verified cleanly!")
+    print("selftest ok — all mathematical engine components verified cleanly!")
 
 
 if __name__ == "__main__":

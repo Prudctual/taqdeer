@@ -19,7 +19,6 @@ from .h2h_engine import evaluate_h2h_advantage
 from .league_profiles import get_league_profile
 from .logistics_engine import evaluate_logistics_and_external_factors
 from .pi_ratings import PiState, pi_expected_goals
-from .player_impact import apply_rapm_to_xg
 from .strengths_weaknesses import analyze_team_strengths_weaknesses
 from .tactical_matchup import evaluate_tactical_matchup
 
@@ -162,8 +161,6 @@ def predict_match(
     temperature: float = 1.0,
     weights: Optional[Dict[str, float]] = None,
     dc_shots: Optional[DixonColesResult] = None,
-    home_missing: Optional[list] = None,
-    away_missing: Optional[list] = None,
     h2h_matches: Optional[list] = None,
     league_id: Optional[str] = None,
 ) -> Dict:
@@ -207,16 +204,12 @@ def predict_match(
             0.62 * math.log(mu_f) + 0.25 * math.log(mu_pi) + 0.13 * math.log(mu_dc)
         )
 
-    # RAPM Player Impact adjustment for key missing starters
-    if home_missing or away_missing:
-        lam, mu = apply_rapm_to_xg(lam, mu, home_missing, away_missing)
-
     # Head-to-Head (H2H) Historical Dominance Adjustment
     h2h_res = evaluate_h2h_advantage(home, away, h2h_matches)
     lam *= float(h2h_res["home_lambda_mult"])
     mu *= float(h2h_res["away_lambda_mult"])
 
-    # Artificial Turf Advantage (e.g. Norwegian Eliteserien teams like Bodø/Glimt, Tromsø, KFUM)
+    # Artificial Turf Advantage (فرق ملاعب العشب الصناعي المعرفة في ملف الدوري)
     clean_home = home.lower().replace(" ", "").replace("-", "")
     if any(t in clean_home for t in profile.turf_teams):
         lam *= 1.05  # +5% goal expectation bonus on artificial turf
@@ -226,15 +219,13 @@ def predict_match(
     lam *= float(tactics["home_lambda_mult"])
     mu *= float(tactics["away_lambda_mult"])
 
-    # Logistics & External Travel Adjustments (including rest_days & congestion)
+    # ملخص الراحة للعرض فقط — خصم الإرهاق الكمي مطبق مسبقاً في form_lambda_adjust
     logistics = evaluate_logistics_and_external_factors(
         home_team=home,
         away_team=away,
         rest_days_home=form_home.rest_days,
         rest_days_away=form_away.rest_days,
     )
-    lam *= float(logistics["home_lambda_mult"])
-    mu *= float(logistics["away_lambda_mult"])
 
     # Opponent Strengths & Weaknesses Analysis
     sw_home = analyze_team_strengths_weaknesses(
@@ -379,6 +370,7 @@ def predict_match(
             },
             "market": {"p": market_p, "odds": market_odds},
             "shots_dc": {"lambda": [lam_sh, mu_sh]} if lam_sh is not None else None,
+            "h2h": h2h_res,
             "tactics": tactics,
             "logistics": logistics,
             "home_sw": sw_home,

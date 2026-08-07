@@ -1,15 +1,42 @@
 "use client";
 
 import { useState } from "react";
+import dynamic from "next/dynamic";
 import type { MatchCard, MatchRow } from "@/lib/queries";
 import { formatMatchTime, cleanSpace } from "@/lib/format";
-import { AccuracyLineChart } from "@/components/charts/AccuracyLineChart";
-import { EvAreaChart } from "@/components/charts/EvAreaChart";
-import { OutcomePieChart } from "@/components/charts/OutcomePieChart";
-import { TeamRadarChart } from "@/components/charts/TeamRadarChart";
-import { ConfidenceRadialChart } from "@/components/charts/ConfidenceRadialChart";
 import { LeagueAccuracyChart } from "@/components/LeagueAccuracyChart";
 import { Crest } from "@/components/Crest";
+
+/** هيكل انتظار موحد أثناء تحميل حزمة Recharts كسولاً */
+function ChartSkeleton() {
+  return (
+    <div className="rounded-2xl border border-line bg-panel p-6 shadow-2xs">
+      <div className="h-72 w-full animate-pulse rounded-xl bg-surface" />
+    </div>
+  );
+}
+
+// Recharts مكتبة ثقيلة — تُحمَّل عند الطلب بدل تضخيم حزمة الصفحة الأولى
+const AccuracyLineChart = dynamic(
+  () => import("@/components/charts/AccuracyLineChart").then((m) => m.AccuracyLineChart),
+  { ssr: false, loading: ChartSkeleton },
+);
+const EvAreaChart = dynamic(
+  () => import("@/components/charts/EvAreaChart").then((m) => m.EvAreaChart),
+  { ssr: false, loading: ChartSkeleton },
+);
+const OutcomePieChart = dynamic(
+  () => import("@/components/charts/OutcomePieChart").then((m) => m.OutcomePieChart),
+  { ssr: false, loading: ChartSkeleton },
+);
+const TeamRadarChart = dynamic(
+  () => import("@/components/charts/TeamRadarChart").then((m) => m.TeamRadarChart),
+  { ssr: false, loading: ChartSkeleton },
+);
+const ConfidenceRadialChart = dynamic(
+  () => import("@/components/charts/ConfidenceRadialChart").then((m) => m.ConfidenceRadialChart),
+  { ssr: false, loading: ChartSkeleton },
+);
 
 type ChartCategory = "all" | "radar" | "pie" | "ev" | "goals" | "line" | "radial";
 type FlexibleMatch = MatchCard & Partial<MatchRow>;

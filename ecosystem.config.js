@@ -8,6 +8,7 @@ module.exports = {
       env: {
         NODE_ENV: "production",
         PORT: "3000",
+        PATH: "/home/ubuntu/.bun/bin:/usr/local/bin:/usr/bin:/bin",
       },
     },
     {
@@ -17,13 +18,18 @@ module.exports = {
       cwd: "/home/ubuntu/taqdeer",
       env: {
         PYTHONUNBUFFERED: "1",
+        // PM2 لا يرث login shell — بدون هذا المسار يفشل العفريت بـ FileNotFoundError: bun
+        PATH: "/home/ubuntu/.bun/bin:/usr/local/bin:/usr/bin:/bin",
       },
     },
     {
       name: "taqdeer-telegram",
       script: "scripts/telegram-bot.ts",
-      interpreter: "bun",
+      interpreter: "/home/ubuntu/.bun/bin/bun",
       cwd: "/home/ubuntu/taqdeer",
+      env: {
+        PATH: "/home/ubuntu/.bun/bin:/usr/local/bin:/usr/bin:/bin",
+      },
     },
   ],
 };

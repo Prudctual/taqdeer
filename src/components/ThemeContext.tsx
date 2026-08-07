@@ -106,25 +106,23 @@ function resolveIsDark(mode: ThemeMode): boolean {
   return window.matchMedia("(prefers-color-scheme: dark)").matches;
 }
 
+/** قراءة التفضيل المحفوظ عند أول تهيئة — تمنع دورة إزالة/إعادة الكلاس بعد سكربت الـ<head> */
+function savedPref<T extends string>(key: string, fallback: T): T {
+  if (typeof window === "undefined") return fallback;
+  try {
+    return (localStorage.getItem(key) as T | null) ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [mode, setModeState] = useState<ThemeMode>("light");
-  const [preset, setPresetState] = useState<ColorPreset>("blue");
-  const [radius, setRadiusState] = useState<RadiusValue>("0.75");
-  const [density, setDensityState] = useState<DensityValue>("comfortable");
+  const [mode, setModeState] = useState<ThemeMode>(() => savedPref("taqdeer-theme-mode", "light"));
+  const [preset, setPresetState] = useState<ColorPreset>(() => savedPref("taqdeer-theme-preset", "blue"));
+  const [radius, setRadiusState] = useState<RadiusValue>(() => savedPref("taqdeer-theme-radius", "0.75"));
+  const [density, setDensityState] = useState<DensityValue>(() => savedPref("taqdeer-theme-density", "comfortable"));
   const [customizerOpen, setCustomizerOpen] = useState<boolean>(false);
   const [commandOpen, setCommandOpen] = useState<boolean>(false);
-
-  useEffect(() => {
-    const savedMode = localStorage.getItem("taqdeer-theme-mode") as ThemeMode | null;
-    const savedPreset = localStorage.getItem("taqdeer-theme-preset") as ColorPreset | null;
-    const savedRadius = localStorage.getItem("taqdeer-theme-radius") as RadiusValue | null;
-    const savedDensity = localStorage.getItem("taqdeer-theme-density") as DensityValue | null;
-
-    if (savedMode) setModeState(savedMode);
-    if (savedPreset) setPresetState(savedPreset);
-    if (savedRadius) setRadiusState(savedRadius);
-    if (savedDensity) setDensityState(savedDensity);
-  }, []);
 
   useEffect(() => {
     const root = document.documentElement;

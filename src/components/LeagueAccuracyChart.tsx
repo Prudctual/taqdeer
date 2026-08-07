@@ -15,20 +15,30 @@ export function LeagueAccuracyChart({
 }: {
   perLeague?: LeagueAccuracyData[];
 }) {
-  const defaultData: LeagueAccuracyData[] = [
-    { leagueId: "PL", leagueNameAr: "الدوري الإنجليزي", accuracy: 0.512, brier: 0.58, matches: 82 },
-    { leagueId: "PD", leagueNameAr: "الدوري الإسباني", accuracy: 0.488, brier: 0.59, matches: 82 },
-    { leagueId: "BL1", leagueNameAr: "الدوري الألماني", accuracy: 0.463, brier: 0.61, matches: 82 },
-    { leagueId: "SA", leagueNameAr: "الدوري الإيطالي", accuracy: 0.451, brier: 0.62, matches: 82 },
-    { leagueId: "FL1", leagueNameAr: "الدوري الفرنسي", accuracy: 0.439, brier: 0.64, matches: 82 },
-    { leagueId: "KL1", leagueNameAr: "الدوري الكوري", accuracy: 0.385, brier: 0.66, matches: 82 },
-  ];
-
-  const data = perLeague && perLeague.length > 0 ? perLeague : defaultData;
+  // بيانات حقيقية فقط من model_metrics — لا أرقام افتراضية مختلقة
+  const data = perLeague;
 
   const maxAcc = useMemo(() => {
     return Math.max(...data.map((d) => d.accuracy), 0.6);
   }, [data]);
+
+  const avgAcc = useMemo(() => {
+    if (data.length === 0) return null;
+    const totalMatches = data.reduce((n, d) => n + d.matches, 0);
+    if (totalMatches === 0) return null;
+    return data.reduce((s, d) => s + d.accuracy * d.matches, 0) / totalMatches;
+  }, [data]);
+
+  if (data.length === 0) {
+    return (
+      <div className="rounded-2xl border border-line bg-panel p-5 sm:p-6 text-center space-y-1 shadow-2xs">
+        <h3 className="text-sm font-black text-ink">دقة النموذج حسب الدوري</h3>
+        <p className="text-xs font-semibold text-muted">
+          لا مقاييس دقة متاحة بعد — تُحسب تلقائياً بعد اكتمال دورة التدريب القادمة.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="rounded-2xl border border-line bg-panel p-5 sm:p-6 space-y-5 shadow-2xs">
@@ -93,7 +103,11 @@ export function LeagueAccuracyChart({
       {/* Footer Info */}
       <div className="pt-3 border-t border-line flex flex-wrap items-center justify-between text-xs text-muted font-semibold gap-2">
         <span>خط الأساس العشوائي المستهدف: 33.3% لكل نتيجة</span>
-        <span className="font-mono font-black text-ink">متوسط الدقة العام: 46.8%</span>
+        {avgAcc != null && (
+          <span className="font-mono font-black text-ink">
+            متوسط الدقة العام: {(avgAcc * 100).toFixed(1)}%
+          </span>
+        )}
       </div>
     </div>
   );

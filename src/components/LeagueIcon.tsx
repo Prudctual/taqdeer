@@ -9,23 +9,7 @@ export function LeagueIcon({ leagueId, className = "w-8 h-8" }: { leagueId?: str
     bl1: "/crests/bl1-league.png",
     sa: "/crests/sa-league.png",
     fl1: "/crests/fl1-league.png",
-    kl1: "/crests/kl1-league.png",
   };
-
-  if (tone === "kl1") {
-    return (
-      <div className="flex h-full w-full items-center justify-center rounded-full bg-success p-1 shadow-inner">
-        <Image
-          src="/crests/kl1-league.png"
-          alt="K League"
-          width={64}
-          height={64}
-          className={`${className} object-contain filter drop-shadow-md`}
-          unoptimized
-        />
-      </div>
-    );
-  }
 
   if (tone && LEAGUE_PNGS[tone]) {
     return (

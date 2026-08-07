@@ -2,46 +2,36 @@ import { SectionCard } from "./ui";
 import { getMatchDetailedInfo } from "@/lib/match-details";
 
 interface LogisticsWidgetProps {
-  matchId?: string;
-  leagueId?: string;
   homeTeamId?: string;
   homeTeamNameAr?: string;
   refereeName?: string | null;
   logistics?: {
     travel_distance_km?: number;
-    pitch_surface?: string;
+    rest_days_home?: number;
+    rest_days_away?: number;
     is_european_midweek?: boolean;
     logistics_summary?: string;
   };
 }
 
+/**
+ * تفاصيل واقعية فقط: الملعب، الحكم المعلن، وملخص اللوجستيات من محرك التوقعات.
+ * البيانات غير المتاحة تُعرض كذلك صراحةً — لا طقس ولا مسافات ولا سيولة مخترعة.
+ */
 export function LogisticsWidget({
-  matchId = "",
-  leagueId = "",
   homeTeamId = "",
   homeTeamNameAr = "المضيف",
   refereeName,
   logistics,
 }: LogisticsWidgetProps) {
-  const info = getMatchDetailedInfo(
-    homeTeamId,
-    homeTeamNameAr,
-    matchId,
-    refereeName,
-    leagueId
-  );
-  const distance = logistics?.travel_distance_km ?? info.travelDistanceKm;
+  const info = getMatchDetailedInfo(homeTeamId, homeTeamNameAr, refereeName);
   const summary =
-    logistics?.logistics_summary ??
-    `ظروف مباراة جديدة في ${info.stadiumName} بقيادة ${info.refereeName}.`;
+    logistics?.logistics_summary ?? `تقام المباراة في ${info.stadiumName}.`;
 
   return (
-    <SectionCard
-      title="تفاصيل المباراة والملعب والتحكيم والطقس"
-      subtitle={summary}
-    >
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
-        {/* 1. Stadium & Pitch Location - Blue Theme */}
+    <SectionCard title="تفاصيل الملعب والتحكيم واللوجستيات" subtitle={summary}>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-xs">
+        {/* الملعب */}
         <div className="rounded-2xl border border-blue-500/30 bg-surface overflow-hidden shadow-2xs">
           <div className="bg-blue-500/10 border-b border-blue-500/20 px-3.5 py-2 flex items-center justify-between">
             <span className="text-xs font-black text-home flex items-center gap-1.5">
@@ -56,72 +46,74 @@ export function LogisticsWidget({
             <div className="text-sm font-black text-ink truncate">
               {info.stadiumName}
             </div>
-            <p className="text-[11px] font-semibold text-muted">
-              مسافة السفر: <strong className="text-ink font-bold">{distance} كم</strong>
-            </p>
+            {logistics?.travel_distance_km != null && (
+              <p className="text-[11px] font-semibold text-muted">
+                مسافة سفر الضيف:{" "}
+                <strong className="text-ink font-bold">
+                  {logistics.travel_distance_km} كم
+                </strong>
+              </p>
+            )}
           </div>
         </div>
 
-        {/* 2. Referee & Strictness - Purple Theme */}
+        {/* التحكيم */}
         <div className="rounded-2xl border border-purple-500/30 bg-surface overflow-hidden shadow-2xs">
           <div className="bg-accent-dim border-b border-accent/25 px-3.5 py-2 flex items-center justify-between">
             <span className="text-xs font-black text-purple-600 dark:text-purple-400 flex items-center gap-1.5">
               <span>⚖️</span>
-              <span>التحكيم وحكم المباراة</span>
+              <span>حكم المباراة</span>
             </span>
             <span className="rounded-full bg-accent text-on-fill px-2 py-0.5 text-[10px] font-extrabold">
-              الصرامة
+              التحكيم
             </span>
           </div>
           <div className="p-3.5 space-y-1 bg-surface text-start">
             <div className="text-sm font-black text-ink truncate">
-              {info.refereeName}
+              {info.refereeName ?? "لم يُعلن بعد"}
             </div>
-            <p className="text-[11px] font-bold text-purple-600 dark:text-purple-400 truncate">
-              {info.refereeStrictness}
-            </p>
+            {!info.refereeName && (
+              <p className="text-[11px] font-semibold text-muted">
+                يُحدَّث تلقائياً فور إعلان طاقم التحكيم
+              </p>
+            )}
           </div>
         </div>
 
-        {/* 3. Goal Expectation & Market Liquidity - Emerald Theme */}
+        {/* الراحة واللوجستيات */}
         <div className="rounded-2xl border border-success/30 bg-surface overflow-hidden shadow-2xs">
           <div className="bg-success-dim border-b border-success/25 px-3.5 py-2 flex items-center justify-between">
             <span className="text-xs font-black text-success flex items-center gap-1.5">
-              <span>⚽</span>
-              <span>توقع الأهداف والسيولة</span>
+              <span>🧳</span>
+              <span>الراحة واللوجستيات</span>
             </span>
             <span className="rounded-full bg-success text-on-fill px-2 py-0.5 text-[10px] font-extrabold">
-              الأهداف
+              الجاهزية
             </span>
           </div>
           <div className="p-3.5 space-y-1 bg-surface text-start">
-            <div className="text-xs font-black text-success">
-              توقع الأهداف: <strong className="text-ink font-black">{info.goalExpectation}</strong>
-            </div>
-            <p className="text-[11px] font-semibold text-muted">
-              اتجاه المراهنات: <strong className="text-ink font-bold">{info.bettingTrend}</strong>
-            </p>
-          </div>
-        </div>
-
-        {/* 4. Weather & Pitch Condition - Amber Theme */}
-        <div className="rounded-2xl border border-warn/30 bg-surface overflow-hidden shadow-2xs">
-          <div className="bg-warn/10 border-b border-warn/25 px-3.5 py-2 flex items-center justify-between">
-            <span className="text-xs font-black text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
-              <span>🌤️</span>
-              <span>حالة الطقس والملعب</span>
-            </span>
-            <span className="rounded-full bg-warn text-on-fill px-2 py-0.5 text-[10px] font-extrabold">
-              الطقس
-            </span>
-          </div>
-          <div className="p-3.5 space-y-1 bg-surface text-start">
-            <div className="text-xs font-black text-amber-600 dark:text-amber-400">
-              الطقس: <strong className="text-ink font-black">{info.weatherCondition}</strong>
-            </div>
-            <p className="text-[11px] font-semibold text-muted truncate">
-              {info.pitchSurface}
-            </p>
+            {logistics?.rest_days_home != null || logistics?.rest_days_away != null ? (
+              <div className="text-xs font-black text-ink space-y-0.5">
+                {logistics?.rest_days_home != null && (
+                  <p>
+                    راحة المضيف:{" "}
+                    <strong className="tabular">{logistics.rest_days_home} يوم</strong>
+                  </p>
+                )}
+                {logistics?.rest_days_away != null && (
+                  <p>
+                    راحة الضيف:{" "}
+                    <strong className="tabular">{logistics.rest_days_away} يوم</strong>
+                  </p>
+                )}
+              </div>
+            ) : (
+              <p className="text-xs font-bold text-muted">
+                {logistics?.is_european_midweek
+                  ? "أسبوع مزدحم بمشاركة أوروبية"
+                  : "لا عوامل لوجستية مؤثرة مسجلة"}
+              </p>
+            )}
           </div>
         </div>
       </div>

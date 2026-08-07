@@ -169,7 +169,8 @@ export default async function ArticleDetailsPage(props: ArticlePageProps) {
           <div className="flex items-center gap-1.5 tabular">
             <Calendar className="w-3.5 h-3.5" />
             <span>
-              {new Date(article.publishedAt).toLocaleDateString("ar-EG", {
+              {new Date(article.publishedAt).toLocaleDateString("ar-IQ", {
+                timeZone: "Asia/Baghdad",
                 year: "numeric",
                 month: "long",
                 day: "numeric",

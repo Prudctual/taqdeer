@@ -234,16 +234,10 @@ function migrate(db: Database.Database) {
     ["xa_away", "REAL"],
     ["ppda_home", "REAL"],
     ["ppda_away", "REAL"],
-    ["lineup_status", "TEXT"],
-    ["missing_home_json", "TEXT"],
-    ["missing_away_json", "TEXT"],
-    ["gamestate_bias_ratio", "REAL"],
     ["odds_open_home", "REAL"],
     ["odds_open_draw", "REAL"],
     ["odds_open_away", "REAL"],
-    ["sharp_steam_side", "TEXT"],
     ["referee_name", "TEXT"],
-    ["weather_condition", "TEXT"],
     ["minute", "INTEGER"],
     ["live_status_ar", "TEXT"],
     ["live_events_json", "TEXT"],
@@ -254,24 +248,6 @@ function migrate(db: Database.Database) {
       db.exec(`ALTER TABLE matches ADD COLUMN ${name} ${typ};`);
     }
   }
-
-  // جدول الحكام ومعدلات الصرامة والإنذارات
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS referees (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      league_id TEXT,
-      matches_count INTEGER DEFAULT 0,
-      yellow_cards INTEGER DEFAULT 0,
-      red_cards INTEGER DEFAULT 0,
-      fouls INTEGER DEFAULT 0,
-      yellow_per_game REAL DEFAULT 0.0,
-      red_per_game REAL DEFAULT 0.0,
-      fouls_per_game REAL DEFAULT 0.0,
-      strictness_index REAL DEFAULT 1.0,
-      updated_at TEXT
-    );
-  `);
 
   const pcols = new Set(
     (

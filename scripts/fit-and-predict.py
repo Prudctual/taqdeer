@@ -31,9 +31,6 @@ from engine.ensemble import (  # noqa: E402
 from engine.evaluate import summarize  # noqa: E402
 from engine.form import FormMatch, TeamForm, rolling_form  # noqa: E402
 from engine.pi_ratings import PiMatch, update_pi  # noqa: E402
-from engine.player_provider import get_missing_players  # noqa: E402
-from engine.referee_engine import predict_referee_impact  # noqa: E402
-from engine.sharp_market import evaluate_sharp_value_alignment  # noqa: E402
 from engine.xg_engine import compute_advanced_metrics  # noqa: E402
 
 
@@ -67,7 +64,6 @@ def ensure_columns(conn: sqlite3.Connection) -> None:
         ("odds_open_home", "REAL"),
         ("odds_open_draw", "REAL"),
         ("odds_open_away", "REAL"),
-        ("sharp_steam_side", "TEXT"),
         ("referee_name", "TEXT"),
     ]:
         if name not in cols:
@@ -289,6 +285,30 @@ def main() -> None:
 
         obs_shots = build_obs_shots(train, obs)
 
+        # --- فهرس المواجهات المباشرة (H2H): لكل زوج فرق لقاءاتهما المنتهية
+        # مرتبة زمنياً. يُمرَّر آخر 5 لقاءات سابقة للمباراة فقط — نظيف زمنياً.
+        h2h_pairs: dict[frozenset, list[tuple[int, sqlite3.Row]]] = {}
+        for h2h_gi, h2h_m in enumerate(finished):
+            h2h_pairs.setdefault(
+                frozenset((h2h_m["home_team_id"], h2h_m["away_team_id"])), []
+            ).append((h2h_gi, h2h_m))
+
+        def h2h_before(
+            home_id: str, away_id: str, before_gi: int | None = None, last: int = 5
+        ) -> list[dict]:
+            rows = h2h_pairs.get(frozenset((home_id, away_id)), [])
+            if before_gi is not None:
+                rows = [r for r in rows if r[0] < before_gi]
+            return [
+                {
+                    "home_team": r["home_team_id"],
+                    "away_team": r["away_team_id"],
+                    "home_goals": int(r["home_goals"]),
+                    "away_goals": int(r["away_goals"]),
+                }
+                for _, r in rows[-last:]
+            ]
+
         targets = conn.execute(
             """
             SELECT id, home_team_id, away_team_id, odds_home, odds_draw, odds_away,
@@ -361,7 +381,7 @@ def main() -> None:
         model_shots = (
             fit_dixon_coles(obs_shots, half_life_days=HALF_LIFE, league_id=lid) if obs_shots else None
         )
-        ratings, history = update_elo(elo_matches, home_adv=(35.0 if lid == "kl1" else 80.0), seeds=elo_seeds)
+        ratings, history = update_elo(elo_matches, home_adv=80.0, seeds=elo_seeds)
         pi_state = update_pi(
             pi_matches, off_seeds=pi_off_seeds, def_seeds=pi_def_seeds
         )
@@ -478,6 +498,7 @@ def main() -> None:
                 ea = elo_k.get(a, elo_seeds.get(a, 1500.0))
                 fh = forms_k.get(h, empty_form())
                 fa = forms_k.get(a, empty_form())
+                h2h_k = h2h_before(h, a, before_gi=cut_full + k)
                 pred = predict_match(
                     home=h,
                     away=a,
@@ -490,6 +511,7 @@ def main() -> None:
                     market_odds=odds,
                     temperature=1.0,
                     dc_shots=eval_model_shots,
+                    h2h_matches=h2h_k,
                     league_id=lid,
                 )
                 comps.append(
@@ -514,6 +536,7 @@ def main() -> None:
                     "odds": odds,
                     "dc": eval_model,
                     "dc_shots": eval_model_shots,
+                    "h2h": h2h_k,
                 }
 
             # --- Stacking: أوزان الخلط تُتعلَّم من النصف الأول فقط (شطر معايرة T
@@ -746,8 +769,7 @@ def main() -> None:
                 temperature=temp,
                 weights=fitted_w,
                 dc_shots=model_shots,
-                home_missing=get_missing_players(t["home_team_id"]),
-                away_missing=get_missing_players(t["away_team_id"]),
+                h2h_matches=h2h_before(t["home_team_id"], t["away_team_id"]),
                 league_id=lid,
             )
 
@@ -786,6 +808,8 @@ def main() -> None:
                 temperature=temp_m,
                 weights=fitted_w,
                 dc_shots=ctx["dc_shots"],
+                h2h_matches=ctx["h2h"],
+                league_id=lid,
             )
             write_prediction(r["id"], pred, ctx["elo_home"], ctx["elo_away"])
             retro += 1

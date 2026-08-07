@@ -9,25 +9,46 @@ import {
 } from "recharts";
 import type { MatchCard } from "@/lib/queries";
 
+/**
+ * مؤشرات حقيقية فقط من مخرجات النموذج المخزنة — لا درجات مُختلقة.
+ * إذا لم يتوفر توقع للمباراة تُعرض حالة فارغة صادقة.
+ */
 export function ConfidenceRadialChart({ match }: { match?: MatchCard | null }) {
-  const pHome = match?.pHome ?? 0.48;
-  const pDraw = match?.pDraw ?? 0.27;
-  const pAway = match?.pAway ?? 0.25;
+  const hasPred =
+    match?.pHome != null && match?.pDraw != null && match?.pAway != null;
 
+  if (!hasPred) {
+    return (
+      <div className="rounded-2xl border border-line bg-panel p-5 sm:p-6 shadow-2xs">
+        <h3 className="text-base sm:text-lg font-black text-ink">
+          مؤشرات ثقة التوقع لهذه المباراة
+        </h3>
+        <p className="mt-2 text-xs font-semibold text-muted">
+          لا يتوفر توقع من النموذج لهذه المباراة بعد — تُعرض المؤشرات فور صدوره.
+        </p>
+      </div>
+    );
+  }
+
+  const pHome = match!.pHome!;
+  const pDraw = match!.pDraw!;
+  const pAway = match!.pAway!;
   const maxProb = Math.max(pHome, pDraw, pAway);
-  const confidenceScore = Math.min(98, Math.round(maxProb * 100 + 35));
-
-  const poissonScore = Math.min(96, Math.round((match?.pOver25 ?? 0.55) * 80 + 40));
-  const piRatingScore = Math.min(95, Math.round(Math.abs((match?.eloHome ?? 1800) - (match?.eloAway ?? 1750)) / 5 + 60));
-  const softmaxTempScore = 92;
 
   const radialData = [
-    { name: "ثقة النموذج المباشر (Poisson)", count: poissonScore, fill: "var(--home)" },
-    { name: "فارق تصنيف Pi-ratings & Elo", count: piRatingScore, fill: "var(--success)" },
-    { name: "مؤشر حركية أسعار السوق", count: match?.sharpSteamSide ? 94 : 75, fill: "var(--accent)" },
-    { name: "معايرة Softmax (T=0.92)", count: softmaxTempScore, fill: "var(--warn)" },
-    { name: "معدل استقرار توقع المباراة", count: confidenceScore, fill: "var(--accent)" },
+    { name: "أعلى احتمال معاير (1X2)", count: Math.round(maxProb * 100), fill: "var(--home)" },
+    ...(match?.confidence != null
+      ? [{ name: "ثقة النموذج (اتفاق الإشارات)", count: Math.round(match.confidence * 100), fill: "var(--success)" }]
+      : []),
+    ...(match?.pOver25 != null
+      ? [{ name: "احتمال +2.5 هدف", count: Math.round(match.pOver25 * 100), fill: "var(--accent)" }]
+      : []),
+    ...(match?.pBttsYes != null
+      ? [{ name: "احتمال تسجيل الطرفين", count: Math.round(match.pBttsYes * 100), fill: "var(--warn)" }]
+      : []),
   ];
+
+  const confidencePct = match?.confidence != null ? Math.round(match.confidence * 100) : Math.round(maxProb * 100);
 
   return (
     <div className="rounded-2xl border border-line bg-panel p-5 sm:p-6 space-y-4 shadow-2xs">
@@ -39,12 +60,12 @@ export function ConfidenceRadialChart({ match }: { match?: MatchCard | null }) {
             </h3>
           </div>
           <p className="text-xs font-semibold text-muted">
-            قياس نسبة الاستقرار والجودة التحليلية لإشارات التوقع الخمسة للمواجهة المحددة
+            احتمالات النموذج المعايرة كما خرجت من التدريب — بلا أي تجميل
           </p>
         </div>
 
         <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-accent-dim border border-accent/25 text-sky-600 dark:text-sky-400 font-extrabold text-xs">
-          <span>معدل الثقة العام: {confidenceScore}%</span>
+          <span>ثقة النموذج: {confidencePct}%</span>
         </div>
       </div>
 
@@ -72,7 +93,7 @@ export function ConfidenceRadialChart({ match }: { match?: MatchCard | null }) {
                 fontWeight: "bold",
                 color: "var(--ink)",
               }}
-              formatter={(value) => [`${value}%`, "مقياس الاستقرار"]}
+              formatter={(value) => [`${value}%`, "احتمال معاير"]}
             />
             <Legend
               iconSize={10}
@@ -86,9 +107,9 @@ export function ConfidenceRadialChart({ match }: { match?: MatchCard | null }) {
       </div>
 
       <div className="pt-3 border-t border-line flex flex-wrap items-center justify-between text-xs text-muted font-semibold gap-2">
-        <span>الحكم والظروف: {match?.refereeName ?? "غير محدد"} · {match?.weatherCondition ?? "طبيعية"}</span>
+        <span>الحكم: {match?.refereeName ?? "لم يُعلن بعد"}</span>
         <span className="font-mono font-black text-sky-600 dark:text-sky-400">
-          درجة الموثوقية: {confidenceScore >= 80 ? "مرتفعة جداً" : "متوسطة"}
+          درجة الموثوقية: {confidencePct >= 70 ? "مرتفعة" : confidencePct >= 50 ? "متوسطة" : "منخفضة"}
         </span>
       </div>
     </div>

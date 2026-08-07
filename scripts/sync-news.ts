@@ -131,54 +131,14 @@ async function fetchRssFeed(feedUrl: string, sourceName: string, category: strin
   }
 }
 
-const FALLBACK_LIVE_NEWS = [
-  {
-    id: "news-001",
-    title: "تطورات سوق الانتقالات الصيفية: أندية الدوري الإنجليزي تحسم صفقتين قبل إغلاق النافذة",
-    summary: "تسارع وتيرة المفاوضات في اللحظات الأخيرة وحسم الاتفاقات المالية الخاصة بصفوف الوسط والمحور.",
-    source_name: "Transfermarkt Live",
-    source_url: "https://www.transfermarkt.com",
-    category: "انتقالات",
-    published_at: new Date().toISOString(),
-    image_url: "/crests/pl.svg",
-  },
-  {
-    id: "news-002",
-    title: "مؤتمر مدرب مانشستر سيتي: جاهزية الفريق كاملة لمواجهة عطلة الأسبوع ولا إصابات جديدة",
-    summary: "تأكيد مشاركة عناصر خط الهجوم بالكامل بعد تعافيهم في التدريبات الجماعية الأخيرة.",
-    source_name: "BBC Sport",
-    source_url: "https://www.bbc.com/sport/football",
-    category: "إصابات وتشكيلات",
-    published_at: new Date(Date.now() - 1800 * 1000).toISOString(),
-    image_url: "/crests/pl.svg",
-  },
-  {
-    id: "news-003",
-    title: "رابطة الدوري الكوري تعلن جدول المباريات المؤجلة للجولات القادمة",
-    summary: "تحديد المواعيد النهائية للمواجهات الحاسمة وتعديل ساعات الانطلاق لتناسب البث التلفزيوني العالمي.",
-    source_name: "K League Official",
-    source_url: "https://www.kleague.com",
-    category: "أخبار الدوريات",
-    published_at: new Date(Date.now() - 3600 * 1000 * 2).toISOString(),
-    image_url: "/crests/kl1.svg",
-  },
-  {
-    id: "news-004",
-    title: "تقرير تقييم الأداء: ارتفاع معدل التهديف المتوقع (xG) في مباريات الدوري الإسباني هذا الموسم",
-    summary: "تحليل الرقم الإحصائي يوضح اعتماد الفرق على التسديد من داخل المنطقة بنسبة أعلى مقارنة بالعام الماضي.",
-    source_name: "Opta Sports",
-    source_url: "https://www.theanalyst.com",
-    category: "تقارير إحصائية",
-    published_at: new Date(Date.now() - 3600 * 1000 * 5).toISOString(),
-    image_url: "/crests/pd.svg",
-  },
-];
-
 async function syncNews() {
   let count = 0;
 
   // Clear older English non-translated entries if any
   db.exec(`DELETE FROM news WHERE title GLOB '*[a-zA-Z]*'`);
+
+  // أخبار مفبركة قديمة كانت تُزرع منسوبة لمصادر حقيقية — تُحذف نهائياً ولا تُنشأ بعد الآن
+  db.exec(`DELETE FROM news WHERE id IN ('news-001', 'news-002', 'news-003', 'news-004')`);
 
   const insertStmt = db.prepare(`
     INSERT INTO news (id, title, summary, source_name, source_url, category, published_at, image_url, created_at)
@@ -189,22 +149,6 @@ async function syncNews() {
       source_url = excluded.source_url,
       published_at = excluded.published_at
   `);
-
-  // Insert baseline breaking news
-  for (const item of FALLBACK_LIVE_NEWS) {
-    insertStmt.run(
-      item.id,
-      item.title,
-      item.summary,
-      item.source_name,
-      item.source_url,
-      item.category,
-      item.published_at,
-      item.image_url,
-      new Date().toISOString()
-    );
-    count++;
-  }
 
   // Fetch live RSS items and translate to Arabic
   for (const feed of FEEDS) {

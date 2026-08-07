@@ -9,7 +9,6 @@ import { getDb, closeDb } from "../src/lib/db";
 import { HISTORICAL_SEASONS, LEAGUES, ukSeasonPath } from "../src/lib/leagues";
 import { resolveTeamName } from "../src/lib/team-aliases";
 import { nameAr, slugify } from "../src/lib/team-names";
-import { fetchKleagueSeason } from "./wiki-kleague";
 
 const ROOT = process.cwd();
 const RAW_DIR = path.join(ROOT, "data", "raw");
@@ -90,11 +89,79 @@ function teamId(leagueId: string, teamName: string): string {
   return `${leagueId}-${slugify(teamName)}`;
 }
 
+/**
+ * دمج الفرق المكررة: مصادر مختلفة سمّت نفس النادي بأسماء مختلفة
+ * (Bayern München من API مقابل Bayern Munich من CSV) فنشأت هويات موازية
+ * تشطر تاريخ الفريق وتكرّر النتائج في الترتيب. يعاد كل فريق إلى هويته
+ * القياسية (اسم CSV القصير) وتُنقل مراجعه ثم تُحذف النسخة المكررة.
+ */
+export function mergeAliasTeams(db: ReturnType<typeof getDb>) {
+  const teams = db
+    .prepare(`SELECT id, league_id, name_en FROM teams`)
+    .all() as Array<{ id: string; league_id: string; name_en: string }>;
+
+  let merged = 0;
+  for (const t of teams) {
+    const canonicalName = resolveTeamName(t.name_en);
+    const canonicalId = teamId(t.league_id, canonicalName);
+    if (canonicalId === t.id) continue;
+
+    const tx = db.transaction(() => {
+      // الهوية القانونية تُنشأ أولاً (foreign_keys=ON): المراجع لا تُنقل لهوية غير موجودة
+      db.prepare(
+        `INSERT OR IGNORE INTO teams (id, league_id, name_ar, name_en, short_name, crest_url, elo, attack, defense)
+         SELECT ?, league_id, ?, ?, substr(?, 1, 12), crest_url, elo, attack, defense
+         FROM teams WHERE id = ?`,
+      ).run(canonicalId, nameAr(canonicalName), canonicalName, canonicalName, t.id);
+
+      db.prepare(`UPDATE matches SET home_team_id = ? WHERE home_team_id = ?`).run(canonicalId, t.id);
+      db.prepare(`UPDATE matches SET away_team_id = ? WHERE away_team_id = ?`).run(canonicalId, t.id);
+      db.prepare(`UPDATE OR IGNORE players SET team_id = ? WHERE team_id = ?`).run(canonicalId, t.id);
+      db.prepare(`UPDATE OR IGNORE elo_snapshots SET team_id = ? WHERE team_id = ?`).run(canonicalId, t.id);
+      // بقايا لم تُنقل بسبب قيود التفرد + صفوف الترتيب/القوة تُعاد حسابياً لاحقاً
+      db.prepare(`DELETE FROM players WHERE team_id = ?`).run(t.id);
+      db.prepare(`DELETE FROM elo_snapshots WHERE team_id = ?`).run(t.id);
+      db.prepare(`DELETE FROM standings WHERE team_id = ?`).run(t.id);
+      db.prepare(`DELETE FROM team_strengths WHERE team_id = ?`).run(t.id);
+      db.prepare(`DELETE FROM teams WHERE id = ?`).run(t.id);
+    });
+    tx();
+    merged++;
+    console.log(`  دمج فريق مكرر: ${t.id} → ${canonicalId}`);
+  }
+  if (merged) console.log(`  دُمج ${merged} فريقاً مكرراً بهويته القياسية`);
+}
+
+/** فرق يتيمة لا تمسّها أي مباراة (بقايا استيراد خاطئ أو دمج) — تُحذف بمراجعها */
+export function cleanupOrphanTeams(db: ReturnType<typeof getDb>) {
+  const orphans = db
+    .prepare(
+      `SELECT id FROM teams
+       WHERE id NOT IN (SELECT home_team_id FROM matches)
+         AND id NOT IN (SELECT away_team_id FROM matches)`,
+    )
+    .all() as Array<{ id: string }>;
+  if (orphans.length === 0) return;
+
+  const tx = db.transaction(() => {
+    for (const o of orphans) {
+      db.prepare(`DELETE FROM players WHERE team_id = ?`).run(o.id);
+      db.prepare(`DELETE FROM elo_snapshots WHERE team_id = ?`).run(o.id);
+      db.prepare(`DELETE FROM standings WHERE team_id = ?`).run(o.id);
+      db.prepare(`DELETE FROM team_strengths WHERE team_id = ?`).run(o.id);
+      db.prepare(`DELETE FROM teams WHERE id = ?`).run(o.id);
+    }
+  });
+  tx();
+  console.log(`  حُذف ${orphans.length} فريقاً يتيماً بلا مباريات`);
+}
+
 function seedLeagues(db: ReturnType<typeof getDb>) {
   const activeIds = LEAGUES.map((l) => `'${l.id}'`).join(",");
   db.prepare(`DELETE FROM players WHERE team_id IN (SELECT id FROM teams WHERE league_id NOT IN (${activeIds}))`).run();
   db.prepare(`DELETE FROM elo_snapshots WHERE team_id IN (SELECT id FROM teams WHERE league_id NOT IN (${activeIds}))`).run();
   db.prepare(`DELETE FROM predictions WHERE match_id IN (SELECT id FROM matches WHERE league_id NOT IN (${activeIds}))`).run();
+  db.prepare(`DELETE FROM prediction_snapshots WHERE match_id IN (SELECT id FROM matches WHERE league_id NOT IN (${activeIds}))`).run();
   db.prepare(`DELETE FROM matches WHERE league_id NOT IN (${activeIds})`).run();
   db.prepare(`DELETE FROM standings WHERE league_id NOT IN (${activeIds})`).run();
   db.prepare(`DELETE FROM team_strengths WHERE league_id NOT IN (${activeIds})`).run();
@@ -186,23 +253,6 @@ const CREST_SEARCH: Record<string, string> = {
   Tottenham: "Tottenham",
   "West Ham": "West Ham",
   Spurs: "Tottenham",
-  // K League crest search hints
-  "FC Seoul": "FC Seoul",
-  "Ulsan HD": "Ulsan HD",
-  "Jeonbuk Hyundai Motors": "Jeonbuk Motors",
-  "Pohang Steelers": "Pohang Steelers",
-  "Gangwon FC": "Gangwon FC",
-  "Gwangju FC": "Gwangju FC",
-  "Daejeon Hana Citizen": "Daejeon Citizen",
-  "Incheon United": "Incheon United",
-  "Jeju SK": "Jeju United",
-  "FC Anyang": "FC Anyang",
-  "Bucheon FC 1995": "Bucheon FC 1995",
-  "Gimcheon Sangmu": "Gimcheon Sangmu",
-  "Suwon FC": "Suwon FC",
-  "Daegu FC": "Daegu FC",
-  "Suwon Samsung Bluewings": "Suwon Bluewings",
-  "Seongnam FC": "Seongnam FC",
 };
 
 const LEAGUE_BADGE_HINT: Record<string, string[]> = {
@@ -211,7 +261,6 @@ const LEAGUE_BADGE_HINT: Record<string, string[]> = {
   bl1: ["Bundesliga"],
   sa: ["Serie A"],
   fl1: ["Ligue 1"],
-  kl1: ["K League", "South Korean", "Korea"],
 };
 
 async function fetchBuffer(
@@ -393,6 +442,22 @@ async function backfillMissingCrests(db: ReturnType<typeof getDb>) {
   return n;
 }
 
+/** تباعد طلبات football-data.org — الحد المجاني 10 طلبات/دقيقة */
+let lastFdOrgCall = 0;
+async function fdOrgFetch(url: string, key: string): Promise<Response> {
+  const wait = lastFdOrgCall + 6500 - Date.now();
+  if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+  lastFdOrgCall = Date.now();
+  let res = await fetch(url, { headers: { "X-Auth-Token": key } });
+  if (res.status === 429) {
+    console.warn("  football-data.org 429 — انتظار دقيقة ثم إعادة المحاولة");
+    await new Promise((r) => setTimeout(r, 61_000));
+    lastFdOrgCall = Date.now();
+    res = await fetch(url, { headers: { "X-Auth-Token": key } });
+  }
+  return res;
+}
+
 /** شعارات حقيقية: تحميل محلي (CDN football-data أو TheSportsDB) */
 async function syncTeamCrests(db: ReturnType<typeof getDb>) {
   const key = process.env.FOOTBALL_DATA_API_KEY?.trim();
@@ -403,7 +468,7 @@ async function syncTeamCrests(db: ReturnType<typeof getDb>) {
   for (const league of LEAGUES) {
     if (league.fdOrgCode && key) {
       const url = `https://api.football-data.org/v4/competitions/${league.fdOrgCode}/teams`;
-      const res = await fetch(url, { headers: { "X-Auth-Token": key } });
+      const res = await fdOrgFetch(url, key);
       if (!res.ok) {
         console.warn(`  crests ${league.code}: ${res.status}`);
         continue;
@@ -424,7 +489,7 @@ async function syncTeamCrests(db: ReturnType<typeof getDb>) {
       continue;
     }
 
-    // دوريات بلا football-data.org (مثل K League): شعارات الفرق الموجودة عبر TheSportsDB
+    // دوريات بلا football-data.org: شعارات الفرق الموجودة عبر TheSportsDB
     const rows = db
       .prepare(
         `SELECT id, name_en AS name, crest_url AS crest FROM teams WHERE league_id = ?`,
@@ -455,107 +520,12 @@ async function syncTeamCrests(db: ReturnType<typeof getDb>) {
   console.log(`  مجموع الشعارات المحدّثة: ${updated}`);
 }
 
-/** نتائج وجدول K League من ويكيبيديا (مصدر علني كامل بالتاريخ والنتائج) */
-async function syncKleagueFromWikipedia(db: ReturnType<typeof getDb>) {
-  const league = LEAGUES.find((l) => l.id === "kl1");
-  if (!league?.wikiSeasons?.length || !league.wikiTitle) return;
-
-  console.log("مزامنة الدوري الكوري من ويكيبيديا…");
-  const latest = league.wikiSeasons[league.wikiSeasons.length - 1]!;
-
-  for (const year of league.wikiSeasons) {
-    try {
-      const fixtures = await fetchKleagueSeason(year, league.wikiTitle);
-      if (fixtures.length === 0) {
-        console.warn(`  KL1 ${year}: لا مباريات`);
-        continue;
-      }
-
-      db.prepare(
-        `DELETE FROM predictions WHERE match_id IN (
-           SELECT id FROM matches WHERE league_id = ? AND season = ? AND source = 'wikipedia'
-         )`,
-      ).run(league.id, String(year));
-      db.prepare(
-        `DELETE FROM matches WHERE league_id = ? AND season = ? AND source = 'wikipedia'`,
-      ).run(league.id, String(year));
-
-      const insert = db.prepare(`
-        INSERT INTO matches (
-          id, league_id, season, matchday, utc_date, status,
-          home_team_id, away_team_id, home_goals, away_goals, source, external_id, referee_name
-        ) VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, 'wikipedia', ?, ?)
-        ON CONFLICT(id) DO UPDATE SET
-          utc_date=excluded.utc_date,
-          status=excluded.status,
-          home_goals=excluded.home_goals,
-          away_goals=excluded.away_goals,
-          home_team_id=excluded.home_team_id,
-          away_team_id=excluded.away_team_id,
-          referee_name=COALESCE(matches.referee_name, excluded.referee_name)
-      `);
-
-      const kleagueRefs = [
-        "كيم جونغ هيوك (Kim Jong-hyeok)",
-        "غو هيون جين (Ko Hyung-jin)",
-        "كيم داي يونغ (Kim Dae-yong)",
-        "تشاي سانغ هيوب (Chae Sang-hyeop)",
-        "لي دونغ جون (Lee Dong-jun)",
-        "كيم وو سونغ (Kim Woo-sung)",
-        "شين يونغ جون (Shin Yong-jun)",
-        "سونغ مين سيوك (Song Min-seok)",
-        "بارك بيونغ أون (Park Byung-eun)",
-        "كيم يونغ سو (Kim Young-soo)",
-      ];
-
-      let n = 0;
-      for (const m of fixtures) {
-        const homeName = resolveTeamName(m.home);
-        const awayName = resolveTeamName(m.away);
-        const homeId = upsertTeam(db, league.id, homeName);
-        const awayId = upsertTeam(db, league.id, awayName);
-        const day = m.utcDate.slice(0, 10).replace(/-/g, "");
-        const id = `${league.id}-wiki-${year}-${day}-${slugify(homeName)}-${slugify(awayName)}`;
-        let hash = 5381;
-        for (let i = 0; i < id.length; i++) hash = (hash * 33) ^ id.charCodeAt(i);
-        const refName = kleagueRefs[Math.abs(hash) % kleagueRefs.length];
-
-        insert.run(
-          id,
-          league.id,
-          String(year),
-          m.utcDate,
-          m.status,
-          homeId,
-          awayId,
-          m.homeGoals,
-          m.awayGoals,
-          `${year}-${day}-${slugify(homeName)}-${slugify(awayName)}`,
-          refName,
-        );
-        n++;
-      }
-      console.log(
-        `  KL1 ${year}: ${n} مباراة (${fixtures.filter((f) => f.status === "FINISHED").length} منتهية، ${fixtures.filter((f) => f.status === "SCHEDULED").length} مجدولة)`,
-      );
-    } catch (e) {
-      console.warn(`  KL1 ${year}: فشل المزامنة`, e);
-    }
-    await new Promise((r) => setTimeout(r, 1200));
-  }
-
-  recomputeStandings(
-    db,
-    league.id,
-    latestSeasonWithResults(db, league.id) ?? String(latest),
-  );
-}
-
 function ingestCsv(
   db: ReturnType<typeof getDb>,
   leagueId: string,
   season: string,
   csvText: string,
+  expectedDiv?: string,
 ) {
   const rows = parse(csvText, {
     columns: true,
@@ -563,6 +533,15 @@ function ingestCsv(
     relax_column_count: true,
     trim: true,
   }) as Record<string, string>[];
+
+  // football-data.co.uk يعيد توجيه ملفات الموسم غير المنشورة لملف دوري آخر
+  // (مثال: 2627/SP1.csv → SC1.csv الاسكتلندي) — صفوف Div الغريبة تُرفض بالكامل
+  if (expectedDiv) {
+    const withDiv = rows.filter((r) => r.Div);
+    if (withDiv.length > 0 && withDiv.every((r) => r.Div !== expectedDiv)) {
+      return -1;
+    }
+  }
 
   const insert = db.prepare(`
     INSERT INTO matches (
@@ -612,6 +591,7 @@ function ingestCsv(
   let n = 0;
   const tx = db.transaction(() => {
     for (const r of rows) {
+      if (expectedDiv && r.Div && r.Div !== expectedDiv) continue;
       const home = r.HomeTeam || r.Home || r["Home Team"];
       const away = r.AwayTeam || r.Away || r["Away Team"];
       const fthg = r.FTHG ?? r.HG;
@@ -663,6 +643,316 @@ function ingestCsv(
   return n;
 }
 
+/** معرّفات API-Football لدورياتنا — تُستخدم مع fixtures?date= (بلا موسم؛ الخطة المجانية تقفل seasons الحديثة) */
+const API_FOOTBALL_LEAGUE_IDS: Record<number, string> = {
+  39: "pl",
+  140: "pd",
+  78: "bl1",
+  135: "sa",
+  61: "fl1",
+  94: "ppd",
+  88: "ded",
+  203: "tur1",
+};
+
+function avgMatchWinnerOdds(
+  bookmakers: Array<{
+    bets?: Array<{ id?: number; name?: string; values?: Array<{ value: string; odd: string }> }>;
+  }>,
+): { home: number; draw: number; away: number } | null {
+  const homes: number[] = [];
+  const draws: number[] = [];
+  const aways: number[] = [];
+  for (const bm of bookmakers) {
+    for (const bet of bm.bets ?? []) {
+      if (bet.id !== 1 && bet.name !== "Match Winner" && bet.name !== "1X2") continue;
+      const vals: Record<string, number> = {};
+      for (const v of bet.values ?? []) {
+        const n = Number(v.odd);
+        if (Number.isFinite(n) && n > 1) vals[v.value] = n;
+      }
+      if (vals.Home && vals.Draw && vals.Away) {
+        homes.push(vals.Home);
+        draws.push(vals.Draw);
+        aways.push(vals.Away);
+      }
+      break;
+    }
+  }
+  if (homes.length === 0) return null;
+  const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
+  return {
+    home: Math.round(mean(homes) * 1000) / 1000,
+    draw: Math.round(mean(draws) * 1000) / 1000,
+    away: Math.round(mean(aways) * 1000) / 1000,
+  };
+}
+
+/**
+ * أودز + حكّام للمباريات القادمة عبر API-Football باليوم (يعمل على الخطة المجانية).
+ * يُحدَّث كل 6 ساعات كحد أقصى حفاظاً على سقف 100 طلب/يوم.
+ */
+async function syncUpcomingOddsFromApiFootball(
+  db: ReturnType<typeof getDb>,
+): Promise<number> {
+  const apiKey =
+    process.env.API_FOOTBALL_KEY?.trim() || process.env.API_SPORTS_KEY?.trim();
+  if (!apiKey) {
+    console.warn("  لا API_FOOTBALL_KEY — تخطّي أودز API-Football");
+    return 0;
+  }
+
+  const last = db
+    .prepare(`SELECT value FROM app_meta WHERE key = 'last_odds_api_sync'`)
+    .get() as { value: string } | undefined;
+  if (last?.value) {
+    const ageH = (Date.now() - Date.parse(last.value)) / 3_600_000;
+    if (Number.isFinite(ageH) && ageH < 6) {
+      console.log(
+        `  أودز API-Football: تخطّي (آخر مزامنة منذ ${ageH.toFixed(1)}س — الحد الأدنى 6س)`,
+      );
+      return 0;
+    }
+  }
+
+  type FxHit = {
+    fixtureId: number;
+    leagueId: string;
+    date: string;
+    home: string;
+    away: string;
+    referee: string | null;
+  };
+  const hits: FxHit[] = [];
+  const DAY_WINDOW = 5;
+  const MAX_ODDS_CALLS = 25;
+  let hit429 = false;
+
+  for (let i = 0; i < DAY_WINDOW; i++) {
+    const day = new Date(Date.now() + i * 86_400_000).toISOString().slice(0, 10);
+    try {
+      const res = await fetch(
+        `https://v3.football.api-sports.io/fixtures?date=${day}`,
+        { headers: { "x-apisports-key": apiKey }, signal: AbortSignal.timeout(25000) },
+      );
+      if (res.status === 429) {
+        hit429 = true;
+        console.warn(`  fixtures?date=${day}: 429 — إيقاف`);
+        break;
+      }
+      if (!res.ok) {
+        console.warn(`  fixtures?date=${day}: ${res.status}`);
+        continue;
+      }
+      const data = (await res.json()) as {
+        response?: Array<{
+          fixture: { id: number; date: string; referee?: string | null };
+          league: { id: number };
+          teams: { home: { name: string }; away: { name: string } };
+        }>;
+      };
+      for (const item of data.response ?? []) {
+        const leagueId = API_FOOTBALL_LEAGUE_IDS[item.league.id];
+        if (!leagueId) continue;
+        hits.push({
+          fixtureId: item.fixture.id,
+          leagueId,
+          date: item.fixture.date,
+          home: resolveTeamName(item.teams.home.name),
+          away: resolveTeamName(item.teams.away.name),
+          referee: item.fixture.referee?.trim() || null,
+        });
+      }
+      await new Promise((r) => setTimeout(r, 350));
+    } catch (e) {
+      console.warn(`  fixtures?date=${day} error:`, e);
+    }
+  }
+
+  if (hits.length === 0) {
+    console.log("  أودز API-Football: لا مباريات لدورياتنا في الأيام القادمة");
+    return 0;
+  }
+
+  const findMatch = db.prepare(`
+    SELECT id, odds_home FROM matches
+    WHERE league_id = ? AND home_team_id = ? AND away_team_id = ?
+      AND status IN ('SCHEDULED', 'TIMED', 'IN_PLAY', 'PAUSED')
+      AND abs(julianday(utc_date) - julianday(?)) <= 1.5
+    ORDER BY abs(julianday(utc_date) - julianday(?))
+    LIMIT 1
+  `);
+  const updOdds = db.prepare(`
+    UPDATE matches SET
+      odds_home = @oh, odds_draw = @od, odds_away = @oa,
+      odds_open_home = COALESCE(odds_open_home, @oh),
+      odds_open_draw = COALESCE(odds_open_draw, @od),
+      odds_open_away = COALESCE(odds_open_away, @oa),
+      referee_name = COALESCE(@ref, referee_name)
+    WHERE id = @id
+  `);
+  const updRefOnly = db.prepare(`
+    UPDATE matches SET referee_name = COALESCE(?, referee_name) WHERE id = ?
+  `);
+
+  let oddsUpdated = 0;
+  let refsUpdated = 0;
+  let oddsCalls = 0;
+
+  for (const h of hits) {
+    const homeId = teamId(h.leagueId, h.home);
+    const awayId = teamId(h.leagueId, h.away);
+    // تأكد من وجود الفريقين بأسمائهم القانونية قبل المطابقة
+    upsertTeam(db, h.leagueId, h.home);
+    upsertTeam(db, h.leagueId, h.away);
+    const row = findMatch.get(h.leagueId, homeId, awayId, h.date, h.date) as
+      | { id: string; odds_home: number | null }
+      | undefined;
+    if (!row) continue;
+
+    if (h.referee) {
+      const r = updRefOnly.run(h.referee, row.id);
+      refsUpdated += r.changes;
+    }
+
+    // لا تهدر الحصة على مباراة لها أودز حديثة إن تجاوزنا السقف
+    if (oddsCalls >= MAX_ODDS_CALLS) continue;
+
+    try {
+      const res = await fetch(
+        `https://v3.football.api-sports.io/odds?fixture=${h.fixtureId}`,
+        { headers: { "x-apisports-key": apiKey }, signal: AbortSignal.timeout(25000) },
+      );
+      oddsCalls++;
+      if (res.status === 429) {
+        hit429 = true;
+        console.warn("  odds API 429 — إيقاف الجلب حتى الدورة التالية");
+        break;
+      }
+      if (!res.ok) continue;
+      const data = (await res.json()) as {
+        response?: Array<{
+          bookmakers?: Array<{
+            bets?: Array<{
+              id?: number;
+              name?: string;
+              values?: Array<{ value: string; odd: string }>;
+            }>;
+          }>;
+        }>;
+      };
+      const books = data.response?.[0]?.bookmakers ?? [];
+      const avg = avgMatchWinnerOdds(books);
+      if (!avg) continue;
+      const r = updOdds.run({
+        oh: avg.home,
+        od: avg.draw,
+        oa: avg.away,
+        ref: h.referee,
+        id: row.id,
+      });
+      oddsUpdated += r.changes;
+      await new Promise((r) => setTimeout(r, 350));
+    } catch (e) {
+      console.warn(`  odds?fixture=${h.fixtureId} error:`, e);
+    }
+  }
+
+  // لا نختم عند 429 حتى تُعاد المحاولة في الدورة الساعية التالية
+  if (!hit429) {
+    db.prepare(
+      `INSERT INTO app_meta (key, value) VALUES ('last_odds_api_sync', ?)
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+    ).run(new Date().toISOString());
+  }
+
+  console.log(
+    `  أودز API-Football: ${oddsUpdated} مباراة · حكّام ${refsUpdated} · طلبات ~${oddsCalls + DAY_WINDOW}${hit429 ? " (429)" : ""}`,
+  );
+  return oddsUpdated;
+}
+
+/**
+ * أودز سوق حقيقية للمباريات القادمة:
+ * 1) fixtures.csv من football-data.co.uk (بلا مفتاح، حين تتوفر دورياتنا)
+ * 2) API-Football باليوم + odds?fixture= كبديل يعمل على الخطة المجانية
+ */
+export async function syncUpcomingOdds(db: ReturnType<typeof getDb>) {
+  loadEnv();
+  const text = await download("https://www.football-data.co.uk/fixtures.csv");
+  let fromCsv = 0;
+  if (!text || !text.includes("HomeTeam")) {
+    console.warn("  fixtures.csv غير متاح");
+  } else {
+    const rows = parse(text, {
+      columns: true,
+      skip_empty_lines: true,
+      relax_column_count: true,
+      trim: true,
+    }) as Record<string, string>[];
+
+    const byCode = new Map(
+      LEAGUES.filter((l) => l.fdUkCode).map((l) => [l.fdUkCode!, l.id]),
+    );
+
+    const num = (v: string | undefined) => {
+      if (v === undefined || v === "") return null;
+      const n = Number(v);
+      return Number.isFinite(n) ? n : null;
+    };
+
+    const upd = db.prepare(`
+      UPDATE matches SET
+        odds_home = @oh, odds_draw = @od, odds_away = @oa,
+        odds_open_home = COALESCE(odds_open_home, @oh),
+        odds_open_draw = COALESCE(odds_open_draw, @od),
+        odds_open_away = COALESCE(odds_open_away, @oa)
+      WHERE id = (
+        SELECT id FROM matches
+        WHERE league_id = @league AND home_team_id = @home AND away_team_id = @away
+          AND status IN ('SCHEDULED', 'TIMED')
+          AND abs(julianday(utc_date) - julianday(@date)) <= 2
+        ORDER BY abs(julianday(utc_date) - julianday(@date))
+        LIMIT 1
+      )
+    `);
+
+    const tx = db.transaction(() => {
+      for (const r of rows) {
+        const leagueId = byCode.get(r.Div ?? "");
+        if (!leagueId) continue;
+        const home = r.HomeTeam || r.Home || r["Home Team"];
+        const away = r.AwayTeam || r.Away || r["Away Team"];
+        if (!home || !away || !r.Date) continue;
+        const utc = parseUkDate(r.Date, r.Time);
+        if (!utc) continue;
+        const oh = num(r.AvgH) ?? num(r.B365H) ?? num(r.PSH);
+        const od = num(r.AvgD) ?? num(r.B365D) ?? num(r.PSD);
+        const oa = num(r.AvgA) ?? num(r.B365A) ?? num(r.PSA);
+        if (!oh || !od || !oa) continue;
+        const res = upd.run({
+          oh,
+          od,
+          oa,
+          league: leagueId,
+          home: teamId(leagueId, home),
+          away: teamId(leagueId, away),
+          date: utc,
+        });
+        fromCsv += res.changes;
+      }
+    });
+    tx();
+    console.log(`  أودز حقيقية لـ${fromCsv} مباراة قادمة من fixtures.csv`);
+  }
+
+  // بديل دائم: حتى مع fixtures.csv الاسكتلندي فقط نحصل على أودز دورياتنا من API-Football
+  const fromApi = await syncUpcomingOddsFromApiFootball(db);
+  if (fromCsv === 0 && fromApi === 0) {
+    console.warn("  لا أودز سوق للمباريات القادمة بعد — صفحة القيمة ستبقى فارغة بصدق");
+  }
+}
+
 /** أحدث موسم له نتائج فعلية — لا نعتمد على تقويم ثابت قد يسبق صدور البيانات */
 function latestSeasonWithResults(
   db: ReturnType<typeof getDb>,
@@ -678,7 +968,61 @@ function latestSeasonWithResults(
   return row?.season ?? null;
 }
 
-function recomputeStandings(db: ReturnType<typeof getDb>, leagueId: string, season: string) {
+/**
+ * حذف مباريات CSV المستوردة خطأً من ملف معاد توجيهه لدوري آخر.
+ * إن وُجدت نسخة موازية لنفس المواجهة من مصدر آخر تُنقل إليها التوقعات واللقطات أولاً.
+ */
+function purgeRedirectedCsvImports(
+  db: ReturnType<typeof getDb>,
+  leagueId: string,
+  season: string,
+) {
+  const bad = db
+    .prepare(
+      `SELECT id, home_team_id, away_team_id, date(utc_date) AS day
+       FROM matches
+       WHERE league_id = ? AND season = ? AND source = 'football-data.co.uk'`,
+    )
+    .all(leagueId, season) as Array<{
+    id: string;
+    home_team_id: string;
+    away_team_id: string;
+    day: string;
+  }>;
+  if (bad.length === 0) return;
+
+  const twin = db.prepare(
+    `SELECT id FROM matches
+     WHERE league_id = ? AND home_team_id = ? AND away_team_id = ?
+       AND date(utc_date) = ? AND source != 'football-data.co.uk'
+     LIMIT 1`,
+  );
+  const tx = db.transaction(() => {
+    for (const b of bad) {
+      const t = twin.get(leagueId, b.home_team_id, b.away_team_id, b.day) as
+        | { id: string }
+        | undefined;
+      if (t) {
+        db.prepare(
+          `UPDATE predictions SET match_id = ? WHERE match_id = ?
+           AND NOT EXISTS (SELECT 1 FROM predictions WHERE match_id = ?)`,
+        ).run(t.id, b.id, t.id);
+        db.prepare(
+          `UPDATE prediction_snapshots SET match_id = ? WHERE match_id = ?
+           AND NOT EXISTS (SELECT 1 FROM prediction_snapshots WHERE match_id = ?)`,
+        ).run(t.id, b.id, t.id);
+      }
+      db.prepare(`DELETE FROM predictions WHERE match_id = ?`).run(b.id);
+      db.prepare(`DELETE FROM prediction_snapshots WHERE match_id = ?`).run(b.id);
+      db.prepare(`DELETE FROM matches WHERE id = ?`).run(b.id);
+    }
+  });
+  tx();
+  recomputeStandings(db, leagueId, season);
+  console.warn(`  حُذفت ${bad.length} مباراة مستوردة خطأً من ملف معاد توجيهه`);
+}
+
+export function recomputeStandings(db: ReturnType<typeof getDb>, leagueId: string, season: string) {
   const matches = db
     .prepare(
       `SELECT home_team_id, away_team_id, home_goals, away_goals
@@ -793,6 +1137,20 @@ async function syncFixturesFromApiFootball(db: ReturnType<typeof getDb>) {
   const apiFootballKey = process.env.API_FOOTBALL_KEY?.trim() || process.env.API_SPORTS_KEY?.trim();
   if (!apiFootballKey) return;
 
+  // الخطة المجانية 100 طلب/يوم — لا نُفرّغ الحصة كل ساعة بموسم كامل
+  const last = db
+    .prepare(`SELECT value FROM app_meta WHERE key = 'last_apif_fixtures_sync'`)
+    .get() as { value: string } | undefined;
+  if (last?.value) {
+    const ageH = (Date.now() - Date.parse(last.value)) / 3_600_000;
+    if (Number.isFinite(ageH) && ageH < 20) {
+      console.log(
+        `مزامنة API-Football للنتائج/الحكّام: تخطّي (آخر مزامنة منذ ${ageH.toFixed(1)}س)`,
+      );
+      return;
+    }
+  }
+
   console.log("مزامنة المباريات والحكام الحقيقيين من API-Football (api-sports.io)...");
   const API_FOOTBALL_LEAGUES: Record<string, number> = {
     pl: 39,
@@ -800,7 +1158,6 @@ async function syncFixturesFromApiFootball(db: ReturnType<typeof getDb>) {
     sa: 135,
     bl1: 78,
     fl1: 61,
-    kl1: 292,
   };
 
   const updateRef = db.prepare(`
@@ -824,7 +1181,7 @@ async function syncFixturesFromApiFootball(db: ReturnType<typeof getDb>) {
       away_team_id=excluded.away_team_id
   `);
 
-  const targetSeasons = [2024, 2025];
+  const targetSeasons = [2024]; // الخطة المجانية: 2022–2024 فقط؛ الأيام القادمة تُغطّى عبر odds/date sync
 
   for (const league of LEAGUES) {
     const apiId = API_FOOTBALL_LEAGUES[league.id];
@@ -848,6 +1205,7 @@ async function syncFixturesFromApiFootball(db: ReturnType<typeof getDb>) {
               status: { short: string };
               venue?: { name?: string };
             };
+            league?: { round?: string };
             teams: {
               home: { name: string; logo?: string };
               away: { name: string; logo?: string };
@@ -857,7 +1215,11 @@ async function syncFixturesFromApiFootball(db: ReturnType<typeof getDb>) {
         };
 
         const fixtures = data.response ?? [];
+        const seasonIds = new Set<string>();
         for (const item of fixtures) {
+          // ملاحق الصعود/الهبوط ليست مباريات دوري — تُقحم فريقاً بمباراتين في الترتيب
+          const round = item.league?.round ?? "";
+          if (round && !/^Regular Season/i.test(round)) continue;
           const f = item.fixture;
           const homeName = resolveTeamName(item.teams.home.name);
           const awayName = resolveTeamName(item.teams.away.name);
@@ -888,7 +1250,33 @@ async function syncFixturesFromApiFootball(db: ReturnType<typeof getDb>) {
             refName,
             String(f.id),
           );
+          seasonIds.add(id);
           totalLeagueCount++;
+        }
+
+        // مزامنة تفاضلية: ما اختفى من الاستجابة (أو استُبعد كملحق) يُحذف من هذا المصدر
+        if (fixtures.length > 0) {
+          const stale = db
+            .prepare(
+              `SELECT id FROM matches
+               WHERE league_id = ? AND season = ? AND source = 'api-football'`,
+            )
+            .all(league.id, String(seasonYear)) as Array<{ id: string }>;
+          const toDelete = stale.filter((m) => !seasonIds.has(m.id));
+          if (toDelete.length > 0) {
+            const tx = db.transaction(() => {
+              for (const m of toDelete) {
+                db.prepare(`DELETE FROM predictions WHERE match_id = ?`).run(m.id);
+                db.prepare(`DELETE FROM prediction_snapshots WHERE match_id = ?`).run(m.id);
+                db.prepare(`DELETE FROM matches WHERE id = ?`).run(m.id);
+              }
+            });
+            tx();
+            recomputeStandings(db, league.id, String(seasonYear));
+            console.log(
+              `  API-Football ${league.code} ${seasonYear}: حُذفت ${toDelete.length} مباراة غير دورية (ملاحق/مختفية)`,
+            );
+          }
         }
         await new Promise((r) => setTimeout(r, 1200));
       } catch (e) {
@@ -897,6 +1285,11 @@ async function syncFixturesFromApiFootball(db: ReturnType<typeof getDb>) {
     }
     console.log(`  API-Football ${league.nameAr}: ${totalLeagueCount} مباراة حقيقية بأسماء الحكام المعتمدة`);
   }
+
+  db.prepare(
+    `INSERT INTO app_meta (key, value) VALUES ('last_apif_fixtures_sync', ?)
+     ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+  ).run(new Date().toISOString());
 }
 
 async function syncFixturesFromApi(db: ReturnType<typeof getDb>) {
@@ -931,7 +1324,7 @@ async function syncFixturesFromApi(db: ReturnType<typeof getDb>) {
   for (const league of LEAGUES) {
     if (!league.fdOrgCode) continue;
     const url = `https://api.football-data.org/v4/competitions/${league.fdOrgCode}/matches?status=SCHEDULED`;
-    const res = await fetch(url, { headers: { "X-Auth-Token": key } });
+    const res = await fdOrgFetch(url, key);
     if (!res.ok) {
       console.warn(`  API ${league.code}: ${res.status}`);
       continue;
@@ -1002,29 +1395,7 @@ async function main() {
   }
 
   seedLeagues(db);
-
-  if (process.argv.includes("--kleague-only")) {
-    await syncKleagueFromWikipedia(db);
-    console.log("مزامنة شعارات الأندية الكورية…");
-    const rows = db
-      .prepare(
-        `SELECT id, name_en AS name, crest_url AS crest FROM teams WHERE league_id = 'kl1'`,
-      )
-      .all() as Array<{ id: string; name: string; crest?: string }>;
-    await syncCrestsForLeagueTeams(
-      db,
-      "kl1",
-      "الدوري الكوري",
-      rows.map((r) => ({ teamKey: r.id, name: r.name, crest: r.crest })),
-    );
-    db.prepare(
-      `INSERT INTO app_meta (key, value) VALUES ('last_sync', ?)
-       ON CONFLICT(key) DO UPDATE SET value=excluded.value`,
-    ).run(new Date().toISOString());
-    closeDb();
-    console.log("تمت مزامنة الدوري الكوري.");
-    return;
-  }
+  mergeAliasTeams(db);
 
   const latestYear = HISTORICAL_SEASONS[HISTORICAL_SEASONS.length - 1]!;
   console.log("تنزيل نتائج حقيقية من football-data.co.uk…");
@@ -1052,7 +1423,15 @@ async function main() {
         }
       }
       if (!text) continue;
-      const n = ingestCsv(db, league.id, seasonLabel, text);
+      const n = ingestCsv(db, league.id, seasonLabel, text, league.fdUkCode);
+      if (n === -1) {
+        console.warn(
+          `  ${league.code} ${seg}: الملف معاد توجيهه لدوري آخر — تجاهل وتنظيف ما استُورد منه خطأً`,
+        );
+        purgeRedirectedCsvImports(db, league.id, seasonLabel);
+        if (fs.existsSync(local)) fs.unlinkSync(local);
+        continue;
+      }
       console.log(
         `  ${league.code} ${seg}: ${n} مباراة حقيقية${forceRefresh ? " (محدّث)" : ""}`,
       );
@@ -1060,10 +1439,10 @@ async function main() {
     }
   }
 
-  await syncKleagueFromWikipedia(db);
-
   console.log("مزامنة المباريات المجدولة…");
   await syncFixturesFromApi(db);
+
+  cleanupOrphanTeams(db);
 
   console.log("مزامنة شعارات الأندية…");
   await syncTeamCrests(db);

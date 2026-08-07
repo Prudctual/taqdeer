@@ -474,12 +474,6 @@ a {
 [data-league="tur1"] {
   --league: oklch(0.55 0.20 25);
 }
-[data-league="no1"] {
-  --league: oklch(0.55 0.14 250);
-}
-[data-league="kl1"] {
-  --league: oklch(0.55 0.12 145);
-}
 
 .league-band {
   display: flex;

@@ -96,9 +96,7 @@ def fit_dixon_coles(
         attack = theta[:n].copy()
         defense = theta[n : 2 * n].copy()
         home_adv = float(theta[2 * n])
-        if league_id == "kl1":
-            home_adv = float(np.clip(home_adv, 0.02, 0.12))
-        elif profile.home_advantage > 0:
+        if profile.home_advantage > 0:
             home_adv = float(np.clip(home_adv, profile.home_advantage * 0.5, profile.home_advantage * 1.5))
         rho = float(np.clip(theta[2 * n + 1], -0.3, 0.3))
         intercept = float(theta[2 * n + 2])

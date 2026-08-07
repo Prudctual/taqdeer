@@ -1,6 +1,6 @@
 import { cache } from "react";
 import { getDb } from "./db";
-import { LEAGUES } from "./leagues";
+import { LEAGUES, latestSeasonStartYear } from "./leagues";
 
 export type MatchCard = {
   id: string;
@@ -54,10 +54,7 @@ export type MatchCard = {
   oddsOpenHome?: number | null;
   oddsOpenDraw?: number | null;
   oddsOpenAway?: number | null;
-  sharpSteamSide?: string | null;
-  gamestateBiasRatio?: number | null;
   refereeName?: string | null;
-  weatherCondition?: string | null;
   matchday?: number | null;
   minute?: number | null;
   liveStatusAr?: string | null;
@@ -104,7 +101,7 @@ export type MatchRow = MatchCard & {
   odds_away: number | null;
 };
 
-/** أعمدة القائمة — بلا JSON الثقيل غير المستخدم في الصفوف */
+/** أعمدة القائمة — بلا JSON الثقيل غير المستخدم في الصفوف (يقلّص حمولة RSC للعميل) */
 const LIST_SELECT = `
   SELECT m.id,
          m.league_id as leagueId,
@@ -115,8 +112,8 @@ const LIST_SELECT = `
          m.matchday,
          m.minute,
          m.live_status_ar as liveStatusAr,
-         m.live_events_json as liveEventsJson,
-         m.live_stats_json as liveStatsJson,
+         NULL as liveEventsJson,
+         NULL as liveStatsJson,
          ht.name_ar as homeNameAr, at.name_ar as awayNameAr,
          ht.name_en as homeNameEn, at.name_en as awayNameEn,
          ht.crest_url as homeCrestUrl, at.crest_url as awayCrestUrl,
@@ -174,8 +171,7 @@ const DETAIL_SELECT = `
          m.xa_home as xaHome, m.xa_away as xaAway,
          m.ppda_home as ppdaHome, m.ppda_away as ppdaAway,
          m.odds_open_home as oddsOpenHome, m.odds_open_draw as oddsOpenDraw, m.odds_open_away as oddsOpenAway,
-         m.sharp_steam_side as sharpSteamSide, m.gamestate_bias_ratio as gamestateBiasRatio,
-         m.referee_name as refereeName, m.weather_condition as weatherCondition
+         m.referee_name as refereeName
   FROM matches m
   JOIN leagues l ON l.id = m.league_id
   JOIN teams ht ON ht.id = m.home_team_id
@@ -228,8 +224,11 @@ function toLegacy(m: MatchCard & { matchday?: number | null }): MatchRow {
  * المباريات المباشرة والقادمة لكل دوري على حدة.
  * لا تختفي المباريات عند انطلاقها أو أثناء اللعب، بل تبقى ظاهرة حتى تنتهي رسمياً (FINISHED)،
  * وبعد انتهائها تصعد المباريات والجولات التي تليها تلقائياً.
+ *
+ * الجولات تُعاد كاملة دائماً: perLeague حدّ أدنى تقريبي، وتُضاف الجولات جولةً
+ * جولةً حتى بلوغه — فلا تُقصّ جولة في منتصفها ولا تظهر مباراتان فقط من دوري.
  */
-export function getUpcomingByLeague(perLeague = 6): {
+export function getUpcomingByLeague(perLeague = 9): {
   leagueId: string;
   leagueNameAr: string;
   matches: MatchCard[];
@@ -247,9 +246,35 @@ export function getUpcomingByLeague(perLeague = 6): {
      LIMIT ?`,
   );
 
+  // مفتاح التجميع: رقم الجولة إن وُجد، وإلا يوم المباراة
+  const bucketOf = (m: MatchCard) =>
+    m.matchday != null ? `md-${m.matchday}` : `day-${m.utcDate.slice(0, 10)}`;
+  const fetchCap = Math.max(perLeague * 4, 40);
+
   return getLeagues()
     .map((league) => {
-      const matches = activeStmt.all(league.id, perLeague) as MatchCard[];
+      const all = activeStmt.all(league.id, fetchCap) as MatchCard[];
+
+      const order: string[] = [];
+      const counts = new Map<string, number>();
+      for (const m of all) {
+        const b = bucketOf(m);
+        if (!counts.has(b)) {
+          order.push(b);
+          counts.set(b, 0);
+        }
+        counts.set(b, counts.get(b)! + 1);
+      }
+
+      const allowed = new Set<string>();
+      let total = 0;
+      for (const b of order) {
+        allowed.add(b);
+        total += counts.get(b)!;
+        if (total >= perLeague) break;
+      }
+
+      const matches = all.filter((m) => allowed.has(bucketOf(m)));
       return {
         leagueId: league.id,
         leagueNameAr: league.name_ar,
@@ -270,11 +295,17 @@ export function getUpcomingByLeague(perLeague = 6): {
  * أو دقيقة/وصف حيّ داخل زمن اللعب. مضيّ الموعد وحده لا يجعل المباراة جارية،
  * وإلا ظهرت مباريات منتهية لم تُحدَّث حالتها بوصفها مباشرة.
  */
+/** كما LIST_SELECT لكن مع حمولة البث المباشر (الأحداث والإحصائيات) — للـAPI اللحظي فقط */
+const LIVE_SELECT = LIST_SELECT.replace(
+  "NULL as liveEventsJson",
+  "m.live_events_json as liveEventsJson",
+).replace("NULL as liveStatsJson", "m.live_stats_json as liveStatsJson");
+
 export function getLiveMatches(): MatchCard[] {
   const db = getDb();
   return db
     .prepare(
-      `${LIST_SELECT}
+      `${LIVE_SELECT}
        WHERE m.status NOT IN ('FINISHED','POSTPONED','CANCELLED')
          AND m.utc_date <= datetime('now')
          AND (
@@ -316,7 +347,7 @@ export function getRecentFinished(limit = 20, _season?: string): MatchCard[] {
 
   const rows: MatchCard[] = [];
   for (const league of leagues) {
-    const season = _season ?? (latestSeasonStmt.get(league.id) as { season: string } | undefined)?.season ?? "2026";
+    const season = _season ?? (latestSeasonStmt.get(league.id) as { season: string } | undefined)?.season ?? String(latestSeasonStartYear());
     rows.push(...(stmt.all(league.id, season, perLeague) as MatchCard[]));
   }
 
@@ -354,7 +385,7 @@ export function getRecentFinishedByLeague(perLeague = 4, _season?: string): {
 
   return leagues
     .map((league) => {
-      const season = _season ?? (latestSeasonStmt.get(league.id) as { season: string } | undefined)?.season ?? "2026";
+      const season = _season ?? (latestSeasonStmt.get(league.id) as { season: string } | undefined)?.season ?? String(latestSeasonStartYear());
       const matches = stmt.all(league.id, season, perLeague) as MatchCard[];
       return {
         leagueId: league.id,
@@ -406,11 +437,11 @@ export function getMatchById(id: string): MatchRow | null {
 
 /**
  * مباريات الدوري للواجهة: كل القادمة أولاً، ثم أحدث النتائج.
- * كان LIMIT موحّداً يقطع الموسم (مثلاً 40 من أصل ~200+ مجدولة).
+ * الحد الافتراضي يستوعب موسماً كاملاً (380 مباراة) فلا يُقصّ الجدول.
  */
 export function getLeagueMatches(
   leagueId: string,
-  upcomingLimit = 250,
+  upcomingLimit = 400,
   recentLimit = 48,
 ): MatchCard[] {
   const db = getDb();
@@ -485,8 +516,9 @@ export function getAvailableSeasons(leagueId: string): string[] {
     )
     .all(leagueId, leagueId) as Array<{ season: string }>;
   const list = rows.map((r) => r.season);
-  if (leagueId !== "kl1" && !list.includes("2026")) {
-    list.unshift("2026");
+  const currentSeason = String(latestSeasonStartYear());
+  if (!list.includes(currentSeason)) {
+    list.unshift(currentSeason);
   }
   return list;
 }
@@ -867,6 +899,8 @@ export const getValueMatches = cache(function getValueMatches(): Array<{
 }> {
   try {
     const db = getDb();
+    // فرص القيمة تُحسب فقط من أودز سوق حقيقية — بلا أودز لا يوجد EV يمكن ادعاؤه.
+    // النطاق: الأسابيع الثلاثة القادمة (الموسم كامل في القاعدة وعرضه كله بلا فائدة تحليلية)
     const rows = db.prepare(`
       SELECT m.id, m.league_id, l.name_ar as league_name_ar,
              ht.name_ar as home_name_ar, at.name_ar as away_name_ar,
@@ -878,8 +912,13 @@ export const getValueMatches = cache(function getValueMatches(): Array<{
       JOIN teams ht ON ht.id = m.home_team_id
       JOIN teams at ON at.id = m.away_team_id
       WHERE m.utc_date >= datetime('now')
+        AND m.utc_date <= datetime('now', '+21 days')
         AND m.status IN ('SCHEDULED', 'TIMED', 'IN_PLAY', 'PAUSED')
+        AND m.odds_home IS NOT NULL
+        AND m.odds_draw IS NOT NULL
+        AND m.odds_away IS NOT NULL
       ORDER BY m.utc_date ASC
+      LIMIT 150
     `).all() as Array<{
       id: string;
       league_id: string;
@@ -890,9 +929,9 @@ export const getValueMatches = cache(function getValueMatches(): Array<{
       p_home: number;
       p_draw: number;
       p_away: number;
-      odds_home: number | null;
-      odds_draw: number | null;
-      odds_away: number | null;
+      odds_home: number;
+      odds_draw: number;
+      odds_away: number;
       analytics_json: string | null;
     }>;
 
@@ -920,34 +959,28 @@ export const getValueMatches = cache(function getValueMatches(): Array<{
         } catch {}
       }
 
-      const p_h = r.p_home ?? 0.33;
-      const p_d = r.p_draw ?? 0.34;
-      const p_a = r.p_away ?? 0.33;
-
-      // Implied odds with standard market margin if odds unavailable
-      const o_h = r.odds_home || parseFloat((1 / (p_h * 0.92)).toFixed(2));
-      const o_d = r.odds_draw || parseFloat((1 / (p_d * 0.94)).toFixed(2));
-      const o_a = r.odds_away || parseFloat((1 / (p_a * 0.92)).toFixed(2));
-
-      const ev_h = (p_h * o_h) - 1;
-      const ev_d = (p_d * o_d) - 1;
-      const ev_a = (p_a * o_a) - 1;
+      const ev_h = r.p_home * r.odds_home - 1;
+      const ev_d = r.p_draw * r.odds_draw - 1;
+      const ev_a = r.p_away * r.odds_away - 1;
 
       const maxEv = Math.max(ev_h, ev_d, ev_a);
+      // نفس نطاق محرك التوقعات: أقل من 3% ضجيج، وأكثر من 15% غالباً خطأ نموذج أو أودز قديمة
+      if (maxEv < 0.03 || maxEv > 0.15) continue;
+
       const side: "home" | "draw" | "away" =
         maxEv === ev_h ? "home" : maxEv === ev_d ? "draw" : "away";
 
-      const odds = side === "home" ? o_h : side === "draw" ? o_d : o_a;
-      const prob = side === "home" ? p_h : side === "draw" ? p_d : p_a;
+      const odds = side === "home" ? r.odds_home : side === "draw" ? r.odds_draw : r.odds_away;
+      const prob = side === "home" ? r.p_home : side === "draw" ? r.p_draw : r.p_away;
 
       const b = odds > 1 ? odds - 1 : 1;
       const q = 1 - prob;
-      const kelly = Math.max(0.005, Math.max(0, (b * prob - q) / b) * 0.25);
+      const kelly = Math.max(0, (b * prob - q) / b) * 0.25;
 
       const valueObj = {
         side,
         odds,
-        ev: Math.max(0.035, parseFloat(maxEv.toFixed(3))),
+        ev: parseFloat(maxEv.toFixed(3)),
         stake: parseFloat(kelly.toFixed(3)),
         bet: true,
       };
@@ -958,9 +991,6 @@ export const getValueMatches = cache(function getValueMatches(): Array<{
 
       result.push({
         ...r,
-        odds_home: o_h,
-        odds_draw: o_d,
-        odds_away: o_a,
         analytics_json: JSON.stringify(updatedAnalytics),
       });
     }
@@ -1036,7 +1066,8 @@ export const getBankerPicks = cache(function getBankerPicks(limit = 4, leagueId?
       const isHomePick = pH >= pA;
       const prob = isHomePick ? pH : pA;
       const pickLabel = isHomePick ? `فوز المضيف (1)` : `فوز الضيف (2)`;
-      const conf = r.confidence ?? Math.min(0.95, prob + 0.12);
+      // بلا اختلاق: عند غياب ثقة النموذج (لا يحدث عملياً — العمود NOT NULL) نعرض الاحتمال نفسه
+      const conf = r.confidence ?? prob;
 
       return {
         matchId: r.matchId,
@@ -1272,16 +1303,16 @@ export type FinishedPredictionItem = MatchCard & {
 };
 
 export const getFinishedPredictionsHistory = cache(
-  (leagueId?: string, limit = 100): FinishedPredictionItem[] => {
+  (leagueId?: string, limit = 200): FinishedPredictionItem[] => {
     try {
       const db = getDb();
       let sql = `
         SELECT 
           m.id, m.league_id AS leagueId, l.name_ar AS leagueNameAr, m.season, m.matchday,
           m.utc_date AS utcDate, m.status, m.home_goals AS homeGoals, m.away_goals AS awayGoals,
-          m.home_team_id AS homeTeamId, m.away_team_id AS awayTeamId,
-          th.name_ar AS homeTeamName, th.name_en AS homeTeamNameEn, th.crest_url AS homeCrestUrl,
-          ta.name_ar AS awayTeamName, ta.name_en AS awayTeamNameEn, ta.crest_url AS awayCrestUrl,
+          m.home_team_id AS homeId, m.away_team_id AS awayId,
+          th.name_ar AS homeNameAr, th.name_en AS homeNameEn, th.crest_url AS homeCrestUrl,
+          ta.name_ar AS awayNameAr, ta.name_en AS awayNameEn, ta.crest_url AS awayCrestUrl,
           COALESCE(ps.p_home, p.p_home) AS pHome,
           COALESCE(ps.p_draw, p.p_draw) AS pDraw,
           COALESCE(ps.p_away, p.p_away) AS pAway,
@@ -1295,13 +1326,16 @@ export const getFinishedPredictionsHistory = cache(
         JOIN leagues l ON l.id = m.league_id
         JOIN teams th ON th.id = m.home_team_id
         JOIN teams ta ON ta.id = m.away_team_id
-        LEFT JOIN predictions p ON p.match_id = m.id
-        LEFT JOIN prediction_snapshots ps ON ps.match_id = m.id
+        LEFT JOIN predictions p
+          ON p.match_id = m.id AND p.model_version != 'live-v1'
+        LEFT JOIN prediction_snapshots ps
+          ON ps.match_id = m.id AND ps.model_version != 'live-v1'
         WHERE m.status = 'FINISHED'
-          AND m.utc_date >= '2026-08-07'
+          AND m.utc_date >= ?
           AND (p.p_home IS NOT NULL OR ps.p_home IS NOT NULL)
       `;
-      const params: (string | number)[] = [];
+      // بداية الموسم الجاري تُشتق من التاريخ — لا قيمة مكتوبة تتقادم مع المواسم
+      const params: (string | number)[] = [`${latestSeasonStartYear()}-08-01`];
 
       if (leagueId && leagueId !== "all") {
         sql += ` AND m.league_id = ?`;
@@ -1376,14 +1410,18 @@ export const getFinishedPredictionsHistory = cache(
   }
 );
 
-export const getUpcomingSnapshotMatches = cache((limit = 40): MatchCard[] => {
+/**
+ * توقعات محفوظة (snapshots) للمباريات القادمة — جولة كاملة لكل دوري.
+ * لا تُقصّ الجولة في منتصفها: perLeague حدّ أدنى، وتُضاف الجولات جولةً جولةً حتى بلوغه.
+ */
+export const getUpcomingSnapshotMatches = cache((perLeague = 20): MatchCard[] => {
   try {
     const db = getDb();
-    const sql = `
+    const stmt = db.prepare(`
       SELECT 
         m.id, m.league_id AS leagueId, l.name_ar AS leagueNameAr, m.season, m.matchday,
         m.utc_date AS utcDate, m.status, m.home_goals AS homeGoals, m.away_goals AS awayGoals,
-        m.home_team_id AS homeTeamId, m.away_team_id AS awayTeamId,
+        m.home_team_id AS homeId, m.away_team_id AS awayId,
         th.name_ar AS homeNameAr, th.name_en AS homeNameEn, th.crest_url AS homeCrestUrl,
         ta.name_ar AS awayNameAr, ta.name_en AS awayNameEn, ta.crest_url AS awayCrestUrl,
         COALESCE(ps.p_home, p.p_home) AS pHome,
@@ -1401,11 +1439,45 @@ export const getUpcomingSnapshotMatches = cache((limit = 40): MatchCard[] => {
       JOIN prediction_snapshots ps ON ps.match_id = m.id
       LEFT JOIN predictions p ON p.match_id = m.id
       WHERE m.status IN ('SCHEDULED', 'TIMED')
-        AND m.utc_date >= '2026-08-07'
+        AND date(m.utc_date) >= date('now')
+        AND m.league_id = ?
       ORDER BY m.utc_date ASC
       LIMIT ?
-    `;
-    return db.prepare(sql).all(limit) as MatchCard[];
+    `);
+
+    const bucketOf = (m: MatchCard) =>
+      m.matchday != null ? `md-${m.matchday}` : `day-${m.utcDate.slice(0, 10)}`;
+    const fetchCap = Math.max(perLeague * 4, 40);
+
+    const out: MatchCard[] = [];
+    for (const league of getLeagues()) {
+      const all = stmt.all(league.id, fetchCap) as MatchCard[];
+      if (all.length === 0) continue;
+
+      const order: string[] = [];
+      const counts = new Map<string, number>();
+      for (const m of all) {
+        const b = bucketOf(m);
+        if (!counts.has(b)) {
+          order.push(b);
+          counts.set(b, 0);
+        }
+        counts.set(b, counts.get(b)! + 1);
+      }
+
+      const allowed = new Set<string>();
+      let total = 0;
+      for (const b of order) {
+        allowed.add(b);
+        total += counts.get(b)!;
+        if (total >= perLeague) break;
+      }
+
+      out.push(...all.filter((m) => allowed.has(bucketOf(m))));
+    }
+
+    out.sort((a, b) => a.utcDate.localeCompare(b.utcDate));
+    return out;
   } catch (e) {
     console.error("Error in getUpcomingSnapshotMatches:", e);
     return [];

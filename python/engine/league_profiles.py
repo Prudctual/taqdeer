@@ -116,18 +116,6 @@ LEAGUE_PROFILES: Dict[str, LeagueProfile] = {
         elo_weight_mult=1.05,
         form_weight_mult=1.15,
     ),
-    # 🇳🇴 Eliteserien
-    "no1": LeagueProfile(
-        league_id="no1",
-        name_ar="الدوري النرويجي",
-        home_advantage=0.28,
-        draw_baseline=0.22,
-        avg_match_goals=3.05,
-        turf_teams=["bodo", "bodø/glimt", "tromso", "tromsø", "kfum", "kfum oslo", "aalesund"],
-        noise_factor=0.88,
-        elo_weight_mult=0.95,
-        form_weight_mult=1.25,
-    ),
 }
 
 DEFAULT_PROFILE = LeagueProfile(

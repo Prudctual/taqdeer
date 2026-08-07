@@ -6,7 +6,6 @@ import { Crest } from "@/components/Crest";
 import { MatchList } from "@/components/MatchList";
 import { RevealOnView } from "@/components/RevealOnView";
 import { TrophyIcon } from "@/components/Icons";
-import { TeamTacticalSpotlight } from "@/components/TeamTacticalSpotlight";
 import { SquadGridWidget } from "@/components/SquadGridWidget";
 import {
   BackBar,
@@ -351,15 +350,6 @@ export default async function TeamPage({
         </div>
       )}
 
-      {/* 3 — Comprehensive Tactical & Manager Analysis */}
-      <TeamTacticalSpotlight
-        teamName={team.name_ar}
-        leagueName={team.league_name_ar}
-        elo={team.elo}
-        attackRating={team.attack}
-        defenseRating={team.defense}
-        crestUrl={team.crest_url}
-      />
 
       <SquadGridWidget homeTeam={team.name_ar} awayTeam="" players={squadStars} />
 

@@ -45,14 +45,18 @@ export const metadata: Metadata = {
   },
 };
 
+/** يطبق الوضع الداكن والتفضيلات المحفوظة قبل الـhydration — يمنع وميض الوضع الفاتح (FOUC) */
+const themeInitScript = `(function(){try{var m=localStorage.getItem("taqdeer-theme-mode")||"light";var d=m==="dark"||(m==="system"&&window.matchMedia("(prefers-color-scheme: dark)").matches);var r=document.documentElement;r.classList.add(d?"dark":"light");r.setAttribute("data-theme",d?"dark":"light");var p=localStorage.getItem("taqdeer-theme-preset");if(p)r.setAttribute("data-preset",p);var rad=localStorage.getItem("taqdeer-theme-radius");if(rad){r.setAttribute("data-radius",rad);r.style.setProperty("--radius",rad+"rem");}var den=localStorage.getItem("taqdeer-theme-density");if(den)r.setAttribute("data-density",den);}catch(e){}})();`;
+
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="ar" dir="rtl" className={`${arabic.variable} h-full`}>
+    <html lang="ar" dir="rtl" className={`${arabic.variable} h-full`} suppressHydrationWarning>
       <body className="h-full bg-bg font-sans antialiased">
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
         <ThemeProvider>
           <AdvancedModeProvider>
             {/* Command Menu Modal (Cmd+K) */}

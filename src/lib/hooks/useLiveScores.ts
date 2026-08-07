@@ -19,7 +19,9 @@ export function useLiveScores(intervalMs = 12000) {
         if (isMounted && data.success) {
           setLiveMatches(data.liveMatches || []);
           setIsLiveActive((data.liveMatches || []).length > 0);
-          setLastUpdated(new Date().toLocaleTimeString("ar-SA"));
+          setLastUpdated(
+            new Date().toLocaleTimeString("ar-IQ", { timeZone: "Asia/Baghdad" }),
+          );
         }
       } catch {
         // silent fail

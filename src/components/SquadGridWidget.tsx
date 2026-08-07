@@ -50,13 +50,15 @@ export function SquadGridWidget({
               }`}
             >
               <span className="text-xs font-bold text-muted">{p.position}</span>
-              <span
-                className={`text-xl font-black tabular font-mono ${
-                  p.isHome ? "text-home" : "text-away"
-                }`}
-              >
-                #{p.number}
-              </span>
+              {p.number ? (
+                <span
+                  className={`text-xl font-black tabular font-mono ${
+                    p.isHome ? "text-home" : "text-away"
+                  }`}
+                >
+                  #{p.number}
+                </span>
+              ) : null}
             </div>
 
             <div className="my-4 flex justify-center">
@@ -101,20 +103,6 @@ export function SquadGridWidget({
               </div>
             </div>
 
-            <div className="mt-4 pt-3 border-t border-line grid grid-cols-2 gap-2 text-center text-xs">
-              <div className="bg-panel p-2 rounded-xl border border-line">
-                <span className="text-[10px] font-bold text-muted block">تصنيف Elo</span>
-                <span className="font-mono font-black text-ink text-xs tabular">
-                  {p.rating}
-                </span>
-              </div>
-              <div className="bg-panel p-2 rounded-xl border border-line">
-                <span className="text-[10px] font-bold text-muted block">تأثير xG</span>
-                <span className="font-mono font-black text-success text-xs tabular">
-                  {p.xg}
-                </span>
-              </div>
-            </div>
           </div>
         ))}
       </div>

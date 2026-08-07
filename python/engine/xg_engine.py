@@ -1,4 +1,8 @@
-"""Expected Goals (xG), Expected Assists (xA), and PPDA (Passes per Defensive Action) Analytics Engine."""
+"""مؤشر تسديدات موزون (بديل xG) وPPDA تقريبي — من إحصاءات التسديد الرسمية فقط.
+
+هذا ليس xG تتبّعياً (لا بيانات مواقع تسديد): إنه وكيل خطي من التسديدات على
+المرمى وخارجه، ويُعرض في الواجهة بمسمى «مؤشر التسديدات الموزون» بصدق.
+"""
 
 from __future__ import annotations
 
@@ -9,10 +13,8 @@ def calculate_match_xg(
     shots: Optional[float], sot: Optional[float], goals: Optional[float]
 ) -> float:
     """
-    Opta-calibrated shot-based Expected Goals (xG) model.
-    Shot on Target weight: 0.31 xG
-    Shot off Target weight: 0.045 xG
-    Unblocked goal overrun adjustment.
+    وكيل تسديدات خطي: تسديدة على المرمى = 0.31، خارج المرمى = 0.045،
+    مع تصحيح للأهداف الزائدة عن التسديدات المسجلة.
     """
     if shots is None or shots <= 0:
         return float(round(goals if goals is not None else 0.0, 2))

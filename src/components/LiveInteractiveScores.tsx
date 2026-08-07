@@ -19,9 +19,9 @@ type LiveMatchData = {
   awayGoals: number;
   minute: number;
   liveStatusAr: string;
-  pHome: number;
-  pDraw: number;
-  pAway: number;
+  pHome: number | null;
+  pDraw: number | null;
+  pAway: number | null;
   liveEventsJson?: string | null;
 };
 
@@ -141,20 +141,22 @@ export function LiveInteractiveScores() {
                 </div>
               </div>
 
-              {/* Live Probability Bar */}
-              <div className="space-y-1 pt-1 border-t border-line">
-                <div className="flex items-center justify-between text-[10px] font-bold text-muted">
-                  <span>احتمال الفوز الحقيقي الآن:</span>
-                  <span className="font-mono text-ink">
-                    1: {pct(m.pHome, 0)} | X: {pct(m.pDraw, 0)} | 2: {pct(m.pAway, 0)}
-                  </span>
+              {/* شريط الاحتمالات اللحظية — لا يظهر عند غياب توقع النموذج */}
+              {m.pHome != null && m.pDraw != null && m.pAway != null && (
+                <div className="space-y-1 pt-1 border-t border-line">
+                  <div className="flex items-center justify-between text-[10px] font-bold text-muted">
+                    <span>احتمال الفوز الحقيقي الآن:</span>
+                    <span className="font-mono text-ink">
+                      1: {pct(m.pHome, 0)} | X: {pct(m.pDraw, 0)} | 2: {pct(m.pAway, 0)}
+                    </span>
+                  </div>
+                  <div className="h-1.5 w-full rounded-full bg-panel overflow-hidden flex">
+                    <div style={{ width: `${m.pHome * 100}%` }} className="bg-home h-full" />
+                    <div style={{ width: `${m.pDraw * 100}%` }} className="bg-draw h-full" />
+                    <div style={{ width: `${m.pAway * 100}%` }} className="bg-away h-full" />
+                  </div>
                 </div>
-                <div className="h-1.5 w-full rounded-full bg-panel overflow-hidden flex">
-                  <div style={{ width: `${m.pHome * 100}%` }} className="bg-home h-full" />
-                  <div style={{ width: `${m.pDraw * 100}%` }} className="bg-draw h-full" />
-                  <div style={{ width: `${m.pAway * 100}%` }} className="bg-away h-full" />
-                </div>
-              </div>
+              )}
             </Link>
           ))}
         </div>

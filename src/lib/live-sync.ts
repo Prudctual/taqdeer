@@ -79,7 +79,6 @@ export async function syncRealLiveMatches(): Promise<number> {
       94: "ppd",
       88: "ded",
       203: "tur1",
-      103: "no1",
     };
 
     const upsertTeam = db.prepare(`
@@ -89,7 +88,29 @@ export async function syncRealLiveMatches(): Promise<number> {
         crest_url = COALESCE(excluded.crest_url, teams.crest_url)
     `);
 
-    const upsertMatch = db.prepare(`
+    // المباراة الحقيقية موجودة مسبقاً في الجدول (من مزامنة الجداول) —
+    // تُحدَّث في مكانها فيبقى توقعها الحقيقي ولقطته مرتبطين بها، بلا صفوف مكررة
+    const findExisting = db.prepare(`
+      SELECT id FROM matches
+      WHERE league_id = ? AND home_team_id = ? AND away_team_id = ?
+        AND date(utc_date) = date(?)
+      LIMIT 1
+    `);
+
+    const updateLive = db.prepare(`
+      UPDATE matches SET
+        status = ?,
+        home_goals = ?,
+        away_goals = ?,
+        minute = ?,
+        live_status_ar = ?,
+        live_events_json = ?,
+        referee_name = COALESCE(referee_name, ?)
+      WHERE id = ?
+    `);
+
+    // احتياط نادر: مباراة غير موجودة في جداولنا (تأجيل لم يصلنا مثلاً) — تُنشأ بلا توقع مختلق
+    const insertMatch = db.prepare(`
       INSERT INTO matches (
         id, league_id, season, matchday, utc_date, status,
         home_team_id, away_team_id, home_goals, away_goals, referee_name, source, external_id,
@@ -103,19 +124,6 @@ export async function syncRealLiveMatches(): Promise<number> {
         minute = excluded.minute,
         live_status_ar = excluded.live_status_ar,
         live_events_json = excluded.live_events_json
-    `);
-
-    const upsertPred = db.prepare(`
-      INSERT INTO predictions (
-        id, match_id, lambda_home, lambda_away, p_home, p_draw, p_away,
-        p_btts_yes, p_over25, top_scores_json, score_matrix_json, elo_home, elo_away,
-        confidence, model_version, created_at, updated_at
-      ) VALUES (?, ?, 1.4, 1.2, ?, ?, ?, 0.55, 0.52, '[]', '[]', 1500, 1500, 0.75, 'live-v1', ?, ?)
-      ON CONFLICT(match_id) DO UPDATE SET
-        p_home = excluded.p_home,
-        p_draw = excluded.p_draw,
-        p_away = excluded.p_away,
-        updated_at = excluded.updated_at
     `);
 
     let syncedCount = 0;
@@ -151,7 +159,6 @@ export async function syncRealLiveMatches(): Promise<number> {
         item.teams.away.logo ?? null,
       );
 
-      const matchId = `live-apif-${f.id}`;
       const statusShort = f.status.short || "1H";
       const isFinished = ["FT", "AET", "PEN", "FINISHED"].includes(statusShort);
       const statusStr = isFinished ? "FINISHED" : "IN_PLAY";
@@ -169,41 +176,40 @@ export async function syncRealLiveMatches(): Promise<number> {
 
       const eventsJson = item.events ? JSON.stringify(item.events.slice(0, 10)) : null;
 
-      upsertMatch.run(
-        matchId,
-        leagueId,
-        String(item.league.season || 2026),
-        null,
-        f.date,
-        statusStr,
-        homeTeamId,
-        awayTeamId,
-        hg,
-        ag,
-        f.referee ?? null,
-        String(f.id),
-        elapsed,
-        liveStatusAr,
-        eventsJson,
-      );
+      const existing = findExisting.get(leagueId, homeTeamId, awayTeamId, f.date) as
+        | { id: string }
+        | undefined;
 
-      // In-play simple live odds estimation
-      const remMin = Math.max(0, 90 - Math.min(elapsed, 90));
-      const r = remMin / 90.0;
-      const pH = parseFloat((0.45 * r + (hg > ag ? 0.3 : 0.05)).toFixed(2));
-      const pD = parseFloat((0.30 * r + (hg === ag ? 0.35 : 0.1)).toFixed(2));
-      const pA = parseFloat((0.25 * r + (ag > hg ? 0.3 : 0.05)).toFixed(2));
-      const sum = pH + pD + pA || 1;
-
-      upsertPred.run(
-        `pred-${matchId}`,
-        matchId,
-        parseFloat((pH / sum).toFixed(4)),
-        parseFloat((pD / sum).toFixed(4)),
-        parseFloat((pA / sum).toFixed(4)),
-        new Date().toISOString(),
-        new Date().toISOString(),
-      );
+      if (existing) {
+        updateLive.run(
+          statusStr,
+          hg,
+          ag,
+          elapsed,
+          liveStatusAr,
+          eventsJson,
+          f.referee ?? null,
+          existing.id,
+        );
+      } else {
+        insertMatch.run(
+          `live-apif-${f.id}`,
+          leagueId,
+          String(item.league.season || new Date().getUTCFullYear()),
+          null,
+          f.date,
+          statusStr,
+          homeTeamId,
+          awayTeamId,
+          hg,
+          ag,
+          f.referee ?? null,
+          String(f.id),
+          elapsed,
+          liveStatusAr,
+          eventsJson,
+        );
+      }
 
       syncedCount++;
     }
