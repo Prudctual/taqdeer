@@ -31,5 +31,16 @@ module.exports = {
         PATH: "/home/ubuntu/.bun/bin:/usr/local/bin:/usr/bin:/bin",
       },
     },
+    {
+      name: "taqdeer-enrich",
+      script: ".venv/bin/python",
+      args: "scripts/enrichment/run_enrichment.py",
+      cwd: "/home/ubuntu/taqdeer",
+      env: {
+        PYTHONUNBUFFERED: "1",
+        PATH: "/home/ubuntu/.bun/bin:/usr/local/bin:/usr/bin:/bin",
+        DATABASE_URL: "file:./data/taqdeer.db",
+      },
+    },
   ],
 };

@@ -551,7 +551,7 @@ function ingestCsv(
       odds_open_home, odds_open_draw, odds_open_away,
       shots_home, shots_away, sot_home, sot_away,
       fouls_home, fouls_away, corners_home, corners_away,
-      referee_name
+      referee_name, yellow_home, yellow_away, red_home, red_away
     ) VALUES (
       @id, @league_id, @season, @matchday, @utc_date, @status,
       @home_team_id, @away_team_id, @home_goals, @away_goals, @source, @external_id,
@@ -559,7 +559,7 @@ function ingestCsv(
       @odds_open_home, @odds_open_draw, @odds_open_away,
       @shots_home, @shots_away, @sot_home, @sot_away,
       @fouls_home, @fouls_away, @corners_home, @corners_away,
-      @referee_name
+      @referee_name, @yellow_home, @yellow_away, @red_home, @red_away
     )
     ON CONFLICT(id) DO UPDATE SET
       home_goals=excluded.home_goals,
@@ -579,7 +579,11 @@ function ingestCsv(
       fouls_away=excluded.fouls_away,
       corners_home=excluded.corners_home,
       corners_away=excluded.corners_away,
-      referee_name=excluded.referee_name
+      referee_name=excluded.referee_name,
+      yellow_home=excluded.yellow_home,
+      yellow_away=excluded.yellow_away,
+      red_home=excluded.red_home,
+      red_away=excluded.red_away
   `);
 
   const num = (v: string | undefined) => {
@@ -635,6 +639,10 @@ function ingestCsv(
         corners_home: num(r.HC),
         corners_away: num(r.AC),
         referee_name: r.Referee ? String(r.Referee).trim() : null,
+        yellow_home: num(r.HY),
+        yellow_away: num(r.AY),
+        red_home: num(r.HR),
+        red_away: num(r.AR),
       });
       n++;
     }
@@ -689,8 +697,8 @@ function avgMatchWinnerOdds(
 }
 
 /**
- * أودز + حكّام للمباريات القادمة عبر API-Football باليوم (يعمل على الخطة المجانية).
- * يُحدَّث كل 6 ساعات كحد أقصى حفاظاً على سقف 100 طلب/يوم.
+ * أودز + حكّام للمباريات القادمة عبر API-Football باليوم (احتياطي فقط).
+ * الإثراء الأساسي من fixtures.csv عبر taqdeer-enrich — هنا حد أدنى 24 ساعة للحفاظ على الحصة.
  */
 async function syncUpcomingOddsFromApiFootball(
   db: ReturnType<typeof getDb>,
@@ -707,9 +715,9 @@ async function syncUpcomingOddsFromApiFootball(
     .get() as { value: string } | undefined;
   if (last?.value) {
     const ageH = (Date.now() - Date.parse(last.value)) / 3_600_000;
-    if (Number.isFinite(ageH) && ageH < 6) {
+    if (Number.isFinite(ageH) && ageH < 24) {
       console.log(
-        `  أودز API-Football: تخطّي (آخر مزامنة منذ ${ageH.toFixed(1)}س — الحد الأدنى 6س)`,
+        `  أودز API-Football: تخطّي (آخر مزامنة منذ ${ageH.toFixed(1)}س — الحد الأدنى 24س؛ الإثراء من CSV)`,
       );
       return 0;
     }

@@ -5,6 +5,8 @@ interface OddsMovementProps {
   oddsCurrent?: { home?: number | null; draw?: number | null; away?: number | null };
   homeTeam: string;
   awayTeam: string;
+  steamSide?: string | null;
+  steamSummary?: string | null;
 }
 
 /**
@@ -16,6 +18,8 @@ export function OddsMovementChart({
   oddsCurrent,
   homeTeam,
   awayTeam,
+  steamSide,
+  steamSummary,
 }: OddsMovementProps) {
   const oH = oddsOpen?.home;
   const oD = oddsOpen?.draw;
@@ -41,12 +45,24 @@ export function OddsMovementChart({
     <SectionCard
       title="أسعار السوق المسجلة"
       subtitle={
-        showDelta
-          ? "مقارنة بين سعر الافتتاح وآخر سعر مسجل من مصدر البيانات"
-          : "آخر أسعار مسجلة من مصدر البيانات"
+        steamSummary
+          ? steamSummary
+          : showDelta
+            ? "مقارنة بين سعر الافتتاح وآخر سعر مسجل من مصدر البيانات"
+            : "آخر أسعار مسجلة من مصدر البيانات"
       }
       quiet
     >
+      {steamSide ? (
+        <div className="mb-3 text-[11px] font-black text-accent bg-accent-dim inline-flex px-2.5 py-1 rounded-full">
+          حراك نحو{" "}
+          {steamSide === "home"
+            ? homeTeam
+            : steamSide === "away"
+              ? awayTeam
+              : "التعادل"}
+        </div>
+      ) : null}
       <div className="rounded-xl border border-line bg-surface p-4 shadow-xs">
         <div className="grid grid-cols-3 gap-2 text-center text-xs">
           {rows.map((r) => {

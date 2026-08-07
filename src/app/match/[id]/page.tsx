@@ -43,7 +43,9 @@ import {
 import { matchDisplay } from "@/lib/match-status";
 import {
   getHeadToHead,
+  getMatchAvailability,
   getMatchById,
+  getMatchEnrichment,
   getRestDays,
   getStandings,
   getStandingsAt,
@@ -260,19 +262,38 @@ export default async function MatchPage({
   // الحكم الحقيقي فقط من مصدر البيانات — لا أسماء مولّدة
   const resolvedReferee = matchDetails.refereeName;
 
+  const enrichment = getMatchEnrichment(match.id);
+  const availability = getMatchAvailability(match.id);
+  const availByName = new Map(
+    availability.map((a) => [a.playerName.toLowerCase(), a]),
+  );
+
+  const withAvail = <T extends { name: string }>(p: T) => {
+    const st = availByName.get(p.name.toLowerCase())?.status;
+    const availability =
+      st === "injured" || st === "suspended" || st === "doubtful" ? st : null;
+    return { ...p, availability };
+  };
   const homeSquad = toSquadStars(
     getTeamPlayers(match.home_id, 16),
     match.home_name_ar,
     true,
     4,
-  );
+  ).map(withAvail);
   const awaySquad = toSquadStars(
     getTeamPlayers(match.away_id, 16),
     match.away_name_ar,
     false,
     4,
-  );
+  ).map(withAvail);
   const squadStars = [...homeSquad, ...awaySquad];
+  const missingForUi = availability.map((a) => ({
+    teamId: a.teamId,
+    playerName: a.playerName,
+    status: a.status,
+    reason: a.reason,
+    isHome: a.teamId === match.home_id,
+  }));
 
   const matrixRaw = parseJson<number[][]>(match.score_matrix_json, []);
   const matrix = Array.isArray(matrixRaw) ? matrixRaw : [];
@@ -665,6 +686,22 @@ export default async function MatchPage({
         homeTeamNameAr={match.home_name_ar}
         refereeName={resolvedReferee}
         logistics={analytics?.components?.logistics as { travel_distance_km?: number; rest_days_home?: number; rest_days_away?: number; is_european_midweek?: boolean; logistics_summary?: string }}
+        weather={{
+          tempC: enrichment?.weatherTempC ?? (analytics?.components?.weather as { temp_c?: number } | undefined)?.temp_c,
+          precipMm: enrichment?.weatherPrecipMm,
+          windKmh: enrichment?.weatherWindKmh,
+          summary:
+            enrichment?.weatherSummary ??
+            (analytics?.components?.weather as { summary?: string } | undefined)?.summary ??
+            null,
+          multiplier:
+            enrichment?.weatherMultiplier ??
+            (analytics?.components?.weather as { multiplier?: number } | undefined)?.multiplier ??
+            null,
+        }}
+        refereeSummary={
+          (analytics?.components?.referee as { summary?: string } | undefined)?.summary ?? null
+        }
       />
     </div>
   );
@@ -812,6 +849,14 @@ export default async function MatchPage({
         oddsCurrent={{ home: match.oddsHome, draw: match.oddsDraw, away: match.oddsAway }}
         homeTeam={match.home_name_ar}
         awayTeam={match.away_name_ar}
+        steamSide={
+          enrichment?.steamSide ??
+          (analytics?.components?.sharp as { side?: string } | undefined)?.side ??
+          null
+        }
+        steamSummary={
+          (analytics?.components?.sharp as { summary?: string } | undefined)?.summary ?? null
+        }
       />
 
       {hasPred && match.lambda_home != null && match.lambda_away != null ? (
@@ -826,6 +871,30 @@ export default async function MatchPage({
           hasMarketOdds={match.oddsHome != null && match.oddsDraw != null && match.oddsAway != null}
           homeVenueRecord={homeVenue}
           awayVenueRecord={awayVenue}
+          enrich={{
+            weather: (analytics?.components?.weather ?? null) as {
+              applied?: boolean;
+              summary?: string | null;
+              multiplier?: number | null;
+              temp_c?: number | null;
+            } | null,
+            player_impact: (analytics?.components?.player_impact ?? null) as {
+              applied?: boolean;
+              summary?: string | null;
+            } | null,
+            referee: (analytics?.components?.referee ?? null) as {
+              applied?: boolean;
+              summary?: string | null;
+              matches_n?: number;
+              lambda_mult?: number;
+            } | null,
+            sharp: (analytics?.components?.sharp ?? null) as {
+              applied?: boolean;
+              summary?: string | null;
+              side?: string | null;
+              magnitude?: number;
+            } | null,
+          }}
         />
       ) : null}
 
@@ -1123,6 +1192,8 @@ export default async function MatchPage({
           homeTeam={match.home_name_ar}
           awayTeam={match.away_name_ar}
           players={squadStars}
+          missing={missingForUi}
+          lineupConfirmed={!!enrichment?.lineupConfirmed}
         />
       </div>
 

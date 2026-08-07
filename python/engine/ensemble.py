@@ -19,8 +19,12 @@ from .h2h_engine import evaluate_h2h_advantage
 from .league_profiles import get_league_profile
 from .logistics_engine import evaluate_logistics_and_external_factors
 from .pi_ratings import PiState, pi_expected_goals
+from .player_impact import apply_rapm_to_xg
+from .referee_engine import evaluate_referee_impact
+from .sharp_market import detect_steam, steam_confidence_bonus
 from .strengths_weaknesses import analyze_team_strengths_weaknesses
 from .tactical_matchup import evaluate_tactical_matchup
+from .weather_engine import apply_weather_to_lambdas
 
 
 Prob3 = Tuple[float, float, float]
@@ -163,6 +167,11 @@ def predict_match(
     dc_shots: Optional[DixonColesResult] = None,
     h2h_matches: Optional[list] = None,
     league_id: Optional[str] = None,
+    weather: Optional[Dict] = None,
+    home_missing: Optional[list] = None,
+    away_missing: Optional[list] = None,
+    referee_profile: Optional[Dict] = None,
+    open_odds: Optional[tuple[float, float, float]] = None,
 ) -> Dict:
     w = weights or dict(DEFAULT_WEIGHTS)
     profile = get_league_profile(league_id)
@@ -218,6 +227,28 @@ def predict_match(
     tactics = evaluate_tactical_matchup(home, away)
     lam *= float(tactics["home_lambda_mult"])
     mu *= float(tactics["away_lambda_mult"])
+
+    # طقس حقيقي (إن وُجدت قراءات) → player_impact → حكم
+    weather_res = apply_weather_to_lambdas(
+        lam,
+        mu,
+        temp_c=(weather or {}).get("temp_c"),
+        precip_mm=(weather or {}).get("precip_mm"),
+        wind_kmh=(weather or {}).get("wind_kmh"),
+        multiplier=(weather or {}).get("multiplier"),
+    )
+    lam = float(weather_res["lambda_home"])
+    mu = float(weather_res["lambda_away"])
+
+    player_res = apply_rapm_to_xg(lam, mu, home_missing, away_missing)
+    lam = float(player_res["lambda_home"])
+    mu = float(player_res["lambda_away"])
+
+    referee_res = evaluate_referee_impact(referee_profile)
+    lam *= float(referee_res["lambda_mult"])
+    mu *= float(referee_res["lambda_mult"])
+
+    steam_res = detect_steam(open_odds, market_odds)
 
     # ملخص الراحة للعرض فقط — خصم الإرهاق الكمي مطبق مسبقاً في form_lambda_adjust
     logistics = evaluate_logistics_and_external_factors(
@@ -331,6 +362,14 @@ def predict_match(
         abs(dc_p[0] - elo_p[0]) + abs(dc_p[0] - pi_p[0]) + abs(dc_p[0] - form_p[0])
     ) / 3
     confidence = float(min(0.95, max(0.18, 0.55 * conf + 0.35 * max(agree, 0))))
+    model_side = (
+        "home"
+        if calibrated[0] >= calibrated[1] and calibrated[0] >= calibrated[2]
+        else ("draw" if calibrated[1] >= calibrated[2] else "away")
+    )
+    confidence = float(
+        min(0.95, confidence + steam_confidence_bonus(steam_res, model_side))
+    )
 
     p_1x = float(calibrated[0] + calibrated[1])
     p_x2 = float(calibrated[1] + calibrated[2])
@@ -373,6 +412,10 @@ def predict_match(
             "h2h": h2h_res,
             "tactics": tactics,
             "logistics": logistics,
+            "weather": weather_res,
+            "player_impact": player_res,
+            "referee": referee_res,
+            "sharp": steam_res,
             "home_sw": sw_home,
             "away_sw": sw_away,
             "blended_pre_cal": blended,

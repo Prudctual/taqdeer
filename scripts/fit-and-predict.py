@@ -41,6 +41,92 @@ def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def load_live_enrichment(conn: sqlite3.Connection, match_id: str, referee_name: str | None) -> dict:
+    """إشارات حية للمباريات القادمة فقط — لا تُستخدم في walk-forward التاريخي."""
+    out: dict = {
+        "weather": None,
+        "home_missing": None,
+        "away_missing": None,
+        "referee_profile": None,
+        "open_odds": None,
+    }
+    mrow = conn.execute(
+        """
+        SELECT odds_open_home, odds_open_draw, odds_open_away, home_team_id, away_team_id
+        FROM matches WHERE id=?
+        """,
+        (match_id,),
+    ).fetchone()
+    if mrow and mrow["odds_open_home"] and mrow["odds_open_draw"] and mrow["odds_open_away"]:
+        out["open_odds"] = (
+            float(mrow["odds_open_home"]),
+            float(mrow["odds_open_draw"]),
+            float(mrow["odds_open_away"]),
+        )
+
+    try:
+        erow = conn.execute(
+            """
+            SELECT weather_temp_c, weather_precip_mm, weather_wind_kmh, weather_multiplier
+            FROM match_enrichment WHERE match_id=?
+            """,
+            (match_id,),
+        ).fetchone()
+    except sqlite3.OperationalError:
+        erow = None
+
+    if erow and (
+        erow["weather_temp_c"] is not None
+        or erow["weather_precip_mm"] is not None
+        or erow["weather_wind_kmh"] is not None
+        or erow["weather_multiplier"] is not None
+    ):
+        out["weather"] = {
+            "temp_c": erow["weather_temp_c"],
+            "precip_mm": erow["weather_precip_mm"],
+            "wind_kmh": erow["weather_wind_kmh"],
+            "multiplier": erow["weather_multiplier"],
+        }
+
+    try:
+        missing = conn.execute(
+            """
+            SELECT team_id, player_name, position, status, reason
+            FROM player_availability WHERE match_id=?
+            """,
+            (match_id,),
+        ).fetchall()
+    except sqlite3.OperationalError:
+        missing = []
+    if missing and mrow:
+        out["home_missing"] = [
+            dict(r)
+            for r in missing
+            if r["team_id"] == mrow["home_team_id"]
+        ]
+        out["away_missing"] = [
+            dict(r)
+            for r in missing
+            if r["team_id"] == mrow["away_team_id"]
+        ]
+
+    if referee_name:
+        try:
+            pref = conn.execute(
+                """
+                SELECT name, matches_n, avg_yellows, avg_reds, strictness
+                FROM referee_profiles WHERE name=?
+                """,
+                (referee_name,),
+            ).fetchone()
+        except sqlite3.OperationalError:
+            pref = None
+        if pref:
+            out["referee_profile"] = dict(pref)
+
+    return out
+
+
 def ensure_columns(conn: sqlite3.Connection) -> None:
     cols = {r[1] for r in conn.execute("PRAGMA table_info(matches)")}
     for name, typ in [
@@ -312,7 +398,8 @@ def main() -> None:
         targets = conn.execute(
             """
             SELECT id, home_team_id, away_team_id, odds_home, odds_draw, odds_away,
-                   status, season
+                   odds_open_home, odds_open_draw, odds_open_away,
+                   referee_name, status, season
             FROM matches
             WHERE league_id=?
               AND status IN ('SCHEDULED','TIMED','IN_PLAY','PAUSED')
@@ -756,6 +843,7 @@ def main() -> None:
                     float(t["odds_draw"]),
                     float(t["odds_away"]),
                 )
+            enrich = load_live_enrichment(conn, t["id"], t["referee_name"])
             pred = predict_match(
                 home=t["home_team_id"],
                 away=t["away_team_id"],
@@ -771,6 +859,11 @@ def main() -> None:
                 dc_shots=model_shots,
                 h2h_matches=h2h_before(t["home_team_id"], t["away_team_id"]),
                 league_id=lid,
+                weather=enrich["weather"],
+                home_missing=enrich["home_missing"],
+                away_missing=enrich["away_missing"],
+                referee_profile=enrich["referee_profile"],
+                open_odds=enrich["open_odds"],
             )
 
             write_prediction(

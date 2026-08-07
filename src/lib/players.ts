@@ -103,6 +103,8 @@ export type SquadStar = {
   photoUrl?: string;
   team: string;
   isHome: boolean;
+  /** حالة غياب حقيقية من الإثراء إن وُجدت */
+  availability?: "injured" | "suspended" | "doubtful" | null;
 };
 
 export function toSquadStars(

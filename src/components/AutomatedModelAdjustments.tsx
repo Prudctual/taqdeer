@@ -10,6 +10,33 @@ interface AdjustmentItem {
   positive?: boolean;
 }
 
+type EnrichSignals = {
+  weather?: {
+    applied?: boolean;
+    summary?: string | null;
+    multiplier?: number | null;
+    temp_c?: number | null;
+  } | null;
+  player_impact?: {
+    applied?: boolean;
+    summary?: string | null;
+    home?: { n?: number };
+    away?: { n?: number };
+  } | null;
+  referee?: {
+    applied?: boolean;
+    summary?: string | null;
+    matches_n?: number;
+    lambda_mult?: number;
+  } | null;
+  sharp?: {
+    applied?: boolean;
+    summary?: string | null;
+    side?: string | null;
+    magnitude?: number;
+  } | null;
+};
+
 interface AutomatedModelAdjustmentsProps {
   homeTeam: string;
   awayTeam: string;
@@ -22,92 +49,115 @@ interface AutomatedModelAdjustmentsProps {
   hasMarketOdds?: boolean;
   homeVenueRecord?: { played: number; w?: number; d?: number; l?: number } | null;
   awayVenueRecord?: { played: number; w?: number; d?: number; l?: number } | null;
+  /** إشارات إثراء حقيقية من analytics.components إن وُجدت */
+  enrich?: EnrichSignals | null;
 }
 
 /**
- * وصف صادق للمحركات المدمجة فعلاً في النموذج — لا ادعاءات عن معاملات
- * (حكم، طقس…) غير موجودة في الحساب.
+ * بطاقات صادقة: محركات أساسية + إثراء حي (طقس/غيابات/حكم/حراك) عند توفره فقط.
  */
 export function AutomatedModelAdjustments({
   homeTeam,
   awayTeam,
-  homeP,
-  drawP,
-  awayP,
   lambdaHome,
   lambdaAway,
   hasMarketOdds,
   homeVenueRecord,
-  awayVenueRecord,
+  enrich,
 }: AutomatedModelAdjustmentsProps) {
+  const weather = enrich?.weather;
+  const players = enrich?.player_impact;
+  const referee = enrich?.referee;
+  const sharp = enrich?.sharp;
+
   const adjustments: AdjustmentItem[] = [
     {
       Icon: HomeIcon,
-      label: "أفضلية الأرض (Dixon-Coles Home Advantage)",
+      label: "أفضلية الأرض (Dixon-Coles)",
       value:
         homeVenueRecord && homeVenueRecord.played > 0
           ? `سجل ${homeTeam} على أرضه: ${homeVenueRecord.w ?? 0} فوز في ${homeVenueRecord.played} مباراة`
-          : "تُقدَّر أفضلية الأرض لكل دوري من واقع نتائجه التاريخية",
-      impact: `مدمجة في λ المضيف (${lambdaHome.toFixed(2)})`,
-      detail: `معامل أفضلية الأرض يُتعلَّم رياضياً لكل دوري ضمن نموذج Dixon-Coles ويرفع شدة أهداف المضيف مباشرة.`,
+          : "تُقدَّر أفضلية الأرض لكل دوري من نتائجه التاريخية",
+      impact: `λ المضيف ${lambdaHome.toFixed(2)} · الضيف ${lambdaAway.toFixed(2)}`,
+      detail: "معامل أفضلية الأرض يُتعلَّم لكل دوري ضمن Dixon-Coles.",
       positive: true,
     },
     {
       Icon: ZapIcon,
-      label: "مزج أسعار السوق (Market Blend)",
+      label: "مزج أسعار السوق",
       value: hasMarketOdds
-        ? "أودز إغلاق حقيقية متوفرة — مُزجت كمكوّن في التوقع بعد إزالة هامش المراهن"
-        : "لا أودز سوق متاحة لهذه المباراة — التوقع من المحركات الإحصائية فقط",
-      impact: hasMarketOdds ? "وزن يُتعلَّم لكل دوري" : "غير مفعّل",
-      detail:
-        "عند توفر أسعار السوق تُحوَّل لاحتمالات نقية (بطريقة Power مع تصحيح انحياز المرشح/البعيد) وتدخل المزيج بوزن مُتعلَّم.",
+        ? "أودز حقيقية مُزجت بعد إزالة هامش المراهن"
+        : "لا أودز سوق — التوقع من المحركات الإحصائية فقط",
+      impact: hasMarketOdds ? "وزن مُتعلَّم" : "غير مفعّل",
+      detail: "عند توفر الأسعار تُحوَّل لاحتمالات نقية وتدخل المزيج.",
       positive: !!hasMarketOdds,
     },
     {
-      Icon: RefereeIcon,
-      label: "الفورمة وأيام الراحة (Form & Rest)",
-      value:
-        awayVenueRecord && awayVenueRecord.played > 0
-          ? `سجل ${awayTeam} خارج أرضه: ${awayVenueRecord.w ?? 0} فوز في ${awayVenueRecord.played} مباراة`
-          : "نافذة آخر 5 مباريات: نقاط وفارق أهداف وتسديدات",
-      impact: "تعديل λ في نطاق ×0.70–1.35",
-      detail:
-        "الفورمة الأخيرة تعدّل شدة الأهداف المتوقعة صعوداً أو هبوطاً، مع خصم إرهاق عند راحة أقل من 3.5 يوم.",
-      positive: true,
+      Icon: WeatherIcon,
+      label: "الطقس (Open-Meteo)",
+      value: weather?.summary
+        ? weather.summary
+        : weather?.temp_c != null
+          ? `${weather.temp_c.toFixed(0)}°C`
+          : "لا قراءة طقس لهذه المباراة بعد",
+      impact:
+        weather?.multiplier != null
+          ? `×${Number(weather.multiplier).toFixed(3)}${weather.applied ? " مطبّق على λ" : ""}`
+          : "غير مفعّل",
+      detail: "يُجلب من إحداثيات الملعب؛ التعديل ضمن ±8% عند مطر/رياح/حرارة قصوى فقط.",
+      positive: !!weather?.applied,
     },
     {
-      Icon: WeatherIcon,
-      label: "المعايرة الحرارية (Temperature Calibration)",
-      value: "تُعاير الاحتمالات النهائية لكل دوري على بيانات اختبار مستقلة",
-      impact: "احتمالات صادقة قابلة للمقارنة",
-      detail:
-        "المعايرة تمنع الثقة الزائدة: دوري بلا إشارة واضحة تُسطَّح احتمالاته تلقائياً بدل ادعاء يقين زائف.",
-      positive: true,
+      Icon: RefereeIcon,
+      label: "الغيابات والتشكيلات",
+      value: players?.summary
+        ? players.summary
+        : `لا غيابات مسجّلة · ${awayTeam} / ${homeTeam}`,
+      impact: players?.applied ? "تعديل RAPM على λ" : "غير مفعّل",
+      detail: "مصدر Sofascore (missingPlayers) — بلا قوائم مصابة مخترعة.",
+      positive: !!players?.applied,
+    },
+    {
+      Icon: RefereeIcon,
+      label: "ملف الحكم",
+      value: referee?.summary ?? "لا ملف حكم كافٍ (أقل من 8 مباريات) أو لم يُعلن",
+      impact:
+        referee?.applied && referee.lambda_mult != null
+          ? `×${Number(referee.lambda_mult).toFixed(3)} على λ`
+          : "عرض فقط",
+      detail: "يُبنى من بطاقات المباريات المنتهية محلياً — بلا تعديل عند عيّنة صغيرة.",
+      positive: !!referee?.applied,
+    },
+    {
+      Icon: ZapIcon,
+      label: "حراك السوق (Steam)",
+      value: sharp?.summary ?? "لا حراك يُذكر بين الافتتاح والحالي",
+      impact: sharp?.applied ? "مكافأة ثقة عند التوافق" : "غير مفعّل",
+      detail: "من تغيّر الاحتمال الضمني بين أودز الافتتاح والحالي — بلا اختراع EV.",
+      positive: !!sharp?.applied,
     },
   ];
 
   return (
     <div className="bg-surface p-6 sm:p-8 space-y-6 rounded-2xl border-0 shadow-none">
-      {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line pb-4">
         <div className="flex items-center gap-3">
           <h3 className="text-base font-black text-ink tracking-tight leading-snug">
-            المحركات والمعاملات المحسوبة آلياً (ALGORITHMIC VECTORS)
+            المحركات والإثراء الحي
           </h3>
         </div>
         <span className="text-xs font-black text-accent bg-accent-dim px-4 py-1.5 rounded-full border-0">
-          حساب آلي مستقل
+          بيانات حقيقية فقط
         </span>
       </div>
 
       <p className="text-xs sm:text-sm font-medium text-muted leading-relaxed">
-        جميع الأرقام أدناه مستخرجة <strong className="text-ink font-black">أوتوماتيكياً بالكامل</strong> من محركات «تقدير» الإحصائية بدون أي تدخل يدوي:
+        ما لا يتوفر من مصدر حي يُعرض صراحةً كـ«غير مفعّل» — لا قيم افتراضية مزيفة.
       </p>
 
-      {/* Grid of prominent borderless inner cards */}
       <div className="grid gap-5 sm:grid-cols-2">
         {adjustments.map((adj, i) => {
-          const isNeutral = adj.impact.includes("غير مفعّل");
+          const isNeutral = adj.impact.includes("غير مفعّل") || adj.impact.includes("عرض فقط");
           const IconComp = adj.Icon;
           return (
             <div
@@ -115,68 +165,29 @@ export function AutomatedModelAdjustments({
               className="press-scale group rounded-2xl border-0 bg-panel/70 p-5 flex flex-col justify-between space-y-3.5 shadow-none transition-all duration-140 active:scale-[0.98]"
             >
               <div className="space-y-3">
-                {/* Title & Badge */}
                 <div className="flex items-start justify-between gap-3">
                   <span className="text-sm font-black text-ink flex items-center gap-2.5 leading-snug">
-                    <span className="p-1.5 rounded-lg bg-surface text-ink">
-                      <IconComp size={18} />
-                    </span>
-                    <span>{adj.label}</span>
+                    <IconComp className="h-4 w-4 shrink-0 text-accent" />
+                    {adj.label}
                   </span>
-
-                  {/* Impact Badge */}
                   <span
-                    className={`shrink-0 text-xs font-extrabold tabular tracking-wide px-3.5 py-1 rounded-full border-0 ${
+                    className={`text-[10px] font-black px-2 py-1 rounded-full whitespace-nowrap ${
                       isNeutral
                         ? "bg-panel text-muted"
-                        : "bg-accent text-on-fill"
+                        : adj.positive
+                          ? "bg-success-dim text-success"
+                          : "bg-accent-dim text-accent"
                     }`}
                   >
                     {adj.impact}
                   </span>
                 </div>
-
-                {/* Value Text */}
-                <div className="bg-surface rounded-xl px-3.5 py-2 border-0">
-                  <p className="text-xs sm:text-sm font-black text-ink leading-snug">
-                    {adj.value}
-                  </p>
-                </div>
-              </div>
-
-              {/* Detail Text - Solid Panel Background with Text */}
-              <div className="rounded-xl bg-surface p-3.5 text-muted border-0">
-                <p className="text-xs font-semibold leading-relaxed text-ink">
-                  {adj.detail}
-                </p>
+                <p className="text-xs font-bold text-ink leading-relaxed">{adj.value}</p>
+                <p className="text-[11px] text-muted leading-relaxed">{adj.detail}</p>
               </div>
             </div>
           );
         })}
-      </div>
-
-      {/* Summary Box */}
-      <div className="rounded-2xl border-0 bg-panel/80 p-5 flex flex-wrap items-center justify-between gap-4 shadow-none">
-        <div className="space-y-1">
-          <span className="block text-sm font-black text-ink">
-            النتيجة التلقائية النهائية المحسوبة من مزيج المحركات:
-          </span>
-          <span className="text-xs sm:text-sm text-muted font-medium">
-            أهداف متوقعة λ: <strong className="text-ink font-black">{homeTeam} {lambdaHome.toFixed(2)}</strong> - <strong className="text-ink font-black">{lambdaAway.toFixed(2)} {awayTeam}</strong>
-          </span>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2.5 text-xs font-black">
-          <span className="rounded-full bg-home text-on-fill px-4 py-2 border-0 font-mono tracking-wide text-xs">
-            فوز 1: {Math.round(homeP * 100)}%
-          </span>
-          <span className="rounded-full bg-draw text-draw-ink px-4 py-2 border-0 font-mono tracking-wide text-xs">
-            تعادل X: {Math.round(drawP * 100)}%
-          </span>
-          <span className="rounded-full bg-away text-on-fill px-4 py-2 border-0 font-mono tracking-wide text-xs">
-            فوز 2: {Math.round(awayP * 100)}%
-          </span>
-        </div>
       </div>
     </div>
   );

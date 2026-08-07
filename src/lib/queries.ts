@@ -1484,7 +1484,97 @@ export const getUpcomingSnapshotMatches = cache((perLeague = 20): MatchCard[] =>
   }
 });
 
+export type MatchEnrichment = {
+  weatherTempC: number | null;
+  weatherPrecipMm: number | null;
+  weatherWindKmh: number | null;
+  weatherMultiplier: number | null;
+  weatherSummary: string | null;
+  lineupConfirmed: boolean;
+  lineupJson: string | null;
+  steamSide: string | null;
+  steamMagnitude: number | null;
+  sofascoreEventId: string | null;
+  updatedAt: string | null;
+};
 
+export type PlayerAvailabilityRow = {
+  teamId: string;
+  playerName: string;
+  position: string | null;
+  status: string;
+  reason: string | null;
+};
 
+export function getMatchEnrichment(matchId: string): MatchEnrichment | null {
+  try {
+    const db = getDb();
+    const row = db
+      .prepare(
+        `SELECT weather_temp_c, weather_precip_mm, weather_wind_kmh, weather_multiplier,
+                weather_summary, lineup_confirmed, lineup_json, steam_side, steam_magnitude,
+                sofascore_event_id, updated_at
+         FROM match_enrichment WHERE match_id = ?`,
+      )
+      .get(matchId) as
+      | {
+          weather_temp_c: number | null;
+          weather_precip_mm: number | null;
+          weather_wind_kmh: number | null;
+          weather_multiplier: number | null;
+          weather_summary: string | null;
+          lineup_confirmed: number | null;
+          lineup_json: string | null;
+          steam_side: string | null;
+          steam_magnitude: number | null;
+          sofascore_event_id: string | null;
+          updated_at: string | null;
+        }
+      | undefined;
+    if (!row) return null;
+    return {
+      weatherTempC: row.weather_temp_c,
+      weatherPrecipMm: row.weather_precip_mm,
+      weatherWindKmh: row.weather_wind_kmh,
+      weatherMultiplier: row.weather_multiplier,
+      weatherSummary: row.weather_summary,
+      lineupConfirmed: !!row.lineup_confirmed,
+      lineupJson: row.lineup_json,
+      steamSide: row.steam_side,
+      steamMagnitude: row.steam_magnitude,
+      sofascoreEventId: row.sofascore_event_id,
+      updatedAt: row.updated_at,
+    };
+  } catch {
+    return null;
+  }
+}
 
+export function getMatchAvailability(matchId: string): PlayerAvailabilityRow[] {
+  try {
+    const db = getDb();
+    const rows = db
+      .prepare(
+        `SELECT team_id, player_name, position, status, reason
+         FROM player_availability WHERE match_id = ?
+         ORDER BY status, player_name`,
+      )
+      .all(matchId) as Array<{
+      team_id: string;
+      player_name: string;
+      position: string | null;
+      status: string;
+      reason: string | null;
+    }>;
+    return rows.map((r) => ({
+      teamId: r.team_id,
+      playerName: r.player_name,
+      position: r.position,
+      status: r.status,
+      reason: r.reason,
+    }));
+  } catch {
+    return [];
+  }
+}
 

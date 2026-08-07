@@ -238,6 +238,10 @@ function migrate(db: Database.Database) {
     ["odds_open_draw", "REAL"],
     ["odds_open_away", "REAL"],
     ["referee_name", "TEXT"],
+    ["yellow_home", "INTEGER"],
+    ["yellow_away", "INTEGER"],
+    ["red_home", "INTEGER"],
+    ["red_away", "INTEGER"],
     ["minute", "INTEGER"],
     ["live_status_ar", "TEXT"],
     ["live_events_json", "TEXT"],
@@ -309,6 +313,57 @@ function migrate(db: Database.Database) {
       UNIQUE(team_id, name_en)
     );
     CREATE INDEX IF NOT EXISTS idx_players_team ON players(team_id);
+
+    CREATE TABLE IF NOT EXISTS match_enrichment (
+      match_id TEXT PRIMARY KEY REFERENCES matches(id) ON DELETE CASCADE,
+      weather_temp_c REAL,
+      weather_precip_mm REAL,
+      weather_wind_kmh REAL,
+      weather_multiplier REAL,
+      weather_summary TEXT,
+      lineup_json TEXT,
+      lineup_confirmed INTEGER NOT NULL DEFAULT 0,
+      steam_side TEXT,
+      steam_magnitude REAL,
+      sofascore_event_id TEXT,
+      source TEXT,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS player_availability (
+      id TEXT PRIMARY KEY,
+      team_id TEXT NOT NULL REFERENCES teams(id),
+      match_id TEXT REFERENCES matches(id) ON DELETE CASCADE,
+      player_name TEXT NOT NULL,
+      position TEXT,
+      status TEXT NOT NULL,
+      reason TEXT,
+      source TEXT NOT NULL DEFAULT 'sofascore',
+      as_of TEXT NOT NULL,
+      UNIQUE(team_id, match_id, player_name)
+    );
+    CREATE INDEX IF NOT EXISTS idx_player_avail_team ON player_availability(team_id);
+    CREATE INDEX IF NOT EXISTS idx_player_avail_match ON player_availability(match_id);
+
+    CREATE TABLE IF NOT EXISTS referee_profiles (
+      name TEXT PRIMARY KEY,
+      matches_n INTEGER NOT NULL DEFAULT 0,
+      avg_yellows REAL NOT NULL DEFAULT 0,
+      avg_reds REAL NOT NULL DEFAULT 0,
+      strictness REAL NOT NULL DEFAULT 1.0,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS external_id_map (
+      source TEXT NOT NULL,
+      entity_type TEXT NOT NULL,
+      local_id TEXT NOT NULL,
+      external_id TEXT NOT NULL,
+      label TEXT,
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY (source, entity_type, local_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_ext_map_ext ON external_id_map(source, entity_type, external_id);
   `);
 }
 

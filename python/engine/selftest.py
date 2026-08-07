@@ -9,8 +9,12 @@ from .form import FormMatch, TeamForm, form_lambda_adjust, rolling_form
 from .h2h_engine import evaluate_h2h_advantage
 from .logistics_engine import evaluate_logistics_and_external_factors
 from .pi_ratings import PiMatch, update_pi
+from .player_impact import apply_rapm_to_xg
+from .referee_engine import evaluate_referee_impact
+from .sharp_market import detect_steam, steam_confidence_bonus
 from .strengths_weaknesses import analyze_team_strengths_weaknesses
 from .tactical_matchup import evaluate_tactical_matchup
+from .weather_engine import apply_weather_to_lambdas, weather_goal_multiplier
 from .xg_engine import compute_advanced_metrics
 
 
@@ -147,10 +151,29 @@ def main() -> None:
         h2h_matches=[
             {"home_team": "teamA", "away_team": "teamB", "home_goals": 2, "away_goals": 0},
         ],
+        weather={"temp_c": 10.0, "precip_mm": 6.0, "wind_kmh": 20.0},
+        home_missing=[{"player_name": "Star FW", "position": "F", "status": "injured"}],
+        referee_profile={"matches_n": 20, "avg_yellows": 5.5, "avg_reds": 0.2, "strictness": 1.4},
+        open_odds=(2.10, 3.40, 3.50),
     )
     assert 0.0 < full_pred["p_home"] < 1.0 and abs(full_pred["p_home"] + full_pred["p_draw"] + full_pred["p_away"] - 1.0) < 1e-5
     assert full_pred["xpts_home"] > 0 and full_pred["xpts_away"] > 0
     assert full_pred["components"]["h2h"]["h2h_matches_count"] == 1
+    assert full_pred["components"]["weather"]["multiplier"] is not None
+    assert full_pred["components"]["player_impact"]["applied"]
+    assert full_pred["components"]["referee"]["matches_n"] == 20
+
+    # 14. محركات الإثراء منفردة
+    assert weather_goal_multiplier(temp_c=18.0, precip_mm=0.0, wind_kmh=10.0) == 1.0
+    w = apply_weather_to_lambdas(1.5, 1.2, precip_mm=9.0)
+    assert w["applied"] and w["lambda_home"] < 1.5
+    rapm = apply_rapm_to_xg(1.5, 1.2, [{"position": "F", "status": "injured"}], [])
+    assert rapm["lambda_home"] < 1.5
+    ref = evaluate_referee_impact({"matches_n": 3, "avg_yellows": 6.0, "strictness": 1.5})
+    assert not ref["applied"]
+    steam = detect_steam((2.5, 3.3, 2.8), (2.1, 3.3, 3.4))
+    assert steam["applied"] and steam["side"] == "home"
+    assert steam_confidence_bonus(steam, "home") > 0
 
     print("selftest ok — all mathematical engine components verified cleanly!")
 
