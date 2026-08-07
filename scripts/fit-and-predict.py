@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Pitchlab v2: Dixon-Coles + Pi-ratings + Elo + Form + Market + temperature calibration."""
+"""Taqdeer ensemble-v3: Dixon-Coles + Pi + Elo + Form + Market + temperature calibration."""
 
 from __future__ import annotations
 
@@ -23,6 +23,7 @@ from engine.calibrate import apply_temperature, fit_temperature, odds_to_probs  
 from engine.dixon_coles import MatchObs, fit_dixon_coles, top_scores  # noqa: E402
 from engine.elo import EloMatch, update_elo  # noqa: E402
 from engine.ensemble import (  # noqa: E402
+    DEFAULT_WEIGHTS,
     blend_components,
     fit_weights,
     predict_match,
@@ -200,8 +201,172 @@ def empty_form() -> TeamForm:
     return TeamForm(0, 0, 0, 0, 0, 0, 0)
 
 
+def _row_ppda(m, side: str) -> float | None:
+    """Read stored ppda_* or compute shot-proxy PPDA from match stats."""
+    key = f"ppda_{side}"
+    try:
+        v = m[key]
+        if v is not None:
+            return float(v)
+    except (IndexError, KeyError):
+        pass
+    if side == "home":
+        if m["shots_home"] is None and m["fouls_home"] is None:
+            return None
+        return float(
+            compute_advanced_metrics(
+                int(m["home_goals"]),
+                int(m["away_goals"]),
+                m["shots_home"],
+                m["shots_away"],
+                m["sot_home"],
+                m["sot_away"],
+                m["fouls_home"],
+                m["fouls_away"],
+                m["corners_home"],
+                m["corners_away"],
+            )["ppda_home"]
+        )
+    if m["shots_away"] is None and m["fouls_away"] is None:
+        return None
+    return float(
+        compute_advanced_metrics(
+            int(m["home_goals"]),
+            int(m["away_goals"]),
+            m["shots_home"],
+            m["shots_away"],
+            m["sot_home"],
+            m["sot_away"],
+            m["fouls_home"],
+            m["fouls_away"],
+            m["corners_home"],
+            m["corners_away"],
+        )["ppda_away"]
+    )
+
+
+def rolling_team_ppda(
+    finished: list, team_id: str, *, last_n: int = 12
+) -> tuple[float | None, int]:
+    """Mean proxy PPDA for a team over its last N finished matches with data."""
+    vals: list[float] = []
+    for m in reversed(finished):
+        if m["home_team_id"] == team_id:
+            v = _row_ppda(m, "home")
+        elif m["away_team_id"] == team_id:
+            v = _row_ppda(m, "away")
+        else:
+            continue
+        if v is not None:
+            vals.append(v)
+        if len(vals) >= last_n:
+            break
+    if not vals:
+        return None, 0
+    return sum(vals) / len(vals), len(vals)
+
+
+def load_fit_params(conn: sqlite3.Connection, league_id: str) -> tuple[dict, float]:
+    """Load last fitted blend weights + temperature for a league (else defaults)."""
+    row = conn.execute(
+        "SELECT value FROM app_meta WHERE key=?",
+        (f"fit_params_{league_id}",),
+    ).fetchone()
+    if not row or not row["value"]:
+        return dict(DEFAULT_WEIGHTS), 1.0
+    try:
+        data = json.loads(row["value"])
+        weights = data.get("weights") or DEFAULT_WEIGHTS
+        temp = float(data.get("temperature") or 1.0)
+        return {k: float(weights.get(k, DEFAULT_WEIGHTS[k])) for k in DEFAULT_WEIGHTS}, temp
+    except Exception:
+        return dict(DEFAULT_WEIGHTS), 1.0
+
+
+def save_fit_params(
+    conn: sqlite3.Connection,
+    league_id: str,
+    weights: dict | None,
+    temperature: float,
+) -> None:
+    payload = {
+        "weights": weights or DEFAULT_WEIGHTS,
+        "temperature": float(temperature),
+        "model_version": MODEL_VERSION,
+        "updated_at": now_iso(),
+    }
+    conn.execute(
+        """
+        INSERT INTO app_meta(key, value) VALUES(?, ?)
+        ON CONFLICT(key) DO UPDATE SET value=excluded.value
+        """,
+        (f"fit_params_{league_id}", json.dumps(payload)),
+    )
+
+
+def build_obs_shots(rows, obs_prefix):
+    """Scaled shot-proxy pseudo-goals for parallel DC (needs ≥300 shot matches)."""
+
+    def shot_value(shots: float, sot: float) -> float:
+        return 0.30 * sot + 0.04 * max(shots - sot, 0.0)
+
+    sh = [
+        m
+        for m in rows
+        if m["shots_home"] is not None
+        and m["sot_home"] is not None
+        and m["shots_away"] is not None
+        and m["sot_away"] is not None
+    ]
+    if len(sh) < 300:
+        return None
+    tot_g = sum(m["home_goals"] + m["away_goals"] for m in sh)
+    tot_v = sum(
+        shot_value(m["shots_home"], m["sot_home"])
+        + shot_value(m["shots_away"], m["sot_away"])
+        for m in sh
+    )
+    scale = tot_g / tot_v if tot_v > 0 else 1.0
+
+    def pseudo(g: int, shots, sot) -> float:
+        if shots is None or sot is None:
+            return float(g)
+        return 0.5 * g + 0.5 * scale * shot_value(shots, sot)
+
+    return [
+        MatchObs(
+            home=o.home,
+            away=o.away,
+            home_goals=pseudo(m["home_goals"], m["shots_home"], m["sot_home"]),
+            away_goals=pseudo(m["away_goals"], m["shots_away"], m["sot_away"]),
+            days_ago=o.days_ago,
+        )
+        for o, m in zip(obs_prefix, rows)
+    ]
+
+
+def h2h_list_from_finished(
+    finished: list, home_id: str, away_id: str, *, limit: int = 5
+) -> list:
+    key = frozenset((home_id, away_id))
+    rows = [
+        m
+        for m in finished
+        if frozenset((m["home_team_id"], m["away_team_id"])) == key
+    ]
+    return [
+        {
+            "home_team": r["home_team_id"],
+            "away_team": r["away_team_id"],
+            "home_goals": int(r["home_goals"]),
+            "away_goals": int(r["away_goals"]),
+        }
+        for r in rows[-limit:]
+    ]
+
+
 def repredict_flagged(conn: sqlite3.Connection) -> int:
-    """إعادة توقع ضيقة للمباريات المؤكَّد تشكيلتها — بلا walk-forward كامل."""
+    """إعادة توقع ضيقة للمباريات المؤكَّد تشكيلتها — بأوزان/حرارة آخر fit كاملة الثراء."""
     row = conn.execute(
         "SELECT value FROM app_meta WHERE key='enrich_repredict_matches'"
     ).fetchone()
@@ -231,7 +396,8 @@ def repredict_flagged(conn: sqlite3.Connection) -> int:
             SELECT id, home_team_id, away_team_id, home_goals, away_goals, utc_date,
                    odds_home, odds_draw, odds_away,
                    shots_home, shots_away, sot_home, sot_away,
-                   fouls_home, fouls_away, corners_home, corners_away, season
+                   fouls_home, fouls_away, corners_home, corners_away,
+                   ppda_home, ppda_away, season
             FROM matches
             WHERE league_id = ? AND status = 'FINISHED'
               AND home_goals IS NOT NULL AND away_goals IS NOT NULL
@@ -241,10 +407,9 @@ def repredict_flagged(conn: sqlite3.Connection) -> int:
         ).fetchall()
         if len(finished) < 20:
             continue
-        # إعادة استخدام مسار التدريب المبسط عبر استدعاء predict بعد fit سريع
-        # — نحدّث predictions لهذه الـids فقط
         train = finished[-MAX_TRAIN:]
         ref = datetime.now(timezone.utc)
+        weights, temperature = load_fit_params(conn, lid)
 
         def days_ago(utc: str) -> float:
             try:
@@ -266,6 +431,12 @@ def repredict_flagged(conn: sqlite3.Connection) -> int:
             for m in train
         ]
         model = fit_dixon_coles(obs, half_life_days=HALF_LIFE, league_id=lid)
+        shots_obs = build_obs_shots(train, obs)
+        model_shots = (
+            fit_dixon_coles(shots_obs, half_life_days=HALF_LIFE, league_id=lid)
+            if shots_obs
+            else None
+        )
 
         elo_matches = [
             EloMatch(
@@ -294,6 +465,8 @@ def repredict_flagged(conn: sqlite3.Connection) -> int:
                 away=m["away_team_id"],
                 home_goals=int(m["home_goals"]),
                 away_goals=int(m["away_goals"]),
+                shots_home=m["shots_home"],
+                shots_away=m["shots_away"],
                 sot_home=m["sot_home"],
                 sot_away=m["sot_away"],
                 date=m["utc_date"],
@@ -307,6 +480,8 @@ def repredict_flagged(conn: sqlite3.Connection) -> int:
             if t["odds_home"] and t["odds_draw"] and t["odds_away"]:
                 odds = (float(t["odds_home"]), float(t["odds_draw"]), float(t["odds_away"]))
             enrich = load_live_enrichment(conn, t["id"], t["referee_name"])
+            ppda_h, ppda_hn = rolling_team_ppda(finished, t["home_team_id"])
+            ppda_a, ppda_an = rolling_team_ppda(finished, t["away_team_id"])
             pred = predict_match(
                 home=t["home_team_id"],
                 away=t["away_team_id"],
@@ -317,14 +492,23 @@ def repredict_flagged(conn: sqlite3.Connection) -> int:
                 form_home=forms.get(t["home_team_id"], empty_form()),
                 form_away=forms.get(t["away_team_id"], empty_form()),
                 market_odds=odds,
-                temperature=1.0,
-                dc_shots=None,
+                temperature=temperature,
+                weights=weights,
+                dc_shots=model_shots,
+                h2h_matches=h2h_list_from_finished(
+                    finished, t["home_team_id"], t["away_team_id"]
+                ),
                 league_id=lid,
                 weather=enrich["weather"],
                 home_missing=enrich["home_missing"],
                 away_missing=enrich["away_missing"],
                 referee_profile=enrich["referee_profile"],
                 open_odds=enrich["open_odds"],
+                ppda_home=ppda_h,
+                ppda_away=ppda_a,
+                ppda_home_n=ppda_hn,
+                ppda_away_n=ppda_an,
+                form_matches=form_matches,
             )
             conn.execute("DELETE FROM predictions WHERE match_id=?", (t["id"],))
             market = pred["components"]["market"]["p"]
@@ -339,6 +523,8 @@ def repredict_flagged(conn: sqlite3.Connection) -> int:
                 "narrow_repredict": True,
             }
             tops = top_scores(pred["matrix"], 8)
+            elo_h = ratings.get(t["home_team_id"], 1500.0)
+            elo_a = ratings.get(t["away_team_id"], 1500.0)
             conn.execute(
                 """
                 INSERT INTO predictions (
@@ -363,8 +549,8 @@ def repredict_flagged(conn: sqlite3.Connection) -> int:
                     pred["p_over25"],
                     json.dumps(tops),
                     json.dumps(pred["matrix"].tolist()),
-                    ratings.get(t["home_team_id"], 1500.0),
-                    ratings.get(t["away_team_id"], 1500.0),
+                    elo_h,
+                    elo_a,
                     pred["confidence"],
                     MODEL_VERSION,
                     ts,
@@ -375,6 +561,38 @@ def repredict_flagged(conn: sqlite3.Connection) -> int:
                     market[0] if market else None,
                     market[1] if market else None,
                     market[2] if market else None,
+                ),
+            )
+            conn.execute(
+                """
+                INSERT INTO prediction_snapshots (
+                  id, match_id, league_id, utc_date,
+                  p_home, p_draw, p_away, p_btts_yes, p_over25,
+                  lambda_home, lambda_away, elo_home, elo_away,
+                  confidence, model_version, snapshot_at
+                ) SELECT
+                    ?, m.id, m.league_id, m.utc_date,
+                    ?, ?, ?, ?, ?,
+                    ?, ?, ?, ?,
+                    ?, ?, ?
+                FROM matches m WHERE m.id = ?
+                ON CONFLICT(match_id) DO NOTHING
+                """,
+                (
+                    str(uuid.uuid4()),
+                    pred["p_home"],
+                    pred["p_draw"],
+                    pred["p_away"],
+                    pred["p_btts_yes"],
+                    pred["p_over25"],
+                    pred["lambda_home"],
+                    pred["lambda_away"],
+                    elo_h,
+                    elo_a,
+                    pred["confidence"],
+                    MODEL_VERSION,
+                    ts,
+                    t["id"],
                 ),
             )
             n_written += 1
@@ -515,50 +733,7 @@ def main() -> None:
                 )
             )
 
-        # --- أهداف زائفة من التسديدات: pseudo = ½·أهداف + ½·قيمة التسديدات مقيسة
-        # بحيث يساوي مجموعها مجموع الأهداف ضمن البادئة المعطاة. الأهداف ضجيج
-        # بواسوني والتسديدات تحمل إشارة القوة الأثبت — بديل xG العملي بلا بيانات
-        # تتبّع. النموذج الموازي يفقد فاعلية τ (قيم عشرية لا تطابق أقنعة 0/1)
-        # فيقارب بواسون مستقلاً — مقبول: ρ للتوقع يأتي من نموذج الأهداف الحقيقية.
-        def shot_value(shots: float, sot: float) -> float:
-            return 0.30 * sot + 0.04 * max(shots - sot, 0.0)
-
-        def build_obs_shots(rows, obs_prefix):
-            """المقياس يُحسب من البادئة نفسها فقط — لا ثابت مشتق من مستقبل الشريحة."""
-            sh = [
-                m
-                for m in rows
-                if m["shots_home"] is not None
-                and m["sot_home"] is not None
-                and m["shots_away"] is not None
-                and m["sot_away"] is not None
-            ]
-            if len(sh) < 300:
-                return None
-            tot_g = sum(m["home_goals"] + m["away_goals"] for m in sh)
-            tot_v = sum(
-                shot_value(m["shots_home"], m["sot_home"])
-                + shot_value(m["shots_away"], m["sot_away"])
-                for m in sh
-            )
-            scale = tot_g / tot_v if tot_v > 0 else 1.0
-
-            def pseudo(g: int, shots, sot) -> float:
-                if shots is None or sot is None:
-                    return float(g)
-                return 0.5 * g + 0.5 * scale * shot_value(shots, sot)
-
-            return [
-                MatchObs(
-                    home=o.home,
-                    away=o.away,
-                    home_goals=pseudo(m["home_goals"], m["shots_home"], m["sot_home"]),
-                    away_goals=pseudo(m["away_goals"], m["shots_away"], m["sot_away"]),
-                    days_ago=o.days_ago,
-                )
-                for o, m in zip(obs_prefix, rows)
-            ]
-
+        # أهداف زائفة من التسديدات (بديل xG عملي) — انظر build_obs_shots
         obs_shots = build_obs_shots(train, obs)
 
         # --- فهرس المواجهات المباشرة (H2H): لكل زوج فرق لقاءاتهما المنتهية
@@ -778,6 +953,13 @@ def main() -> None:
                 fh = forms_k.get(h, empty_form())
                 fa = forms_k.get(a, empty_form())
                 h2h_k = h2h_before(h, a, before_gi=cut_full + k)
+                # Walk-forward: core stack only (no live weather/injuries) — published metrics stay honest
+                ppda_h, ppda_hn = rolling_team_ppda(
+                    train[: cut + k], h
+                )
+                ppda_a, ppda_an = rolling_team_ppda(
+                    train[: cut + k], a
+                )
                 pred = predict_match(
                     home=h,
                     away=a,
@@ -792,6 +974,11 @@ def main() -> None:
                     dc_shots=eval_model_shots,
                     h2h_matches=h2h_k,
                     league_id=lid,
+                    ppda_home=ppda_h,
+                    ppda_away=ppda_a,
+                    ppda_home_n=ppda_hn,
+                    ppda_away_n=ppda_an,
+                    form_matches=form_matches[: cut_full + k],
                 )
                 comps.append(
                     {
@@ -1035,6 +1222,8 @@ def main() -> None:
                     float(t["odds_away"]),
                 )
             enrich = load_live_enrichment(conn, t["id"], t["referee_name"])
+            ppda_h, ppda_hn = rolling_team_ppda(finished, t["home_team_id"])
+            ppda_a, ppda_an = rolling_team_ppda(finished, t["away_team_id"])
             pred = predict_match(
                 home=t["home_team_id"],
                 away=t["away_team_id"],
@@ -1055,6 +1244,11 @@ def main() -> None:
                 away_missing=enrich["away_missing"],
                 referee_profile=enrich["referee_profile"],
                 open_odds=enrich["open_odds"],
+                ppda_home=ppda_h,
+                ppda_away=ppda_a,
+                ppda_home_n=ppda_hn,
+                ppda_away_n=ppda_an,
+                form_matches=form_matches,
             )
 
             write_prediction(
@@ -1098,6 +1292,7 @@ def main() -> None:
             write_prediction(r["id"], pred, ctx["elo_home"], ctx["elo_away"])
             retro += 1
         print(f"    predictions: {len(targets)} scheduled + {retro} retro", flush=True)
+        save_fit_params(conn, lid, fitted_w, temp)
 
     if all_probs:
         overall = summarize(all_probs, all_outcomes)

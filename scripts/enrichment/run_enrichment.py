@@ -272,11 +272,18 @@ def tier_a_odds_steam(conn: sqlite3.Connection) -> None:
             except Exception:
                 return None
 
-        oh = num("AvgH") or num("B365H") or num("PSH")
-        od = num("AvgD") or num("B365D") or num("PSD")
-        oa = num("AvgA") or num("B365A") or num("PSA")
+        # open = book (PS/B365/PP); current = market Avg (fallback book)
+        open_csv_h = num("PSH") or num("B365H") or num("PPH")
+        open_csv_d = num("PSD") or num("B365D") or num("PPD")
+        open_csv_a = num("PSA") or num("B365A") or num("PPA")
+        oh = num("AvgH") or open_csv_h
+        od = num("AvgD") or open_csv_d
+        oa = num("AvgA") or open_csv_a
         if not oh or not od or not oa:
             continue
+        book_h = open_csv_h or oh
+        book_d = open_csv_d or od
+        book_a = open_csv_a or oa
 
         rows = conn.execute(
             """
@@ -301,26 +308,47 @@ def tier_a_odds_steam(conn: sqlite3.Connection) -> None:
             continue
 
         mid = match_row["id"]
-        # تجميد الافتتاح: لا نمرّر القيمة الحالية لـ COALESCE كبديل — NULL يُملأ مرة واحدة
-        open_h = match_row["odds_open_home"]
-        open_d = match_row["odds_open_draw"]
-        open_a = match_row["odds_open_away"]
+        # Freeze open once from book; repair rows frozen as Avg when book differs
         conn.execute(
             """
             UPDATE matches SET
               odds_home=?, odds_draw=?, odds_away=?,
-              odds_open_home=COALESCE(odds_open_home, ?),
-              odds_open_draw=COALESCE(odds_open_draw, ?),
-              odds_open_away=COALESCE(odds_open_away, ?)
+              odds_open_home = CASE
+                WHEN odds_open_home IS NULL THEN ?
+                WHEN ABS(odds_open_home - ?) < 1e-9
+                     AND ABS(odds_open_home - ?) >= 1e-9 THEN ?
+                ELSE odds_open_home
+              END,
+              odds_open_draw = CASE
+                WHEN odds_open_draw IS NULL THEN ?
+                WHEN ABS(odds_open_draw - ?) < 1e-9
+                     AND ABS(odds_open_draw - ?) >= 1e-9 THEN ?
+                ELSE odds_open_draw
+              END,
+              odds_open_away = CASE
+                WHEN odds_open_away IS NULL THEN ?
+                WHEN ABS(odds_open_away - ?) < 1e-9
+                     AND ABS(odds_open_away - ?) >= 1e-9 THEN ?
+                ELSE odds_open_away
+              END
             WHERE id=?
             """,
-            (oh, od, oa, oh, od, oa, mid),
+            (
+                oh, od, oa,
+                book_h, oh, book_h, book_h,
+                book_d, od, book_d, book_d,
+                book_a, oa, book_a, book_a,
+                mid,
+            ),
         )
-        # بعد التحديث: إن كان open فارغاً قبلها فهو الآن = oh (أول لمسة)
+        frozen = conn.execute(
+            "SELECT odds_open_home, odds_open_draw, odds_open_away FROM matches WHERE id=?",
+            (mid,),
+        ).fetchone()
         use_open = (
-            (float(open_h) if open_h is not None else oh),
-            (float(open_d) if open_d is not None else od),
-            (float(open_a) if open_a is not None else oa),
+            float(frozen["odds_open_home"] if frozen["odds_open_home"] is not None else book_h),
+            float(frozen["odds_open_draw"] if frozen["odds_open_draw"] is not None else book_d),
+            float(frozen["odds_open_away"] if frozen["odds_open_away"] is not None else book_a),
         )
         steam = detect_steam(use_open, (oh, od, oa))
         upsert_enrichment(
@@ -387,7 +415,7 @@ def tier_b_weather(conn: sqlite3.Connection) -> None:
         """
         SELECT id, home_team_id, utc_date FROM matches
         WHERE status IN ('SCHEDULED','TIMED')
-          AND datetime(utc_date) BETWEEN datetime('now') AND datetime('now', '+72 hours')
+          AND datetime(utc_date) BETWEEN datetime('now') AND datetime('now', '+8 days')
         ORDER BY utc_date
         """
     ).fetchall()
@@ -638,7 +666,7 @@ def tier_d_lineups_imminent(conn: sqlite3.Connection) -> None:
     conn.commit()
     print(f"  [D] imminent checked={len(rows)} newly_confirmed={len(newly_confirmed)}", flush=True)
     if newly_confirmed:
-        meta_set(conn, "repredict_matches", ",".join(newly_confirmed))
+        meta_set(conn, "enrich_repredict_matches", ",".join(newly_confirmed))
         print(f"  [D] flag repredict: {newly_confirmed[:5]}", flush=True)
         # إعادة توقع فورية خفيفة (لا walk-forward)
         try:

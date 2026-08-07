@@ -11,9 +11,8 @@ if (!fs.existsSync(dataDir)) {
 
 const db = new Database(dbPath);
 
-console.log("📰 Starting Taqdeer Automated Sports Articles & Analysis Generator...");
+console.log("📰 Starting Taqdeer articles sync...");
 
-// Ensure articles table exists
 db.exec(`
   CREATE TABLE IF NOT EXISTS articles (
     id TEXT PRIMARY KEY,
@@ -36,52 +35,45 @@ const INITIAL_ARTICLES = [
   {
     id: "art-001",
     slug: "tactical-breakdown-possession-vs-counter",
-    title: "التصادم التكتيكي: كيف تُفكك أسلوب الضغط العالي مع محاكاة Dixon-Coles؟",
-    summary: "تحليل كمّي شامل للمواجهات التكتيكية بين فرق الاستحواذ الكثيف وفرق المرتدات السريعة في الدوريات الأوروبية الخمس الكبرى.",
+    title: "التصادم التكتيكي: استحواذ مقابل مرتدات داخل ensemble-v3",
+    summary:
+      "كيف يترجم محرك التكتيك أنماط اللعب وPPDA التقريبي إلى مضاعفات λ مقيدة — بلا ادعاء xG تتبّعي.",
     category: "تحليل تكتيكي",
     imageUrl: "/crests/pl.svg",
     author: "تـقـديـر",
-    readTimeMins: 6,
+    readTimeMins: 5,
     viewsCount: 1420,
     isFeatured: 1,
     publishedAt: new Date(Date.now() - 3600 * 1000 * 4).toISOString(),
     contentMd: `
-# التصادم التكتيكي: كيف تُفكك أسلوب الضغط العالي مع محاكاة Dixon-Coles؟
+# التصادم التكتيكي داخل تقدير
 
-في كرة القدم الحديثة، لم يعد التفوق الإحصائي محصوراً في نسبة الاستحواذ التقليدية، بل في **جودة وصناعة الأهداف المتوقعة (xG)** تحت تأثير الضغط العالي والمواجهات التكتيكية المباشرة.
-
----
-
-### 🧠 1. صراع الأساليب: الاستحواذ ضد الهجمات المرتدة
-
-عندما يواجه فريق يستحوذ بنسبة تزيد عن **62%** فريقاً يتقن التحول السريع، تشير مخرجات محرك \`tactical_matchup.py\` إلى المعادلة التالية:
-
-- **المخاطرة الدفاعية لفريق الاستحواذ:** تترك مساحات شاسعة خلف خط الدفاع العالي، مما يرفع الأهداف المتوقعة للخصم ($\mu_{\\text{away}}$) بمقدار **+5%**.
-- **نجاعة المرتدات:** فرق التحول الخاطف تسجل معدل تحويل تسديدات إلى أهداف بنسبة **34%** مقارنة بالمتوسط العام (28%).
-
-> *"الاستحواذ بلا اختراع مساحات هو مجرد تدوير سلبي للكرة يمنح المنافس وقتاً لتنظيم الكتلة الدفاعية."*
+في تقدير لا ندّعي xG تتبّعي (Opta/StatsBomb). نعتمد على **مؤشر تسديدات موزون** و**PPDA تقريبي** من الإحصاءات الرسمية المجانية، مع مضاعفات تكتيكية **مقيّدة** حتى لا تطغى السردية على الإشارة الإحصائية.
 
 ---
 
-### 📊 2. نتائج المحاكاة من نموذج Dixon-Coles الهجين
+### 1. صراع الأساليب
 
-بتحليل **1,000 مباراة** سابقة عبر الدوريات الخمس الكبرى:
+عندما يواجه فريق استحواذ فريقاً يتقن المرتدات، يحسب \`tactical_matchup.py\` مضاعفات أولية ثم يقيّدها إلى النطاق \`[0.97, 1.03]\` — ولا تُطبَّق أصلاً إلا إذا كان لكل فريق ≥8 مباريات بـPPDA تقريبي.
 
-1. **المباريات متكافئة التقييم (Tight Contests):** عندما يكون فارق Elo أقل من 55 نقطة، ترتفع احتمالات التعادل المعايرة إلى **31.5%**.
-2. **عامل الإرهاق وتتابع المباريات:** الفرق التي تخوض مباراتها الثانية خلال أقل من 84 ساعة تعاني من تراجع في معدل التهديف المتوقع ($\lambda$) بنسبة **6.8%**.
+- فريق الاستحواذ قد يترك مساحات خلف الخط العالي.
+- فرق التحول تستفيد من الاسترداد السريع — ضمن سقف صغير حتى لا نبالغ.
 
----
+### 2. ما يدخل التقييم المنشور؟
 
-### 🎯 3. التوصية التحليلية
+مقاييس \`/accuracy\` تقيس اللبّ (DC + Pi + Elo + فورم + سوق + سياق إحصائي) **بلا** طقس/إصابات حية. صفحات المباريات قد تضيف الإثراء بعد \`fit\` أو إعادة التوقع عند تأكيد التشكيلة.
 
-متابعة مؤشرات الضغط العالي (PPDA) ومعدل الراحة بين المباريات تمنح المحلل العربي رؤية أعمق من مجرد متابعة نتائج الأسابيع السابقة.
+### 3. التوصية
+
+اقرأ PPDA التقريبي ومؤشر التسديدات كـ**وكلاء**، لا كحقيقة تتبّعية — وراجع دائماً أوزان المكوّنات في صفحة المباراة.
 `,
   },
   {
     id: "art-002",
     slug: "value-bets-kelly-criterion-guide",
-    title: "هندسة إشارات القيمة (+EV) وحصة كيلي الربعية في الأسواق الرياضية",
-    summary: "دليل كمّي وعلمي لاستخراج فرص القيمة وحماية المحفظة المالية باستخدام حاسبة Quarter-Kelly ورفع عائد الاستثمار على المدى الطويل.",
+    title: "هندسة إشارات القيمة (+EV) وحصة كيلي الربعية",
+    summary:
+      "كيف تُستخرج فرص القيمة من احتمال النموذج المعاير مقابل السوق، ولماذا نقيّد EV بين 3% و15%.",
     category: "فرص القيمة +EV",
     imageUrl: "/crests/pd.svg",
     author: "قسم الرياضيات والتحليل الكمي",
@@ -90,37 +82,27 @@ const INITIAL_ARTICLES = [
     isFeatured: 0,
     publishedAt: new Date(Date.now() - 3600 * 1000 * 12).toISOString(),
     contentMd: `
-# هندسة إشارات القيمة (+EV) وحصة كيلي الربعية في الأسواق الرياضية
+# هندسة إشارات القيمة (+EV) وحصة كيلي الربعية
 
-تعتمد المنصات المالية الكمية على مبدأ أساسي: **لا توجد مراهنة مضمونة، بل توجد فرص ذات قيمة متوقعة إيجابية (+EV)**.
+تعتمد تقدير على مبدأ: **لا توجد مراهنة مضمونة، بل فرص ذات قيمة متوقعة إيجابية (+EV)**.
 
 ---
 
-### 📐 1. ما هي فرصة القيمة المتوقعة (+EV)؟
-
-تتحقق فرصة القيمة عندما يكون احتمال النموذج المعاير ($P$) أعلى من الاحتمال الضمني الذي تعكسه أسعار السوق ($P_{\\text{market}}$) بعد إزالة هامش ربح المراهن عبر خوارزمية Power Method:
+### 1. ما هي فرصة القيمة؟
 
 $$\\text{EV} = (P \\times \\text{Odds}) - 1.0$$
 
-عندما يكون $\\text{EV} \\ge +3\\%$, تعتبر الإشارة ذات جودة وقيمة تستحق المتابعة.
+حيث $P$ احتمال النموذج المعاير (بعد إزالة هامش السوق من الأودز عبر Power Method عند الحاجة). نقبل الإشارات عندما $\\text{EV}$ بين **3% و 15%**.
 
----
-
-### 🛡️ 2. حماية المحفظة بحصة كيلي الربعية (Quarter-Kelly)
-
-لحماية رأس المال من التقلبات العشوائية، نطبق معيار كيلي الموزون بنسبة 25%:
+### 2. كيلي الربعي
 
 $$f^* = 0.25 \\times \\left( \\frac{P \\times b - (1 - P)}{b} \\right)$$
 
-حيث $b = \\text{Odds} - 1.0$.
-
-- **النطاق الموثوق:** يتم قبول الإشارات فقط إذا كانت القيمة المتوقعة بين **3% و 15%**.
-- **الاستبعاد التلقائي:** أي إشارة تتجاوز 15% تُستبعد تلقائياً لأنها تشير إلى نقطة عمياء في البيانات (مثل تدوير كامل للتشكيلة أو جولات ميتة).
+حيث $b = \\text{Odds} - 1.0$. أي إشارة فوق 15% تُستبعد كتحذير من نقطة عمياء في البيانات.
 `,
   },
 ];
 
-// مقالات قديمة عن ميزات أو دوريات حُذفت (الدوري الكوري، نظام تشكيلات RAPM الوهمي) — تُزال نهائياً
 const REMOVED_ARTICLE_IDS = ["art-003", "art-004"];
 const insertStmt = db.prepare(`
   INSERT INTO articles (
@@ -158,10 +140,152 @@ for (const art of INITIAL_ARTICLES) {
     art.viewsCount,
     art.isFeatured,
     art.publishedAt,
-    new Date().toISOString()
+    new Date().toISOString(),
   );
   inserted++;
 }
 
-console.log(`✅ Articles sync complete: Updated ${inserted} exclusive analytical articles.`);
+/** Metrics-driven weekly note from local model_metrics / value_backtest / upcoming picks */
+function upsertMetricsArticle() {
+  type MetricRow = {
+    window_label: string;
+    n_matches: number;
+    accuracy: number | null;
+    brier: number | null;
+    rps: number | null;
+    model_version: string | null;
+  };
+
+  let overall: MetricRow | undefined;
+  try {
+    overall = db
+      .prepare(
+        `SELECT window_label, n_matches, accuracy, brier, rps, model_version
+         FROM model_metrics
+         WHERE league_id IS NULL
+         ORDER BY created_at DESC LIMIT 1`,
+      )
+      .get() as MetricRow | undefined;
+  } catch {
+    return;
+  }
+
+  const valueMeta = db
+    .prepare(`SELECT value FROM app_meta WHERE key = 'value_backtest'`)
+    .get() as { value: string } | undefined;
+
+  type PickRow = {
+    home: string;
+    away: string;
+    league: string;
+    p_home: number;
+    p_draw: number;
+    p_away: number;
+    confidence: number;
+  };
+  let picks: PickRow[] = [];
+  try {
+    picks = db
+      .prepare(
+        `SELECT t1.name_en AS home, t2.name_en AS away, l.name_ar AS league,
+                p.p_home, p.p_draw, p.p_away, p.confidence
+         FROM predictions p
+         JOIN matches m ON m.id = p.match_id
+         JOIN teams t1 ON t1.id = m.home_team_id
+         JOIN teams t2 ON t2.id = m.away_team_id
+         JOIN leagues l ON l.id = m.league_id
+         WHERE m.status IN ('SCHEDULED','TIMED')
+           AND datetime(m.utc_date) BETWEEN datetime('now') AND datetime('now', '+7 days')
+         ORDER BY p.confidence DESC
+         LIMIT 5`,
+      )
+      .all() as PickRow[];
+  } catch {
+    picks = [];
+  }
+
+  if (!overall && picks.length === 0) return;
+
+  const acc = overall?.accuracy != null ? (overall.accuracy * 100).toFixed(1) : "—";
+  const brier = overall?.brier != null ? overall.brier.toFixed(3) : "—";
+  const rps = overall?.rps != null ? overall.rps.toFixed(4) : "—";
+  const n = overall?.n_matches ?? 0;
+  const ver = overall?.model_version ?? "ensemble-v3";
+
+  let valueBlock = "لا بطاقة value-backtest بعد آخر تدريب.";
+  if (valueMeta?.value) {
+    try {
+      const vb = JSON.parse(valueMeta.value) as {
+        total?: { n_bets?: number; pnl?: number; staked?: number };
+        policy?: string;
+      };
+      const t = vb.total ?? {};
+      valueBlock = `سياسة: ${vb.policy ?? "—"}\n- رهانات: ${t.n_bets ?? 0}\n- PnL: ${(t.pnl ?? 0).toFixed(3)}u على ${(t.staked ?? 0).toFixed(3)}u`;
+    } catch {
+      /* keep default */
+    }
+  }
+
+  const pickLines =
+    picks.length === 0
+      ? "- لا توقعات عالية الثقة في الأيام السبعة القادمة."
+      : picks
+          .map((p) => {
+            const side =
+              p.p_home >= p.p_draw && p.p_home >= p.p_away
+                ? `مضيف ${(p.p_home * 100).toFixed(0)}%`
+                : p.p_away >= p.p_draw
+                  ? `ضيف ${(p.p_away * 100).toFixed(0)}%`
+                  : `تعادل ${(p.p_draw * 100).toFixed(0)}%`;
+            return `- **${p.home} × ${p.away}** (${p.league}): ${side} · ثقة ${(p.confidence * 100).toFixed(0)}%`;
+          })
+          .join("\n");
+
+  const weekKey = new Date().toISOString().slice(0, 10);
+  const contentMd = `
+# نشرة المقاييس الأسبوعية
+
+مولَّدة تلقائياً من قاعدة \`data/taqdeer.db\` — ليست مقالاً صحفياً بشرياً.
+
+## أداء walk-forward (${ver})
+
+- النافذة: ${overall?.window_label ?? "—"}
+- عدد المباريات: ${n}
+- الدقة: ${acc}%
+- Brier: ${brier}
+- RPS: ${rps}
+
+> هذه الأرقام تقيس اللبّ الإحصائي بلا إثراء حي (طقس/إصابات).
+
+## اختبار القيمة (+EV)
+
+${valueBlock}
+
+## أعلى ثقة خلال 7 أيام
+
+${pickLines}
+`;
+
+  insertStmt.run(
+    "art-metrics-weekly",
+    "weekly-model-metrics",
+    `نشرة المقاييس · ${weekKey}`,
+    `ملخص تلقائي لدقة ${ver} وفرص الثقة العالية من القاعدة المحلية.`,
+    contentMd,
+    "مقاييس النموذج",
+    "/crests/bl1.svg",
+    "تـقـديـر · مولّد المقاييس",
+    3,
+    0,
+    0,
+    new Date().toISOString(),
+    new Date().toISOString(),
+  );
+  inserted++;
+  console.log("  ↳ metrics article upserted");
+}
+
+upsertMetricsArticle();
+
+console.log(`✅ Articles sync complete: ${inserted} articles upserted.`);
 db.close();

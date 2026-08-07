@@ -32,7 +32,7 @@ def calculate_match_xg(
 
 
 def calculate_match_xa(xg: float) -> float:
-    """Expected Assists (xA) proxy derived from expected threat generated."""
+    """مشتق من مؤشر التسديدات (ليس xA تتبّعي)."""
     return float(round(max(0.04, 0.85 * xg), 2))
 
 
@@ -43,11 +43,10 @@ def calculate_match_ppda(
     opp_shots: Optional[float],
 ) -> float:
     """
-    PPDA (Passes Per Defensive Action) Index.
-    Lower PPDA = Aggressive high-pressing defense (e.g. 7.5 - 10.0).
-    Higher PPDA = Passive low-block defense (e.g. 14.0 - 18.0).
+    PPDA تقريبي من التسديدات/الأخطاء/الركنيات (ليس تمريرات Opta).
+    أقل = ضغط أعلى؛ أعلى = تكتل أدنى.
     """
-    # Average opponent passing sequence ~ 420 passes
+    # Approximate opponent pass volume — free proxy, not event data
     opp_pass_volume = 420.0 + 8.0 * (opp_shots if opp_shots is not None else 10.0)
 
     defensive_actions = 4.0  # Base tackles/interceptions
@@ -75,7 +74,7 @@ def compute_advanced_metrics(
     corners_home: Optional[float] = None,
     corners_away: Optional[float] = None,
 ) -> Dict[str, float]:
-    """Calculate comprehensive xG, xA, and PPDA metrics for a match."""
+    """Shot-proxy threat index, derived xa, and approximate PPDA for a match."""
     xg_h = calculate_match_xg(shots_home, sot_home, float(home_goals))
     xg_a = calculate_match_xg(shots_away, sot_away, float(away_goals))
 

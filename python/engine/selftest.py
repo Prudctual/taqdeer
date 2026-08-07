@@ -5,15 +5,21 @@ from .dixon_coles import DixonColesResult, MatchObs, fit_dixon_coles, score_matr
 from .elo import EloMatch, update_elo
 from .ensemble import DEFAULT_WEIGHTS, align_matrix_to_probs, blend_components, fit_weights, predict_match, value_signal
 from .evaluate import rps, summarize
-from .form import FormMatch, TeamForm, form_lambda_adjust, rolling_form
+from .form import (
+    FormMatch,
+    TeamForm,
+    form_lambda_adjust,
+    multi_window_form,
+    rolling_form,
+)
 from .h2h_engine import evaluate_h2h_advantage
 from .logistics_engine import evaluate_logistics_and_external_factors
 from .pi_ratings import PiMatch, update_pi
-from .player_impact import apply_rapm_to_xg
+from .player_impact import apply_absence_penalties, apply_rapm_to_xg
 from .referee_engine import evaluate_referee_impact
 from .sharp_market import detect_steam, steam_confidence_bonus
 from .strengths_weaknesses import analyze_team_strengths_weaknesses
-from .tactical_matchup import evaluate_tactical_matchup
+from .tactical_matchup import LAMBDA_MULT_HI, LAMBDA_MULT_LO, evaluate_tactical_matchup
 from .weather_engine import apply_weather_to_lambdas, weather_goal_multiplier
 from .xg_engine import compute_advanced_metrics
 
@@ -114,10 +120,41 @@ def main() -> None:
     adv = compute_advanced_metrics(2, 1, 12.0, 8.0, 5.0, 3.0, 10.0, 14.0, 6.0, 4.0)
     assert adv["xg_home"] > 0.5 and adv["xa_home"] > 0.0 and 5.0 <= adv["ppda_home"] <= 25.0
 
-    # 9. Tactical matchup — بمعرفات الفرق الفعلية (slug) لضمان مطابقة المفاتيح
+    # 9. Tactical matchup — commentary always; λ only with enough PPDA samples
     tactics = evaluate_tactical_matchup("pd-real-madrid", "pl-man-city")
     assert "home_formation" in tactics and "away_style" in tactics
     assert tactics["home_formation"] == "4-3-3" and tactics["away_formation"] == "3-2-4-1", tactics
+    assert tactics["home_lambda_mult"] == 1.0 and tactics["away_lambda_mult"] == 1.0
+    assert tactics["lambda_applied"] is False
+    tactics_on = evaluate_tactical_matchup(
+        "pd-real-madrid",
+        "pl-man-city",
+        ppda_home=8.5,
+        ppda_away=8.0,
+        ppda_home_n=10,
+        ppda_away_n=10,
+    )
+    assert tactics_on["lambda_applied"] is True
+    assert LAMBDA_MULT_LO <= float(tactics_on["home_lambda_mult"]) <= LAMBDA_MULT_HI
+    assert LAMBDA_MULT_LO <= float(tactics_on["away_lambda_mult"]) <= LAMBDA_MULT_HI
+
+    # Multi-window form blends without crashing
+    hist = [
+        FormMatch("H", "A", 2, 1, sot_home=5, sot_away=2, date="2024-01-01T12:00:00Z"),
+        FormMatch("H", "B", 1, 0, sot_home=4, sot_away=1, date="2024-01-08T12:00:00Z"),
+        FormMatch("C", "H", 0, 3, sot_home=1, sot_away=7, date="2024-01-15T12:00:00Z"),
+        FormMatch("H", "D", 2, 2, sot_home=6, sot_away=3, date="2024-01-22T12:00:00Z"),
+        FormMatch("E", "H", 1, 1, sot_home=2, sot_away=2, date="2024-01-29T12:00:00Z"),
+    ]
+    mw = multi_window_form(hist, windows=(3, 5, 10))
+    assert 3 in mw["H"] and mw["H"][3].n >= 1
+    lam_mw, _ = form_lambda_adjust(
+        mw["H"][5],
+        mw["A"][5] if "A" in mw else avg,
+        multi_home=mw["H"],
+        multi_away=mw.get("A"),
+    )
+    assert 0.70 <= lam_mw <= 1.35
 
     # 10. H2H المواجهات المباشرة: تفوق تاريخي يرفع مضاعف صاحب التفوق
     h2h = evaluate_h2h_advantage(
@@ -183,13 +220,34 @@ def main() -> None:
     assert weather_goal_multiplier(temp_c=18.0, precip_mm=0.0, wind_kmh=10.0) == 1.0
     w = apply_weather_to_lambdas(1.5, 1.2, precip_mm=9.0)
     assert w["applied"] and w["lambda_home"] < 1.5
-    rapm = apply_rapm_to_xg(1.5, 1.2, [{"position": "F", "status": "injured"}], [])
-    assert rapm["lambda_home"] < 1.5
+    abs_pen = apply_absence_penalties(
+        1.5, 1.2, [{"position": "F", "status": "injured"}], []
+    )
+    assert abs_pen["lambda_home"] < 1.5
+    assert apply_rapm_to_xg is apply_absence_penalties
     ref = evaluate_referee_impact({"matches_n": 3, "avg_yellows": 6.0, "strictness": 1.5})
     assert not ref["applied"]
     steam = detect_steam((2.5, 3.3, 2.8), (2.1, 3.3, 3.4))
     assert steam["applied"] and steam["side"] == "home"
     assert steam_confidence_bonus(steam, "home") > 0
+    # open == current → no steam
+    steam_flat = detect_steam((2.1, 3.3, 3.4), (2.1, 3.3, 3.4))
+    assert not steam_flat["applied"]
+
+    # Alias JSON must not invert CSV-short keys back to long names
+    import json
+    from pathlib import Path
+
+    alias_path = Path(__file__).resolve().parents[2] / "scripts" / "data" / "team-aliases.json"
+    aliases = json.loads(alias_path.read_text(encoding="utf-8"))
+    assert aliases.get("For Sittard") is None
+    assert aliases.get("Sp Lisbon") is None
+    assert aliases.get("Academico") is None
+    assert aliases.get("Fortuna Sittard") == "For Sittard"
+    assert aliases.get("Sporting CP") == "Sp Lisbon"
+
+    # Enrich / fit share the same repredict meta key name
+    assert "enrich_repredict_matches" == "enrich_repredict_matches"
 
     print("selftest ok — all mathematical engine components verified cleanly!")
 

@@ -14,12 +14,12 @@ from .dixon_coles import (
     score_matrix,
 )
 from .elo import elo_outcome_probs
-from .form import TeamForm, form_lambda_adjust
+from .form import TeamForm, form_lambda_adjust, multi_window_form, tiered_form
 from .h2h_engine import evaluate_h2h_advantage
 from .league_profiles import get_league_profile
 from .logistics_engine import evaluate_logistics_and_external_factors
 from .pi_ratings import PiState, pi_expected_goals
-from .player_impact import apply_rapm_to_xg
+from .player_impact import apply_absence_penalties
 from .referee_engine import evaluate_referee_impact
 from .sharp_market import detect_steam, steam_confidence_bonus
 from .strengths_weaknesses import analyze_team_strengths_weaknesses
@@ -173,6 +173,11 @@ def predict_match(
     away_missing: Optional[list] = None,
     referee_profile: Optional[Dict] = None,
     open_odds: Optional[tuple[float, float, float]] = None,
+    ppda_home: Optional[float] = None,
+    ppda_away: Optional[float] = None,
+    ppda_home_n: int = 0,
+    ppda_away_n: int = 0,
+    form_matches: Optional[list] = None,
 ) -> Dict:
     profile = get_league_profile(league_id)
     w = dict(weights or DEFAULT_WEIGHTS)
@@ -187,7 +192,30 @@ def predict_match(
 
     # --- Dixon-Coles base λ ---
     lam_dc, mu_dc = dc_xg(dc, home, away)
-    f_h, f_a = form_lambda_adjust(form_home, form_away)
+    multi_h = multi_a = None
+    tier_h = tier_a = None
+    if form_matches:
+        mw = multi_window_form(form_matches, windows=(3, 5, 10))
+        multi_h = mw.get(home)
+        multi_a = mw.get(away)
+        elo_map = {home: elo_home, away: elo_away}
+        # Expand elo map with any teams seen in form history at default 1500
+        for fm in form_matches:
+            elo_map.setdefault(fm.home, 1500.0)
+            elo_map.setdefault(fm.away, 1500.0)
+        tiers = tiered_form(form_matches, elo_map)
+        tier_h = tiers.get(home)
+        tier_a = tiers.get(away)
+    f_h, f_a = form_lambda_adjust(
+        form_home,
+        form_away,
+        multi_home=multi_h,
+        multi_away=multi_a,
+        tiered_home=tier_h,
+        tiered_away=tier_a,
+        elo_home=elo_home,
+        elo_away=elo_away,
+    )
     lam_f = lam_dc * f_h
     mu_f = mu_dc * f_a
 
@@ -232,12 +260,19 @@ def predict_match(
     if any(t in clean_home for t in profile.turf_teams):
         lam *= 1.05  # +5% goal expectation bonus on artificial turf
 
-    # Tactical Style Clash & Compatibility Adjustment
-    tactics = evaluate_tactical_matchup(home, away)
+    # Tactical Style Clash — capped λ when proxy PPDA history is sufficient
+    tactics = evaluate_tactical_matchup(
+        home,
+        away,
+        ppda_home=float(ppda_home if ppda_home is not None else 11.0),
+        ppda_away=float(ppda_away if ppda_away is not None else 11.0),
+        ppda_home_n=int(ppda_home_n),
+        ppda_away_n=int(ppda_away_n),
+    )
     lam *= float(tactics["home_lambda_mult"])
     mu *= float(tactics["away_lambda_mult"])
 
-    # طقس حقيقي (إن وُجدت قراءات) → player_impact → حكم
+    # طقس حقيقي (إن وُجدت قراءات) → خصم غياب بالمركز → حكم
     weather_res = apply_weather_to_lambdas(
         lam,
         mu,
@@ -249,7 +284,7 @@ def predict_match(
     lam = float(weather_res["lambda_home"])
     mu = float(weather_res["lambda_away"])
 
-    player_res = apply_rapm_to_xg(lam, mu, home_missing, away_missing)
+    player_res = apply_absence_penalties(lam, mu, home_missing, away_missing)
     lam = float(player_res["lambda_home"])
     mu = float(player_res["lambda_away"])
 
@@ -418,7 +453,7 @@ def predict_match(
         "xpts_away": xpts_away,
         "double_chance": double_chance,
         "components": {
-            # ما يدخل الخلط فعلاً بوزن 0.42: احتمالات λ المُمالة بالفورم وPi —
+            # ما يدخل الخلط فعلاً (dc≈0.38 + context≈0.08): λ بعد تعديلات السياق —
             # لا DC الخام، حتى يصدق تتبّع الرقم على صفحة المباراة
             "dixon_coles": {"p": dc_p, "lambda": [lam, mu]},
             "pi_ratings": {"p": pi_p, "lambda": [lam_pi, mu_pi]},

@@ -724,14 +724,28 @@ async function syncUpcomingOddsFromApiFootball(
     return 0;
   }
 
+  const DAY_WINDOW = 14;
+  const MAX_ODDS_CALLS = 25;
+  const THROTTLE_H = 12;
+
+  const missingInWindow = db
+    .prepare(
+      `SELECT COUNT(*) AS n FROM matches
+       WHERE status IN ('SCHEDULED', 'TIMED')
+         AND odds_home IS NULL
+         AND datetime(utc_date) BETWEEN datetime('now', '-1 day')
+             AND datetime('now', '+14 days')`,
+    )
+    .get() as { n: number };
+
   const last = db
     .prepare(`SELECT value FROM app_meta WHERE key = 'last_odds_api_sync'`)
     .get() as { value: string } | undefined;
-  if (last?.value) {
+  if (last?.value && (missingInWindow?.n ?? 0) === 0) {
     const ageH = (Date.now() - Date.parse(last.value)) / 3_600_000;
-    if (Number.isFinite(ageH) && ageH < 24) {
+    if (Number.isFinite(ageH) && ageH < THROTTLE_H) {
       console.log(
-        `  أودز API-Football: تخطّي (آخر مزامنة منذ ${ageH.toFixed(1)}س — الحد الأدنى 24س؛ الإثراء من CSV)`,
+        `  أودز API-Football: تخطّي (آخر مزامنة منذ ${ageH.toFixed(1)}س — الحد ${THROTTLE_H}س؛ لا فجوات)`,
       );
       return 0;
     }
@@ -746,8 +760,6 @@ async function syncUpcomingOddsFromApiFootball(
     referee: string | null;
   };
   const hits: FxHit[] = [];
-  const DAY_WINDOW = 5;
-  const MAX_ODDS_CALLS = 25;
   let hit429 = false;
 
   for (let i = 0; i < DAY_WINDOW; i++) {
@@ -821,24 +833,33 @@ async function syncUpcomingOddsFromApiFootball(
   let refsUpdated = 0;
   let oddsCalls = 0;
 
+  type ResolvedHit = FxHit & { matchId: string; hasOdds: boolean };
+  const resolved: ResolvedHit[] = [];
   for (const h of hits) {
-    const homeId = teamId(h.leagueId, h.home);
-    const awayId = teamId(h.leagueId, h.away);
-    // تأكد من وجود الفريقين بأسمائهم القانونية قبل المطابقة
     upsertTeam(db, h.leagueId, h.home);
     upsertTeam(db, h.leagueId, h.away);
+    const homeId = teamId(h.leagueId, h.home);
+    const awayId = teamId(h.leagueId, h.away);
     const row = findMatch.get(h.leagueId, homeId, awayId, h.date, h.date) as
       | { id: string; odds_home: number | null }
       | undefined;
     if (!row) continue;
-
     if (h.referee) {
       const r = updRefOnly.run(h.referee, row.id);
       refsUpdated += r.changes;
     }
+    resolved.push({
+      ...h,
+      matchId: row.id,
+      hasOdds: row.odds_home != null && row.odds_home > 1.01,
+    });
+  }
+  // Spend free-tier budget on gaps first
+  resolved.sort((a, b) => Number(a.hasOdds) - Number(b.hasOdds));
 
-    // لا تهدر الحصة على مباراة لها أودز حديثة إن تجاوزنا السقف
-    if (oddsCalls >= MAX_ODDS_CALLS) continue;
+  for (const h of resolved) {
+    if (h.hasOdds) continue; // skip already-filled unless we later add a refresh path
+    if (oddsCalls >= MAX_ODDS_CALLS) break;
 
     try {
       const res = await fetch(
@@ -871,7 +892,7 @@ async function syncUpcomingOddsFromApiFootball(
         od: avg.draw,
         oa: avg.away,
         ref: h.referee,
-        id: row.id,
+        id: h.matchId,
       });
       oddsUpdated += r.changes;
       await new Promise((r) => setTimeout(r, 350));
@@ -921,9 +942,24 @@ export async function syncUpcomingOdds(db: ReturnType<typeof getDb>) {
     const upd = db.prepare(`
       UPDATE matches SET
         odds_home = @oh, odds_draw = @od, odds_away = @oa,
-        odds_open_home = COALESCE(odds_open_home, @oh),
-        odds_open_draw = COALESCE(odds_open_draw, @od),
-        odds_open_away = COALESCE(odds_open_away, @oa)
+        odds_open_home = CASE
+          WHEN odds_open_home IS NULL THEN @book_h
+          WHEN ABS(odds_open_home - odds_home) < 1e-9
+               AND ABS(odds_open_home - @book_h) >= 1e-9 THEN @book_h
+          ELSE odds_open_home
+        END,
+        odds_open_draw = CASE
+          WHEN odds_open_draw IS NULL THEN @book_d
+          WHEN ABS(odds_open_draw - odds_draw) < 1e-9
+               AND ABS(odds_open_draw - @book_d) >= 1e-9 THEN @book_d
+          ELSE odds_open_draw
+        END,
+        odds_open_away = CASE
+          WHEN odds_open_away IS NULL THEN @book_a
+          WHEN ABS(odds_open_away - odds_away) < 1e-9
+               AND ABS(odds_open_away - @book_a) >= 1e-9 THEN @book_a
+          ELSE odds_open_away
+        END
       WHERE id = (
         SELECT id FROM matches
         WHERE league_id = @league AND home_team_id = @home AND away_team_id = @away
@@ -945,14 +981,21 @@ export async function syncUpcomingOdds(db: ReturnType<typeof getDb>) {
         const away = resolveTeamName(awayRaw);
         const utc = parseUkDate(r.Date, r.Time);
         if (!utc) continue;
-        const oh = num(r.AvgH) ?? num(r.B365H) ?? num(r.PSH);
-        const od = num(r.AvgD) ?? num(r.B365D) ?? num(r.PSD);
-        const oa = num(r.AvgA) ?? num(r.B365A) ?? num(r.PSA);
+        // open = book (PS/B365/PP); current = Avg (fallback book)
+        const bookH = num(r.PSH) ?? num(r.B365H) ?? num(r.PPH);
+        const bookD = num(r.PSD) ?? num(r.B365D) ?? num(r.PPD);
+        const bookA = num(r.PSA) ?? num(r.B365A) ?? num(r.PPA);
+        const oh = num(r.AvgH) ?? bookH;
+        const od = num(r.AvgD) ?? bookD;
+        const oa = num(r.AvgA) ?? bookA;
         if (!oh || !od || !oa) continue;
         const res = upd.run({
           oh,
           od,
           oa,
+          book_h: bookH ?? oh,
+          book_d: bookD ?? od,
+          book_a: bookA ?? oa,
           league: leagueId,
           home: teamId(leagueId, home),
           away: teamId(leagueId, away),

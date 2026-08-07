@@ -113,8 +113,8 @@ export function AutomatedModelAdjustments({
       value: players?.summary
         ? players.summary
         : `لا غيابات مسجّلة · ${awayTeam} / ${homeTeam}`,
-      impact: players?.applied ? "تعديل RAPM على λ" : "غير مفعّل",
-      detail: "مصدر FotMob (unavailable) — بلا قوائم مصابة مخترعة.",
+      impact: players?.applied ? "خصم غياب بالمركز على λ" : "غير مفعّل",
+      detail: "مصدر FotMob — خصم تقريبي حسب المركز، ليس تقييم RAPM لاعبين.",
       positive: !!players?.applied,
     },
     {

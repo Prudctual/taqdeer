@@ -25,12 +25,14 @@ def analyze_team_strengths_weaknesses(
     strengths: List[str] = []
     weaknesses: List[str] = []
 
-    # 1. Attacking Efficiency & xG
+    # 1. Attacking Efficiency (λ / shot-proxy threat)
     if gf_avg >= 1.95:
         strengths.append(f"نجاعة هجومية عالية جداً (متوسط {gf_avg:.1f} هدف/مباراة)")
     elif xg_avg >= 1.70:
-        strengths.append(f"خلق فرص عالية وصناعة خطورة متواصلة (xG معدل {xg_avg:.2f})")
-    
+        strengths.append(
+            f"خلق فرص عالية وصناعة خطورة متواصلة (λ المتوقع {xg_avg:.2f})"
+        )
+
     if gf_avg < 1.0:
         weaknesses.append(f"شح تهديفي واضح (متوسط {gf_avg:.1f} هدف/مباراة)")
     elif xg_avg < 1.10:
@@ -41,11 +43,13 @@ def analyze_team_strengths_weaknesses(
         strengths.append(f"منظومة دفاعية صلبة للغاية (يستقبل {ga_avg:.1f} هدف/مباراة)")
     if clean_sheets_pct >= 0.40:
         strengths.append(f"استقرار في الحفاظ على نظافة الشباك ({int(clean_sheets_pct*100)}% من المباريات)")
-    
+
     if ga_avg >= 1.75:
         weaknesses.append(f"هشاشة دفاعية واضحة (معدل استقبال {ga_avg:.1f} هدف/مباراة)")
     elif xga_avg >= 1.60:
-        weaknesses.append(f"استقبال خطورة وتسديدات سهلة على المرمى (xGA معدل {xga_avg:.2f})")
+        weaknesses.append(
+            f"استقبال خطورة عالية على المرمى (μ المتوقع {xga_avg:.2f})"
+        )
 
     # 3. Home / Away Discrepancies
     if home_win_rate >= 0.65:

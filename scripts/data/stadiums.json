@@ -803,5 +803,210 @@
     "lat": 37.066,
     "lon": 37.378,
     "name": "Kalyon"
+  },
+  "bl1-ein-frankfurt": {
+    "lat": 50.0686,
+    "lon": 8.6455,
+    "name": "Deutsche Bank Park"
+  },
+  "bl1-m-gladbach": {
+    "lat": 51.1746,
+    "lon": 6.3855,
+    "name": "Borussia-Park"
+  },
+  "ded-az-alkmaar": {
+    "lat": 52.6131,
+    "lon": 4.7424,
+    "name": "AFAS Stadion"
+  },
+  "fl1-paris-sg": {
+    "lat": 48.8414,
+    "lon": 2.253,
+    "name": "Parc des Princes"
+  },
+  "pd-ath-bilbao": {
+    "lat": 43.2642,
+    "lon": -2.9494,
+    "name": "San Mamés"
+  },
+  "pd-ath-madrid": {
+    "lat": 40.4362,
+    "lon": -3.5995,
+    "name": "Cívitas Metropolitano"
+  },
+  "pd-betis": {
+    "lat": 37.3565,
+    "lon": -5.9817,
+    "name": "Benito Villamarín"
+  },
+  "pd-espanol": {
+    "lat": 41.3479,
+    "lon": 2.0756,
+    "name": "RCDE Stadium"
+  },
+  "pd-sociedad": {
+    "lat": 43.3015,
+    "lon": -1.9736,
+    "name": "Reale Arena"
+  },
+  "pd-vallecano": {
+    "lat": 40.3919,
+    "lon": -3.6587,
+    "name": "Vallecas"
+  },
+  "pl-nott-m-forest": {
+    "lat": 52.9399,
+    "lon": -1.1325,
+    "name": "City Ground"
+  },
+  "ppd-sp-braga": {
+    "lat": 41.5625,
+    "lon": -8.4298,
+    "name": "Estádio Municipal de Braga"
+  },
+  "tur1-goztep": {
+    "lat": 38.427,
+    "lon": 27.128,
+    "name": "Gürsel Aksel"
+  },
+  "bl1-elversberg": {
+    "lat": 49.316,
+    "lon": 7.133,
+    "name": "Waldstadion an der Kaiserlinde"
+  },
+  "bl1-hamburg": {
+    "lat": 53.5519,
+    "lon": 9.9356,
+    "name": "Volksparkstadion"
+  },
+  "bl1-paderborn": {
+    "lat": 51.7314,
+    "lon": 8.7181,
+    "name": "Home Deluxe Arena"
+  },
+  "bl1-schalke-04": {
+    "lat": 51.5546,
+    "lon": 7.0676,
+    "name": "Veltins-Arena"
+  },
+  "ded-den-haag": {
+    "lat": 52.0628,
+    "lon": 4.3819,
+    "name": "Bingoal Stadion"
+  },
+  "fl1-le-mans": {
+    "lat": 47.956,
+    "lon": 0.223,
+    "name": "MMArena"
+  },
+  "fl1-lorient": {
+    "lat": 47.7486,
+    "lon": -3.3694,
+    "name": "Stade du Moustoir"
+  },
+  "fl1-paris-fc": {
+    "lat": 48.819,
+    "lon": 2.346,
+    "name": "Stade Charléty"
+  },
+  "fl1-troyes": {
+    "lat": 48.307,
+    "lon": 4.073,
+    "name": "Stade de l'Aube"
+  },
+  "pd-elche": {
+    "lat": 38.267,
+    "lon": -0.703,
+    "name": "Martínez Valero"
+  },
+  "pd-la-coruna": {
+    "lat": 43.3687,
+    "lon": -8.4175,
+    "name": "Riazor"
+  },
+  "pd-levante": {
+    "lat": 39.451,
+    "lon": -0.346,
+    "name": "Ciutat de València"
+  },
+  "pd-malaga": {
+    "lat": 36.734,
+    "lon": -4.426,
+    "name": "La Rosaleda"
+  },
+  "pd-santander": {
+    "lat": 43.476,
+    "lon": -3.793,
+    "name": "El Sardinero"
+  },
+  "pl-coventry": {
+    "lat": 52.4481,
+    "lon": -1.4956,
+    "name": "Coventry Building Society Arena"
+  },
+  "pl-hull": {
+    "lat": 53.7465,
+    "lon": -0.3679,
+    "name": "MKM Stadium"
+  },
+  "pl-leeds": {
+    "lat": 53.7778,
+    "lon": -1.5721,
+    "name": "Elland Road"
+  },
+  "pl-sunderland": {
+    "lat": 54.9146,
+    "lon": -1.3884,
+    "name": "Stadium of Light"
+  },
+  "ppd-maritimo": {
+    "lat": 32.6706,
+    "lon": -16.8994,
+    "name": "Estádio do Marítimo"
+  },
+  "sa-frosinone": {
+    "lat": 41.635,
+    "lon": 13.322,
+    "name": "Benito Stirpe"
+  },
+  "sa-sassuolo": {
+    "lat": 44.714,
+    "lon": 10.65,
+    "name": "Mapei Stadium"
+  },
+  "tur1-amedspor": {
+    "lat": 37.913,
+    "lon": 40.217,
+    "name": "Diyarbakır Stadyumu"
+  },
+  "tur1-corum": {
+    "lat": 40.55,
+    "lon": 34.955,
+    "name": "Çorum Şehir"
+  },
+  "tur1-erzurumspor": {
+    "lat": 39.906,
+    "lon": 41.262,
+    "name": "Kazım Karabekir"
+  },
+  "tur1-genclerbirligi": {
+    "lat": 39.939,
+    "lon": 32.846,
+    "name": "Eryaman"
+  },
+  "tur1-kocaelispor": {
+    "lat": 40.766,
+    "lon": 29.941,
+    "name": "Kocaeli Stadyumu"
+  },
+  "bl1-fc-koln": {
+    "lat": 50.9335,
+    "lon": 6.8752,
+    "name": "RheinEnergieStadion"
+  },
+  "bl1-koln": {
+    "lat": 50.9335,
+    "lon": 6.8752,
+    "name": "RheinEnergieStadion"
   }
 }

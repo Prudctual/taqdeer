@@ -8,6 +8,8 @@ const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 if (!BOT_TOKEN) throw new Error("TELEGRAM_BOT_TOKEN environment variable is required");
 const API_URL = `https://api.telegram.org/bot${BOT_TOKEN}`;
 
+const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || process.env.SITE_URL || "http://13.53.56.196").replace(/\/$/, "");
+
 const possiblePaths = [
   path.resolve(process.cwd(), "data/taqdeer.db"),
   path.resolve(process.cwd(), "data/pitchlab.db"),
@@ -235,13 +237,12 @@ function getConciseHighlights(): string {
     text += `لا تتوفر مباريات مجدولة خلال الساعات القادمة.\nيمكنك متابعة جداول الترتيب والتحليلات عبر المنصة.\n\n`;
   }
 
-  text += `🌐 <b>تابع المزيد بالمنصة الحية:</b> http://13.53.56.196`;
+  text += `🌐 <b>تابع المزيد بالمنصة الحية:</b> ${SITE_URL}`;
   return text;
 }
 
 async function broadcastToAllSubscribers() {
-  // Automated notifications disabled as requested
-  return;
+  if (process.env.TELEGRAM_BROADCAST !== "1") return;
   try {
     const subscribers = db.query(`SELECT chat_id FROM telegram_subscribers`).all() as { chat_id: number }[];
     if (!subscribers.length) return;
@@ -249,11 +250,11 @@ async function broadcastToAllSubscribers() {
     const message = getConciseHighlights();
     const keyboard = {
       inline_keyboard: [
-        [{ text: "فتح منصة تقدير", url: "http://13.53.56.196" }],
+        [{ text: "فتح منصة تقدير", url: `${SITE_URL}` }],
       ],
     };
 
-    console.log(`🤖 [30-Min Broadcast] Sending update to ${subscribers.length} subscriber(s)...`);
+    console.log(`🤖 [Broadcast] Sending update to ${subscribers.length} subscriber(s)...`);
     for (const sub of subscribers) {
       await sendMessage(sub.chat_id, message, keyboard);
       await new Promise((r) => setTimeout(r, 100));
@@ -322,7 +323,7 @@ const MAIN_KEYBOARD = {
     ],
     [
       { text: "🧠 المنهجية الحسابية", callback_data: "cmd_methodology" },
-      { text: "🌐 منصة «تقدير» الحية", url: "http://13.53.56.196" },
+      { text: "🌐 منصة «تقدير» الحية", url: `${SITE_URL}` },
     ],
   ],
 };
@@ -633,7 +634,7 @@ async function handleUpdate(update: TelegramUpdate) {
       reply += matches.map((m) => formatMatchCard(m)).join("\n──────────────\n");
       reply += `\n\nاستعرض جميع الفرص والتفاصيل المالية عبر المنصة:`;
       const kb = {
-        inline_keyboard: [[{ text: "🌐 فتح صفحة فرص القيمة", url: "http://13.53.56.196/value" }]],
+        inline_keyboard: [[{ text: "🌐 فتح صفحة فرص القيمة", url: `${SITE_URL}/value` }]],
       };
       await sendMessage(chatId, reply, kb);
       return;
@@ -660,7 +661,7 @@ async function handleUpdate(update: TelegramUpdate) {
     ) {
       const reply = `<b>📊 سجل الدقة والتحقق الرياضي:</b>\n\n• <b>نسبة التوقع الصحيح (Out-of-sample):</b> 47.3%\n• <b>نطاق الاختبار:</b> 582 مباراة موثقة على نماذج Dixon-Coles و Elo.\n• <b>معايرة الاحتمالات:</b> Temperature Scaling بدون تسريب بيانات.\n\nاستعرض السجل الكامل والتحليل المتقدم:`;
       const kb = {
-        inline_keyboard: [[{ text: "🌐 فتح صفحة سجل الدقة", url: "http://13.53.56.196/accuracy" }]],
+        inline_keyboard: [[{ text: "🌐 فتح صفحة سجل الدقة", url: `${SITE_URL}/accuracy` }]],
       };
       await sendMessage(chatId, reply, kb);
       return;
@@ -674,7 +675,7 @@ async function handleUpdate(update: TelegramUpdate) {
     ) {
       const reply = `<b>🧠 المنهجية الحسابية لمنصة «تقدير»:</b>\n\nتعتمد منصتنا على دمج 4 محركات رياضية مستقلة:\n1. <b>Dixon-Coles:</b> حساب قوة التهديف والهجوم والدفاع.\n2. <b>Pi-ratings & Elo:</b> تقييم الفورم والأداء التاريخي.\n3. <b>De-margined Odds:</b> قراءة الاحتمالات بعد إزالة هامش ربح المراهن.\n4. <b>Temperature Scaling:</b> معايرة الاحتمالات الرياضية.`;
       const kb = {
-        inline_keyboard: [[{ text: "🌐 قراءة المنهجية الكاملة بالمنصة", url: "http://13.53.56.196/methodology" }]],
+        inline_keyboard: [[{ text: "🌐 قراءة المنهجية الكاملة بالمنصة", url: `${SITE_URL}/methodology` }]],
       };
       await sendMessage(chatId, reply, kb);
       return;
@@ -731,7 +732,7 @@ async function handleUpdate(update: TelegramUpdate) {
       reply += matches.map((m) => formatMatchCard(m)).join("\n──────────────\n");
       const kb = {
         inline_keyboard: [
-          [{ text: "🌐 استعراض كافة فرص القيمة بالمنصة", url: "http://13.53.56.196/value" }],
+          [{ text: "🌐 استعراض كافة فرص القيمة بالمنصة", url: `${SITE_URL}/value` }],
           [{ text: "🔙 القائمة الرئيسية", callback_data: "cmd_main_menu" }],
         ],
       };
@@ -757,7 +758,7 @@ async function handleUpdate(update: TelegramUpdate) {
       }
       const kb = {
         inline_keyboard: [
-          [{ text: `🌐 فتح صفحة ${standings.leagueName} بالمنصة`, url: `http://13.53.56.196/leagues/${leagueId}` }],
+          [{ text: `🌐 فتح صفحة ${standings.leagueName} بالمنصة`, url: `${SITE_URL}/leagues/${leagueId}` }],
           [{ text: "🔙 قائمة الدوريات", callback_data: "cmd_leagues" }],
         ],
       };
@@ -766,7 +767,7 @@ async function handleUpdate(update: TelegramUpdate) {
       const text = `<b>📊 سجل الدقة والتحقق الرياضي:</b>\n\n• <b>نسبة التوقع الصحيح (Out-of-sample):</b> 47.3%\n• <b>نطاق الاختبار:</b> 582 مباراة موثقة على نماذج Dixon-Coles و Elo.\n• <b>معايرة الاحتمالات:</b> Temperature Scaling بدون تسريب بيانات.`;
       const kb = {
         inline_keyboard: [
-          [{ text: "🌐 استعراض سجل الدقة بالمنصة", url: "http://13.53.56.196/accuracy" }],
+          [{ text: "🌐 استعراض سجل الدقة بالمنصة", url: `${SITE_URL}/accuracy` }],
           [{ text: "🔙 القائمة الرئيسية", callback_data: "cmd_main_menu" }],
         ],
       };
@@ -775,7 +776,7 @@ async function handleUpdate(update: TelegramUpdate) {
       const text = `<b>🧠 المنهجية الحسابية لمنصة «تقدير»:</b>\n\nتعتمد منصتنا على دمج 4 محركات رياضية مستقلة:\n1. <b>Dixon-Coles:</b> لحساب معاملات الهجوم والدفاع وقوة التهديف.\n2. <b>Pi-ratings & Elo:</b> لتقييم الأداء التاريخي والفورم.\n3. <b>De-margined Odds:</b> قراءة الاحتمالات بعد إزالة هامش ربح المراهن.\n4. <b>Temperature Scaling:</b> معايرة الاحتمالات الخالية من التسريب.`;
       const kb = {
         inline_keyboard: [
-          [{ text: "🌐 قراءة المنهجية الكاملة بالمنصة", url: "http://13.53.56.196/methodology" }],
+          [{ text: "🌐 قراءة المنهجية الكاملة بالمنصة", url: `${SITE_URL}/methodology` }],
           [{ text: "🔙 القائمة الرئيسية", callback_data: "cmd_main_menu" }],
         ],
       };
@@ -803,9 +804,13 @@ async function pollUpdates() {
   }
 }
 
-// ⏰ Recurring broadcast loop is completely disabled as requested
-// const ONE_HOUR_MS = 60 * 60 * 1000;
-// setInterval(broadcastToAllSubscribers, ONE_HOUR_MS);
+// Opt-in hourly broadcast: set TELEGRAM_BROADCAST=1
+const ONE_HOUR_MS = 60 * 60 * 1000;
+if (process.env.TELEGRAM_BROADCAST === "1") {
+  setInterval(() => {
+    void broadcastToAllSubscribers();
+  }, ONE_HOUR_MS);
+}
 
 async function setupBotMetadata() {
   try {

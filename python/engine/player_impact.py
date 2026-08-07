@@ -1,4 +1,4 @@
-"""تأثير الغيابات الحقيقية على λ — RAPM مبسّط بالمركز فقط."""
+"""تأثير الغيابات على λ — خصم بالمركز (ليس RAPM لاعبين حقيقي)."""
 
 from __future__ import annotations
 
@@ -65,7 +65,7 @@ def missing_impact(players: Sequence[Dict[str, Any]]) -> Dict[str, float]:
     }
 
 
-def apply_rapm_to_xg(
+def apply_absence_penalties(
     lam: float,
     mu: float,
     home_missing: Optional[Iterable[Dict[str, Any]]] = None,
@@ -103,3 +103,7 @@ def apply_rapm_to_xg(
             else None
         ),
     }
+
+
+# Backward-compatible alias (old name oversold the method)
+apply_rapm_to_xg = apply_absence_penalties

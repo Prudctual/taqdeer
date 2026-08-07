@@ -179,24 +179,93 @@ def tiered_form(
     return out
 
 
-def form_lambda_adjust(form_home: TeamForm, form_away: TeamForm) -> Tuple[float, float]:
+def _blend_window_forms(windows: Optional[Dict[int, TeamForm]]) -> Optional[TeamForm]:
+    """Blend W3/W5/W10 into a single TeamForm (recent windows weigh more)."""
+    if not windows:
+        return None
+    weights = {3: 0.45, 5: 0.35, 10: 0.20}
+    present = [(w, windows[w], weights[w]) for w in (3, 5, 10) if w in windows and windows[w].n > 0]
+    if not present:
+        return None
+    tw = sum(wt for _, _, wt in present)
+    def avg(attr: str) -> float:
+        return sum(getattr(tf, attr) * wt for _, tf, wt in present) / tw
+
+    # Prefer rest_days from shortest window (most recent)
+    rest = None
+    for w in (3, 5, 10):
+        if w in windows and windows[w].rest_days is not None:
+            rest = windows[w].rest_days
+            break
+    return TeamForm(
+        pts=avg("pts"),
+        gd=avg("gd"),
+        gf=avg("gf"),
+        ga=avg("ga"),
+        sot_for=avg("sot_for"),
+        sot_against=avg("sot_against"),
+        n=max(tf.n for _, tf, _ in present),
+        rest_days=rest,
+    )
+
+
+def _tier_ppm_bonus(
+    tiered: Optional[Dict[str, Dict[str, float]]],
+    opponent_elo: Optional[float],
+) -> float:
+    """Small ±3% from ppm vs opponent tier when sample ≥ 5."""
+    if not tiered or opponent_elo is None:
+        return 0.0
+    tier = (
+        "vs_strong"
+        if opponent_elo >= 1650
+        else "vs_mid"
+        if opponent_elo >= 1500
+        else "vs_weak"
+    )
+    data = tiered.get(tier) or {}
+    if float(data.get("played") or 0) < 5:
+        return 0.0
+    ppm = float(data.get("ppm") or 1.0)
+    # league avg ~1.3–1.4 ppm; map gap into ±0.03
+    return float(min(max((ppm - 1.35) * 0.04, -0.03), 0.03))
+
+
+def form_lambda_adjust(
+    form_home: TeamForm,
+    form_away: TeamForm,
+    *,
+    multi_home: Optional[Dict[int, TeamForm]] = None,
+    multi_away: Optional[Dict[int, TeamForm]] = None,
+    tiered_home: Optional[Dict[str, Dict[str, float]]] = None,
+    tiered_away: Optional[Dict[str, Dict[str, float]]] = None,
+    elo_home: Optional[float] = None,
+    elo_away: Optional[float] = None,
+) -> Tuple[float, float]:
     """
     Multiplicative adjustment to expected goals from recent form.
     Sot (shots on target) acts as a stability proxy when goals are noisy.
+    Optional multi-window / tiered signals add at most ±3% each.
     """
+    fh = _blend_window_forms(multi_home) or form_home
+    fa = _blend_window_forms(multi_away) or form_away
+
     # Higher weight on SoT stability (0.50 gf / 0.50 sot)
-    home_att = 0.50 * form_home.gf + 0.50 * (form_home.sot_for / 3.5)
-    away_att = 0.50 * form_away.gf + 0.50 * (form_away.sot_for / 3.5)
-    home_def = 0.50 * form_home.ga + 0.50 * (form_home.sot_against / 3.5)
-    away_def = 0.50 * form_away.ga + 0.50 * (form_away.sot_against / 3.5)
+    home_att = 0.50 * fh.gf + 0.50 * (fh.sot_for / 3.5)
+    away_att = 0.50 * fa.gf + 0.50 * (fa.sot_for / 3.5)
+    home_def = 0.50 * fh.ga + 0.50 * (fh.sot_against / 3.5)
+    away_def = 0.50 * fa.ga + 0.50 * (fa.sot_against / 3.5)
 
     lam_mult = 1.0 + 0.08 * (home_att - 1.3) + 0.06 * (away_def - 1.3)
     mu_mult = 1.0 + 0.08 * (away_att - 1.3) + 0.06 * (home_def - 1.3)
 
+    lam_mult *= 1.0 + _tier_ppm_bonus(tiered_home, elo_away)
+    mu_mult *= 1.0 + _tier_ppm_bonus(tiered_away, elo_home)
+
     # Fatigue adjustment if rest < 3.5 days (84 hours turnaround)
-    if form_home.rest_days is not None and 0.0 < form_home.rest_days < 3.5:
+    if fh.rest_days is not None and 0.0 < fh.rest_days < 3.5:
         lam_mult *= 0.95
-    if form_away.rest_days is not None and 0.0 < form_away.rest_days < 3.5:
+    if fa.rest_days is not None and 0.0 < fa.rest_days < 3.5:
         mu_mult *= 0.95
 
     return float(min(max(lam_mult, 0.70), 1.35)), float(min(max(mu_mult, 0.70), 1.35))

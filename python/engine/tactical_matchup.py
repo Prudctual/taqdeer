@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Dict, Tuple
+from typing import Dict, Optional
 
 
 # المفاتيح مقاطع من slug معرف الفريق الفعلي بعد إزالة الشرطات
@@ -34,16 +34,31 @@ TEAM_STYLE_MAP: Dict[str, Dict[str, str]] = {
     "trabzonspor": {"formation": "4-3-3", "style": "المرتدات السريعة والتكتل الإقليمي"},
 }
 
+# Proxy PPDA: apply λ only when both sides have enough history
+MIN_PPDA_SAMPLES = 8
+LAMBDA_MULT_LO = 0.97
+LAMBDA_MULT_HI = 1.03
 
-def get_team_tactics(team_key: str) -> Dict[str, str]:
+
+def get_team_tactics(
+    team_key: str, ppda: Optional[float] = None
+) -> Dict[str, str]:
     """Retrieve formation and primary tactical playing style for a team."""
     clean_key = team_key.lower().replace(" ", "").replace("-", "").replace("_", "")
     for k, info in TEAM_STYLE_MAP.items():
         if k in clean_key:
-            return info
+            style = info["style"]
+            # Reinforce pressing label from proxy PPDA when map is thin on press wording
+            if ppda is not None and ppda <= 9.5 and "ضغط" not in style:
+                style = style + " والضغط العالي"
+            return {"formation": info["formation"], "style": style}
 
-    # Generic default for unknown teams
-    return {"formation": "4-3-3", "style": "أسلوب متوازن بين الاستحواذ والتراجع"}
+    style = "أسلوب متوازن بين الاستحواذ والتراجع"
+    if ppda is not None and ppda <= 9.5:
+        style = "الضغط العالي والتحول السريع"
+    elif ppda is not None and ppda >= 13.0:
+        style = "التكتل الدفاعي والمرتدات"
+    return {"formation": "4-3-3", "style": style}
 
 
 def evaluate_tactical_matchup(
@@ -51,14 +66,16 @@ def evaluate_tactical_matchup(
     away_team: str,
     ppda_home: float = 11.0,
     ppda_away: float = 11.0,
-) -> Dict[str, float | str]:
+    ppda_home_n: int = 0,
+    ppda_away_n: int = 0,
+) -> Dict[str, float | str | bool]:
     """
-    Evaluate tactical synergy, style clash, and vulnerability:
-    e.g. High possession team facing rapid counter-attacking opponent.
-    Returns lambda multipliers and matchup commentary.
+    Evaluate tactical synergy / style clash.
+    λ multipliers apply only when both teams have enough proxy-PPDA samples;
+    otherwise commentary-only with mults = 1.0.
     """
-    h_tac = get_team_tactics(home_team)
-    a_tac = get_team_tactics(away_team)
+    h_tac = get_team_tactics(home_team, ppda_home)
+    a_tac = get_team_tactics(away_team, ppda_away)
 
     h_form, h_style = h_tac["formation"], h_tac["style"]
     a_form, a_style = a_tac["formation"], a_tac["style"]
@@ -69,15 +86,19 @@ def evaluate_tactical_matchup(
 
     # 1. Possession vs Counter Attack Clash
     if "الاستحواذ" in h_style and "مرتدات" in a_style:
-        h_mult *= 0.96  # Possession team vulnerable to counters
-        a_mult *= 1.05  # Counter team thrives on turnovers
-        notes.append(f"{home_team} يستحوذ كثيراً ويترك مساحات قد يستغلها {away_team} بالمرتدات السريعة")
+        h_mult *= 0.96
+        a_mult *= 1.05
+        notes.append(
+            f"{home_team} يستحوذ كثيراً ويترك مساحات قد يستغلها {away_team} بالمرتدات السريعة"
+        )
     elif "الاستحواذ" in a_style and "مرتدات" in h_style:
         a_mult *= 0.96
         h_mult *= 1.05
-        notes.append(f"{away_team} سيمسك بالكرة لكنه يواجه خطورة مرتدات خاطفة من {home_team}")
+        notes.append(
+            f"{away_team} سيمسك بالكرة لكنه يواجه خطورة مرتدات خاطفة من {home_team}"
+        )
 
-    # 2. High Pressing vs High Pressing (High Pace Neutralizer)
+    # 2. High Pressing vs High Pressing (proxy PPDA ≤ 9)
     if ppda_home <= 9.0 and ppda_away <= 9.0:
         h_mult *= 0.98
         a_mult *= 0.98
@@ -85,20 +106,31 @@ def evaluate_tactical_matchup(
 
     # 3. 3-5-2 vs 4-3-3 Wing Back Overlap
     if h_form == "3-5-2" and a_form == "4-3-3":
-        notes.append(f"التشكيل {h_form} يمنح تفوقاً في عمق الوسط لكن يُعرض الأطراف لاختراق 4-3-3")
+        notes.append(
+            f"التشكيل {h_form} يمنح تفوقاً في عمق الوسط لكن يُعرض الأطراف لاختراق 4-3-3"
+        )
     elif a_form == "3-5-2" and h_form == "4-3-3":
         notes.append(f"تشكيل {a_form} سيزاحم كتل الوسط بينما يستغل الأطراف العريضة")
 
     commentary = " • ".join(notes) if notes else "صراع تكتيكي متوازن في خط الوسط والأطراف"
 
-    # مضاعفات λ = 1.0 حتى تتوفر أنماط PPDA حقيقية — النص للواجهة فقط
-    _ = (h_mult, a_mult)
+    apply_lambda = (
+        ppda_home_n >= MIN_PPDA_SAMPLES and ppda_away_n >= MIN_PPDA_SAMPLES
+    )
+    if apply_lambda:
+        h_out = float(min(max(h_mult, LAMBDA_MULT_LO), LAMBDA_MULT_HI))
+        a_out = float(min(max(a_mult, LAMBDA_MULT_LO), LAMBDA_MULT_HI))
+    else:
+        h_out = 1.0
+        a_out = 1.0
+
     return {
         "home_formation": h_form,
         "away_formation": a_form,
         "home_style": h_style,
         "away_style": a_style,
-        "home_lambda_mult": 1.0,
-        "away_lambda_mult": 1.0,
+        "home_lambda_mult": h_out,
+        "away_lambda_mult": a_out,
         "matchup_commentary": commentary,
+        "lambda_applied": apply_lambda,
     }
