@@ -1,8 +1,8 @@
-"""Multi-signal ensemble for match outcomes."""
+"""Multi-signal ensemble for match outcomes (ensemble-v4)."""
 
 from __future__ import annotations
 
-from typing import Dict, Optional, Tuple
+from typing import Dict, Mapping, Optional, Sequence, Tuple
 
 import numpy as np
 
@@ -13,15 +13,16 @@ from .dixon_coles import (
     markets_from_matrix,
     score_matrix,
 )
-from .elo import elo_outcome_probs
-from .form import TeamForm, form_lambda_adjust, multi_window_form, tiered_form
+from .elo import elo_home_adv_from_profile, elo_outcome_probs
+from .evaluate import apply_binary_temperature
+from .form import TeamForm, apply_congestion, form_lambda_adjust, multi_window_form, tiered_form
 from .h2h_engine import evaluate_h2h_advantage
 from .league_profiles import get_league_profile
 from .logistics_engine import evaluate_logistics_and_external_factors
-from .pi_ratings import PiState, pi_expected_goals
+from .pi_ratings import PiState, pi_expected_goals, pi_home_boost_from_profile
 from .player_impact import apply_absence_penalties
 from .referee_engine import evaluate_referee_impact
-from .sharp_market import detect_steam, steam_confidence_bonus
+from .sharp_market import closing_line_value, detect_steam, pick_market_odds, steam_confidence_bonus
 from .strengths_weaknesses import analyze_team_strengths_weaknesses
 from .tactical_matchup import evaluate_tactical_matchup
 from .weather_engine import apply_weather_to_lambdas
@@ -30,14 +31,17 @@ from .weather_engine import apply_weather_to_lambdas
 Prob3 = Tuple[float, float, float]
 
 WEIGHT_KEYS = ("dc", "pi", "elo", "form", "market", "context")
+FORM_BLEND_WEIGHT = 0.20
+OTHER_WEIGHT_KEYS = ("dc", "pi", "elo", "market", "context")
 DEFAULT_WEIGHTS: Dict[str, float] = {
-    "dc": 0.38,
-    "pi": 0.16,
-    "elo": 0.16,
-    "form": 0.10,
-    "market": 0.12,
-    "context": 0.08,
+    "dc": 0.34,
+    "pi": 0.14,
+    "elo": 0.14,
+    "form": FORM_BLEND_WEIGHT,
+    "market": 0.11,
+    "context": 0.07,
 }
+EARLY_SEASON_DAYS = 60
 
 
 def _norm(h: float, d: float, a: float) -> Prob3:
@@ -55,9 +59,38 @@ def _blend_many(parts: list[tuple[Prob3, float]]) -> Prob3:
     return _norm(h, d, a)
 
 
+def lock_form_weight(
+    weights: Dict[str, float],
+    form_share: float = FORM_BLEND_WEIGHT,
+) -> Dict[str, float]:
+    keys = [k for k in WEIGHT_KEYS if k in weights]
+    if not keys:
+        return dict(DEFAULT_WEIGHTS)
+
+    form_share = float(min(max(form_share, 0.0), 1.0))
+    if "form" not in keys:
+        raw = {k: max(0.0, float(weights.get(k, 0.0))) for k in keys}
+        s = sum(raw.values()) or 1.0
+        return {k: raw[k] / s for k in keys}
+
+    others = [k for k in keys if k != "form"]
+    rest = 1.0 - form_share
+    raw = {k: max(0.0, float(weights.get(k, 0.0))) for k in others}
+    s = sum(raw.values())
+    if not others:
+        return {"form": 1.0}
+    if s <= 0:
+        out = {k: rest / len(others) for k in others}
+    else:
+        out = {k: rest * raw[k] / s for k in others}
+    out["form"] = form_share
+    return out
+
+
 def blend_components(comp: Dict[str, Optional[Prob3]], weights: Dict[str, float]) -> Prob3:
-    """نفس خلط predict_match لكن من احتمالات مكوّنات مخزنة — لإعادة المزج بأوزان جديدة."""
-    parts = [(comp[k], weights[k]) for k in WEIGHT_KEYS if comp.get(k) is not None]
+    present = [k for k in WEIGHT_KEYS if comp.get(k) is not None]
+    w = lock_form_weight({k: float(weights.get(k, DEFAULT_WEIGHTS[k])) for k in present})
+    parts = [(comp[k], w[k]) for k in present]
     return _blend_many(parts)
 
 
@@ -66,25 +99,27 @@ def fit_weights(
     outcomes: list[str],
     ridge: float = 1.0,
 ) -> Dict[str, float]:
-    """
-    تعلُّم أوزان الخلط بتقليل log-loss على نافذة walk-forward (stacking فعلي).
-
-    softmax على θ يضمن أوزاناً موجبة مجموعها 1، والـridge نحو الافتراضيات يمنع
-    الانهيار على إشارة واحدة عندما تكون النافذة قصيرة (~100 مباراة لخمسة أوزان).
-    """
     import math
 
     if len(comps) < 40:
         return dict(DEFAULT_WEIGHTS)
     from scipy.optimize import minimize
 
-    theta0 = np.log(np.array([DEFAULT_WEIGHTS[k] for k in WEIGHT_KEYS]))
+    theta0 = np.log(
+        np.array([max(DEFAULT_WEIGHTS[k], 1e-6) for k in OTHER_WEIGHT_KEYS], dtype=float)
+    )
     y_idx = [{"H": 0, "D": 1, "A": 2}[o] for o in outcomes]
+    rest = 1.0 - FORM_BLEND_WEIGHT
+
+    def pack(theta: np.ndarray) -> Dict[str, float]:
+        w_other = np.exp(theta - theta.max())
+        w_other = (w_other / w_other.sum()) * rest
+        wd = {k: float(v) for k, v in zip(OTHER_WEIGHT_KEYS, w_other)}
+        wd["form"] = FORM_BLEND_WEIGHT
+        return wd
 
     def nll(theta: np.ndarray) -> float:
-        w = np.exp(theta - theta.max())
-        w = w / w.sum()
-        wd = dict(zip(WEIGHT_KEYS, w))
+        wd = pack(theta)
         total = ridge * float(np.sum((theta - theta0) ** 2))
         for c, yi in zip(comps, y_idx):
             p = blend_components(c, wd)
@@ -94,18 +129,12 @@ def fit_weights(
     res = minimize(
         nll, theta0, method="Nelder-Mead", options={"maxiter": 800, "xatol": 1e-3, "fatol": 1e-3}
     )
-    # res.x هو أفضل رأس في السمبلكس — لا يكون أسوأ من theta0 حتى بلا تقارب،
-    # وفحص success كان يرمي الأوزان المتعلَّمة كلما نفدت ميزانية التكرارات
-    theta = res.x
-    w = np.exp(theta - theta.max())
-    w = w / w.sum()
-    return {k: float(v) for k, v in zip(WEIGHT_KEYS, w)}
+    return pack(res.x)
 
 
 def value_signal(
     calibrated: Prob3, market_odds: tuple[float, float, float]
 ) -> Optional[Dict]:
-    """+EV مقابل أسعار السوق وحصة كيلي الربعية على الأفضل — بلا رهان دون عتبة 3%."""
     best = None
     for name, p, odds in zip(("home", "draw", "away"), calibrated, market_odds):
         b = odds - 1.0
@@ -121,25 +150,15 @@ def value_signal(
             "kelly": float(kelly),
             "stake": float(round(0.25 * kelly, 4)),
         }
-        # الترتيب بكيلي لا بـEV: كيلي = EV/(السعر−1)، فعند تساوي القيمة المتوقعة
-        # يُفضَّل الرهان الأقل تذبذباً — الأمثل لنموّ المحفظة اللوغاريتمي
         if best is None or cand["kelly"] > best["kelly"]:
             best = cand
     if best is None:
         return None
-    # نطاق موثوق 3–15%: تحت 3% ضجيج، وفوق 15% ضد سعر إغلاق يعني نقطة عمياء
-    # في النموذج (جولات ميتة، تدوير تشكيلات) لا فرصة حقيقية
     best["bet"] = bool(0.03 <= best["ev"] <= 0.15 and best["kelly"] > 0)
     return best
 
 
 def align_matrix_to_probs(mat: np.ndarray, target: Prob3) -> np.ndarray:
-    """
-    أعد وزن كتل المصفوفة (فوز/تعادل/خسارة) لتساوي الاحتمالات المعايرة،
-    مع حفظ شكل التوزيع داخل كل كتلة.
-
-    بدون هذا تعرض الصفحة رقمين متناقضين: شريط 1X2 معايَر وخريطة نتائج غير معايرة.
-    """
     n = mat.shape[0]
     i = np.arange(n)[:, None]
     j = np.arange(n)[None, :]
@@ -152,84 +171,50 @@ def align_matrix_to_probs(mat: np.ndarray, target: Prob3) -> np.ndarray:
     return out / total if total > 0 else mat
 
 
-def predict_match(
+def _blend_lambdas(
     *,
-    home: str,
-    away: str,
-    dc: DixonColesResult,
-    elo_home: float,
-    elo_away: float,
-    pi: PiState,
-    form_home: TeamForm,
-    form_away: TeamForm,
-    market_odds: Optional[tuple[float, float, float]] = None,
-    temperature: float = 1.0,
-    weights: Optional[Dict[str, float]] = None,
-    dc_shots: Optional[DixonColesResult] = None,
-    h2h_matches: Optional[list] = None,
-    league_id: Optional[str] = None,
-    weather: Optional[Dict] = None,
-    home_missing: Optional[list] = None,
-    away_missing: Optional[list] = None,
-    referee_profile: Optional[Dict] = None,
-    open_odds: Optional[tuple[float, float, float]] = None,
-    ppda_home: Optional[float] = None,
-    ppda_away: Optional[float] = None,
-    ppda_home_n: int = 0,
-    ppda_away_n: int = 0,
-    form_matches: Optional[list] = None,
-) -> Dict:
-    profile = get_league_profile(league_id)
-    w = dict(weights or DEFAULT_WEIGHTS)
-    # تفعيل مضاعفات ملف الدوري على Elo/Form قبل التطبيع
-    w["elo"] = float(w.get("elo", DEFAULT_WEIGHTS["elo"])) * float(profile.elo_weight_mult)
-    w["form"] = float(w.get("form", DEFAULT_WEIGHTS["form"])) * float(profile.form_weight_mult)
-    w.setdefault("context", DEFAULT_WEIGHTS["context"])
-    s_w = sum(max(0.0, float(w.get(k, 0.0))) for k in WEIGHT_KEYS) or 1.0
-    w = {k: max(0.0, float(w.get(k, 0.0))) / s_w for k in WEIGHT_KEYS}
-    # حرارة أعلى في الدوريات الصاخبة
-    temperature = float(temperature) * float(profile.noise_factor)
-
-    # --- Dixon-Coles base λ ---
-    lam_dc, mu_dc = dc_xg(dc, home, away)
-    multi_h = multi_a = None
-    tier_h = tier_a = None
-    if form_matches:
-        mw = multi_window_form(form_matches, windows=(3, 5, 10))
-        multi_h = mw.get(home)
-        multi_a = mw.get(away)
-        elo_map = {home: elo_home, away: elo_away}
-        # Expand elo map with any teams seen in form history at default 1500
-        for fm in form_matches:
-            elo_map.setdefault(fm.home, 1500.0)
-            elo_map.setdefault(fm.away, 1500.0)
-        tiers = tiered_form(form_matches, elo_map)
-        tier_h = tiers.get(home)
-        tier_a = tiers.get(away)
-    f_h, f_a = form_lambda_adjust(
-        form_home,
-        form_away,
-        multi_home=multi_h,
-        multi_away=multi_a,
-        tiered_home=tier_h,
-        tiered_away=tier_a,
-        elo_home=elo_home,
-        elo_away=elo_away,
-    )
-    lam_f = lam_dc * f_h
-    mu_f = mu_dc * f_a
-
-    # Pi-ratings λ
-    lam_pi, mu_pi = pi_expected_goals(pi, home, away)
-
-    # Blend intensities (geometric mean keeps Poisson-ish)
+    lam_f: float,
+    mu_f: float,
+    lam_pi: float,
+    mu_pi: float,
+    lam_dc: float,
+    mu_dc: float,
+    lam_sh: Optional[float],
+    mu_sh: Optional[float],
+    lam_xg: Optional[float],
+    mu_xg: Optional[float],
+) -> Tuple[float, float]:
     import math
 
-    lam_sh = mu_sh = None
-    if dc_shots is not None:
-        # DC مواز مدرَّب على أهداف زائفة من التسديدات — الأهداف ضجيج بواسوني
-        # والتسديدات تحمل إشارة القوة الأثبت (بديل xG العملي بلا بيانات تتبّع)
-        lam_sh, mu_sh = dc_xg(dc_shots, home, away)
+    if lam_xg is not None and mu_xg is not None and lam_sh is not None and mu_sh is not None:
+        lam = math.exp(
+            0.40 * math.log(lam_f)
+            + 0.16 * math.log(lam_pi)
+            + 0.07 * math.log(lam_dc)
+            + 0.17 * math.log(lam_sh)
+            + 0.20 * math.log(lam_xg)
+        )
+        mu = math.exp(
+            0.40 * math.log(mu_f)
+            + 0.16 * math.log(mu_pi)
+            + 0.07 * math.log(mu_dc)
+            + 0.17 * math.log(mu_sh)
+            + 0.20 * math.log(mu_xg)
+        )
+    elif lam_xg is not None and mu_xg is not None:
+        lam = math.exp(
+            0.48 * math.log(lam_f)
+            + 0.20 * math.log(lam_pi)
+            + 0.10 * math.log(lam_dc)
+            + 0.22 * math.log(lam_xg)
+        )
+        mu = math.exp(
+            0.48 * math.log(mu_f)
+            + 0.20 * math.log(mu_pi)
+            + 0.10 * math.log(mu_dc)
+            + 0.22 * math.log(mu_xg)
+        )
+    elif lam_sh is not None and mu_sh is not None:
         lam = math.exp(
             0.47 * math.log(lam_f)
             + 0.20 * math.log(lam_pi)
@@ -249,18 +234,132 @@ def predict_match(
         mu = math.exp(
             0.62 * math.log(mu_f) + 0.25 * math.log(mu_pi) + 0.13 * math.log(mu_dc)
         )
+    return float(lam), float(mu)
 
-    # Head-to-Head (H2H) Historical Dominance Adjustment
+
+def predict_match(
+    *,
+    home: str,
+    away: str,
+    dc: DixonColesResult,
+    elo_home: float,
+    elo_away: float,
+    pi: PiState,
+    form_home: TeamForm,
+    form_away: TeamForm,
+    market_odds: Optional[tuple[float, float, float]] = None,
+    temperature: float = 1.0,
+    weights: Optional[Dict[str, float]] = None,
+    dc_shots: Optional[DixonColesResult] = None,
+    dc_true_xg: Optional[DixonColesResult] = None,
+    h2h_matches: Optional[list] = None,
+    league_id: Optional[str] = None,
+    weather: Optional[Dict] = None,
+    home_missing: Optional[list] = None,
+    away_missing: Optional[list] = None,
+    referee_profile: Optional[Dict] = None,
+    open_odds: Optional[tuple[float, float, float]] = None,
+    sharp_odds: Optional[tuple[float, float, float]] = None,
+    close_odds: Optional[tuple[float, float, float]] = None,
+    ppda_home: Optional[float] = None,
+    ppda_away: Optional[float] = None,
+    ppda_home_n: int = 0,
+    ppda_away_n: int = 0,
+    form_matches: Optional[list] = None,
+    home_matches_7d: Optional[float] = None,
+    away_matches_7d: Optional[float] = None,
+    days_into_season: Optional[float] = None,
+    home_strength: Optional[Mapping[str, float]] = None,
+    away_strength: Optional[Mapping[str, float]] = None,
+    home_xi: Optional[Sequence[Dict]] = None,
+    away_xi: Optional[Sequence[Dict]] = None,
+    home_bench: Optional[Sequence[Dict]] = None,
+    away_bench: Optional[Sequence[Dict]] = None,
+    lineup_confirmed: bool = False,
+    temp_over25: float = 1.0,
+    temp_btts: float = 1.0,
+) -> Dict:
+    profile = get_league_profile(league_id)
+    w = dict(weights or DEFAULT_WEIGHTS)
+    early = days_into_season is not None and float(days_into_season) < EARLY_SEASON_DAYS
+    if early:
+        w["dc"] = float(w.get("dc", DEFAULT_WEIGHTS["dc"])) * 0.88
+        w["elo"] = float(w.get("elo", DEFAULT_WEIGHTS["elo"])) * 1.08
+    w["elo"] = float(w.get("elo", DEFAULT_WEIGHTS["elo"])) * float(profile.elo_weight_mult)
+    w.setdefault("context", DEFAULT_WEIGHTS["context"])
+    w = lock_form_weight(w, FORM_BLEND_WEIGHT)
+    temperature = float(temperature) * float(profile.noise_factor)
+    if early:
+        temperature *= 1.12
+
+    elo_ha = elo_home_adv_from_profile(profile.home_advantage)
+    pi_boost = pi_home_boost_from_profile(profile.home_advantage)
+
+    lam_dc, mu_dc = dc_xg(dc, home, away)
+    multi_h = multi_a = None
+    tier_h = tier_a = None
+    if form_matches:
+        mw = multi_window_form(form_matches, windows=(3, 5, 10))
+        multi_h = mw.get(home)
+        multi_a = mw.get(away)
+        elo_map = {home: elo_home, away: elo_away}
+        for fm in form_matches:
+            elo_map.setdefault(fm.home, 1500.0)
+            elo_map.setdefault(fm.away, 1500.0)
+        tiers = tiered_form(form_matches, elo_map)
+        tier_h = tiers.get(home)
+        tier_a = tiers.get(away)
+    f_h, f_a = form_lambda_adjust(
+        form_home,
+        form_away,
+        multi_home=multi_h,
+        multi_away=multi_a,
+        tiered_home=tier_h,
+        tiered_away=tier_a,
+        elo_home=elo_home,
+        elo_away=elo_away,
+    )
+    f_h, f_a = apply_congestion(
+        f_h,
+        f_a,
+        home_matches_7d=home_matches_7d,
+        away_matches_7d=away_matches_7d,
+    )
+    lam_f = lam_dc * f_h
+    mu_f = mu_dc * f_a
+
+    lam_pi, mu_pi = pi_expected_goals(pi, home, away, home_boost=pi_boost)
+
+    import math
+
+    lam_sh = mu_sh = None
+    if dc_shots is not None:
+        lam_sh, mu_sh = dc_xg(dc_shots, home, away)
+    lam_tx = mu_tx = None
+    if dc_true_xg is not None:
+        lam_tx, mu_tx = dc_xg(dc_true_xg, home, away)
+
+    lam, mu = _blend_lambdas(
+        lam_f=lam_f,
+        mu_f=mu_f,
+        lam_pi=lam_pi,
+        mu_pi=mu_pi,
+        lam_dc=lam_dc,
+        mu_dc=mu_dc,
+        lam_sh=lam_sh,
+        mu_sh=mu_sh,
+        lam_xg=lam_tx,
+        mu_xg=mu_tx,
+    )
+
     h2h_res = evaluate_h2h_advantage(home, away, h2h_matches)
     lam *= float(h2h_res["home_lambda_mult"])
     mu *= float(h2h_res["away_lambda_mult"])
 
-    # Artificial Turf Advantage (فرق ملاعب العشب الصناعي المعرفة في ملف الدوري)
     clean_home = home.lower().replace(" ", "").replace("-", "")
     if any(t in clean_home for t in profile.turf_teams):
-        lam *= 1.05  # +5% goal expectation bonus on artificial turf
+        lam *= 1.05
 
-    # Tactical Style Clash — capped λ when proxy PPDA history is sufficient
     tactics = evaluate_tactical_matchup(
         home,
         away,
@@ -272,7 +371,6 @@ def predict_match(
     lam *= float(tactics["home_lambda_mult"])
     mu *= float(tactics["away_lambda_mult"])
 
-    # طقس حقيقي (إن وُجدت قراءات) → خصم غياب بالمركز → حكم
     weather_res = apply_weather_to_lambdas(
         lam,
         mu,
@@ -284,7 +382,19 @@ def predict_match(
     lam = float(weather_res["lambda_home"])
     mu = float(weather_res["lambda_away"])
 
-    player_res = apply_absence_penalties(lam, mu, home_missing, away_missing)
+    player_res = apply_absence_penalties(
+        lam,
+        mu,
+        home_missing,
+        away_missing,
+        home_strength=home_strength,
+        away_strength=away_strength,
+        home_xi=home_xi,
+        away_xi=away_xi,
+        home_bench=home_bench,
+        away_bench=away_bench,
+        lineup_confirmed=lineup_confirmed,
+    )
     lam = float(player_res["lambda_home"])
     mu = float(player_res["lambda_away"])
 
@@ -292,17 +402,30 @@ def predict_match(
     lam *= float(referee_res["lambda_mult"])
     mu *= float(referee_res["lambda_mult"])
 
-    steam_res = detect_steam(open_odds, market_odds)
+    market_for_steam, market_src = pick_market_odds(
+        sharp=sharp_odds, current=market_odds, soft_avg=market_odds
+    )
+    steam_res = detect_steam(open_odds, market_for_steam or market_odds)
 
-    # ملخص الراحة للعرض فقط — خصم الإرهاق الكمي مطبق مسبقاً في form_lambda_adjust
     logistics = evaluate_logistics_and_external_factors(
         home_team=home,
         away_team=away,
         rest_days_home=form_home.rest_days,
         rest_days_away=form_away.rest_days,
     )
+    if home_matches_7d is not None and home_matches_7d >= 3:
+        logistics = dict(logistics)
+        logistics["logistics_summary"] = (
+            (logistics.get("logistics_summary") or "")
+            + f" · ازدحام مضيف {home_matches_7d:.0f} مباريات/7ي"
+        ).strip(" ·")
+    if away_matches_7d is not None and away_matches_7d >= 3:
+        logistics = dict(logistics)
+        logistics["logistics_summary"] = (
+            (logistics.get("logistics_summary") or "")
+            + f" · ازدحام ضيف {away_matches_7d:.0f} مباريات/7ي"
+        ).strip(" ·")
 
-    # Opponent Strengths & Weaknesses Analysis
     sw_home = analyze_team_strengths_weaknesses(
         team_name=home,
         gf_avg=form_home.gf,
@@ -326,7 +449,6 @@ def predict_match(
         rest_days=form_away.rest_days,
     )
 
-    # Tight & Low-Scoring contest detection
     elo_diff = abs(elo_home - elo_away)
     total_xg = lam + mu
     is_low_scoring = total_xg <= (profile.avg_match_goals * 0.70)
@@ -343,9 +465,6 @@ def predict_match(
     mk_ctx = markets_from_matrix(mat)
     context_p: Prob3 = (mk_ctx["p_home"], mk_ctx["p_draw"], mk_ctx["p_away"])
 
-    # dc_p uses raw DC lambdas — NOT the blended lam/mu which already contain
-    # Pi and Form signals. Using blended lambdas here would double-count those
-    # signals when dc_p is later blended with pi_p and form_p in _blend_many.
     mat_dc_raw = score_matrix(lam_dc * f_h, mu_dc * f_a, dc.rho)
     mk_dc = markets_from_matrix(mat_dc_raw)
     dc_p = (mk_dc["p_home"], mk_dc["p_draw"], mk_dc["p_away"])
@@ -354,12 +473,13 @@ def predict_match(
     mk_pi = markets_from_matrix(mat_pi)
     pi_p = (mk_pi["p_home"], mk_pi["p_draw"], mk_pi["p_away"])
 
-    elo_p = elo_outcome_probs(elo_home, elo_away)
+    elo_p = elo_outcome_probs(
+        elo_home, elo_away, home_adv=elo_ha, draw_base=float(profile.draw_baseline)
+    )
 
-    # Form as 1X2 via points differential
-    pts_gap = form_home.pts - form_away.pts  # per-match avg points last 5
-    # map pts_gap (-3..3) to home lean
-    home_lean = 1 / (1 + math.exp(-1.1 * pts_gap))
+    pts_gap = form_home.pts - form_away.pts
+    form_steep = 1.1 * float(profile.form_weight_mult)
+    home_lean = 1 / (1 + math.exp(-form_steep * pts_gap))
     form_draw = profile.draw_baseline + 0.05 * (1 - abs(pts_gap) / 3)
     if is_tight:
         form_draw += 0.03
@@ -367,39 +487,54 @@ def predict_match(
         form_draw += 0.04
     form_p = _norm(home_lean * (1 - form_draw), form_draw, (1 - home_lean) * (1 - form_draw))
 
-    parts: list[tuple[Prob3, float]] = [
-        (dc_p, w["dc"]),
-        (pi_p, w["pi"]),
-        (elo_p, w["elo"]),
-        (form_p, w["form"]),
-        (context_p, w["context"]),
-    ]
-
+    blend_odds, blend_src = pick_market_odds(
+        sharp=sharp_odds, current=market_odds, soft_avg=None
+    )
     market_p = None
-    if market_odds:
+    if blend_odds:
+        market_p = odds_to_probs(*blend_odds)
+    elif market_odds:
         market_p = odds_to_probs(*market_odds)
-        if market_p:
-            parts.append((market_p, w["market"]))
+        blend_src = "avg"
+
+    present_keys = ["dc", "pi", "elo", "form", "context"]
+    if market_p is not None:
+        present_keys.append("market")
+    w_eff = lock_form_weight({k: w[k] for k in present_keys}, FORM_BLEND_WEIGHT)
+
+    parts: list[tuple[Prob3, float]] = [
+        (dc_p, w_eff["dc"]),
+        (pi_p, w_eff["pi"]),
+        (elo_p, w_eff["elo"]),
+        (form_p, w_eff["form"]),
+        (context_p, w_eff["context"]),
+    ]
+    if market_p is not None:
+        parts.append((market_p, w_eff["market"]))
 
     blended = _blend_many(parts)
     calibrated = apply_temperature(blended, temperature)
 
-    # وفّق المصفوفة مع 1X2 المعايَر ثم اشتق كل الأسواق منها — مصدر واحد للحقيقة
     mat = align_matrix_to_probs(mat, calibrated)
     mk = markets_from_matrix(mat)
+    p_over25 = apply_binary_temperature(float(mk["p_over25"]), temp_over25)
+    p_btts = apply_binary_temperature(float(mk["p_btts_yes"]), temp_btts)
 
-    # EV صادق: احتمالات بلا مكوّن السوق مقابل خط الأودز (تفضيل open إن وُجد)
     edge = None
     value = None
+    w_fair = lock_form_weight(
+        {k: w[k] for k in ("dc", "pi", "elo", "form", "context")},
+        FORM_BLEND_WEIGHT,
+    )
     fair_parts = [
-        (dc_p, w["dc"]),
-        (pi_p, w["pi"]),
-        (elo_p, w["elo"]),
-        (form_p, w["form"]),
-        (context_p, w["context"]),
+        (dc_p, w_fair["dc"]),
+        (pi_p, w_fair["pi"]),
+        (elo_p, w_fair["elo"]),
+        (form_p, w_fair["form"]),
+        (context_p, w_fair["context"]),
     ]
     fair = apply_temperature(_blend_many(fair_parts), temperature)
-    value_odds = open_odds if open_odds else market_odds
+    value_odds = open_odds if open_odds else (sharp_odds or market_odds)
     if value_odds:
         value_market = odds_to_probs(*value_odds)
         if value_market:
@@ -410,21 +545,21 @@ def predict_match(
             }
             value = value_signal(fair, value_odds)
 
-    # Expected points for home/away
+    model_side = (
+        "home"
+        if fair[0] >= fair[1] and fair[0] >= fair[2]
+        else ("draw" if fair[1] >= fair[2] else "away")
+    )
+    clv_res = closing_line_value(fair, close_odds=close_odds, side=model_side)
+
     xpts_home = 3 * calibrated[0] + calibrated[1]
     xpts_away = 3 * calibrated[2] + calibrated[1]
 
     conf = max(calibrated)
-    # sharper when signals agree
     agree = 1.0 - (
         abs(dc_p[0] - elo_p[0]) + abs(dc_p[0] - pi_p[0]) + abs(dc_p[0] - form_p[0])
     ) / 3
     confidence = float(min(0.95, max(0.18, 0.55 * conf + 0.35 * max(agree, 0))))
-    model_side = (
-        "home"
-        if calibrated[0] >= calibrated[1] and calibrated[0] >= calibrated[2]
-        else ("draw" if calibrated[1] >= calibrated[2] else "away")
-    )
     confidence = float(
         min(0.95, confidence + steam_confidence_bonus(steam_res, model_side))
     )
@@ -445,45 +580,53 @@ def predict_match(
         "p_home": calibrated[0],
         "p_draw": calibrated[1],
         "p_away": calibrated[2],
-        "p_btts_yes": mk["p_btts_yes"],
-        "p_over25": mk["p_over25"],
+        "p_btts_yes": p_btts,
+        "p_over25": p_over25,
         "matrix": mat,
         "confidence": confidence,
         "xpts_home": xpts_home,
         "xpts_away": xpts_away,
         "double_chance": double_chance,
         "components": {
-            # ما يدخل الخلط فعلاً (dc≈0.38 + context≈0.08): λ بعد تعديلات السياق —
-            # لا DC الخام، حتى يصدق تتبّع الرقم على صفحة المباراة
             "dixon_coles": {"p": dc_p, "lambda": [lam, mu]},
             "pi_ratings": {"p": pi_p, "lambda": [lam_pi, mu_pi]},
-            "elo": {"p": elo_p, "ratings": [elo_home, elo_away]},
+            "elo": {"p": elo_p, "ratings": [elo_home, elo_away], "home_adv": elo_ha},
             "form": {
                 "p": form_p,
                 "home_pts": form_home.pts,
                 "away_pts": form_away.pts,
                 "home_gd": form_home.gd,
                 "away_gd": form_away.gd,
+                "blend_weight": FORM_BLEND_WEIGHT,
             },
-            "market": {"p": market_p, "odds": market_odds},
+            "market": {
+                "p": market_p,
+                "odds": blend_odds or market_odds,
+                "source": blend_src,
+            },
             "shots_dc": {"lambda": [lam_sh, mu_sh]} if lam_sh is not None else None,
+            "true_xg_dc": {"lambda": [lam_tx, mu_tx]} if lam_tx is not None else None,
             "h2h": h2h_res,
             "tactics": tactics,
             "logistics": logistics,
             "weather": weather_res,
             "player_impact": player_res,
             "referee": referee_res,
-            "sharp": steam_res,
+            "sharp": {**steam_res, "market_source": market_src},
+            "clv": clv_res,
             "context": {"p": context_p, "lambda": [lam, mu]},
             "home_sw": sw_home,
             "away_sw": sw_away,
             "blended_pre_cal": blended,
             "temperature": temperature,
+            "temp_over25": temp_over25,
+            "temp_btts": temp_btts,
             "double_chance": double_chance,
             "is_low_scoring": bool(total_xg < 1.8),
+            "early_season": bool(early),
         },
         "edge": edge,
         "value": value,
-        "weights": w,
+        "weights": w_eff,
+        "clv": clv_res,
     }
-

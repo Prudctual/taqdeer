@@ -98,7 +98,7 @@ export default function ChartsPage() {
         {/* Hero Header Banner */}
         <div className="rounded-2xl border border-line bg-panel p-6 sm:p-8 space-y-4 shadow-2xs mt-2">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-accent-dim border border-line text-accent font-black text-xs">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-accent-dim border border-line text-accent font-semibold text-xs">
               مركز المخططات والرسوم البيانية للمباريات
             </span>
 
@@ -110,7 +110,7 @@ export default function ChartsPage() {
           </div>
 
           <div className="space-y-2">
-            <h1 className="text-2xl sm:text-4xl font-black text-ink tracking-tight leading-tight">
+            <h1 className="text-2xl sm:text-4xl font-semibold text-ink tracking-tight leading-tight">
               الرسوم البيانية المباشرة المرتبطة بالمباريات
             </h1>
             <p className="text-xs sm:text-sm font-semibold text-muted leading-relaxed max-w-3xl">

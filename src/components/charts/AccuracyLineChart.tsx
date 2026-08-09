@@ -29,7 +29,7 @@ export function AccuracyLineChart() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
-            <h3 className="text-base sm:text-lg font-black text-ink">
+            <h3 className="text-base sm:text-lg font-semibold text-ink">
               مسار تطور دقة التوقعات عبر الجولات
             </h3>
           </div>
@@ -112,7 +112,7 @@ export function AccuracyLineChart() {
 
       <div className="pt-3 border-t border-line flex items-center justify-between text-xs text-muted font-semibold">
         <span>تحسن مستمر بـ +10.0% منذ انطلاق الموسم</span>
-        <span className="font-mono font-black text-success">
+        <span className="font-mono font-semibold text-success">
           استقرار المعايرة: 94.2%
         </span>
       </div>

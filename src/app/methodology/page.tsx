@@ -10,7 +10,8 @@ export const metadata: Metadata = {
     "كيف تُحسب احتمالات تقدير: Dixon–Coles، Elo، Pi-ratings، الفورم، ودمج الإشارة مع خط السوق.",
 };
 
-export const revalidate = 300;
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 const steps = [
   {
@@ -42,15 +43,15 @@ const steps = [
     role: "الحالة الراهنة",
     titleAr: "الفورم متعدد النوافذ والتسديدات",
     titleEn: "Form 3/5/10 + Shots",
-    body: "مزج فورم 3 و5 و10 مباريات مع التسديدات على المرمى كمؤشر خطورة عملي (ليس xG تتبّعي)، وخصم إرهاق عند راحة أقل من 84 ساعة.",
+    body: "مزج فورم 3 و5 و10 مباريات مع التسديدات/xG، وخصم إرهاق عند راحة أقل من 84 ساعة أو ازدحام ≥3 مباريات/7 أيام. حصته في المزيج النهائي ثابتة عند 20٪.",
     color: "var(--warn)",
   },
   {
     n: "05",
     role: "الإشارة الخارجية",
-    titleAr: "سيولة أسواق المراهنين",
-    titleEn: "Market Odds Implied",
-    body: "احتمالات ضمنية من متوسط أسعار السوق بعد خصم الهامش (Power Method) — وزن افتراضي 0.12.",
+    titleAr: "خط السوق الحاد ثم المتوسط",
+    titleEn: "Sharp Market + CLV",
+    body: "تفضيل Pinnacle/PS عند التوفر، ثم متوسط الكتب، بعد خصم الهامش (Power Method). يُتتبَّع CLV مقابل خط الإغلاق بعد الصافرة.",
     color: "var(--away)",
   },
   {
@@ -58,7 +59,7 @@ const steps = [
     role: "سياق المباراة",
     titleAr: "تعديلات λ ثم خلط السياق",
     titleEn: "Context λ stack",
-    body: "بعد مزج DC/Pi تُطبَّق تعديلات محدودة (H2H، عشب، تكتيك مقيد بـPPDA تقريبي، طقس، غيابات بالمركز، حكم) ثم تدخل 1X2 الناتجة كمكوّن context بوزن ~0.08. معايرة الحرارة (Temperature) خطوة لاحقة وليست إشارة خلط سادسة منفصلة.",
+    body: "بعد مزج DC/Pi/shots/true-xG تُطبَّق تعديلات محدودة (H2H، عشب، تكتيك مقيد، طقس، غيابات×قوة لاعب/XI، حكم) ثم تدخل 1X2 كمكوّن context. معايرة الحرارة وحرارة O2.5/BTTS خطوات لاحقة.",
     color: "var(--accent)",
   },
 ];
@@ -78,7 +79,7 @@ export default function MethodologyPage() {
         {/* Hero Header Banner */}
         <div className="rounded-2xl border border-line bg-panel p-6 sm:p-8 space-y-4 shadow-2xs mt-2">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-accent/10 border border-accent/20 text-accent font-black text-xs">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-accent/10 border border-accent/20 text-accent font-semibold text-xs">
               المنهجية والتحليل الحسابي
             </span>
 
@@ -90,7 +91,7 @@ export default function MethodologyPage() {
           </div>
 
           <div className="space-y-2">
-            <h1 className="text-2xl sm:text-4xl font-black text-ink tracking-tight leading-tight">
+            <h1 className="text-2xl sm:text-4xl font-semibold text-ink tracking-tight leading-tight">
               كيف تُحسب التوقعات الإحصائية؟
             </h1>
             <p className="text-xs sm:text-sm font-semibold text-muted leading-relaxed max-w-3xl">
@@ -113,11 +114,11 @@ export default function MethodologyPage() {
             <span className="px-2.5 py-1 rounded-lg bg-surface border border-warn/30 text-amber-600 dark:text-amber-400 font-mono font-bold text-xs">
               04. Form & Shots
             </span>
-            <span className="px-2.5 py-1 rounded-lg bg-surface border border-rose-500/30 text-danger font-mono font-bold text-xs">
+            <span className="px-2.5 py-1 rounded-lg bg-surface border border-danger/30 text-danger font-mono font-bold text-xs">
               05. Market Odds
             </span>
             <span className="px-2.5 py-1 rounded-lg bg-surface border border-sky-500/30 text-sky-600 dark:text-sky-400 font-mono font-bold text-xs">
-              06. Softmax Temp
+              06. Context λ
             </span>
           </div>
         </div>
@@ -148,7 +149,7 @@ export default function MethodologyPage() {
             >
               <div className="flex items-center justify-between">
                 <span
-                  className="font-mono font-black text-xs px-2.5 py-1 rounded-lg border"
+                  className="font-mono font-semibold text-xs px-2.5 py-1 rounded-lg border"
                   style={{
                     color: s.color,
                     borderColor: `${s.color}33`,
@@ -163,7 +164,7 @@ export default function MethodologyPage() {
               </div>
 
               <div className="space-y-1">
-                <h3 className="text-sm sm:text-base font-black text-ink">{s.titleAr}</h3>
+                <h3 className="text-sm sm:text-base font-semibold text-ink">{s.titleAr}</h3>
                 <p className="text-xs font-semibold text-muted leading-relaxed pt-1">
                   {s.body}
                 </p>
@@ -181,7 +182,7 @@ export default function MethodologyPage() {
           </p>
           <p>
             المقاييس المنشورة في{" "}
-            <Link href="/accuracy" className="font-black text-accent underline">
+            <Link href="/accuracy" className="font-semibold text-accent underline">
               صفحة الدقة
             </Link>{" "}
             تقيس <strong className="text-ink font-bold">اللبّ الإحصائي</strong> بلا طقس/إصابات حية (منع تسريب). صفحات المباريات قد تتضمن إثراءً حياً بعد التدريب أو إعادة التوقع عند تأكيد التشكيلة.
@@ -192,10 +193,10 @@ export default function MethodologyPage() {
       {/* حدود صادقة */}
       <div className="rounded-2xl border border-amber-500/40 bg-surface overflow-hidden shadow-2xs">
         <div className="bg-warn/15 border-b border-warn/25 px-5 py-3.5 flex items-center justify-between">
-          <span className="font-black text-ink text-sm sm:text-base">
+          <span className="font-semibold text-ink text-sm sm:text-base">
             حدود وحقائق صادقة عن النموذج
           </span>
-          <span className="bg-warn text-on-fill font-extrabold text-[11px] px-3 py-1 rounded-full">
+          <span className="bg-warn text-on-fill font-semibold text-[11px] px-3 py-1 rounded-full">
             تنبيه منهجي
           </span>
         </div>

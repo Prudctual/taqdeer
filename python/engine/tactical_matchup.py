@@ -36,8 +36,9 @@ TEAM_STYLE_MAP: Dict[str, Dict[str, str]] = {
 
 # Proxy PPDA: apply λ only when both sides have enough history
 MIN_PPDA_SAMPLES = 8
-LAMBDA_MULT_LO = 0.97
-LAMBDA_MULT_HI = 1.03
+# سقف أوسع قليلاً عند عيّنة PPDA كافية (لا يزال proxy وليس Opta)
+LAMBDA_MULT_LO = 0.96
+LAMBDA_MULT_HI = 1.04
 
 
 def get_team_tactics(

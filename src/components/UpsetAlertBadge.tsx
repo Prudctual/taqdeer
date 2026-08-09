@@ -56,18 +56,18 @@ export function UpsetAlertBadge({
       {/* Header bar - ultra clear text contrast */}
       <div className="bg-warn-dim border-b border-warn/30 px-4 py-3 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2.5">
-          <span className="font-black text-ink text-xs sm:text-sm">
+          <span className="font-semibold text-ink text-xs sm:text-sm">
             تنبيه مفاجأة متوقعة في المباراة
           </span>
         </div>
-        <span className="bg-warn text-on-fill font-extrabold text-[11px] px-3 py-1 rounded-full shadow-xs">
+        <span className="bg-warn text-on-fill font-semibold text-[11px] px-3 py-1 rounded-full shadow-xs">
           خطر تعثر {favoriteName}
         </span>
       </div>
 
       {/* Body text */}
       <div className="p-4 bg-surface text-start">
-        <p className="text-xs sm:text-sm font-extrabold text-ink leading-relaxed">
+        <p className="text-xs sm:text-sm font-semibold text-ink leading-relaxed">
           {reason}
         </p>
       </div>

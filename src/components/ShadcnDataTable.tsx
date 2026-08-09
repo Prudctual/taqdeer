@@ -104,7 +104,7 @@ export function ShadcnDataTable({
             placeholder="تصفية باسم الفريق..."
             className="w-full rounded-lg border border-line bg-surface px-3 py-1.5 pe-8 text-xs text-ink placeholder-faint focus:border-accent focus:outline-none transition-all"
           />
-          <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-faint text-xs">
+          <span className="absolute start-2.5 top-1/2 -translate-y-1/2 text-faint text-xs">
             🔍
           </span>
         </div>
@@ -220,9 +220,9 @@ export function ShadcnDataTable({
                               awayGoals: m.awayScore,
                             });
                             return (
-                              <span className={`inline-flex items-center justify-center px-1.5 py-0.5 rounded-md border font-mono font-black text-xs tabular min-w-[2.75rem] ${
+                              <span className={`inline-flex items-center justify-center px-1.5 py-0.5 rounded-md border font-mono font-semibold text-xs tabular min-w-[2.75rem] ${
                                 isLive
-                                  ? "bg-live/10 border-live/40 text-live animate-pulse"
+                                  ? "bg-live/10 border-live/40 text-live"
                                   : "bg-panel border-line text-ink"
                               }`}>
                                 {score ?? badge}

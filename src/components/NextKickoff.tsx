@@ -1,11 +1,15 @@
+"use client";
+
 import Link from "next/link";
 import { ChevronIcon } from "./ChevronIcon";
 import { Crest } from "./Crest";
+import { LiveMatchClock } from "./LiveMatchClock";
 import {
   formatCountdown,
   formatLongDate,
   formatMatchTime,
   formatRelativeDay,
+  hasKnownKickoffTime,
   pct,
   topOutcome,
 } from "@/lib/format";
@@ -67,8 +71,9 @@ export function NextKickoff({ m }: { m: MatchCard }) {
     m.pHome != null ? topOutcome(m.pHome, m.pDraw!, m.pAway!) : null;
   const relative = formatRelativeDay(m.utcDate);
   const longDate = formatLongDate(m.utcDate);
+  const knownTime = hasKnownKickoffTime(m.utcDate);
   const time = formatMatchTime(m.utcDate);
-  const countdown = formatCountdown(m.utcDate);
+  const countdown = knownTime ? formatCountdown(m.utcDate) : null;
   const tone = m.leagueId?.toLowerCase() || undefined;
 
   return (
@@ -81,10 +86,14 @@ export function NextKickoff({ m }: { m: MatchCard }) {
       <div className="league-band flex-wrap">
         <span className="flex min-w-0 items-center gap-2">
           {isLive ? (
-            <span className="live-badge text-[10px]">
-              <span className="live-badge-dot live-pulse-dot" />
-              مباشر الآن
-            </span>
+            <LiveMatchClock
+              utcDate={m.utcDate}
+              liveMinute={m.minute}
+              liveStatusAr={m.liveStatusAr}
+              size="chip"
+              showPeriod={false}
+              className="text-[10px]"
+            />
           ) : (
             <span className="type-label">إحاطة الجولة</span>
           )}
@@ -97,7 +106,7 @@ export function NextKickoff({ m }: { m: MatchCard }) {
         </span>
         <span suppressHydrationWarning className="flex flex-wrap items-center gap-x-1.5 text-[11px] tabular text-muted">
           {isLive ? (
-            <span className="font-extrabold text-live">
+            <span className="font-semibold text-live">
               {m.liveStatusAr || (m.minute ? `الدقيقة ${m.minute}'` : "جارية الآن")}
             </span>
           ) : (
@@ -111,12 +120,16 @@ export function NextKickoff({ m }: { m: MatchCard }) {
                 </>
               ) : null}
               <span>{longDate}</span>
-              <span className="text-line" aria-hidden>
-                ·
-              </span>
-              <time dateTime={m.utcDate} className="font-medium text-ink">
-                {time}
-              </time>
+              {knownTime ? (
+                <>
+                  <span className="text-line" aria-hidden>
+                    ·
+                  </span>
+                  <time dateTime={m.utcDate} className="font-medium text-ink">
+                    {time}
+                  </time>
+                </>
+              ) : null}
               {countdown ? (
                 <>
                   <span className="text-line" aria-hidden>
@@ -134,7 +147,7 @@ export function NextKickoff({ m }: { m: MatchCard }) {
         <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 px-4 py-4 sm:px-5">
           <TeamLine name={m.homeNameAr} crestUrl={m.homeCrestUrl} side="home" />
           {score ? (
-            <span className={`text-xl sm:text-2xl font-mono font-black bg-panel border px-3 py-1 rounded-xl shadow-xs tabular ${
+            <span className={`text-xl sm:text-2xl font-mono font-semibold bg-panel border px-3 py-1 rounded-xl shadow-xs tabular ${
               isLive
                 ? "text-live border-live/40"
                 : "text-ink border-line"

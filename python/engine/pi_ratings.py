@@ -54,8 +54,20 @@ def update_pi(
     return PiState(off=off, deff=deff)
 
 
+def pi_home_boost_from_profile(log_ha: float | None, fallback: float = 0.22) -> float:
+    """يربط أفضلية الأرض في بروفايل الدوري بمضاعف λ للمضيف في Pi."""
+    if log_ha is None:
+        return fallback
+    # log_ha≈0.22 → boost≈0.22؛ تركيا أعلى قليلاً
+    return float(min(max(float(log_ha), 0.14), 0.34))
+
+
 def pi_expected_goals(
-    state: PiState, home: str, away: str, base: float = 1.25, home_boost: float = 0.22
+    state: PiState,
+    home: str,
+    away: str,
+    base: float = 1.25,
+    home_boost: float = 0.22,
 ) -> Tuple[float, float]:
     """Map rating gap into Poisson intensities."""
     import math

@@ -1,5 +1,8 @@
+"use client";
+
 import Link from "next/link";
 import { Crest } from "./Crest";
+import { LiveMatchClock } from "./LiveMatchClock";
 import { formatShortDate } from "@/lib/format";
 import { matchDisplay } from "@/lib/match-status";
 import type { MatchCard } from "@/lib/queries";
@@ -15,9 +18,11 @@ export function HeroMatchBanner({ match }: { match: MatchCard | null }) {
     minute: match.minute,
     liveStatusAr: match.liveStatusAr,
   });
-  const pHome = match.pHome ? Math.round(match.pHome * 100) : 48;
-  const pDraw = match.pDraw ? Math.round(match.pDraw * 100) : 24;
-  const pAway = match.pAway ? Math.round(match.pAway * 100) : 28;
+  const hasPred =
+    match.pHome != null && match.pDraw != null && match.pAway != null;
+  const pHome = hasPred ? match.pHome! * 100 : null;
+  const pDraw = hasPred ? match.pDraw! * 100 : null;
+  const pAway = hasPred ? match.pAway! * 100 : null;
 
   return (
     <div className={`relative overflow-hidden rounded-2xl border-2 p-5 sm:p-7 shadow-xs transition-all ${
@@ -30,10 +35,13 @@ export function HeroMatchBanner({ match }: { match: MatchCard | null }) {
             <span>🏆 {match.leagueNameAr}</span>
             <span className="text-faint">•</span>
             {isLive ? (
-              <span className="live-badge">
-                <span className="live-badge-dot live-pulse-dot" />
-                <span>{match.liveStatusAr || (match.minute ? `د ${match.minute}'` : "مباشر الآن")}</span>
-              </span>
+              <LiveMatchClock
+                utcDate={match.utcDate}
+                liveMinute={match.minute}
+                liveStatusAr={match.liveStatusAr}
+                size="chip"
+                showPeriod={false}
+              />
             ) : (
               <span className="text-muted">{formatShortDate(match.utcDate)}</span>
             )}
@@ -42,11 +50,11 @@ export function HeroMatchBanner({ match }: { match: MatchCard | null }) {
           <div className="flex items-center gap-4 sm:gap-6">
             <div className="flex items-center gap-3">
               <Crest src={match.homeCrestUrl} alt={match.homeNameAr} size="md" />
-              <span className="text-base sm:text-lg font-black text-ink">{match.homeNameAr}</span>
+              <span className="text-base sm:text-lg font-semibold text-ink">{match.homeNameAr}</span>
             </div>
             
             {score ? (
-              <span className={`text-lg sm:text-2xl font-mono font-black bg-panel border px-3 py-1 rounded-xl shadow-xs tabular ${
+              <span className={`text-lg sm:text-2xl font-mono font-semibold bg-panel border px-3 py-1 rounded-xl shadow-xs tabular ${
                 isLive
                   ? "text-live border-live/40"
                   : "text-ink border-line"
@@ -61,16 +69,17 @@ export function HeroMatchBanner({ match }: { match: MatchCard | null }) {
 
             <div className="flex items-center gap-3">
               <Crest src={match.awayCrestUrl} alt={match.awayNameAr} size="md" />
-              <span className="text-base sm:text-lg font-black text-ink">{match.awayNameAr}</span>
+              <span className="text-base sm:text-lg font-semibold text-ink">{match.awayNameAr}</span>
             </div>
           </div>
 
-          {/* Simple Probabilities Bar */}
+          {/* نسب النموذج الحالية فقط — بلا أرقام افتراضية */}
+          {hasPred ? (
           <div className="space-y-1.5 max-w-md">
             <div className="flex justify-between text-[11px] font-bold text-muted tabular">
-              <span>فوز {match.homeNameAr} ({pHome}٪)</span>
-              <span>تعادل ({pDraw}٪)</span>
-              <span>فوز {match.awayNameAr} ({pAway}٪)</span>
+              <span>فوز {match.homeNameAr} ({pHome!.toFixed(1)}٪)</span>
+              <span>تعادل ({pDraw!.toFixed(1)}٪)</span>
+              <span>فوز {match.awayNameAr} ({pAway!.toFixed(1)}٪)</span>
             </div>
             <div className="flex h-2 w-full overflow-hidden rounded-full bg-panel">
               <div style={{ width: `${pHome}%` }} className="bg-home" />
@@ -78,13 +87,14 @@ export function HeroMatchBanner({ match }: { match: MatchCard | null }) {
               <div style={{ width: `${pAway}%` }} className="bg-away" />
             </div>
           </div>
+          ) : null}
         </div>
 
         {/* Right Action */}
         <div className="shrink-0">
           <Link
             href={`/match/${match.id}`}
-            className="press-scale inline-flex items-center justify-center gap-2 rounded-xl bg-accent px-5 py-3 text-xs font-extrabold text-on-fill no-underline shadow-xs hover:bg-accent/90 transition-all"
+            className="press-scale inline-flex items-center justify-center gap-2 rounded-xl bg-accent px-5 py-3 text-xs font-semibold text-on-fill no-underline shadow-xs hover:bg-accent/90 transition-all"
           >
             <span>تحليل المباراة والتوقعات</span>
             <span>←</span>

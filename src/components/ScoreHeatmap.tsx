@@ -49,12 +49,12 @@ export function ScoreHeatmap({ matrix, homeLabel, awayLabel }: Props) {
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-line bg-panel p-3.5 sm:p-4">
         <div className="flex items-center gap-2">
           <span className="text-xs font-bold text-muted">النتيجة الأرجح:</span>
-          <span className="inline-flex items-center gap-1.5 rounded-lg bg-surface border border-line px-3 py-1 font-mono font-black text-sm text-ink tabular">
+          <span className="inline-flex items-center gap-1.5 rounded-lg bg-surface border border-line px-3 py-1 font-mono font-semibold text-sm text-ink tabular">
             <span className="text-home">{topI}</span>
             <span className="text-muted">–</span>
             <span className="text-danger">{topJ}</span>
           </span>
-          <span className="text-sm font-black tabular text-accent">
+          <span className="text-sm font-semibold tabular text-accent">
             ({pct(topP, 1)})
           </span>
         </div>
@@ -85,14 +85,14 @@ export function ScoreHeatmap({ matrix, homeLabel, awayLabel }: Props) {
           <span className="text-[10px] font-bold text-home block">
             أهداف المضيف (الصفوف ↓)
           </span>
-          <span className="font-black text-ink truncate block">{homeLabel}</span>
+          <span className="font-semibold text-ink truncate block">{homeLabel}</span>
         </div>
 
         <div className="rounded-xl border border-danger/25 bg-danger-dim p-3 text-end space-y-0.5">
           <span className="text-[10px] font-bold text-danger block">
             أهداف الضيف (الأعمدة →)
           </span>
-          <span className="font-black text-ink truncate block">{awayLabel}</span>
+          <span className="font-semibold text-ink truncate block">{awayLabel}</span>
         </div>
       </div>
 
@@ -111,7 +111,7 @@ export function ScoreHeatmap({ matrix, homeLabel, awayLabel }: Props) {
                 <th
                   key={`col-${j}`}
                   scope="col"
-                  className={`h-9 border border-line bg-panel text-center text-xs font-black tabular ${
+                  className={`h-9 border border-line bg-panel text-center text-xs font-semibold tabular ${
                     j === topJ ? "text-danger" : "text-muted"
                   }`}
                 >
@@ -125,7 +125,7 @@ export function ScoreHeatmap({ matrix, homeLabel, awayLabel }: Props) {
               <tr key={`row-${i}`}>
                 <th
                   scope="row"
-                  className={`w-9 h-9 border border-line bg-panel text-center text-xs font-black tabular ${
+                  className={`w-9 h-9 border border-line bg-panel text-center text-xs font-semibold tabular ${
                     i === topI ? "text-home" : "text-muted"
                   }`}
                 >
@@ -145,9 +145,9 @@ export function ScoreHeatmap({ matrix, homeLabel, awayLabel }: Props) {
                       key={`${i}-${j}`}
                       className={`h-9 border border-line text-center text-xs font-mono font-bold tabular transition-all duration-150 select-none ${
                         isTop
-                          ? "font-black text-on-fill bg-accent text-on-fill ring-2 ring-accent rounded-sm scale-105"
+                          ? "font-semibold text-on-fill bg-accent text-on-fill ring-2 ring-accent rounded-sm scale-105"
                           : isRunner
-                            ? "font-extrabold text-ink border-accent/40 bg-accent-dim/30"
+                            ? "font-semibold text-ink border-accent/40 bg-accent-dim/30"
                             : t > 0.2
                               ? "text-ink"
                               : "text-muted"

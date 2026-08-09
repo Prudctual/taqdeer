@@ -1,4 +1,5 @@
-export function pct(p: number, digits = 0): string {
+/** نسب النموذج تُعرض بمنزلة عشرية واحدة — لا تقريب يخفي الفوارق الحقيقية */
+export function pct(p: number, digits = 1): string {
   return `${(p * 100).toFixed(digits)}٪`;
 }
 
@@ -51,12 +52,23 @@ export function cleanSpace(str: string): string {
   return str.replace(/[\u00a0\u202f\u2007\u200b]/g, " ").replace(/\s+/g, " ").trim();
 }
 
+/** بعض المصادر تخزّن اليوم فقط كـ midnight UTC — لا نعرض ساعة وهمية. */
+export function hasKnownKickoffTime(iso: string): boolean {
+  return !/T00:00:00(\.0+)?Z?$/i.test(iso.trim());
+}
+
+/**
+ * ساعة الانطلاق بتوقيت العرض الثابت (العراق GMT+3).
+ * صيغة 24 ساعة بأرقام لاتينية — معيار القنوات الرياضية العربية (21:00 لا 09:00 م).
+ */
 export function formatMatchTime(iso: string, tz?: string): string {
+  if (!hasKnownKickoffTime(iso)) return "—";
   return cleanSpace(
-    new Intl.DateTimeFormat("ar", {
+    new Intl.DateTimeFormat("en-GB", {
       timeZone: tz || DISPLAY_TZ,
       hour: "2-digit",
       minute: "2-digit",
+      hourCycle: "h23",
     }).format(parseDate(iso))
   );
 }
@@ -231,8 +243,9 @@ export function topOutcome(
   const top1 = sorted[0]!;
   const top2 = sorted[1]!;
 
-  // High Entropy Boundary: If top outcome is less than 5% ahead of second outcome, it is equally balanced
-  if (top1.p - top2.p < 0.05) {
+  // حد التكافؤ: أقل من 8٪ بين الأول والثاني → لا نُقدّم «إشارة حاسمة»
+  // (حالة ساندفيورد 40٪ مقابل 33٪ كانت ستُعامل كمتكافئة)
+  if (top1.p - top2.p < 0.08) {
     return {
       key: "EQ",
       label: "مواجهة متكافئة",

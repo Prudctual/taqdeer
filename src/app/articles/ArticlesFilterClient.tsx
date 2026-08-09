@@ -9,17 +9,14 @@ interface ArticlesFilterClientProps {
   articles: Article[];
 }
 
-const CATEGORIES = [
-  "الكل",
-  "تحليل تكتيكي",
-  "تقارير حصرية",
-  "قراءة إحصائية",
-  "فرص القيمة +EV",
-];
-
 export default function ArticlesFilterClient({ articles }: ArticlesFilterClientProps) {
   const [selectedCategory, setSelectedCategory] = useState("الكل");
   const [searchQuery, setSearchQuery] = useState("");
+
+  const categories = [
+    "الكل",
+    ...Array.from(new Set(articles.map((a) => a.category).filter(Boolean))),
+  ];
 
   const filteredArticles = articles.filter((art) => {
     const matchesCategory =
@@ -40,7 +37,7 @@ export default function ArticlesFilterClient({ articles }: ArticlesFilterClientP
       <div className="flex flex-col md:flex-row justify-between items-stretch md:items-center gap-4 bg-panel p-4 rounded-xl border border-line">
         <div className="flex items-center gap-2 overflow-x-auto pb-2 md:pb-0 scrollbar-none">
           <Filter className="w-4 h-4 text-accent shrink-0 ms-1" />
-          {CATEGORIES.map((cat) => (
+          {categories.map((cat) => (
             <button
               key={cat}
               type="button"

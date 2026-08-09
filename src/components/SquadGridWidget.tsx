@@ -40,7 +40,7 @@ export function SquadGridWidget({
     <SectionCard title={title} subtitle={subtitle}>
       {lineupConfirmed ? (
         <div className="mb-3">
-          <span className="text-[10px] font-black bg-success-dim text-success px-2.5 py-1 rounded-full">
+          <span className="text-[10px] font-semibold bg-success-dim text-success px-2.5 py-1 rounded-full">
             تشكيلة مؤكدة
           </span>
         </div>
@@ -48,12 +48,12 @@ export function SquadGridWidget({
 
       {missing.length > 0 ? (
         <div className="mb-4 rounded-xl border border-danger/25 bg-danger/5 p-3 space-y-2">
-          <p className="text-xs font-black text-ink">الغيابات المسجّلة</p>
+          <p className="text-xs font-semibold text-ink">الغيابات المسجّلة</p>
           <ul className="grid gap-1.5 sm:grid-cols-2 text-xs">
             {missing.map((m, i) => (
               <li key={`${m.playerName}-${i}`} className="flex items-center justify-between gap-2">
                 <span className="font-bold text-ink truncate">{m.playerName}</span>
-                <span className="text-[10px] font-black text-danger shrink-0">
+                <span className="text-[10px] font-semibold text-danger shrink-0">
                   {STATUS_AR[m.status] ?? m.status}
                 </span>
               </li>
@@ -79,7 +79,7 @@ export function SquadGridWidget({
               }`}
             >
               {p.availability ? (
-                <span className="absolute top-2 left-2 text-[9px] font-black bg-danger text-on-fill px-1.5 py-0.5 rounded">
+                <span className="absolute top-2 start-2 text-[9px] font-semibold bg-danger text-on-fill px-1.5 py-0.5 rounded">
                   {STATUS_AR[p.availability] ?? p.availability}
                 </span>
               ) : null}
@@ -91,7 +91,7 @@ export function SquadGridWidget({
                 <span className="text-xs font-bold text-muted">{p.position}</span>
                 {p.number ? (
                   <span
-                    className={`text-xl font-black tabular font-mono ${
+                    className={`text-xl font-semibold tabular font-mono ${
                       p.isHome ? "text-home" : "text-away"
                     }`}
                   >
@@ -121,7 +121,7 @@ export function SquadGridWidget({
                   ) : null}
                   <div
                     style={{ display: p.photoUrl ? "none" : "flex" }}
-                    className={`h-full w-full items-center justify-center font-mono font-black text-lg ${
+                    className={`h-full w-full items-center justify-center font-mono font-semibold text-lg ${
                       p.isHome ? "text-home" : "text-away"
                     }`}
                   >
@@ -131,7 +131,7 @@ export function SquadGridWidget({
               </div>
 
               <div className="text-center space-y-0.5">
-                <h3 className="text-sm font-black text-ink group-hover:text-accent transition-colors text-pretty">
+                <h3 className="text-sm font-semibold text-ink group-hover:text-accent transition-colors text-pretty">
                   {p.name}
                 </h3>
                 <div className="flex items-center justify-center gap-1.5 pt-0.5">

@@ -88,7 +88,7 @@ export function SignalBreakdown({
               <HandshakeIcon size={20} />
             </span>
             <div>
-              <h4 className="text-sm font-black tracking-tight">
+              <h4 className="text-sm font-semibold tracking-tight">
                 نتيجة التوافق بين الخوارزميات: {agreeCount} من أصل {rows.length} نماذج متفقة تماماً!
               </h4>
               <p className="text-xs text-on-fill/80 font-medium">
@@ -96,7 +96,7 @@ export function SignalBreakdown({
               </p>
             </div>
           </div>
-          <span className="shrink-0 font-extrabold text-xs bg-on-fill text-success px-3.5 py-1.5 rounded-full shadow-2xs">
+          <span className="shrink-0 font-semibold text-xs bg-on-fill text-success px-3.5 py-1.5 rounded-full shadow-2xs">
             توافق كامل 100%
           </span>
         </div>
@@ -131,7 +131,7 @@ export function SignalBreakdown({
               {/* Header */}
               <div className="flex items-start justify-between gap-2 border-b border-line/60 pb-2.5">
                 <div className="space-y-0.5">
-                  <span className="text-xs font-black text-ink flex items-center gap-2">
+                  <span className="text-xs font-semibold text-ink flex items-center gap-2">
                     <span className="p-1.5 rounded-lg bg-surface text-ink">
                       <IconComp size={16} />
                     </span>
@@ -140,7 +140,7 @@ export function SignalBreakdown({
                   <p className="text-[10px] font-medium text-muted">{r.description}</p>
                 </div>
                 {weightPct != null && (
-                  <span className="shrink-0 text-[11px] font-black text-accent bg-accent-dim px-2.5 py-0.5 rounded-full">
+                  <span className="shrink-0 text-[11px] font-semibold text-accent bg-accent-dim px-2.5 py-0.5 rounded-full">
                     تأثير {weightPct}%
                   </span>
                 )}
@@ -148,10 +148,10 @@ export function SignalBreakdown({
 
               {/* Prediction Result Pill */}
               <div className="flex items-center justify-between bg-surface rounded-xl p-2.5 border-0 shadow-none">
-                <span className="text-xs font-black text-ink">
-                  ترجيح هذا النموذج: <strong className="text-accent font-extrabold">{topLabel}</strong>
+                <span className="text-xs font-semibold text-ink">
+                  ترجيح هذا النموذج: <strong className="text-accent font-semibold">{topLabel}</strong>
                 </span>
-                <span className="text-xs font-mono font-black text-home bg-panel px-2.5 py-0.5 rounded-md">
+                <span className="text-xs font-mono font-semibold text-home bg-panel px-2.5 py-0.5 rounded-md">
                   نسبة {pct(topPct)}
                 </span>
               </div>

@@ -41,7 +41,6 @@ export function StudioHomeView({
   upcomingCount,
   leagues = [],
   groups = [],
-  recentGroups = [],
   nextMatch,
   standingsByLeague = {},
   bankerPicks = [],
@@ -50,209 +49,151 @@ export function StudioHomeView({
     "matches" | "value" | "bankers" | "standings"
   >("matches");
 
-  const { liveMatches, isLiveActive } = useLiveScores(10000);
+  const { liveMatches, isLiveActive } = useLiveScores(3000);
 
   const initialMatchesList: MatchCard[] = groups
     ? groups.flatMap((g) => g.matches || g.items || [])
     : [];
 
-  // Merge real-time live match updates into the upcoming list
   const upcomingMatchesList = initialMatchesList.map((m) => {
     const liveUpdate = liveMatches.find((lm) => lm.id === m.id);
     return liveUpdate ? { ...m, ...liveUpdate } : m;
   });
 
-  // Sort upcoming matches strictly by kickoff date ascending
   upcomingMatchesList.sort((a, b) => a.utcDate.localeCompare(b.utcDate));
 
-  const recentMatchesList: MatchCard[] = recentGroups.flatMap(
-    (g) => g.matches || g.items || [],
-  );
-  // أحدث النتائج أولاً مع إبقاء تنوّع الدوريات
-  recentMatchesList.sort((a, b) => b.utcDate.localeCompare(a.utcDate));
+  const heroMatch = nextMatch || upcomingMatchesList[0];
+  const showKickoffHero = Boolean(heroMatch) && !isLiveActive;
 
-  const heroMatch = liveMatches[0] || nextMatch || upcomingMatchesList[0];
+  const tabClass = (active: boolean) =>
+    `press-scale flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-semibold motion-colors whitespace-nowrap ${
+      active
+        ? "bg-surface text-ink border border-line"
+        : "text-muted hover:text-ink hover:bg-surface/50 border border-transparent"
+    }`;
 
   return (
     <div className="space-y-6">
-      {/* Real-time Interactive Live In-Play Scores Banner */}
       <LiveInteractiveScores />
 
-      {/* 1. Next Kickoff Bar */}
-      {heroMatch && (
-        <section aria-label="أول مباراة قادمة">
+      {showKickoffHero && heroMatch ? (
+        <section aria-label="المباراة التالية" className="space-y-3">
           <NextKickoff m={heroMatch} />
-        </section>
-      )}
-
-      {/* 2. Hero Match Showcase */}
-      {heroMatch && (
-        <section aria-label="مواجهة البث الرئيسية" className="space-y-2">
-          <div className="flex items-center justify-between px-1">
-            <span className="text-xs font-black text-ink uppercase tracking-wide flex items-center gap-2">
-              مباراة القمة القادمة
-            </span>
-            <span className="text-[11px] font-bold text-muted tabular">مواجهة قادمة</span>
-          </div>
           <HeroMatchBanner match={heroMatch} />
         </section>
-      )}
+      ) : null}
 
-      {/* 3. Main Dashboard Tabs Navigation */}
-      <div className="space-y-6 pt-2">
-        {/* Tabs Bar - Clean analysis table theme matching DESIGN.md */}
-        <div className="flex items-center gap-2 overflow-x-auto scrollbar-none rounded-2xl bg-panel p-1.5 border border-line">
-          {/* Tab 1: Matches */}
+      <div className="space-y-6">
+        <div className="flex items-center gap-2 overflow-x-auto scrollbar-none rounded-xl bg-panel p-1.5 border border-line">
           <button
             type="button"
             onClick={() => setActiveTab("matches")}
-            className={`press-scale flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
-              activeTab === "matches"
-                ? "bg-surface text-ink border border-accent/40 shadow-xs"
-                : "text-muted hover:text-ink hover:bg-surface/50 border border-transparent"
-            }`}
+            className={tabClass(activeTab === "matches")}
           >
-            <svg className="h-4 w-4 shrink-0 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
-            <span>المباريات القادمة ({upcomingCount || upcomingMatchesList.length})</span>
+            المباريات ({upcomingCount || upcomingMatchesList.length})
           </button>
-
-          {/* Tab 2: Value (+EV) */}
           <button
             type="button"
             onClick={() => setActiveTab("value")}
-            className={`press-scale flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
-              activeTab === "value"
-                ? "bg-surface text-ink border border-accent/40 shadow-xs"
-                : "text-muted hover:text-ink hover:bg-surface/50 border border-transparent"
-            }`}
+            className={tabClass(activeTab === "value")}
           >
-            <svg className="h-4 w-4 shrink-0 text-live" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-            </svg>
-            <span>فرص القيمة المحتملة (+EV)</span>
+            فرص القيمة (+EV)
           </button>
-
-          {/* Tab 3: Banker Picks */}
           <button
             type="button"
             onClick={() => setActiveTab("bankers")}
-            className={`press-scale flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
-              activeTab === "bankers"
-                ? "bg-surface text-ink border border-accent/40 shadow-xs"
-                : "text-muted hover:text-ink hover:bg-surface/50 border border-transparent"
-            }`}
+            className={tabClass(activeTab === "bankers")}
           >
-            <svg className="h-4 w-4 shrink-0 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-            </svg>
-            <span>أأمن التوقعات (Banker Picks)</span>
+            أأمن التوقعات
           </button>
-
-          {/* Tab 4: Standings */}
           <button
             type="button"
             onClick={() => setActiveTab("standings")}
-            className={`press-scale flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
-              activeTab === "standings"
-                ? "bg-surface text-ink border border-accent/40 shadow-xs"
-                : "text-muted hover:text-ink hover:bg-surface/50 border border-transparent"
-            }`}
+            className={tabClass(activeTab === "standings")}
           >
-            <svg className="h-4 w-4 shrink-0 text-warn" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
-            </svg>
-            <span>جدول الترتيب المباشر</span>
+            الترتيب
           </button>
         </div>
 
-        {/* Tab 1: Matches Feed */}
         {activeTab === "matches" && (
-          <div className="space-y-4 animate-in fade-in duration-200">
-            {/* Live Matches Section */}
+          <div className="space-y-4">
             {isLiveActive && liveMatches.length > 0 && (
-              <div className="space-y-3 rounded-2xl border-2 border-live/40 bg-live-dim p-4 sm:p-5 shadow-xs">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-sm font-black text-ink">
-                      🔴 مباشر الآن — نتائج حية لحظية ({liveMatches.length})
-                    </h3>
-                  </div>
-                  <span className="text-[11px] font-bold text-live animate-pulse">
-                    تحديث لحظي مستمر
-                  </span>
+              <div className="space-y-3 rounded-xl border border-live/30 bg-live-dim p-4">
+                <div className="flex items-center justify-between gap-2">
+                  <h3 className="type-section text-ink flex items-center gap-2">
+                    <span className="live-badge-dot live-pulse-dot" aria-hidden />
+                    مباشر الآن ({liveMatches.length})
+                  </h3>
+                  <span className="live-badge">حي</span>
                 </div>
-                <div className="rounded-xl border border-line bg-surface p-3">
+                <div className="rounded-lg border border-line bg-surface overflow-hidden">
                   <MatchList matches={liveMatches} groupDays={false} showLeague />
                 </div>
               </div>
             )}
 
-            {/* Upcoming Matches Header Bar */}
-            <div className="flex flex-wrap items-center justify-between gap-3 bg-panel p-3 rounded-2xl border border-line">
-              <div className="flex items-center gap-2">
-                <h3 className="text-xs font-black text-ink">
-                  المباريات القادمة
-                </h3>
-              </div>
-
-              <span className="px-3 py-1 rounded-xl bg-surface border border-line text-xs font-black text-live">
-                🟢 {upcomingMatchesList.length} مواجهة قادمة
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line pb-3">
+              <h3 className="type-section text-ink">المباريات القادمة</h3>
+              <span className="text-xs font-medium text-muted tabular">
+                {upcomingMatchesList.length} مواجهة
               </span>
             </div>
 
             {upcomingMatchesList.length > 0 ? (
-              <div className="rounded-2xl border border-line bg-surface p-4 sm:p-6 shadow-2xs">
+              <div className="card overflow-hidden">
                 <MatchList matches={upcomingMatchesList} groupDays showLeague />
               </div>
             ) : (
-              <div className="rounded-2xl border border-line bg-surface p-8 text-center space-y-2 shadow-2xs">
-                <h3 className="text-sm font-black text-ink">لا توجد مباريات مجدولة حالياً</h3>
-                <p className="text-xs text-muted">ترتفع الجولة القادمة أوتوماتيكياً بمجرد إدراج المباريات الجديدة.</p>
+              <div className="card">
+                <div className="px-5 py-12 text-center">
+                  <p className="type-section text-ink">لا توجد مباريات مجدولة حالياً</p>
+                  <p className="mx-auto mt-2 max-w-md text-sm text-muted">
+                    ترتفع الجولة القادمة تلقائياً عند إدراج المباريات الجديدة.
+                  </p>
+                </div>
               </div>
             )}
-
-
           </div>
         )}
 
-        {/* Tab 2: Value Bets (+EV) */}
         {activeTab === "value" && (
-          <div className="space-y-4 animate-in fade-in duration-200">
-            <div className="rounded-2xl border border-success/30 bg-success-dim p-6 space-y-4 shadow-2xs">
-              <div className="flex items-center justify-between">
-                <span className="bg-success text-on-fill font-extrabold text-xs px-3 py-1 rounded-full shadow-xs">
-                  فرص قيمة (+EV ≥ 3%)
-                </span>
-                <span className="text-xs font-black text-live">حاسبة كيلي الحسابية</span>
-              </div>
-              <h3 className="text-base font-black text-ink">المباريات ذات القيمة التهديفية والاستثمارية المحتملة</h3>
-              <p className="text-xs font-semibold text-muted leading-relaxed max-w-2xl">
-                يستعرض هذا القسم المباريات القادمة التي يُظهر فيها نموذج التحليل انحرافاً إيجابياً ومزايا رياضية عن أسعار المراهنين.
-              </p>
-              <Link href="/value" className="inline-block no-underline">
-                <div className="press-scale inline-flex items-center gap-2 rounded-xl bg-success text-on-fill hover:opacity-90 px-5 py-2.5 text-xs font-black shadow-xs transition-colors">
-                  <span>تصفح صفحة مباريات القيمة الكاملة</span>
-                  <span>←</span>
-                </div>
+          <div className="card p-5 sm:p-6 space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h3 className="type-section text-ink">فرص القيمة (+EV ≥ 3%)</h3>
+              <span className="text-xs font-medium text-muted">حاسبة كيلي</span>
+            </div>
+            <p className="text-sm text-muted leading-relaxed max-w-2xl">
+              مباريات يظهر فيها النموذج انحرافاً إيجابياً عن أسعار السوق. الاحتمال ليس يقيناً؛ راجع الثقة والمعايرة قبل أي قرار.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Link
+                href="/value"
+                className="press-scale inline-flex items-center gap-2 rounded-lg bg-accent text-on-fill px-4 py-2 text-xs font-semibold no-underline hover:opacity-90"
+              >
+                تصفح صفحة القيمة
+              </Link>
+              <Link
+                href="/double-chance"
+                className="press-scale inline-flex items-center gap-2 rounded-lg border border-line bg-surface text-ink px-4 py-2 text-xs font-semibold no-underline hover:border-accent"
+              >
+                الفرصة المزدوجة
               </Link>
             </div>
           </div>
         )}
 
-        {/* Tab 3: Banker Picks */}
         {activeTab === "bankers" && (
-          <div className="space-y-4 animate-in fade-in duration-200">
-            <BankerPicksWidget picks={bankerPicks} title="أأمن 4 توقعات للجولة الحالية" />
-          </div>
+          <BankerPicksWidget
+            picks={bankerPicks}
+            title="أأمن 4 توقعات للجولة الحالية"
+          />
         )}
 
-        {/* Tab 4: Standings */}
         {activeTab === "standings" && (
-          <div className="space-y-4 animate-in fade-in duration-200">
-            <LeagueTableWidget leagues={leagues} standingsByLeague={standingsByLeague} />
-          </div>
+          <LeagueTableWidget
+            leagues={leagues}
+            standingsByLeague={standingsByLeague}
+          />
         )}
       </div>
     </div>

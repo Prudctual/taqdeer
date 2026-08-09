@@ -26,7 +26,7 @@ export function LeagueIcon({ leagueId, className = "w-8 h-8" }: { leagueId?: str
 
   // 7. كل المباريات - All Matches
   return (
-    <span className="px-1 text-center text-[12px] sm:text-[13px] font-black leading-tight text-zinc-950 tracking-tight select-none">
+    <span className="px-1 text-center text-[12px] sm:text-[13px] font-semibold leading-tight text-zinc-950 tracking-tight select-none">
       كل المباريات
     </span>
   );

@@ -271,3 +271,29 @@ def form_lambda_adjust(
     return float(min(max(lam_mult, 0.70), 1.35)), float(min(max(mu_mult, 0.70), 1.35))
 
 
+def congestion_lambda_mult(matches_in_7d: Optional[float]) -> float:
+    """
+    ازدحام جدول (دوري + كؤوس): ≥3 مباريات/7 أيام يخفض الهجوم أكثر من راحة قصيرة وحدها.
+    """
+    if matches_in_7d is None:
+        return 1.0
+    n = float(matches_in_7d)
+    if n >= 4:
+        return 0.90
+    if n >= 3:
+        return 0.93
+    return 1.0
+
+
+def apply_congestion(
+    lam_mult: float,
+    mu_mult: float,
+    *,
+    home_matches_7d: Optional[float] = None,
+    away_matches_7d: Optional[float] = None,
+) -> Tuple[float, float]:
+    lh = lam_mult * congestion_lambda_mult(home_matches_7d)
+    mu = mu_mult * congestion_lambda_mult(away_matches_7d)
+    return float(min(max(lh, 0.70), 1.35)), float(min(max(mu, 0.70), 1.35))
+
+

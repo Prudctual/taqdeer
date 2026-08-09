@@ -8,6 +8,11 @@ import {
   dayKey,
   formatMatchTime,
 } from "../src/lib/format";
+import {
+  calculateInPlayProbs,
+  remainingIntensityFraction,
+  scoreStateMult,
+} from "../src/lib/in-play-probs";
 
 // أعمدة football-data.co.uk بتوقيت المملكة المتحدة لا UTC
 assert.equal(parseUkDate("15/08/2025", "20:00"), "2025-08-15T19:00:00.000Z"); // BST
@@ -33,12 +38,22 @@ assert.equal(
   ),
   1,
 );
-assert.match(formatMatchTime("2025-08-15T19:00:00.000Z"), /10:00/); // 22:00 بالرياض
+assert.match(formatMatchTime("2025-08-15T19:00:00.000Z"), /22:00/); // 22:00 بالرياض
 
 // بديل الشعار يعرّف الفريق: يتخطّى الأرقام ويصمد على اسم فارغ
 assert.equal(crestInitials("غانغوون"), "غا");
 assert.equal(crestInitials("بوتشيون 1995"), "بو");
 assert.equal(crestInitials("1995 بوتشيون"), "بو"); // الرقم ليس حرفاً
 assert.equal(crestInitials("  "), "•");
+
+assert.ok(remainingIntensityFraction(0) > remainingIntensityFraction(70));
+assert.ok(scoreStateMult(0, 2).homeAtk > 1);
+const liveBase = calculateInPlayProbs(1.4, 1.1, 60, 1, 0);
+const liveAwayRed = calculateInPlayProbs(1.4, 1.1, 60, 1, 0, {
+  homeReds: 0,
+  awayReds: 1,
+});
+assert.ok(liveAwayRed.pHome + liveAwayRed.pDraw + liveAwayRed.pAway > 0.99);
+assert.ok(liveAwayRed.pAway < liveBase.pAway);
 
 console.log("selfcheck ok");

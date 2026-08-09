@@ -11,7 +11,7 @@ import { Crest } from "@/components/Crest";
 function ChartSkeleton() {
   return (
     <div className="rounded-2xl border border-line bg-panel p-6 shadow-2xs">
-      <div className="h-72 w-full animate-pulse rounded-xl bg-surface" />
+      <div className="h-72 w-full skeleton-pulse rounded-xl" />
     </div>
   );
 }
@@ -63,7 +63,7 @@ export function MatchChartsInteractiveContainer({
       {/* 1. Sleek Match Selector Banner */}
       <div className="rounded-2xl border border-line bg-panel p-5 sm:p-6 space-y-4 shadow-2xs">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-lg sm:text-xl font-black text-ink">
+          <h2 className="text-lg sm:text-xl font-semibold text-ink">
             تحليل مخططات المباراة المحددة
           </h2>
 
@@ -99,14 +99,14 @@ export function MatchChartsInteractiveContainer({
               <Crest src={activeMatch.homeCrestUrl} alt={homeName} size="md" fallback={homeName.slice(0, 1)} />
               <div className="space-y-0.5">
                 <span className="text-xs font-bold text-muted">المضيف</span>
-                <p className="text-sm font-black text-ink">{homeName}</p>
+                <p className="text-sm font-semibold text-ink">{homeName}</p>
                 <span className="text-[10px] font-mono text-muted">Elo: {activeMatch.eloHome ?? 1800}</span>
               </div>
             </div>
 
             {/* Center VS / Status */}
             <div className="text-center space-y-1 my-2 sm:my-0">
-              <span className="px-2.5 py-0.5 rounded-full bg-surface border border-accent/40 text-accent font-mono font-black text-xs inline-block">
+              <span className="px-2.5 py-0.5 rounded-full bg-surface border border-accent/40 text-accent font-mono font-semibold text-xs inline-block">
                 VS
               </span>
               <p className="text-xs font-bold text-muted">
@@ -123,7 +123,7 @@ export function MatchChartsInteractiveContainer({
             <div className="flex items-center gap-3 justify-start sm:justify-end">
               <div className="space-y-0.5 text-start sm:text-end">
                 <span className="text-xs font-bold text-muted">الضيف</span>
-                <p className="text-sm font-black text-ink">{awayName}</p>
+                <p className="text-sm font-semibold text-ink">{awayName}</p>
                 <span className="text-[10px] font-mono text-muted">Elo: {activeMatch.eloAway ?? 1750}</span>
               </div>
               <Crest src={activeMatch.awayCrestUrl} alt={awayName} size="md" fallback={awayName.slice(0, 1)} />
@@ -136,7 +136,7 @@ export function MatchChartsInteractiveContainer({
           <button
             type="button"
             onClick={() => setActiveCategory("all")}
-            className={`press-scale px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer whitespace-nowrap border ${
+            className={`press-scale px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer whitespace-nowrap border ${
               activeCategory === "all"
                 ? "bg-home text-on-fill border-home shadow-xs"
                 : "bg-surface text-ink border-line hover:bg-panel"
@@ -148,7 +148,7 @@ export function MatchChartsInteractiveContainer({
           <button
             type="button"
             onClick={() => setActiveCategory("radar")}
-            className={`press-scale px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer whitespace-nowrap border ${
+            className={`press-scale px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer whitespace-nowrap border ${
               activeCategory === "radar"
                 ? "bg-accent text-on-fill border-accent shadow-xs"
                 : "bg-surface text-ink border-line hover:bg-panel"
@@ -160,7 +160,7 @@ export function MatchChartsInteractiveContainer({
           <button
             type="button"
             onClick={() => setActiveCategory("pie")}
-            className={`press-scale px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer whitespace-nowrap border ${
+            className={`press-scale px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer whitespace-nowrap border ${
               activeCategory === "pie"
                 ? "bg-home text-on-fill border-home shadow-xs"
                 : "bg-surface text-ink border-line hover:bg-panel"
@@ -172,7 +172,7 @@ export function MatchChartsInteractiveContainer({
           <button
             type="button"
             onClick={() => setActiveCategory("ev")}
-            className={`press-scale px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer whitespace-nowrap border ${
+            className={`press-scale px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer whitespace-nowrap border ${
               activeCategory === "ev"
                 ? "bg-success text-on-fill border-success shadow-xs"
                 : "bg-surface text-ink border-line hover:bg-panel"
@@ -184,7 +184,7 @@ export function MatchChartsInteractiveContainer({
           <button
             type="button"
             onClick={() => setActiveCategory("goals")}
-            className={`press-scale px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer whitespace-nowrap border ${
+            className={`press-scale px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer whitespace-nowrap border ${
               activeCategory === "goals"
                 ? "bg-accent text-on-fill border-accent shadow-xs"
                 : "bg-surface text-ink border-line hover:bg-panel"
@@ -196,7 +196,7 @@ export function MatchChartsInteractiveContainer({
           <button
             type="button"
             onClick={() => setActiveCategory("line")}
-            className={`press-scale px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer whitespace-nowrap border ${
+            className={`press-scale px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer whitespace-nowrap border ${
               activeCategory === "line"
                 ? "bg-home text-on-fill border-home shadow-xs"
                 : "bg-surface text-ink border-line hover:bg-panel"
@@ -208,7 +208,7 @@ export function MatchChartsInteractiveContainer({
           <button
             type="button"
             onClick={() => setActiveCategory("radial")}
-            className={`press-scale px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer whitespace-nowrap border ${
+            className={`press-scale px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer whitespace-nowrap border ${
               activeCategory === "radial"
                 ? "bg-accent text-on-fill border-accent shadow-xs"
                 : "bg-surface text-ink border-line hover:bg-panel"
@@ -224,7 +224,7 @@ export function MatchChartsInteractiveContainer({
         {/* Section 1: Tactical Radar Chart */}
         {(activeCategory === "all" || activeCategory === "radar") && (
           <section aria-label="المقارنة التكتيكية السداسية" className="space-y-3">
-            <h2 className="text-base font-black text-ink">
+            <h2 className="text-base font-semibold text-ink">
               المقارنة التكتيكية بين {homeName} و {awayName}
             </h2>
             <TeamRadarChart match={activeMatch} />
@@ -234,7 +234,7 @@ export function MatchChartsInteractiveContainer({
         {/* Section 2: Outcome & Goal Market Pie Charts */}
         {(activeCategory === "all" || activeCategory === "pie") && (
           <section aria-label="توزيع احتمالات النتيجة وأسواق الأهداف" className="space-y-3">
-            <h2 className="text-base font-black text-ink">
+            <h2 className="text-base font-semibold text-ink">
               توزيع احتمالات الفوز والتهديف
             </h2>
             <OutcomePieChart match={activeMatch} />
@@ -244,7 +244,7 @@ export function MatchChartsInteractiveContainer({
         {/* Section 3: Expected Value (+EV) Bar/Area Chart */}
         {(activeCategory === "all" || activeCategory === "ev") && (
           <section aria-label="مقارنة القيمة المتوقعة" className="space-y-3">
-            <h2 className="text-base font-black text-ink">
+            <h2 className="text-base font-semibold text-ink">
               مقارنة القيمة المتوقعة (+EV) لأسعار المراهنين
             </h2>
             <EvAreaChart match={activeMatch} />
@@ -254,7 +254,7 @@ export function MatchChartsInteractiveContainer({
         {/* Section 4: League Bar Chart */}
         {(activeCategory === "all" || activeCategory === "goals") && (
           <section aria-label="مقارنة الدوري" className="space-y-3">
-            <h2 className="text-base font-black text-ink">
+            <h2 className="text-base font-semibold text-ink">
               مقارنة دقة النماذج في {leagueName}
             </h2>
             <LeagueAccuracyChart />
@@ -264,7 +264,7 @@ export function MatchChartsInteractiveContainer({
         {/* Section 5: Progress Line Chart */}
         {(activeCategory === "all" || activeCategory === "line") && (
           <section aria-label="تطور الدقة" className="space-y-3">
-            <h2 className="text-base font-black text-ink">
+            <h2 className="text-base font-semibold text-ink">
               مسار تطور دقة التوقعات عبر الجولات
             </h2>
             <AccuracyLineChart />
@@ -274,7 +274,7 @@ export function MatchChartsInteractiveContainer({
         {/* Section 6: Confidence Radial Chart */}
         {(activeCategory === "all" || activeCategory === "radial") && (
           <section aria-label="مؤشرات ثقة المعايرة" className="space-y-3">
-            <h2 className="text-base font-black text-ink">
+            <h2 className="text-base font-semibold text-ink">
               مؤشرات ثقة التوقع واستقرار إشارات هذه المباراة
             </h2>
             <ConfidenceRadialChart match={activeMatch} />

@@ -13,13 +13,24 @@ import {
 import type { MatchCard } from "@/lib/queries";
 
 export function TeamRadarChart({ match }: { match?: MatchCard | null }) {
-  const homeName = match?.homeNameAr ?? "ريال مدريد";
-  const awayName = match?.awayNameAr ?? "برشلونة";
+  const hasPred = match?.pHome != null && match?.pAway != null;
+  if (!hasPred || !match) {
+    return (
+      <div className="rounded-2xl border border-line bg-panel p-8 text-center space-y-2">
+        <h3 className="text-sm font-semibold text-ink">لا تتوفر بيانات نموذج لهذه المباراة</h3>
+        <p className="text-xs text-muted leading-relaxed max-w-md mx-auto">
+          المقارنة التكتيكية تُبنى من نسب النموذج الحالية فقط.
+        </p>
+      </div>
+    );
+  }
 
-  const eloHome = match?.eloHome ?? 1850;
-  const eloAway = match?.eloAway ?? 1790;
-  const pHome = match?.pHome ?? 0.48;
-  const pAway = match?.pAway ?? 0.25;
+  const homeName = match.homeNameAr;
+  const awayName = match.awayNameAr;
+  const eloHome = match.eloHome ?? 1500;
+  const eloAway = match.eloAway ?? 1500;
+  const pHome = match.pHome!;
+  const pAway = match.pAway!;
 
   const homeAttack = Math.min(98, Math.round(pHome * 160 + 15));
   const awayAttack = Math.min(98, Math.round(pAway * 160 + 20));
@@ -33,7 +44,7 @@ export function TeamRadarChart({ match }: { match?: MatchCard | null }) {
     { metric: "تصنيف Elo القوة", home: homeEloScore, away: awayEloScore },
     { metric: "فورم آخر 5 مباريات", home: Math.min(95, Math.round(pHome * 120 + 30)), away: Math.min(95, Math.round(pAway * 120 + 35)) },
     { metric: "دقة التسديدات", home: Math.min(92, Math.round(homeAttack * 0.9)), away: Math.min(92, Math.round(awayAttack * 0.9)) },
-    { metric: "نظافة الشباك", home: Math.min(90, Math.round((1 - (match?.pOver25 ?? 0.5)) * 100 + 30)), away: Math.min(90, Math.round((1 - (match?.pOver25 ?? 0.5)) * 100 + 25)) },
+    { metric: "نظافة الشباك", home: Math.min(90, Math.round((1 - (match.pOver25 ?? 0.5)) * 100 + 30)), away: Math.min(90, Math.round((1 - (match.pOver25 ?? 0.5)) * 100 + 25)) },
   ];
 
   return (
@@ -41,7 +52,7 @@ export function TeamRadarChart({ match }: { match?: MatchCard | null }) {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
-            <h3 className="text-base sm:text-lg font-black text-ink">
+            <h3 className="text-base sm:text-lg font-semibold text-ink">
               المقارنة التكتيكية السداسية بين {homeName} و {awayName}
             </h3>
           </div>
@@ -54,7 +65,7 @@ export function TeamRadarChart({ match }: { match?: MatchCard | null }) {
           <span className="bg-blue-500/15 border border-blue-500/30 text-home px-3 py-1 rounded-full">
             {homeName} (Elo {eloHome})
           </span>
-          <span className="bg-danger-dim border border-rose-500/30 text-danger px-3 py-1 rounded-full">
+          <span className="bg-danger-dim border border-danger/30 text-danger px-3 py-1 rounded-full">
             {awayName} (Elo {eloAway})
           </span>
         </div>
@@ -97,7 +108,7 @@ export function TeamRadarChart({ match }: { match?: MatchCard | null }) {
 
       <div className="pt-3 border-t border-line flex flex-wrap items-center justify-between text-xs text-muted font-semibold gap-2">
         <span>الأفضلية التكتيكية: <strong className="text-ink">{pHome >= pAway ? homeName : awayName}</strong></span>
-        <span className="font-mono font-black text-home">
+        <span className="font-mono font-semibold text-home">
           مؤشر Elo المباشر: {eloHome} vs {eloAway}
         </span>
       </div>

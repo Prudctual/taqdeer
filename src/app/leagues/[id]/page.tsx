@@ -41,7 +41,7 @@ function zoneOf(position: number, total: number): Zone | null {
     return {
       color: "var(--home)",
       bgColor: "bg-blue-500/10 hover:bg-blue-500/20",
-      textColor: "text-blue-500 font-black",
+      textColor: "text-blue-500 font-semibold",
       positionBgColor: "bg-blue-500/20",
       positionTextColor: "text-blue-500",
       borderColor: "border-blue-500/30",
@@ -53,7 +53,7 @@ function zoneOf(position: number, total: number): Zone | null {
     return {
       color: "var(--warn)",
       bgColor: "bg-orange-500/10 hover:bg-orange-500/20",
-      textColor: "text-orange-500 font-black",
+      textColor: "text-orange-500 font-semibold",
       positionBgColor: "bg-orange-500/20",
       positionTextColor: "text-orange-500",
       borderColor: "border-orange-500/30",
@@ -65,10 +65,10 @@ function zoneOf(position: number, total: number): Zone | null {
     return {
       color: "var(--danger)",
       bgColor: "bg-danger-dim hover:bg-danger-dim",
-      textColor: "text-rose-500 font-black",
+      textColor: "text-danger font-semibold",
       positionBgColor: "bg-danger-dim",
-      positionTextColor: "text-rose-500",
-      borderColor: "border-rose-500/30",
+      positionTextColor: "text-danger",
+      borderColor: "border-danger/30",
       label: "منطقة الهبوط",
     };
   }
@@ -77,7 +77,7 @@ function zoneOf(position: number, total: number): Zone | null {
 
 function NumTh({ children, full }: { children: ReactNode; full?: string }) {
   return (
-    <th scope="col" className="px-3 py-3 text-center text-xs font-black text-ink uppercase">
+    <th scope="col" className="px-3 py-3 text-center text-xs font-semibold text-ink uppercase">
       {full ? (
         <abbr title={full} className="no-underline">
           {children}
@@ -104,12 +104,12 @@ function MeterRow({
 }) {
   return (
     <li className="flex items-center gap-3 border-b border-line py-2.5 last:border-b-0">
-      <span className="w-5 shrink-0 text-center font-mono font-extrabold text-xs text-faint">
+      <span className="w-5 shrink-0 text-center font-mono font-semibold text-xs text-faint">
         {rank}
       </span>
       <Link
         href={`/team/${teamId}`}
-        className="min-w-0 flex-1 truncate text-xs font-black text-ink no-underline hover:text-accent transition-colors"
+        className="min-w-0 flex-1 truncate text-xs font-semibold text-ink no-underline hover:text-accent transition-colors"
       >
         {name}
       </Link>
@@ -119,7 +119,7 @@ function MeterRow({
           style={{ width: `${Math.max(5, pct)}%` }}
         />
       </div>
-      <span className="w-12 shrink-0 text-end font-mono font-extrabold text-xs text-muted">
+      <span className="w-12 shrink-0 text-end font-mono font-semibold text-xs text-muted">
         {value}
       </span>
     </li>
@@ -140,11 +140,11 @@ function RankedList({
   return (
     <div className="bg-panel/50 p-4 rounded-2xl border border-line min-w-0 space-y-2">
       <div className="flex items-center justify-between border-b border-line pb-2">
-        <h3 className="text-xs font-black text-ink flex items-center gap-1.5">
+        <h3 className="text-xs font-semibold text-ink flex items-center gap-1.5">
           <span>{icon}</span>
           <span>{title}</span>
         </h3>
-        <span className="text-[10px] font-extrabold text-muted bg-surface px-2 py-0.5 rounded-md border border-line">
+        <span className="text-[10px] font-semibold text-muted bg-surface px-2 py-0.5 rounded-md border border-line">
           {hint}
         </span>
       </div>
@@ -175,10 +175,15 @@ export default async function LeaguePage({
   if (!league) notFound();
 
   const availableSeasons = getAvailableSeasons(id);
+  const currentSeasonYear = String(latestSeasonStartYear());
+  const currentStandings = getStandings(id, currentSeasonYear);
+  // فضّل الموسم الجاري إن وُجد ترتيب أو مباريات؛ وإلا أحدث موسم فيه ترتيب كامل
   const defaultSeason =
-    availableSeasons.find((s) => getStandings(id, s).length > 0) ||
-    availableSeasons[0] ||
-    "2025";
+    currentStandings.length > 0 || availableSeasons[0] === currentSeasonYear
+      ? currentSeasonYear
+      : availableSeasons.find((s) => getStandings(id, s).length > 0) ||
+        availableSeasons[0] ||
+        currentSeasonYear;
   const activeSeason =
     selectedSeasonParam && availableSeasons.includes(selectedSeasonParam)
       ? selectedSeasonParam
@@ -190,8 +195,8 @@ export default async function LeaguePage({
   const matches = getLeagueMatches(id, 400, 24);
   const counts = getLeagueMatchCounts(id);
   const n = standings.length;
-  const currentSeasonYear = String(latestSeasonStartYear());
   const isCurrentSeason = activeSeason === currentSeasonYear;
+  const anyPlayed = standings.some((r) => r.played > 0);
   const seasonPrep = n === 0 && isCurrentSeason;
   const seasonLabel = `${activeSeason}/${Number(activeSeason) + 1}`;
 
@@ -247,10 +252,10 @@ export default async function LeaguePage({
               />
             </div>
             <div className="space-y-1">
-              <span className="text-xs font-black text-accent bg-accent-dim/40 px-3 py-0.5 rounded-full border border-accent/20">
+              <span className="text-xs font-semibold text-accent bg-accent-dim/40 px-3 py-0.5 rounded-full border border-accent/20">
                 {league.country_ar}
               </span>
-              <h1 className="text-2xl sm:text-4xl font-black text-ink tracking-tight">
+              <h1 className="text-2xl sm:text-4xl font-semibold text-ink tracking-tight">
                 {league.name_ar}
               </h1>
               <p className="text-xs font-semibold text-faint font-mono" dir="ltr">
@@ -259,7 +264,7 @@ export default async function LeaguePage({
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 text-xs font-black">
+          <div className="flex flex-wrap items-center gap-2 text-xs font-semibold">
             <span className="bg-panel text-ink px-3.5 py-1.5 rounded-full shadow-2xs border border-line">
               موسم {activeSeason}
             </span>
@@ -285,7 +290,7 @@ export default async function LeaguePage({
             <Link
               key={l.id}
               href={`/leagues/${l.id}`}
-              className={`press-scale px-4 py-2 rounded-full text-xs font-black no-underline transition-all duration-200 ${
+              className={`press-scale px-4 py-2 rounded-full text-xs font-semibold no-underline transition-all duration-200 ${
                 isActive
                   ? "bg-accent text-on-fill shadow-sm scale-105"
                   : "bg-surface text-ink hover:bg-panel hover:text-accent border border-line shadow-2xs"
@@ -301,8 +306,8 @@ export default async function LeaguePage({
       {availableSeasons.length > 0 && (
         <div className="bg-surface p-4 sm:p-5 rounded-2xl border border-line shadow-xs space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <span className="text-xs font-black text-ink">المواسم المتاحة:</span>
-            <span className="text-xs font-black text-accent bg-accent-dim/40 px-3 py-1 rounded-full border border-accent/20">
+            <span className="text-xs font-semibold text-ink">المواسم المتاحة:</span>
+            <span className="text-xs font-semibold text-accent bg-accent-dim/40 px-3 py-1 rounded-full border border-accent/20">
               {seasonPrep
                 ? `بداية الموسم ${seasonLabel} — بانتظار جدول الترتيب`
                 : `جدول الترتيب الرسمي — موسم ${activeSeason}`}
@@ -316,7 +321,7 @@ export default async function LeaguePage({
                 <Link
                   key={s}
                   href={`/leagues/${id}?season=${s}`}
-                  className={`px-4 py-2 rounded-full text-xs font-mono font-black no-underline transition-all ${
+                  className={`px-4 py-2 rounded-full text-xs font-mono font-semibold no-underline transition-all ${
                     isActive
                       ? "bg-accent !text-on-fill shadow-sm border-0 scale-105"
                       : isLatest
@@ -336,7 +341,7 @@ export default async function LeaguePage({
       <div className="card bg-surface p-5 sm:p-7 rounded-2xl border border-line shadow-xs space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line pb-3">
           <div className="space-y-0.5">
-            <h2 className="text-base sm:text-lg font-black text-ink tracking-tight">
+            <h2 className="text-base sm:text-lg font-semibold text-ink tracking-tight">
               {seasonPrep ? `موسم ${seasonLabel}` : "جدول ترتيب الفرق"}
             </h2>
             <p className="text-xs text-muted font-medium">
@@ -345,22 +350,28 @@ export default async function LeaguePage({
                   ? `${counts.scheduled} مباراة مجدولة — الترتيب يظهر بعد انطلاق الموسم`
                   : "تصنيفات القوة الأولية والمباريات المجدولة"
                 : leader
-                ? `الصدارة: ${leader.name_ar} برصيد ${leader.points} نقطة`
-                : `المواسم الرسمية وتقييم Elo النماذج`}
+                  ? anyPlayed
+                    ? `الصدارة: ${leader.name_ar} برصيد ${leader.points} نقطة · ${n} فريقاً`
+                    : `جدول الموسم الجاري · ${n} فريقاً · بانتظار أول النتائج`
+                  : `المواسم الرسمية وتقييم Elo النماذج`}
             </p>
           </div>
-          <span className="text-xs font-black text-muted bg-panel px-3 py-1 rounded-full border border-line">
-            {seasonPrep ? "قبل انطلاق الترتيب" : "محدث أوتوماتيكياً"}
+          <span className="text-xs font-semibold text-muted bg-panel px-3 py-1 rounded-full border border-line">
+            {seasonPrep
+              ? "قبل انطلاق الترتيب"
+              : anyPlayed
+                ? "محدث من النتائج"
+                : "جدول الموسم · 0 مباريات"}
           </span>
         </div>
 
         {n === 0 ? (
           <div className="bg-panel/50 p-6 sm:p-8 rounded-2xl border border-line space-y-6 text-center">
-            <div className="inline-flex items-center justify-center h-14 w-14 rounded-2xl bg-success-dim text-success font-black text-2xl shadow-2xs">
+            <div className="inline-flex items-center justify-center h-14 w-14 rounded-2xl bg-success-dim text-success font-semibold text-2xl shadow-2xs">
               ⏳
             </div>
             <div className="max-w-md mx-auto space-y-2">
-              <h3 className="text-lg font-black text-ink">
+              <h3 className="text-lg font-semibold text-ink">
                 {seasonPrep
                   ? `لا يوجد ترتيب رسمي بعد لموسم ${seasonLabel}`
                   : `لا يتوفر ترتيب لموسم ${activeSeason}`}
@@ -375,7 +386,7 @@ export default async function LeaguePage({
             {/* Strengths Preview Grid */}
             {strengths.length > 0 && (
               <div className="space-y-3 text-start border-t border-line pt-6">
-                <h4 className="text-xs font-black text-ink">
+                <h4 className="text-xs font-semibold text-ink">
                   تصنيفات القوة الأولية المتوقعة للأندية ({strengths.length} نادياً):
                 </h4>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -386,9 +397,9 @@ export default async function LeaguePage({
                     >
                       <div className="flex items-center gap-2.5">
                         <Crest alt={t.name_ar} size="xs" />
-                        <span className="font-black text-ink">{t.name_ar}</span>
+                        <span className="font-semibold text-ink">{t.name_ar}</span>
                       </div>
-                      <span className="font-mono font-black text-ink bg-panel px-2 py-0.5 rounded-md border border-line">
+                      <span className="font-mono font-semibold text-ink bg-panel px-2 py-0.5 rounded-md border border-line">
                         {Math.round(t.elo)}
                       </span>
                     </div>
@@ -404,7 +415,7 @@ export default async function LeaguePage({
                 <thead>
                   <tr className="bg-panel border-b border-line">
                     <NumTh full="المركز">#</NumTh>
-                    <th scope="col" className="px-4 py-3 text-start text-xs font-black text-ink min-w-[10rem]">
+                    <th scope="col" className="px-4 py-3 text-start text-xs font-semibold text-ink min-w-[10rem]">
                       الفريق
                     </th>
                     <NumTh full="لعب">ل</NumTh>
@@ -425,14 +436,14 @@ export default async function LeaguePage({
                     return (
                       <tr
                         key={r.team_id}
-                        className={`transition-colors font-black ${
+                        className={`transition-colors font-semibold ${
                           zone
                             ? zone.bgColor
                             : "hover:bg-panel/50 text-ink"
                         }`}
                       >
                         <td
-                          className={`px-3 py-3 text-center font-mono font-black ${
+                          className={`px-3 py-3 text-center font-mono font-semibold ${
                             zone
                               ? `${zone.positionTextColor} ${zone.positionBgColor}`
                               : "text-muted"
@@ -445,7 +456,7 @@ export default async function LeaguePage({
                         >
                           {r.position}
                         </td>
-                        <td className="px-4 py-3 font-black">
+                        <td className="px-4 py-3 font-semibold">
                           <Link
                             href={`/team/${r.team_id}`}
                             className={`flex items-center gap-2.5 no-underline transition-colors ${
@@ -481,10 +492,10 @@ export default async function LeaguePage({
                         <td className="px-3 py-3 text-center font-mono font-bold text-muted">
                           {r.goal_difference > 0 ? `+${r.goal_difference}` : r.goal_difference}
                         </td>
-                        <td className="px-3 py-3 text-center font-mono font-black text-sm text-accent">
+                        <td className="px-3 py-3 text-center font-mono font-semibold text-sm text-accent">
                           {r.points}
                         </td>
-                        <td className="px-3 py-3 text-center font-mono font-extrabold text-ink">
+                        <td className="px-3 py-3 text-center font-mono font-semibold text-ink">
                           {Math.round(r.elo)}
                         </td>
                       </tr>
@@ -516,7 +527,7 @@ export default async function LeaguePage({
       {/* Model Strengths Section */}
       <div className="card bg-surface p-5 sm:p-7 rounded-2xl border border-line shadow-xs space-y-4">
         <div className="border-b border-line pb-3">
-          <h2 className="text-base sm:text-lg font-black text-ink tracking-tight">
+          <h2 className="text-base sm:text-lg font-semibold text-ink tracking-tight">
             معاملات قوة النماذج الأوتوماتيكية
           </h2>
           <p className="text-xs text-muted font-medium">
@@ -585,7 +596,7 @@ export default async function LeaguePage({
       <div className="card bg-surface p-5 sm:p-7 rounded-2xl border border-line shadow-xs space-y-4">
 
         <div className="border-b border-line pb-3">
-          <h2 className="text-base sm:text-lg font-black text-ink tracking-tight">
+          <h2 className="text-base sm:text-lg font-semibold text-ink tracking-tight">
             جدول ومواعيد مباريات الدوري
           </h2>
           <p className="text-xs text-muted font-medium">

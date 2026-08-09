@@ -4,6 +4,7 @@ const FOOTER_LINKS = [
   { href: "/", label: "المباريات" },
   { href: "/leagues", label: "الدوريات" },
   { href: "/value", label: "فرص القيمة" },
+  { href: "/double-chance", label: "الفرصة المزدوجة" },
   { href: "/accuracy", label: "دقة النماذج" },
   { href: "/methodology", label: "المنهجية" },
   { href: "/news", label: "الأخبار" },
@@ -17,7 +18,7 @@ export function SiteFooter() {
       <div className="mx-auto w-full max-w-[var(--content-max)] px-4 py-8 sm:px-6 space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-6">
           <div className="space-y-2 max-w-md">
-            <p className="text-sm font-black text-ink">تقدير</p>
+            <p className="text-sm font-semibold text-ink">تقدير</p>
             <p className="text-xs text-muted leading-relaxed">
               احتمالات 1X2 وتوزيع النتائج بنماذج Dixon–Coles وElo معايرة على نتائج حقيقية.
               الاحتمال ليس يقيناً — نعرض الثقة والمعايرة بجانب الرقم.

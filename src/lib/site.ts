@@ -2,5 +2,5 @@
 export const SITE_URL = (
   process.env.NEXT_PUBLIC_SITE_URL ||
   process.env.SITE_URL ||
-  "http://13.53.56.196"
+  "http://192.3.12.130"
 ).replace(/\/$/, "");

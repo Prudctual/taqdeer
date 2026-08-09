@@ -6,7 +6,8 @@ import {
   getSecureApiHeaders,
 } from "@/lib/rate-limit";
 
-export const revalidate = 60;
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export async function GET(request: Request) {
   const rl = checkRateLimit(request);
@@ -42,14 +43,17 @@ export async function GET(request: Request) {
       JOIN teams ht ON ht.id = m.home_team_id
       JOIN teams at ON at.id = m.away_team_id
       JOIN predictions p ON p.match_id = m.id
-      WHERE m.status IN ('SCHEDULED', 'TIMED')
-        AND m.utc_date >= datetime('now')
+      WHERE m.status IN ('SCHEDULED', 'TIMED', 'IN_PLAY', 'PAUSED')
+        AND substr(m.utc_date, 1, 19) >= strftime('%Y-%m-%dT%H:%M:%S', 'now')
+        AND substr(m.utc_date, 1, 19) <= strftime('%Y-%m-%dT%H:%M:%S', 'now', '+21 days')
         AND m.odds_home IS NOT NULL
-      ORDER BY p.confidence DESC
-      LIMIT ?
+        AND m.odds_draw IS NOT NULL
+        AND m.odds_away IS NOT NULL
+      ORDER BY m.utc_date ASC
+      LIMIT 150
     `;
 
-    const rows = db.prepare(query).all(limit) as Array<{
+    const rows = db.prepare(query).all() as Array<{
       id: string;
       league_id: string;
       league_name_ar: string;
@@ -105,9 +109,9 @@ export async function GET(request: Request) {
               ev: parseFloat(ev.toFixed(4)),
               kelly: parseFloat(kelly.toFixed(4)),
               stake: parseFloat((0.25 * kelly).toFixed(4)),
-              bet: ev >= 0.03 && ev <= 0.15 && kelly > 0,
+              bet: ev >= 0.03 && ev <= 0.4 && kelly > 0,
             };
-            if (!best || cand.kelly > best.kelly) best = cand;
+            if (!best || cand.ev > best.ev) best = cand;
           }
           valueSignal = best;
         }
@@ -125,7 +129,8 @@ export async function GET(request: Request) {
           value_signal: valueSignal,
         };
       })
-      .filter((b) => b.value_signal && b.value_signal.bet);
+      .filter((b) => b.value_signal && b.value_signal.bet)
+      .slice(0, limit);
 
     return NextResponse.json(
       {

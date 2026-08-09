@@ -23,7 +23,8 @@ import {
 } from "@/lib/queries";
 import { toSquadStars } from "@/lib/players";
 
-export const revalidate = 300;
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 const loadTeam = cache((id: string) => getTeam(id));
 
@@ -144,12 +145,12 @@ export default async function TeamPage({
             <div className="space-y-1">
               <Link
                 href={`/leagues/${team.league_id}`}
-                className="inline-flex items-center gap-1.5 text-xs font-black text-accent bg-accent-dim/40 px-3 py-0.5 rounded-full border border-accent/20 no-underline hover:bg-accent-dim transition-colors"
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-accent bg-accent-dim/40 px-3 py-0.5 rounded-full border border-accent/20 no-underline hover:bg-accent-dim transition-colors"
               >
                 <TrophyIcon size={13} />
                 <span>{team.league_name_ar}</span>
               </Link>
-              <h1 className="text-2xl sm:text-4xl font-black text-ink tracking-tight">
+              <h1 className="text-2xl sm:text-4xl font-semibold text-ink tracking-tight">
                 {team.name_ar}
               </h1>
               <p className="text-xs font-semibold text-faint font-mono" dir="ltr">
@@ -158,7 +159,7 @@ export default async function TeamPage({
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2.5 text-xs font-black">
+          <div className="flex flex-wrap items-center gap-2.5 text-xs font-semibold">
             <span className="bg-panel text-ink px-4 py-1.5 rounded-full shadow-2xs font-mono border border-line">
               Elo {Math.round(team.elo)}
             </span>
@@ -173,14 +174,14 @@ export default async function TeamPage({
       <div className="card bg-surface p-6 sm:p-8 rounded-2xl border border-line shadow-xs space-y-6">
         <div className="border-b border-line pb-3 flex flex-wrap items-center justify-between gap-2">
           <div>
-            <h2 className="text-base sm:text-xl font-black text-ink tracking-tight">
+            <h2 className="text-base sm:text-xl font-semibold text-ink tracking-tight">
               مؤشرات القوة والتصنيف
             </h2>
             <p className="text-xs text-muted font-medium">
-              مستوى Elo الحالي: <strong className="text-ink font-mono font-black">{Math.round(team.elo)}</strong> · التراوح في النافذة ({Math.round(minElo)} إلى {Math.round(maxElo)})
+              مستوى Elo الحالي: <strong className="text-ink font-mono font-semibold">{Math.round(team.elo)}</strong> · التراوح في النافذة ({Math.round(minElo)} إلى {Math.round(maxElo)})
             </p>
           </div>
-          <span className="text-xs font-black text-accent bg-accent-dim/40 px-3.5 py-1 rounded-full border border-accent/20">
+          <span className="text-xs font-semibold text-accent bg-accent-dim/40 px-3.5 py-1 rounded-full border border-accent/20">
             تحليل النماذج
           </span>
         </div>
@@ -188,24 +189,24 @@ export default async function TeamPage({
         {/* 3 Metric Stat Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="bg-panel p-4 rounded-xl border border-line text-center space-y-1">
-            <span className="text-xs font-black text-muted block">Elo الحالي</span>
-            <span className="text-2xl sm:text-3xl font-black text-ink font-mono block">
+            <span className="text-xs font-semibold text-muted block">Elo الحالي</span>
+            <span className="text-2xl sm:text-3xl font-semibold text-ink font-mono block">
               {Math.round(team.elo)}
             </span>
             <span className="text-[11px] font-bold text-faint block">تصنيف القوة التراكمي</span>
           </div>
 
           <div className="bg-panel p-4 rounded-xl border border-line text-center space-y-1">
-            <span className="text-xs font-black text-muted block">معامل الهجوم</span>
-            <span className="text-2xl sm:text-3xl font-black text-ink font-mono block">
+            <span className="text-xs font-semibold text-muted block">معامل الهجوم</span>
+            <span className="text-2xl sm:text-3xl font-semibold text-ink font-mono block">
               {team.attack?.toFixed(2) ?? "—"}
             </span>
             <span className="text-[11px] font-bold text-muted block">أعلى = أكثر خطورة</span>
           </div>
 
           <div className="bg-panel p-4 rounded-xl border border-line text-center space-y-1">
-            <span className="text-xs font-black text-muted block">معامل الدفاع</span>
-            <span className="text-2xl sm:text-3xl font-black text-ink font-mono block">
+            <span className="text-xs font-semibold text-muted block">معامل الدفاع</span>
+            <span className="text-2xl sm:text-3xl font-semibold text-ink font-mono block">
               {team.defense?.toFixed(2) ?? "—"}
             </span>
             <span className="text-[11px] font-bold text-muted block">أقل = أكثر صلابة</span>
@@ -217,14 +218,14 @@ export default async function TeamPage({
           <RevealOnView className="space-y-3 border-t border-line pt-5">
             {team.attack != null && (
               <div className="flex items-center gap-3 text-xs">
-                <span className="w-16 font-black text-ink shrink-0">القوة الهجومية</span>
+                <span className="w-16 font-semibold text-ink shrink-0">القوة الهجومية</span>
                 <div className="h-3 flex-1 rounded-full bg-panel overflow-hidden">
                   <div
                     className="h-full bg-success rounded-full transition-all"
                     style={{ width: `${Math.min(100, (team.attack / 2.2) * 100)}%` }}
                   />
                 </div>
-                <span className="w-12 text-end font-mono font-black text-ink shrink-0">
+                <span className="w-12 text-end font-mono font-semibold text-ink shrink-0">
                   {team.attack.toFixed(2)}
                 </span>
               </div>
@@ -232,14 +233,14 @@ export default async function TeamPage({
 
             {team.defense != null && (
               <div className="flex items-center gap-3 text-xs">
-                <span className="w-16 font-black text-ink shrink-0">الصلابة الدفاعية</span>
+                <span className="w-16 font-semibold text-ink shrink-0">الصلابة الدفاعية</span>
                 <div className="h-3 flex-1 rounded-full bg-panel overflow-hidden">
                   <div
                     className="h-full bg-blue-500 rounded-full transition-all"
                     style={{ width: `${Math.min(100, (Math.abs(team.defense) / 2.2) * 100)}%` }}
                   />
                 </div>
-                <span className="w-12 text-end font-mono font-black text-ink shrink-0">
+                <span className="w-12 text-end font-mono font-semibold text-ink shrink-0">
                   {team.defense.toFixed(2)}
                 </span>
               </div>
@@ -251,13 +252,13 @@ export default async function TeamPage({
         {form.length > 0 && (
           <div className="space-y-3 border-t border-line pt-5">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <span className="text-xs font-black text-ink">
+              <span className="text-xs font-semibold text-ink">
                 الفورم · نتائج المباريات الأخيرة (الأحدث أولاً)
               </span>
-              <span className="text-xs font-extrabold text-muted bg-panel px-3 py-1 rounded-full border border-line">
-                <span className="text-success font-mono font-black me-1">{tally.W}</span> فوز ·{" "}
-                <span className="text-amber-500 font-mono font-black me-1">{tally.D}</span> تعادل ·{" "}
-                <span className="text-rose-500 font-mono font-black me-1">{tally.L}</span> خسارة
+              <span className="text-xs font-semibold text-muted bg-panel px-3 py-1 rounded-full border border-line">
+                <span className="text-success font-mono font-semibold me-1">{tally.W}</span> فوز ·{" "}
+                <span className="text-amber-500 font-mono font-semibold me-1">{tally.D}</span> تعادل ·{" "}
+                <span className="text-danger font-mono font-semibold me-1">{tally.L}</span> خسارة
               </span>
             </div>
 
@@ -266,7 +267,7 @@ export default async function TeamPage({
                 <li key={f.id}>
                   <Link
                     href={`/match/${encodeURIComponent(f.id)}`}
-                    className={`press-scale flex h-9 w-9 items-center justify-center rounded-xl font-mono text-xs font-black no-underline shadow-2xs transition-all hover:scale-110 ${RESULT[f.key].bg}`}
+                    className={`press-scale flex h-9 w-9 items-center justify-center rounded-xl font-mono text-xs font-semibold no-underline shadow-2xs transition-all hover:scale-110 ${RESULT[f.key].bg}`}
                     title={`${RESULT[f.key].label} ${f.gf}–${f.ga} · أمام ${f.opponent} · ${formatShortDate(f.date)}`}
                   >
                     <span>{RESULT[f.key].glyph}</span>
@@ -283,14 +284,14 @@ export default async function TeamPage({
         <div className="card bg-surface p-6 sm:p-8 rounded-2xl border border-line shadow-xs space-y-4">
           <div className="flex items-center justify-between border-b border-line pb-3">
             <div>
-              <h2 className="text-base sm:text-xl font-black text-ink tracking-tight">
+              <h2 className="text-base sm:text-xl font-semibold text-ink tracking-tight">
                 مسار وتطور تصنيف Elo
               </h2>
               <p className="text-xs text-muted font-medium">
                 تطور الأداء عبر آخر {eloHist.length} مباراة (أدنى {Math.round(minElo)} - أعلى {Math.round(maxElo)})
               </p>
             </div>
-            <span className="text-xs font-black text-muted bg-panel px-3 py-1 rounded-full border border-line">
+            <span className="text-xs font-semibold text-muted bg-panel px-3 py-1 rounded-full border border-line">
               منحنى حركي
             </span>
           </div>
@@ -357,7 +358,7 @@ export default async function TeamPage({
       {upcoming.length > 0 ? (
         <div className="card bg-surface p-6 sm:p-8 rounded-2xl border border-line space-y-4">
           <div className="border-b border-line pb-3">
-            <h2 className="text-base sm:text-xl font-black text-ink tracking-tight">
+            <h2 className="text-base sm:text-xl font-semibold text-ink tracking-tight">
               المباريات القادمة للفريق
             </h2>
             <p className="text-xs text-muted font-medium">
@@ -383,7 +384,7 @@ export default async function TeamPage({
       <div className="card bg-surface p-6 sm:p-8 rounded-2xl border border-line shadow-xs space-y-4">
         <div className="flex items-center justify-between border-b border-line pb-3">
           <div>
-            <h2 className="text-base sm:text-xl font-black text-ink tracking-tight">
+            <h2 className="text-base sm:text-xl font-semibold text-ink tracking-tight">
               سجل ونتائج المباريات الأخيرة
             </h2>
             <p className="text-xs text-muted font-medium">
@@ -392,7 +393,7 @@ export default async function TeamPage({
           </div>
           <Link
             href={`/leagues/${team.league_id}`}
-            className="text-xs font-black text-accent bg-accent-dim/40 px-3 py-1 rounded-full border border-accent/20 no-underline hover:bg-accent-dim transition-colors"
+            className="text-xs font-semibold text-accent bg-accent-dim/40 px-3 py-1 rounded-full border border-accent/20 no-underline hover:bg-accent-dim transition-colors"
           >
             جدول الدوري
           </Link>

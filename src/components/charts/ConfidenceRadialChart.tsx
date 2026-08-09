@@ -20,7 +20,7 @@ export function ConfidenceRadialChart({ match }: { match?: MatchCard | null }) {
   if (!hasPred) {
     return (
       <div className="rounded-2xl border border-line bg-panel p-5 sm:p-6 shadow-2xs">
-        <h3 className="text-base sm:text-lg font-black text-ink">
+        <h3 className="text-base sm:text-lg font-semibold text-ink">
           مؤشرات ثقة التوقع لهذه المباراة
         </h3>
         <p className="mt-2 text-xs font-semibold text-muted">
@@ -55,7 +55,7 @@ export function ConfidenceRadialChart({ match }: { match?: MatchCard | null }) {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
-            <h3 className="text-base sm:text-lg font-black text-ink">
+            <h3 className="text-base sm:text-lg font-semibold text-ink">
               مؤشرات ثقة التوقع لهذه المباراة
             </h3>
           </div>
@@ -64,7 +64,7 @@ export function ConfidenceRadialChart({ match }: { match?: MatchCard | null }) {
           </p>
         </div>
 
-        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-accent-dim border border-accent/25 text-sky-600 dark:text-sky-400 font-extrabold text-xs">
+        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-accent-dim border border-accent/25 text-accent font-semibold text-xs">
           <span>ثقة النموذج: {confidencePct}%</span>
         </div>
       </div>
@@ -108,7 +108,7 @@ export function ConfidenceRadialChart({ match }: { match?: MatchCard | null }) {
 
       <div className="pt-3 border-t border-line flex flex-wrap items-center justify-between text-xs text-muted font-semibold gap-2">
         <span>الحكم: {match?.refereeName ?? "لم يُعلن بعد"}</span>
-        <span className="font-mono font-black text-sky-600 dark:text-sky-400">
+        <span className="font-mono font-semibold text-accent">
           درجة الموثوقية: {confidencePct >= 70 ? "مرتفعة" : confidencePct >= 50 ? "متوسطة" : "منخفضة"}
         </span>
       </div>

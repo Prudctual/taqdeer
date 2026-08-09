@@ -4,7 +4,8 @@ import { getArticles, getFeaturedArticle } from "@/lib/queries";
 import { BookOpen, Clock, TrendingUp } from "lucide-react";
 import ArticlesFilterClient from "./ArticlesFilterClient";
 
-export const revalidate = 60;
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export const metadata: Metadata = {
   title: "المقالات والتقارير — منصة تقدير",
@@ -33,7 +34,7 @@ export default function ArticlesPage() {
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
             <div className="space-y-4 max-w-3xl">
               <div className="flex flex-wrap items-center gap-3">
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-accent text-on-fill text-xs font-black">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-accent text-on-fill text-xs font-semibold">
                   <TrendingUp className="w-3.5 h-3.5" />
                   المقال الرئيسي الموصى به
                 </span>
@@ -42,7 +43,7 @@ export default function ArticlesPage() {
                 </span>
               </div>
 
-              <h2 className="text-2xl sm:text-3xl font-black text-ink group-hover:text-accent motion-colors leading-tight">
+              <h2 className="text-2xl sm:text-3xl font-semibold text-ink group-hover:text-accent motion-colors leading-tight">
                 {featured.title}
               </h2>
 
@@ -63,7 +64,7 @@ export default function ArticlesPage() {
             </div>
 
             <div className="shrink-0 self-end md:self-center">
-              <span className="inline-flex items-center justify-center px-5 py-3 rounded-xl bg-accent text-on-fill font-extrabold text-sm">
+              <span className="inline-flex items-center justify-center px-5 py-3 rounded-xl bg-accent text-on-fill font-semibold text-sm">
                 اقرأ المقال الكامل ←
               </span>
             </div>

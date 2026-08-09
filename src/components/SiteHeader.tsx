@@ -40,6 +40,16 @@ export function SiteHeader() {
       ),
     },
     {
+      href: "/double-chance",
+      label: "الفرصة المزدوجة",
+      active: pathname.startsWith("/double-chance"),
+      icon: (
+        <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M8 7h8M8 12h8M8 17h5M5 7v10a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2z" />
+        </svg>
+      ),
+    },
+    {
       href: "/leagues",
       label: "الدوريات والجدول",
       active: pathname.startsWith("/leagues"),
@@ -133,16 +143,16 @@ export function SiteHeader() {
               </button>
 
               <Link href="/" className="flex items-center gap-2 no-underline">
-                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-accent font-black text-base text-on-fill shadow-xs">
+                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-accent font-semibold text-base text-on-fill shadow-xs">
                   ت
                 </div>
-                <span className="font-black text-base tracking-tight text-ink">تقدير</span>
+                <span className="font-semibold text-base tracking-tight text-ink">تقدير</span>
               </Link>
             </div>
 
             {/* Desktop: Page Title */}
             <div className="hidden md:flex items-center gap-2">
-              <span className="text-base font-black text-ink tracking-tight">{activeItem?.label ?? "تقدير"}</span>
+              <span className="text-base font-semibold text-ink tracking-tight">{activeItem?.label ?? "تقدير"}</span>
             </div>
 
             {/* Desktop: Navigation Links */}
@@ -152,7 +162,7 @@ export function SiteHeader() {
                   key={item.href}
                   href={item.href}
                   className={`topbar-mobile-link text-xs px-3.5 py-1.5 font-bold transition-all ${
-                    item.active ? "is-active font-black" : ""
+                    item.active ? "is-active font-semibold" : ""
                   }`}
                 >
                   {item.label}
@@ -167,7 +177,7 @@ export function SiteHeader() {
                 href="https://t.me/Taqdeerbot"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="group press-scale flex items-center gap-1.5 rounded-xl bg-accent-dim hover:bg-accent-dim border border-accent/30 px-3 py-1.5 text-xs font-black text-accent no-underline transition-all shadow-xs"
+                className="group press-scale flex items-center gap-1.5 rounded-xl bg-accent-dim hover:bg-accent-dim border border-accent/30 px-3 py-1.5 text-xs font-semibold text-accent no-underline transition-all shadow-xs"
                 title="افتـح بوت التلغرام التفاعلي (@Taqdeerbot)"
               >
                 <svg className="h-4 w-4 fill-current text-[#229ED9] group-hover:scale-110 transition-transform" viewBox="0 0 24 24">
@@ -206,7 +216,7 @@ export function SiteHeader() {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`topbar-mobile-link shrink-0 ${item.active ? "is-active font-black" : ""}`}
+                className={`topbar-mobile-link shrink-0 ${item.active ? "is-active font-semibold" : ""}`}
               >
                 {item.label}
               </Link>
@@ -220,21 +230,21 @@ export function SiteHeader() {
         <div className="fixed inset-0 z-50 md:hidden">
           {/* Backdrop Click to Close */}
           <div
-            className="fixed inset-0 bg-black/70 backdrop-blur-xs animate-in fade-in duration-200"
+            className="fixed inset-0 bg-ink/50 animate-in fade-in duration-200"
             onClick={() => setIsMobileSidebarOpen(false)}
           />
 
           {/* Sliding Drawer Panel (RTL - right to left) */}
-          <aside className="fixed inset-y-0 right-0 z-50 w-72 sm:w-80 bg-surface border-s border-line shadow-2xl flex flex-col justify-between p-5 overflow-y-auto animate-in slide-in-from-right duration-250">
+          <aside className="fixed inset-y-0 end-0 z-50 w-72 sm:w-80 bg-surface border-s border-line shadow-2xl flex flex-col justify-between p-5 overflow-y-auto animate-in slide-in-from-end duration-250">
             <div className="space-y-6">
               {/* Brand Header + Close Button */}
               <div className="flex items-center justify-between pb-4 border-b border-line">
                 <Link href="/" onClick={() => setIsMobileSidebarOpen(false)} className="flex items-center gap-3 no-underline">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-accent font-black text-base text-on-fill shadow-xs">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-accent font-semibold text-base text-on-fill shadow-xs">
                     ت
                   </div>
                   <div className="flex flex-col">
-                    <span className="font-black text-base tracking-tight text-ink leading-tight">تقدير</span>
+                    <span className="font-semibold text-base tracking-tight text-ink leading-tight">تقدير</span>
                     <span className="text-[11px] font-bold text-muted leading-tight">تحليلات كرة القدم المتقدمة</span>
                   </div>
                 </Link>
@@ -261,7 +271,7 @@ export function SiteHeader() {
                     onClick={() => setIsMobileSidebarOpen(false)}
                     className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all ${
                       item.active
-                        ? "bg-accent/15 text-accent font-black shadow-2xs"
+                        ? "bg-accent/15 text-accent font-semibold shadow-2xs"
                         : "text-muted hover:bg-panel hover:text-ink"
                     }`}
                   >
@@ -279,7 +289,7 @@ export function SiteHeader() {
                 href="https://t.me/Taqdeerbot"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-accent-dim border border-accent/30 text-xs font-black text-accent no-underline transition-all shadow-xs"
+                className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-accent-dim border border-accent/30 text-xs font-semibold text-accent no-underline transition-all shadow-xs"
               >
                 <svg className="h-4 w-4 fill-current text-[#229ED9]" viewBox="0 0 24 24">
                   <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 0 0-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/>
@@ -293,7 +303,7 @@ export function SiteHeader() {
                 onClick={toggleAdvancedMode}
                 className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
                   isAdvancedMode
-                    ? "border-accent/30 bg-accent/10 text-accent font-black"
+                    ? "border-accent/30 bg-accent/10 text-accent font-semibold"
                     : "border-line bg-panel text-muted hover:text-ink"
                 }`}
               >
@@ -319,7 +329,7 @@ export function SiteHeader() {
                   </>
                 ) : (
                   <>
-                    <span className="text-indigo-500">🌙</span>
+                    <span className="text-accent">🌙</span>
                     <span>النمط الداكن</span>
                   </>
                 )}

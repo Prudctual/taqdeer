@@ -22,6 +22,9 @@ import { OddsMovementChart } from "@/components/OddsMovementChart";
 import { MatchCountdownHero } from "@/components/MatchCountdownHero";
 import { UpsetAlertBadge } from "@/components/UpsetAlertBadge";
 import { LiveMatchDataSync } from "@/components/LiveMatchDataSync";
+import { LiveEventsTimeline } from "@/components/LiveEventsTimeline";
+import { MatchRiskPanel } from "@/components/MatchRiskPanel";
+import { DoubleChancePanel } from "@/components/DoubleChancePanel";
 import { LiveInPlaySimulator } from "@/components/LiveInPlaySimulator";
 import { getMatchDetailedInfo } from "@/lib/match-details";
 
@@ -55,7 +58,8 @@ import {
 } from "@/lib/queries";
 import { toSquadStars } from "@/lib/players";
 
-export const revalidate = 180;
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 /** مشترك بين generateMetadata والصفحة داخل الطلب نفسه */
 const loadMatch = cache((id: string) => getMatchById(id));
@@ -150,7 +154,7 @@ function MarketRow({
 }) {
   return (
     <div className="flex items-center gap-3 px-4 py-3 sm:px-5 hover:bg-panel/40 transition-colors">
-      <dt className="w-32 shrink-0 text-xs font-black text-ink sm:w-36">
+      <dt className="w-32 shrink-0 text-xs font-semibold text-ink sm:w-36">
         {label}
         {gloss ? (
           <span className="ms-1.5 text-[10px] font-bold text-muted">
@@ -160,7 +164,7 @@ function MarketRow({
       </dt>
       <dd className="flex min-w-0 flex-1 items-center gap-3">
         <Meter value={meter} color={color} className="min-w-0 flex-1" />
-        <span className="w-12 shrink-0 text-end text-xs font-black tabular font-mono text-ink">
+        <span className="w-12 shrink-0 text-end text-xs font-semibold tabular font-mono text-ink">
           {value}
         </span>
       </dd>
@@ -326,12 +330,19 @@ export default async function MatchPage({
   const upcoming = !finished;
   const form = analytics?.components?.form as
     | {
+        p?: [number, number, number];
         home_pts?: number;
         away_pts?: number;
         home_gd?: number;
         away_gd?: number;
       }
     | undefined;
+  // فورم يعاكس التوقع الهيكلي (كما في ساندفيورد: فورم يفضّل الضيف بقوة)
+  const formAwayLean =
+    !!pick &&
+    !!form?.p &&
+    ((pick.key === "H" && form.p[2]! > form.p[0]! + 0.12) ||
+      (pick.key === "A" && form.p[0]! > form.p[2]! + 0.12));
 
   // سياق المواجهة: لقاءات سابقة، راحة، ترتيب، سجل الملعب — كلها تغيب بصمت عند فقد بياناتها
   const h2h = getHeadToHead(match.home_id, match.away_id, match.utc_date);
@@ -517,11 +528,22 @@ export default async function MatchPage({
   // 1 — تبويب الإشارة والتوصية السريعة (Overview)
   const overviewContent = (
     <div className="space-y-6">
+      {(isLive || isAwaiting || (match.liveEventsJson && finished)) && (
+        <LiveEventsTimeline
+          liveEventsJson={match.liveEventsJson}
+          homeName={match.home_name_ar}
+          awayName={match.away_name_ar}
+          homeNameEn={match.home_name_en}
+          awayNameEn={match.away_name_en}
+          isLive={isLive || isAwaiting}
+        />
+      )}
+
       {/* التوقع الأرجح الشامل */}
       {pick ? (
         <div className="rounded-2xl border border-accent/30 bg-accent-dim/20 p-5 space-y-3 shadow-xs">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-black text-accent flex items-center gap-1.5">
+            <span className="text-xs font-semibold text-accent flex items-center gap-1.5">
               التوقع الأرجح للمباراة
             </span>
             <span className="text-[11px] font-bold text-ink bg-surface px-3 py-1 rounded-full border border-line tabular">
@@ -531,12 +553,15 @@ export default async function MatchPage({
           </div>
 
           <div className="space-y-1">
-            <h3 className="text-lg font-black text-ink">
-              التوقع النهائي: <span className="text-accent font-black">{pick.label}</span> ({pct(pick.p)})
+            <h3 className="text-lg font-semibold text-ink">
+              {pick.isEquallyBalanced ? "قراءة النموذج: " : "التوقع النهائي: "}
+              <span className="text-accent font-semibold">{pick.label}</span> ({pct(pick.p)})
             </h3>
 
             <p className="text-xs text-muted leading-relaxed">
-              بناءً على تحليل الأداء السلسلة وتأثير الأرض والجمهور والقوة الهجومية لكل فريق.
+              {pick.isEquallyBalanced
+                ? "الفارق ضيق بين النتائج — لا تُعامل كإشارة حاسمة؛ راجع حماية المفاجأة أدناه."
+                : "بناءً على تحليل الأداء السلسلة وتأثير الأرض والجمهور والقوة الهجومية لكل فريق."}
             </p>
           </div>
 
@@ -548,12 +573,48 @@ export default async function MatchPage({
               <span>فوز {match.away_name_ar} ({match.p_away ? pct(match.p_away) : "—"})</span>
             </div>
             <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-panel">
-              <div style={{ width: `${(match.p_home || 0.38) * 100}%` }} className="bg-home" />
-              <div style={{ width: `${(match.p_draw || 0.32) * 100}%` }} className="bg-draw" />
-              <div style={{ width: `${(match.p_away || 0.30) * 100}%` }} className="bg-away" />
+              <div style={{ width: `${(match.p_home ?? 0) * 100}%` }} className="bg-home" />
+              <div style={{ width: `${(match.p_draw ?? 0) * 100}%` }} className="bg-draw" />
+              <div style={{ width: `${(match.p_away ?? 0) * 100}%` }} className="bg-away" />
             </div>
           </div>
         </div>
+      ) : null}
+
+      {hasPred &&
+      match.p_home != null &&
+      match.p_draw != null &&
+      match.p_away != null ? (
+        <DoubleChancePanel
+          homeName={match.home_name_ar}
+          awayName={match.away_name_ar}
+          pHome={match.p_home}
+          pDraw={match.p_draw}
+          pAway={match.p_away}
+        />
+      ) : null}
+
+      {hasPred ? (
+        <MatchRiskPanel
+          homeName={match.home_name_ar}
+          awayName={match.away_name_ar}
+          pHome={match.p_home!}
+          pDraw={match.p_draw!}
+          pAway={match.p_away!}
+          confidence={match.confidence}
+          isEquallyBalanced={pick?.isEquallyBalanced}
+          formAwayLean={formAwayLean}
+          formHomePts={form?.home_pts}
+          formAwayPts={form?.away_pts}
+          isLive={isLive}
+          finished={finished}
+          minute={match.minute}
+          homeGoals={match.home_goals}
+          awayGoals={match.away_goals}
+          lambdaHome={match.lambda_home}
+          lambdaAway={match.lambda_away}
+          liveEventsJson={match.liveEventsJson}
+        />
       ) : null}
 
       <UpsetAlertBadge
@@ -570,7 +631,7 @@ export default async function MatchPage({
       {verdict ? (
         <div className="rounded-xl border border-line bg-panel/60 p-4 text-xs space-y-1">
           <div className="flex items-center justify-between">
-            <span className="font-extrabold text-ink">تقييم النتيجة الواقعية المنتهية</span>
+            <span className="font-semibold text-ink">تقييم النتيجة الواقعية المنتهية</span>
             <span className="font-bold tabular text-muted">درجة المفاجأة: {verdict.surprise}</span>
           </div>
           <p className="text-muted leading-relaxed">
@@ -584,32 +645,32 @@ export default async function MatchPage({
         {/* توقع الأهداف — من احتمال +2.5 المعاير */}
         <div className="rounded-2xl border border-success/30 bg-surface overflow-hidden shadow-2xs">
           <div className="bg-success-dim border-b border-success/25 px-3.5 py-2 flex items-center justify-between">
-            <span className="text-xs font-black text-success">
+            <span className="text-xs font-semibold text-success">
               توقع الأهداف
             </span>
-            <span className="rounded-full bg-success text-on-fill px-2 py-0.5 text-[10px] font-extrabold">
+            <span className="rounded-full bg-success text-on-fill px-2 py-0.5 text-[10px] font-semibold">
               الأهداف
             </span>
           </div>
           <div className="p-3.5 bg-surface text-start">
-            <p className="text-xs sm:text-sm font-black text-ink">
+            <p className="text-xs sm:text-sm font-semibold text-ink">
               {match.p_over25 == null ? "بانتظار توقع النموذج" : match.p_over25 > 0.5 ? "مباراة هجومية (أهداف)" : "مباراة هادئة (توازن)"}
             </p>
           </div>
         </div>
 
         {/* الحكم — الاسم الحقيقي من مصدر البيانات أو لم يُعلن */}
-        <div className="rounded-2xl border border-rose-500/30 bg-surface overflow-hidden shadow-2xs">
+        <div className="rounded-2xl border border-danger/30 bg-surface overflow-hidden shadow-2xs">
           <div className="bg-danger-dim border-b border-danger/25 px-3.5 py-2 flex items-center justify-between">
-            <span className="text-xs font-black text-danger">
+            <span className="text-xs font-semibold text-danger">
               حكم المباراة
             </span>
-            <span className="rounded-full bg-danger text-on-fill px-2 py-0.5 text-[10px] font-extrabold">
+            <span className="rounded-full bg-danger text-on-fill px-2 py-0.5 text-[10px] font-semibold">
               التحكيم
             </span>
           </div>
           <div className="p-3.5 bg-surface text-start">
-            <p className="text-xs sm:text-sm font-black text-ink truncate">
+            <p className="text-xs sm:text-sm font-semibold text-ink truncate">
               {resolvedReferee ?? "لم يُعلن الحكم بعد"}
             </p>
           </div>
@@ -756,14 +817,14 @@ export default async function MatchPage({
                       <tr key={`${s.hg}-${s.ag}`} className="hover:bg-panel/50 transition-colors">
                         <td className="py-3 px-3 tabular font-bold text-muted">{i + 1}</td>
                         <td className="py-3 px-3 text-center">
-                          <span className="inline-flex items-center justify-center gap-1.5 px-3 py-1 rounded-lg bg-panel border border-line font-mono font-black text-xs text-ink tabular min-w-[3.5rem]">
+                          <span className="inline-flex items-center justify-center gap-1.5 px-3 py-1 rounded-lg bg-panel border border-line font-mono font-semibold text-xs text-ink tabular min-w-[3.5rem]">
                             <span className="text-home">{s.hg}</span>
                             <span className="text-muted">–</span>
                             <span className="text-danger">{s.ag}</span>
                           </span>
                         </td>
                         <td
-                          className={`py-3 px-3 text-center tabular font-black ${
+                          className={`py-3 px-3 text-center tabular font-semibold ${
                             i === 0 ? "text-accent text-sm" : "text-ink"
                           }`}
                         >
@@ -881,6 +942,8 @@ export default async function MatchPage({
             player_impact: (analytics?.components?.player_impact ?? null) as {
               applied?: boolean;
               summary?: string | null;
+              delta_lambda_home?: number;
+              delta_lambda_away?: number;
             } | null,
             referee: (analytics?.components?.referee ?? null) as {
               applied?: boolean;
@@ -893,6 +956,12 @@ export default async function MatchPage({
               summary?: string | null;
               side?: string | null;
               magnitude?: number;
+              market_source?: string | null;
+            } | null,
+            clv: (analytics?.components?.clv ?? null) as {
+              applied?: boolean;
+              summary?: string | null;
+              clv_points?: number;
             } | null,
           }}
         />
@@ -963,7 +1032,7 @@ export default async function MatchPage({
               <li key={row.key} className="space-y-2 px-4 py-3 sm:px-5 press-scale hover:bg-panel/40">
                 <div className="flex items-baseline justify-between gap-2">
                   <span className="text-[13px] font-bold text-ink">
-                    <span className="tabular font-black me-1" style={{ color: OUTCOME_COLOR[row.key] }}>
+                    <span className="tabular font-semibold me-1" style={{ color: OUTCOME_COLOR[row.key] }}>
                       {OUTCOME_GLYPH[row.key]}
                     </span>{" "}
                     {row.label}
@@ -1090,7 +1159,7 @@ export default async function MatchPage({
             <div className="flex items-center gap-2 text-xs font-bold text-muted">
               <Link
                 href={`/leagues/${match.leagueId}`}
-                className="hover:text-accent font-black text-ink no-underline transition-colors"
+                className="hover:text-accent font-semibold text-ink no-underline transition-colors"
               >
                 {match.league_name_ar}
               </Link>
@@ -1119,7 +1188,7 @@ export default async function MatchPage({
           </div>
 
           <div className="flex flex-wrap items-center justify-between gap-4 pt-1">
-            <h1 className="text-xl sm:text-3xl font-black text-ink tracking-tight">
+            <h1 className="text-xl sm:text-3xl font-semibold text-ink tracking-tight">
               {match.home_name_ar}
               <span className="mx-2 text-accent font-bold">ضد</span>
               {match.away_name_ar}
@@ -1131,7 +1200,9 @@ export default async function MatchPage({
               finished={finished}
               isLive={isLive}
               awaiting={isAwaiting}
-              showCountdown={false}
+              liveMinute={match.minute}
+              liveStatusAr={match.liveStatusAr}
+              showCountdown={!isLive && !finished}
             />
           </div>
         </header>
@@ -1152,8 +1223,28 @@ export default async function MatchPage({
         />
       </div>
 
+      {(isLive || isAwaiting || upcoming) && (
+        <LiveMatchDataSync
+          intervalSeconds={isLive || isAwaiting ? 15 : 30}
+          finished={finished}
+          isLive={isLive || isAwaiting}
+        />
+      )}
+
       {!hasPred || !pick ? (
         <SectionCard leagueId={match.leagueId} flush>
+          {(isLive || isAwaiting) && (
+            <div className="mb-4">
+              <LiveEventsTimeline
+                liveEventsJson={match.liveEventsJson}
+                homeName={match.home_name_ar}
+                awayName={match.away_name_ar}
+                homeNameEn={match.home_name_en}
+                awayNameEn={match.away_name_en}
+                isLive
+              />
+            </div>
+          )}
           {upcoming ? (
             <EmptyState
               title="لا يتوفر توقع بعد"
@@ -1176,7 +1267,6 @@ export default async function MatchPage({
         </SectionCard>
       ) : (
         <div className="space-y-4">
-          <LiveMatchDataSync intervalSeconds={30} finished={finished} />
           <MatchTabContainer
             overviewContent={overviewContent}
             tacticsContent={tacticsContent}

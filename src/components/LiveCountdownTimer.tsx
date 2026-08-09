@@ -25,7 +25,7 @@ function TimeCell({
           : "bg-panel text-ink border-line"
       }`}
     >
-      <span className="font-extrabold">{value}</span>
+      <span className="font-semibold">{value}</span>
       <span
         className={`text-[11px] font-sans font-bold ${
           accent ? "text-on-fill/80" : "text-faint"
@@ -75,7 +75,7 @@ export function LiveCountdownTimer({
   if (timeLeft.isPast) {
     return (
       <div
-        className={`inline-flex items-center gap-2 rounded-full bg-live-dim px-3.5 py-1 text-xs font-black text-live border border-live/30 ${className}`}
+        className={`inline-flex items-center gap-2 rounded-full bg-live-dim px-3.5 py-1 text-xs font-semibold text-live border border-live/30 ${className}`}
       >
         <span className="live-badge-dot live-pulse-dot" />
         موعد الانطلاق حان
@@ -86,7 +86,7 @@ export function LiveCountdownTimer({
   return (
     <div className={`flex flex-wrap items-center gap-2.5 ${className}`}>
       {showBadge ? (
-        <div className="inline-flex items-center gap-2 rounded-full bg-accent-dim px-3.5 py-1 text-xs font-black text-accent border border-line">
+        <div className="inline-flex items-center gap-2 rounded-full bg-accent-dim px-3.5 py-1 text-xs font-semibold text-accent border border-line">
           ينطلق خلال:
         </div>
       ) : null}

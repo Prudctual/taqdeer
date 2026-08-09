@@ -101,7 +101,7 @@ export function LambdaCompare({
       {/* Lead Banner */}
       <div className="rounded-xl border border-line bg-panel p-3.5 text-center space-y-0.5">
         <span className="text-[10px] font-bold text-muted block uppercase">مستخلص المقارنة التهديفية</span>
-        <p className="text-sm sm:text-base font-black text-ink">{lead}</p>
+        <p className="text-sm sm:text-base font-semibold text-ink">{lead}</p>
       </div>
 
       {/* Bars */}
@@ -113,11 +113,11 @@ export function LambdaCompare({
               <div className="flex items-center justify-between text-xs">
                 <dt className="flex items-center gap-2">
                   <span className={`h-2 w-2 rounded-full ${isHome ? "bg-home" : "bg-danger"}`} />
-                  <span className={`font-black ${isHome ? "text-home" : "text-danger"}`}>
+                  <span className={`font-semibold ${isHome ? "text-home" : "text-danger"}`}>
                     {s.name}
                   </span>
                 </dt>
-                <dd className="font-mono font-black text-ink text-sm tabular">
+                <dd className="font-mono font-semibold text-ink text-sm tabular">
                   {s.value.toFixed(2)} هدف
                 </dd>
               </div>
@@ -172,11 +172,11 @@ export function FormBars({
           <span className="p-1 bg-panel rounded text-ink">
             <FlameIcon size={16} />
           </span>
-          <span className="text-xs font-black text-ink">{formLead}</span>
+          <span className="text-xs font-semibold text-ink">{formLead}</span>
         </div>
         {pickKey != null && (
           <span
-            className={`text-xs font-black px-3 py-1 rounded-full border-0 ${
+            className={`text-xs font-semibold px-3 py-1 rounded-full border-0 ${
               agrees ? "bg-accent-dim text-accent" : "bg-panel text-muted"
             }`}
           >
@@ -213,10 +213,10 @@ function FormCard({
         : "bg-surface border-danger/25"
     }`}>
       <div className="flex items-center justify-between text-xs">
-        <span className={`font-black ${isHome ? "text-home" : "text-danger"}`}>
+        <span className={`font-semibold ${isHome ? "text-home" : "text-danger"}`}>
           {label}
         </span>
-        <span className="font-mono font-extrabold text-ink">{pts.toFixed(2)} / 3</span>
+        <span className="font-mono font-semibold text-ink">{pts.toFixed(2)} / 3</span>
       </div>
 
       <div className="flex items-center justify-between text-[11px]">

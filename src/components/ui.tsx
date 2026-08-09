@@ -177,26 +177,18 @@ export function SectionCard({
   return (
     <section className="card overflow-hidden" data-league={tone}>
       {(title || headerRight) && (
-        <div className="card-head relative flex flex-col items-center justify-center text-center p-4 sm:p-5 border-b border-line">
-          <div className="min-w-0 text-center max-w-2xl mx-auto space-y-0.5">
+        <div className="card-head">
+          <div className="min-w-0 space-y-0.5">
             {title ? (
-              <h2
-                className={
-                  quiet
-                    ? "text-sm sm:text-base font-extrabold text-ink tracking-tight"
-                    : "text-base sm:text-lg font-black text-ink tracking-tight"
-                }
-              >
+              <h2 className={quiet ? "text-sm font-semibold text-ink" : "type-section text-ink"}>
                 {title}
               </h2>
             ) : null}
             {subtitle ? (
-              <p className="text-xs font-semibold text-muted max-w-xl mx-auto leading-relaxed">
-                {subtitle}
-              </p>
+              <p className="card-head-sub text-pretty">{subtitle}</p>
             ) : null}
           </div>
-          {headerRight ? <div className="absolute left-4 shrink-0">{headerRight}</div> : null}
+          {headerRight ? <div className="shrink-0">{headerRight}</div> : null}
         </div>
       )}
       {flush ? children : <div className="p-4 sm:p-5">{children}</div>}
@@ -273,7 +265,7 @@ export function OutcomeCards({
               <span>{o.label}</span>
             </dt>
             <dd
-              className="type-figure mt-1.5 text-xl sm:text-2xl font-black tracking-tight"
+              className="type-figure mt-1.5 text-xl sm:text-2xl font-semibold tracking-tight"
               style={{ color: active ? o.color : "var(--muted)" }}
             >
               {`${(value * 100).toFixed(0)}٪`}
@@ -312,7 +304,7 @@ export function Chip({
       aria-current={active ? "page" : undefined}
       className="chip-filter group"
     >
-      <div className="flex h-full w-full items-center justify-center p-1 transition-transform group-hover:scale-110">
+      <div className="flex h-full w-full items-center justify-center p-1">
         {icon ? icon : <LeagueIcon leagueId={leagueId} className="h-14 w-14 sm:h-16 sm:w-16" />}
       </div>
     </Link>

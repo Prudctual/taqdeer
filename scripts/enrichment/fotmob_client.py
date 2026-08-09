@@ -23,6 +23,7 @@ LEAGUE_PRIMARY: Dict[str, int] = {
     "ppd": 61,
     "ded": 57,
     "tur1": 71,
+    "no1": 59,  # Eliteserien
 }
 PRIMARY_TO_LEAGUE = {v: k for k, v in LEAGUE_PRIMARY.items()}
 

@@ -48,6 +48,7 @@ INTERVAL_B = int(os.environ.get("ENRICH_INTERVAL_B", str(2 * 3600)))
 INTERVAL_C = int(os.environ.get("ENRICH_INTERVAL_C", str(3 * 3600)))
 INTERVAL_D = int(os.environ.get("ENRICH_INTERVAL_D", str(18 * 60)))
 INTERVAL_E = int(os.environ.get("ENRICH_INTERVAL_E", str(24 * 3600)))
+INTERVAL_F = int(os.environ.get("ENRICH_INTERVAL_F", str(12 * 3600)))
 LOOP_SLEEP = int(os.environ.get("ENRICH_LOOP_SLEEP", "60"))
 ONCE = "--once" in sys.argv
 
@@ -120,6 +121,17 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
           key TEXT PRIMARY KEY,
           value TEXT NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS player_strength (
+          id TEXT PRIMARY KEY,
+          team_id TEXT NOT NULL,
+          player_name TEXT NOT NULL,
+          position TEXT,
+          strength REAL NOT NULL DEFAULT 1.0,
+          minutes REAL NOT NULL DEFAULT 0,
+          appearances INTEGER NOT NULL DEFAULT 0,
+          updated_at TEXT NOT NULL,
+          UNIQUE(team_id, player_name)
+        );
         """
     )
     # أعمدة بطاقات إن نقصت
@@ -132,6 +144,16 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
         ("odds_open_home", "REAL"),
         ("odds_open_draw", "REAL"),
         ("odds_open_away", "REAL"),
+        ("odds_close_home", "REAL"),
+        ("odds_close_draw", "REAL"),
+        ("odds_close_away", "REAL"),
+        ("odds_sharp_home", "REAL"),
+        ("odds_sharp_draw", "REAL"),
+        ("odds_sharp_away", "REAL"),
+        ("xg_true_home", "REAL"),
+        ("xg_true_away", "REAL"),
+        ("matches_7d_home", "REAL"),
+        ("matches_7d_away", "REAL"),
         ("referee_name", "TEXT"),
     ):
         if name not in cols:
@@ -553,6 +575,24 @@ def apply_fotmob_to_match(
     upsert_enrichment(conn, match["id"], **fields)
     put_mapped(conn, "event", match["id"], str(fotmob_id), "fotmob")
 
+    if confirmed:
+        upsert_player_strength(
+            conn,
+            match["home_team_id"],
+            [
+                {"name": p.get("name"), "position": p.get("position")}
+                for p in (home_side.get("players") or [])
+            ],
+        )
+        upsert_player_strength(
+            conn,
+            match["away_team_id"],
+            [
+                {"name": p.get("name"), "position": p.get("position")}
+                for p in (away_side.get("players") or [])
+            ],
+        )
+
     conn.execute("DELETE FROM player_availability WHERE match_id=?", (match["id"],))
     as_of = now_iso()
     for team_id, missing in (
@@ -724,6 +764,120 @@ def tier_e_referees(conn: sqlite3.Connection) -> None:
     meta_set(conn, "tier_e", time.time())
 
 
+
+def tier_f_understat_xg(conn: sqlite3.Connection) -> None:
+    """مزامنة xG تتبّعي من Understat للخمس الكبرى."""
+    from understat_client import UNDERSTAT_LEAGUES, fetch_league_matches, match_understat_row
+
+    print("[F] Understat true xG…", flush=True)
+    updated = 0
+    for lid in UNDERSTAT_LEAGUES:
+        seasons = conn.execute(
+            """
+            SELECT DISTINCT season FROM matches
+            WHERE league_id=? AND status='FINISHED'
+            ORDER BY season DESC LIMIT 3
+            """,
+            (lid,),
+        ).fetchall()
+        for srow in seasons:
+            season = srow["season"]
+            us_rows = fetch_league_matches(lid, season)
+            if not us_rows:
+                continue
+            local = conn.execute(
+                """
+                SELECT m.id, m.utc_date, m.xg_true_home,
+                       th.name_en AS home_name, ta.name_en AS away_name
+                FROM matches m
+                JOIN teams th ON th.id = m.home_team_id
+                JOIN teams ta ON ta.id = m.away_team_id
+                WHERE m.league_id=? AND m.season=? AND m.status='FINISHED'
+                  AND m.home_goals IS NOT NULL
+                """,
+                (lid, season),
+            ).fetchall()
+            for m in local:
+                if m["xg_true_home"] is not None:
+                    continue
+                hit = match_understat_row(
+                    m["home_name"] or "",
+                    m["away_name"] or "",
+                    m["utc_date"] or "",
+                    us_rows,
+                )
+                if not hit:
+                    continue
+                conn.execute(
+                    "UPDATE matches SET xg_true_home=?, xg_true_away=? WHERE id=?",
+                    (hit["xg_home"], hit["xg_away"], m["id"]),
+                )
+                updated += 1
+    # ازدحام مباريات 7 أيام للمباريات القادمة
+    upcoming = conn.execute(
+        """
+        SELECT id, home_team_id, away_team_id, utc_date
+        FROM matches
+        WHERE status IN ('SCHEDULED','TIMED')
+          AND datetime(utc_date) BETWEEN datetime('now','-1 day') AND datetime('now','+14 days')
+        """
+    ).fetchall()
+    for u in upcoming:
+        for side, col in (("home_team_id", "matches_7d_home"), ("away_team_id", "matches_7d_away")):
+            tid = u[side]
+            n = conn.execute(
+                """
+                SELECT COUNT(*) AS n FROM matches
+                WHERE (home_team_id=? OR away_team_id=?)
+                  AND status IN ('FINISHED','SCHEDULED','TIMED','IN_PLAY','PAUSED','LIVE')
+                  AND id != ?
+                  AND datetime(utc_date) BETWEEN datetime(?, '-7 days') AND datetime(?)
+                """,
+                (tid, tid, u["id"], u["utc_date"], u["utc_date"]),
+            ).fetchone()["n"]
+            conn.execute(f"UPDATE matches SET {col}=? WHERE id=?", (float(n), u["id"]))
+    conn.commit()
+    print(f"  [F] xg_true rows updated: {updated}", flush=True)
+    meta_set(conn, "tier_f", time.time())
+
+
+def upsert_player_strength(
+    conn: sqlite3.Connection,
+    team_id: str,
+    players: list,
+    *,
+    starter_boost: float = 0.04,
+) -> None:
+    """حدّث قوة اللاعب من مشاركات التشكيلة المؤكدة."""
+    ts = now_iso()
+    for p in players or []:
+        name = (p.get("player_name") or p.get("name") or "").strip()
+        if not name:
+            continue
+        pos = p.get("position")
+        row = conn.execute(
+            "SELECT strength, minutes, appearances FROM player_strength WHERE team_id=? AND player_name=?",
+            (team_id, name),
+        ).fetchone()
+        apps = int(row["appearances"]) + 1 if row else 1
+        mins = float(row["minutes"] if row else 0) + 90.0
+        base = float(row["strength"]) if row else 1.0
+        strength = min(1.45, max(0.6, base * 0.92 + (1.0 + starter_boost) * 0.08))
+        conn.execute(
+            """
+            INSERT INTO player_strength(id, team_id, player_name, position, strength, minutes, appearances, updated_at)
+            VALUES(?,?,?,?,?,?,?,?)
+            ON CONFLICT(team_id, player_name) DO UPDATE SET
+              position=COALESCE(excluded.position, player_strength.position),
+              strength=excluded.strength,
+              minutes=excluded.minutes,
+              appearances=excluded.appearances,
+              updated_at=excluded.updated_at
+            """,
+            (str(uuid.uuid4()), team_id, name, pos, strength, mins, apps, ts),
+        )
+
+
 def run_cycle(force_all: bool = False) -> None:
     conn = connect()
     try:
@@ -737,6 +891,8 @@ def run_cycle(force_all: bool = False) -> None:
             tier_d_lineups_imminent(conn)
         if force_all or due(conn, "tier_e", INTERVAL_E):
             tier_e_referees(conn)
+        if force_all or due(conn, "tier_f", INTERVAL_F):
+            tier_f_understat_xg(conn)
     finally:
         conn.close()
 

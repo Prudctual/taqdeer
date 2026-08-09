@@ -35,31 +35,31 @@ export function BankerPicksWidget({
           <Link
             key={item.matchId}
             href={`/match/${encodeURIComponent(item.matchId)}`}
-            className="group block rounded-2xl border border-indigo-500/30 bg-surface overflow-hidden shadow-2xs space-y-0 transition-all hover:border-indigo-500 hover:shadow-md cursor-pointer"
+            className="group block rounded-2xl border border-accent/30 bg-surface overflow-hidden shadow-2xs space-y-0 transition-all hover:border-accent hover:shadow-md cursor-pointer"
           >
             {/* Header Strip */}
             <div className="bg-accent-dim border-b border-accent/25 px-3.5 py-2 flex items-center justify-between">
-              <span className="text-[11px] font-black text-indigo-600 dark:text-indigo-400 truncate">
+              <span className="text-[11px] font-semibold text-accent truncate">
                 {item.leagueName}
               </span>
-              <span className="bg-accent text-on-fill font-extrabold text-[10px] px-2 py-0.5 rounded-full shrink-0">
+              <span className="bg-accent text-on-fill font-semibold text-[10px] px-2 py-0.5 rounded-full shrink-0">
                 ثقة {pct(item.confidence)}
               </span>
             </div>
 
             {/* Body */}
             <div className="p-3.5 space-y-2 bg-surface text-start">
-              <div className="font-black text-ink text-xs truncate group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+              <div className="font-semibold text-ink text-xs truncate group-hover:text-accent transition-colors">
                 {item.homeTeam} <span className="text-muted font-normal me-1 ms-1">ضد</span> {item.awayTeam}
               </div>
 
               <div className="text-[11px] font-semibold text-muted">
-                التوقع: <strong className="text-ink font-black">{item.pickLabel}</strong>
+                التوقع: <strong className="text-ink font-semibold">{item.pickLabel}</strong>
               </div>
 
               <div className="pt-2 border-t border-line flex items-center justify-between">
                 <span className="text-[10px] font-bold text-muted">احتمال الفوز</span>
-                <span className="font-mono font-black text-indigo-600 dark:text-indigo-400 tabular text-base">
+                <span className="font-mono font-semibold text-accent tabular text-base">
                   {pct(item.probability)}
                 </span>
               </div>

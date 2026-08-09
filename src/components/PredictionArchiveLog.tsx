@@ -2,241 +2,32 @@
 
 import { useMemo, useState } from "react";
 import { Crest } from "./Crest";
-import { formatMatchTime, formatShortDate, formatLongDate, groupByDay, pct } from "@/lib/format";
+import { ProbBar } from "./ProbBar";
+import { EmptyState } from "./ui";
+import {
+  formatMatchTime,
+  formatShortDate,
+  formatLongDate,
+  groupByDay,
+  pct,
+} from "@/lib/format";
 import { leagueEmblemUrl } from "@/lib/leagues";
 import type { FinishedPredictionItem, MatchCard } from "@/lib/queries";
 
-/** ألوان وثيمات الدول وتصميم أوراق اللعب (Playing Cards) لكل دوري */
-function getCountryCardTheme(leagueId?: string) {
+function countryAr(leagueId?: string): string {
   const id = (leagueId || "").trim().toLowerCase();
-
-  if (id === "pl" || id === "elc" || id.includes("england") || id.includes("premier")) {
-    // England: Red & White St George Cross gradient
-    return {
-      countryAr: "إنجلترا",
-      leagueName: "الدوري الإنجليزي الممتاز",
-      cardBg: "bg-gradient-to-r from-red-950 via-rose-900 to-red-950 text-white",
-      flagSplitGradient: "linear-gradient(135deg, #7f1d1d 0%, #be123c 45%, #991b1b 55%, #450a0a 100%)",
-      accentText: "text-amber-300 font-extrabold",
-      tagHit: "bg-emerald-500/25 border-emerald-400/50 text-emerald-200",
-      tagMiss: "bg-rose-500/25 border-rose-400/50 text-rose-200",
-    };
-  }
-
-  // Portugal MUST be checked before Spain ("ppd" contains "pd")
-  if (id === "ppd" || id.includes("portugal") || id.includes("primeira")) {
-    // Portugal: Forest Green (Home 40%) | Crimson Red (Away 60%)
-    return {
-      countryAr: "البرتغال",
-      leagueName: "الدوري البرتغالي",
-      cardBg: "bg-gradient-to-r from-emerald-950 via-red-950 to-rose-950 text-white",
-      flagSplitGradient: "linear-gradient(135deg, #064e3b 0%, #047857 40%, #991b1b 41%, #881337 100%)",
-      accentText: "text-amber-300 font-extrabold",
-      tagHit: "bg-emerald-500/25 border-emerald-400/50 text-emerald-200",
-      tagMiss: "bg-rose-500/25 border-rose-400/50 text-rose-200",
-    };
-  }
-
-  if (id === "pd" || id.includes("laliga") || id.includes("spain") || id.includes("primera")) {
-    // Spain: Crimson Red - Spanish Gold - Crimson Red (Spanish Flag Split)
-    return {
-      countryAr: "إسبانيا",
-      leagueName: "الدوري الإسباني",
-      cardBg: "bg-gradient-to-r from-red-950 via-amber-900 to-red-950 text-white",
-      flagSplitGradient: "linear-gradient(135deg, #7f1d1d 0%, #991b1b 35%, #92400e 50%, #991b1b 65%, #450a0a 100%)",
-      accentText: "text-amber-300 font-extrabold",
-      tagHit: "bg-emerald-500/25 border-emerald-400/50 text-emerald-200",
-      tagMiss: "bg-rose-500/25 border-rose-400/50 text-rose-200",
-    };
-  }
-
-  if (id === "sa" || id.includes("serie") || id.includes("italy")) {
-    // Italy: Tricolore - Green (Right/Home RTL) | White (Center) | Red (Left/Away RTL)
-    return {
-      countryAr: "إيطاليا",
-      leagueName: "الدوري الإيطالي",
-      cardBg: "bg-gradient-to-r from-emerald-950 via-slate-900 to-rose-950 text-white",
-      flagSplitGradient: "linear-gradient(135deg, #064e3b 0%, #047857 38%, #1e293b 50%, #be123c 62%, #881337 100%)",
-      accentText: "text-sky-300 font-extrabold",
-      tagHit: "bg-emerald-500/25 border-emerald-400/50 text-emerald-200",
-      tagMiss: "bg-rose-500/25 border-rose-400/50 text-rose-200",
-    };
-  }
-
-  if (id === "bl1" || id.includes("bundes") || id.includes("germany")) {
-    // Germany: Tricolor - Charcoal (Right/Home) | Crimson (Center) | Gold (Left/Away)
-    return {
-      countryAr: "ألمانيا",
-      leagueName: "الدوري الألماني",
-      cardBg: "bg-gradient-to-r from-zinc-950 via-red-950 to-amber-950 text-white",
-      flagSplitGradient: "linear-gradient(135deg, #09090b 0%, #18181b 38%, #881337 50%, #78350f 62%, #451a03 100%)",
-      accentText: "text-amber-400 font-extrabold",
-      tagHit: "bg-emerald-500/25 border-emerald-400/50 text-emerald-200",
-      tagMiss: "bg-rose-500/25 border-rose-400/50 text-rose-200",
-    };
-  }
-
-  if (id === "fl1" || id.includes("ligue") || id.includes("france")) {
-    // France: Tricolore - Royal Blue (Right/Home) | White (Center) | Crimson Red (Left/Away)
-    return {
-      countryAr: "فرنسا",
-      leagueName: "الدوري الفرنسي",
-      cardBg: "bg-gradient-to-r from-blue-950 via-slate-900 to-rose-950 text-white",
-      flagSplitGradient: "linear-gradient(135deg, #1e3a8a 0%, #1e40af 38%, #1e293b 50%, #be123c 62%, #881337 100%)",
-      accentText: "text-cyan-300 font-extrabold",
-      tagHit: "bg-emerald-500/25 border-emerald-400/50 text-emerald-200",
-      tagMiss: "bg-rose-500/25 border-rose-400/50 text-rose-200",
-    };
-  }
-
-  if (id === "cl" || id === "ucl" || id.includes("champions")) {
-    // UEFA Champions League: Midnight Starball Gold & Blue
-    return {
-      countryAr: "أوروبا",
-      leagueName: "دوري أبطال أوروبا",
-      cardBg: "bg-gradient-to-r from-slate-950 via-indigo-950 to-blue-950 text-amber-200",
-      flagSplitGradient: "linear-gradient(135deg, #020617 0%, #1e1b4b 50%, #1e3a8a 100%)",
-      accentText: "text-amber-300 font-extrabold",
-      tagHit: "bg-emerald-500/25 border-emerald-400/50 text-emerald-200",
-      tagMiss: "bg-rose-500/25 border-rose-400/50 text-rose-200",
-    };
-  }
-
-  if (id === "ded" || id.includes("eredivisie") || id.includes("netherlands")) {
-    // Netherlands: Iconic Dutch Oranje (البرتغالي الهولندي البرّاق والفريد)
-    return {
-      countryAr: "هولندا",
-      leagueName: "الدوري الهولندي",
-      cardBg: "bg-gradient-to-r from-orange-950 via-amber-900 to-orange-950 text-white",
-      flagSplitGradient: "linear-gradient(135deg, #7c2d12 0%, #ea580c 45%, #c2410c 55%, #431407 100%)",
-      accentText: "text-amber-300 font-extrabold",
-      tagHit: "bg-emerald-500/25 border-emerald-400/50 text-emerald-200",
-      tagMiss: "bg-rose-500/25 border-rose-400/50 text-rose-200",
-    };
-  }
-
-  if (id === "tur1" || id === "tr1" || id.includes("turkey") || id.includes("superlig")) {
-    // Turkey: Turkish Crimson Red & White Crescent
-    return {
-      countryAr: "تركيا",
-      leagueName: "الدوري التركي الممتاز",
-      cardBg: "bg-gradient-to-r from-red-950 via-rose-900 to-red-950 text-white",
-      flagSplitGradient: "linear-gradient(135deg, #7f1d1d 0%, #b91c1c 45%, #991b1b 55%, #450a0a 100%)",
-      accentText: "text-amber-300 font-extrabold",
-      tagHit: "bg-emerald-500/25 border-emerald-400/50 text-emerald-200",
-      tagMiss: "bg-rose-500/25 border-rose-400/50 text-rose-200",
-    };
-  }
-
-  if (id === "no1" || id.includes("norway") || id.includes("eliteserien")) {
-    return {
-      countryAr: "النرويج",
-      leagueName: "الدوري النرويجي",
-      cardBg: "bg-gradient-to-r from-blue-950 via-indigo-900 to-red-950 text-white",
-      flagSplitGradient: "linear-gradient(135deg, #1e3a8a 0%, #ef4444 50%, #1e3a8a 100%)",
-      accentText: "text-sky-300 font-extrabold",
-      tagHit: "bg-emerald-500/25 border-emerald-400/50 text-emerald-200",
-      tagMiss: "bg-rose-500/25 border-rose-400/50 text-rose-200",
-    };
-  }
-
-  if (id === "uel" || id === "el" || id.includes("europa")) {
-    // UEFA Europa League: Europa Orange & Charcoal
-    return {
-      countryAr: "أوروبا",
-      leagueName: "الدوري الأوروبي",
-      cardBg: "bg-gradient-to-r from-orange-950 via-amber-950 to-zinc-950 text-white",
-      flagSplitGradient: "linear-gradient(135deg, #7c2d12 0%, #c2410c 50%, #18181b 100%)",
-      accentText: "text-amber-300 font-extrabold",
-      tagHit: "bg-emerald-500/25 border-emerald-400/50 text-emerald-200",
-      tagMiss: "bg-rose-500/25 border-rose-400/50 text-rose-200",
-    };
-  }
-
-  return {
-    countryAr: "",
-    leagueName: "دوري عام",
-    cardBg: "bg-gradient-to-r from-zinc-800 via-zinc-900 to-black text-white",
-    flagSplitGradient: "linear-gradient(135deg, #18181b 0%, #09090b 100%)",
-    accentText: "text-accent font-extrabold",
-    tagHit: "bg-emerald-500/25 border-emerald-400/50 text-emerald-200",
-    tagMiss: "bg-rose-500/25 border-rose-400/50 text-rose-200",
-  };
-}
-
-/** توليد باترن خلفية SVG زغرفية مخصصة لرموز كل دولة */
-function getCountryPatternSvg(leagueId?: string) {
-  const id = (leagueId || "").trim().toLowerCase();
-
-  if (id === "pl" || id === "elc" || id.includes("england") || id.includes("premier")) {
-    // England: St George Cross & Crown heraldic pattern
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" fill="none" opacity="0.6"><path d="M32 0v64M0 32h64" stroke="%23ffffff" stroke-width="2.5"/><circle cx="32" cy="32" r="14" stroke="%23ffffff" stroke-width="2"/><path d="M26 24h12l2 8H24z" fill="%23ffffff"/></svg>`;
-    return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
-  }
-
-  // Portugal MUST be checked before Spain ("ppd" contains "pd")
-  if (id === "ppd" || id.includes("portugal") || id.includes("primeira")) {
-    // Portugal: Order of Christ Cross pattern
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" fill="none" opacity="0.6"><path d="M22 10h20v12h12v20H42v12H22V42H10V22h12z" stroke="%23ffffff" stroke-width="2"/><path d="M28 16h8v32h-8zM16 28h32v8H16z" fill="%23ffffff" opacity="0.6"/></svg>`;
-    return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
-  }
-
-  if (id === "pd" || id.includes("laliga") || id.includes("spain") || id.includes("primera")) {
-    // Spain: Castle & Sun Heraldic pattern
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" fill="none" opacity="0.6"><path d="M24 42V28h5v-4h6v4h5v14H24z" fill="%23ffffff"/><circle cx="32" cy="14" r="7" stroke="%23ffffff" stroke-width="2"/><path d="M32 3v4M32 21v4M21 14h-4M47 14h-4" stroke="%23ffffff" stroke-width="2"/></svg>`;
-    return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
-  }
-
-  if (id === "sa" || id.includes("serie") || id.includes("italy")) {
-    // Italy: Stella d'Italia (Star) & Laurel pattern
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" fill="none" opacity="0.6"><path d="M32 8l6 16h16l-13 10 5 16-14-10-14 10 5-16-13-10h16z" stroke="%23ffffff" stroke-width="2" fill="%23ffffff" fill-opacity="0.3"/></svg>`;
-    return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
-  }
-
-  if (id === "bl1" || id.includes("bundes") || id.includes("germany")) {
-    // Germany: Eagle & Geometric Shield pattern
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" fill="none" opacity="0.6"><path d="M32 8l10 12h14l-10 14 12 6-16 5-10 13-10-13-16-5 12-6-10-14h14z" stroke="%23ffffff" stroke-width="2"/><path d="M32 18v24" stroke="%23ffffff" stroke-width="2.5"/></svg>`;
-    return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
-  }
-
-  if (id === "fl1" || id.includes("ligue") || id.includes("france")) {
-    // France: Fleur-de-lis pattern
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" fill="none" opacity="0.6"><path d="M32 8c0 10-10 14-10 22h20c0-8-10-12-10-22z" stroke="%23ffffff" stroke-width="2.2"/><path d="M18 30c5 0 10 5 10 12H13zM46 30c-5 0-10 5-10 12h15z" stroke="%23ffffff" stroke-width="2"/><path d="M20 38h24" stroke="%23ffffff" stroke-width="3"/></svg>`;
-    return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
-  }
-
-  if (id === "cl" || id === "ucl" || id.includes("champions")) {
-    // UEFA Champions League: Starball constellation pattern
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 80 80" fill="none" opacity="0.7"><path d="M40 8l4 11 11 2-8 8 3 11-10-6-10 6 3-11-8-8 11-2z" fill="%23ffd700"/><path d="M16 52l3 7 7 1-5 5 2 7-7-4-7 4 2-7-5-5 7-1z" fill="%23ffffff"/><path d="M64 52l3 7 7 1-5 5 2 7-7-4-7 4 2-7-5-5 7-1z" fill="%23ffffff"/></svg>`;
-    return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
-  }
-
-  if (id === "ded" || id.includes("eredivisie") || id.includes("netherlands")) {
-    // Netherlands: Tulip & Windmill pattern
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" fill="none" opacity="0.6"><path d="M32 10l14 22H18zM32 54L18 32h28zM10 32l22-14v28zM54 32L32 18v28z" stroke="%23ffffff" stroke-width="2"/></svg>`;
-    return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
-  }
-
-  if (id === "tur1" || id === "tr1" || id.includes("turkey") || id.includes("superlig")) {
-    // Turkey: Turkish Crescent Moon & Star pattern
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" fill="none" opacity="0.6"><path d="M28 18a14 14 0 1 0 0 28 10 10 0 1 1 0-28z" fill="%23ffffff"/><path d="M44 26l2 5 5 1-4 3 1 5-4-3-4 3 1-5-4-3 5-1z" fill="%23ffffff"/></svg>`;
-    return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
-  }
-
-  if (id === "no1" || id.includes("norway") || id.includes("eliteserien")) {
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" fill="none" opacity="0.55"><path d="M8 12h48v40H8z" stroke="%23ffffff" stroke-width="2"/><path d="M24 12v40M8 28h48" stroke="%23ffffff" stroke-width="3"/></svg>`;
-    return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
-  }
-
-  if (id === "uel" || id === "el" || id.includes("europa")) {
-    // Europa League: Geometric Waves pattern
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" fill="none" opacity="0.6"><path d="M0 32 Q 16 16 32 32 T 64 32" stroke="%23ffffff" stroke-width="2.5"/><path d="M0 44 Q 16 28 32 44 T 64 44" stroke="%23ffffff" stroke-width="2.5"/></svg>`;
-    return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
-  }
-
-  // Default subtle grid pattern
-  const defaultSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48" fill="none" opacity="0.4"><path d="M0 24h48M24 0v48" stroke="%23ffffff" stroke-width="1.5"/></svg>`;
-  return `url("data:image/svg+xml,${encodeURIComponent(defaultSvg)}")`;
+  if (id === "pl" || id === "elc") return "إنجلترا";
+  if (id === "ppd") return "البرتغال";
+  if (id === "pd") return "إسبانيا";
+  if (id === "sa") return "إيطاليا";
+  if (id === "bl1") return "ألمانيا";
+  if (id === "fl1") return "فرنسا";
+  if (id === "ded") return "هولندا";
+  if (id === "tur1" || id === "tr1") return "تركيا";
+  if (id === "no1") return "النرويج";
+  if (id === "cl" || id === "ucl") return "أوروبا";
+  if (id === "uel" || id === "el") return "أوروبا";
+  return "";
 }
 
 export function PredictionArchiveLog({
@@ -246,18 +37,17 @@ export function PredictionArchiveLog({
 }: {
   items: FinishedPredictionItem[];
   upcomingSnapshots?: MatchCard[];
-  /** عند false تُخفى تبويب النتائج المكتملة (مثلاً سجل التوقعات يبدأ من اليوم) */
   showFinished?: boolean;
 }) {
-  const [activeTab, setActiveTab] = useState<"upcoming" | "finished">(
-    () =>
-      !showFinished || upcomingSnapshots.length > 0 ? "upcoming" : "finished",
+  const [activeTab, setActiveTab] = useState<"upcoming" | "finished">(() =>
+    !showFinished || upcomingSnapshots.length > 0 ? "upcoming" : "finished",
   );
   const [selectedLeague, setSelectedLeague] = useState<string>("all");
-  const [selectedStatus, setSelectedStatus] = useState<"all" | "hit" | "miss" | "dc_hit">("all");
+  const [selectedStatus, setSelectedStatus] = useState<
+    "all" | "hit" | "miss" | "dc_hit"
+  >("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
 
-  // Extract unique leagues list
   const leagues = useMemo(() => {
     const map = new Map<string, string>();
     items.forEach((item) => {
@@ -273,36 +63,63 @@ export function PredictionArchiveLog({
     return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
   }, [items, upcomingSnapshots]);
 
-  // Filter finished items
-  const filtered = useMemo(() => {
+  const finishedForSummary = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
     return items.filter((item) => {
-      if (selectedLeague !== "all" && item.leagueId !== selectedLeague) {
-        return false;
-      }
+      if (selectedLeague !== "all" && item.leagueId !== selectedLeague) return false;
+      if (!q) return true;
+      const homeAr = (item.homeNameAr || "").toLowerCase();
+      const awayAr = (item.awayNameAr || "").toLowerCase();
+      const homeEn = (item.homeNameEn || "").toLowerCase();
+      const awayEn = (item.awayNameEn || "").toLowerCase();
+      return (
+        homeAr.includes(q) ||
+        awayAr.includes(q) ||
+        homeEn.includes(q) ||
+        awayEn.includes(q)
+      );
+    });
+  }, [items, selectedLeague, searchQuery]);
+
+  const filtered = useMemo(() => {
+    return finishedForSummary.filter((item) => {
       if (selectedStatus === "hit" && !item.isHit) return false;
       if (selectedStatus === "miss" && item.isHit) return false;
       if (selectedStatus === "dc_hit" && !item.doubleChanceHit) return false;
-
-      if (searchQuery.trim()) {
-        const q = searchQuery.trim().toLowerCase();
-        const homeAr = (item.homeNameAr || "").toLowerCase();
-        const awayAr = (item.awayNameAr || "").toLowerCase();
-        const homeEn = (item.homeNameEn || "").toLowerCase();
-        const awayEn = (item.awayNameEn || "").toLowerCase();
-        if (
-          !homeAr.includes(q) &&
-          !awayAr.includes(q) &&
-          !homeEn.includes(q) &&
-          !awayEn.includes(q)
-        ) {
-          return false;
-        }
-      }
       return true;
     });
-  }, [items, selectedLeague, selectedStatus, searchQuery]);
+  }, [finishedForSummary, selectedStatus]);
 
-  // Filter upcoming snapshots
+  const dailySummaries = useMemo(() => {
+    return groupByDay(finishedForSummary).map((day) => {
+      const n = day.items.length;
+      const hits = day.items.filter((i) => i.isHit).length;
+      const dcHits = day.items.filter((i) => i.doubleChanceHit).length;
+      const hitRate = n > 0 ? hits / n : 0;
+      const dcRate = n > 0 ? dcHits / n : 0;
+      const best =
+        [...day.items]
+          .filter((i) => i.isHit)
+          .sort((a, b) => b.topProb - a.topProb)[0] ?? null;
+      const worst =
+        [...day.items]
+          .filter((i) => !i.isHit)
+          .sort((a, b) => b.topProb - a.topProb)[0] ?? null;
+      return {
+        key: day.key,
+        label: day.label,
+        relative: day.relative,
+        n,
+        hits,
+        dcHits,
+        hitRate,
+        dcRate,
+        best,
+        worst,
+      };
+    });
+  }, [finishedForSummary]);
+
   const filteredUpcoming = useMemo(() => {
     return upcomingSnapshots.filter((item) => {
       if (selectedLeague !== "all" && item.leagueId !== selectedLeague) {
@@ -327,7 +144,6 @@ export function PredictionArchiveLog({
     });
   }, [upcomingSnapshots, selectedLeague, searchQuery]);
 
-  // تجميع القادمة حسب اليوم — كل تاريخ يعرض مبارياته كاملة
   const upcomingByDay = useMemo(
     () => groupByDay(filteredUpcoming),
     [filteredUpcoming],
@@ -351,121 +167,108 @@ export function PredictionArchiveLog({
   const tabTotal =
     visibleTab === "upcoming" ? upcomingSnapshots.length : items.length;
 
+  const tabBtn = (active: boolean) =>
+    `press-scale flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-xs font-semibold motion-colors whitespace-nowrap ${
+      active
+        ? "bg-surface text-ink border border-line"
+        : "text-muted hover:text-ink hover:bg-surface/60 border border-transparent"
+    }`;
+
+  const filterBtn = (active: boolean) =>
+    `press-scale flex items-center justify-between gap-2 rounded-lg border px-3 py-2.5 text-start motion-colors ${
+      active
+        ? "bg-accent-dim border-accent text-ink"
+        : "bg-surface border-line text-ink hover:bg-panel"
+    }`;
+
   return (
     <div className="space-y-6">
-      {/* تبويب رأس الصفحة: قادمة ↔ نتائج مكتملة (يُخفى المكتمل عند البداية من اليوم) */}
       {showFinished ? (
-      <div className="flex items-center gap-2 overflow-x-auto scrollbar-none rounded-2xl bg-panel p-1.5 border border-line">
-        <button
-          type="button"
-          onClick={() => setActiveTab("upcoming")}
-          className={`press-scale flex flex-1 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
-            visibleTab === "upcoming"
-              ? "bg-surface text-ink border border-accent/40 shadow-xs"
-              : "text-muted hover:text-ink hover:bg-surface/50 border border-transparent"
-          }`}
-        >
-          <span>لم تُلعب بعد</span>
-          <span
-            className={`px-2 py-0.5 rounded-lg font-mono text-[11px] font-black ${
-              visibleTab === "upcoming"
-                ? "bg-accent-dim text-accent"
-                : "bg-panel text-muted border border-line"
-            }`}
+        <div className="flex items-center gap-2 overflow-x-auto scrollbar-none rounded-xl bg-panel p-1.5 border border-line">
+          <button
+            type="button"
+            onClick={() => setActiveTab("upcoming")}
+            className={tabBtn(visibleTab === "upcoming")}
           >
-            {upcomingSnapshots.length}
-          </span>
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab("finished")}
-          className={`press-scale flex flex-1 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
-            visibleTab === "finished"
-              ? "bg-surface text-ink border border-accent/40 shadow-xs"
-              : "text-muted hover:text-ink hover:bg-surface/50 border border-transparent"
-          }`}
-        >
-          <span>نتائج مكتملة</span>
-          <span
-            className={`px-2 py-0.5 rounded-lg font-mono text-[11px] font-black ${
-              visibleTab === "finished"
-                ? "bg-success-dim text-success"
-                : "bg-panel text-muted border border-line"
-            }`}
+            <span>لم تُلعب بعد</span>
+            <span
+              className={`tabular px-2 py-0.5 rounded-md text-[11px] font-semibold ${
+                visibleTab === "upcoming"
+                  ? "bg-accent-dim text-accent"
+                  : "bg-surface text-muted border border-line"
+              }`}
+            >
+              {upcomingSnapshots.length}
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("finished")}
+            className={tabBtn(visibleTab === "finished")}
           >
-            {items.length}
-          </span>
-        </button>
-      </div>
+            <span>نتائج مكتملة</span>
+            <span
+              className={`tabular px-2 py-0.5 rounded-md text-[11px] font-semibold ${
+                visibleTab === "finished"
+                  ? "bg-success-dim text-success"
+                  : "bg-surface text-muted border border-line"
+              }`}
+            >
+              {items.length}
+            </span>
+          </button>
+        </div>
       ) : null}
 
-      {/* Control Bar: Filters & Search */}
-      <div className="rounded-2xl bg-gradient-to-br from-slate-900/80 via-zinc-900/90 to-black p-4 space-y-3 shadow-xl backdrop-blur-md">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-3">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-white/10 flex items-center justify-center text-white shrink-0">
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 002 2h1.5a2.5 2.5 0 002.5-2.5V7.865M12 21a9 9 0 100-18 9 9 0 000 18z" />
-              </svg>
-            </div>
-            <div>
-              <h3 className="text-xs sm:text-sm font-black text-white tracking-wide">
-                {visibleTab === "upcoming"
-                  ? "تصفية المباريات القادمة حسب الدوري"
-                  : "تصفية النتائج المكتملة حسب الدوري"}
-              </h3>
-              <p className="text-[10px] font-semibold text-zinc-400">
-                {visibleTab === "upcoming"
-                  ? "توقعات محفوظة قبل انطلاق المباراة"
-                  : "تُحفظ تلقائياً هنا بعد انتهاء المباراة مع مقارنة النتيجة"}
-              </p>
-            </div>
+      <section className="card overflow-hidden">
+        <div className="card-head flex-col gap-3 sm:flex-row sm:items-center">
+          <div className="min-w-0 space-y-0.5">
+            <h2 className="type-section text-ink">
+              {visibleTab === "upcoming"
+                ? "تصفية المباريات القادمة"
+                : "تصفية النتائج المكتملة"}
+            </h2>
+            <p className="text-xs text-muted">
+              {visibleTab === "upcoming"
+                ? "توقعات محفوظة قبل انطلاق المباراة"
+                : "تُحفظ تلقائياً بعد انتهاء المباراة مع مقارنة النتيجة"}
+            </p>
           </div>
-
-          <div className="relative shrink-0 sm:w-64">
+          <div className="relative w-full sm:w-64 shrink-0">
+            <label className="sr-only" htmlFor="archive-search">
+              بحث باسم الفريق
+            </label>
             <input
-              type="text"
+              id="archive-search"
+              type="search"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="بحث باسم الفريق..."
-              className="w-full rounded-xl bg-black/40 px-3.5 py-1.5 pe-8 text-xs font-bold text-white placeholder:text-white/40 focus:outline-none backdrop-blur-md border border-white/10"
+              placeholder="بحث باسم الفريق…"
+              className="w-full rounded-lg border border-line bg-bg px-3 py-2 pe-8 text-xs font-medium text-ink placeholder:text-faint focus-visible:outline-none"
             />
-            {searchQuery && (
+            {searchQuery ? (
               <button
                 type="button"
                 onClick={() => setSearchQuery("")}
-                className="absolute end-2 top-1/2 -translate-y-1/2 text-white/50 hover:text-white text-xs font-bold"
+                className="absolute end-2 top-1/2 -translate-y-1/2 text-faint hover:text-ink text-xs font-semibold"
+                aria-label="مسح البحث"
               >
                 ✕
               </button>
-            )}
+            ) : null}
           </div>
         </div>
 
-        <div className="pt-1 space-y-3">
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
+        <div className="p-4 sm:p-5 space-y-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
             <button
               type="button"
               onClick={() => setSelectedLeague("all")}
-              className={`p-3 rounded-2xl border transition-all duration-300 cursor-pointer flex items-center justify-between gap-2.5 group backdrop-blur-md ${
-                selectedLeague === "all"
-                  ? "bg-white text-zinc-950 border-white shadow-xl shadow-white/10 font-black scale-[1.02] ring-2 ring-white/50"
-                  : "bg-gradient-to-b from-white/[0.08] to-white/[0.03] text-white/90 border-white/10 hover:border-white/30 hover:bg-white/[0.12]"
-              }`}
+              className={filterBtn(selectedLeague === "all")}
+              data-league={undefined}
             >
-              <div className="flex items-center gap-2.5 min-w-0">
-                <div className={`w-7 h-7 rounded-xl flex items-center justify-center shrink-0 ${
-                  selectedLeague === "all" ? "bg-zinc-950 text-white" : "bg-white/10 text-white/90"
-                }`}>
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
-                  </svg>
-                </div>
-                <span className="text-xs font-black truncate">جميع الدوريات</span>
-              </div>
-              <span className={`px-2 py-0.5 rounded-lg text-[11px] font-mono font-black shrink-0 ${
-                selectedLeague === "all" ? "bg-black/10 text-zinc-900" : "bg-white/10 text-white/70"
-              }`}>
+              <span className="text-xs font-semibold truncate">جميع الدوريات</span>
+              <span className="tabular text-[11px] font-semibold text-muted shrink-0">
                 {tabTotal}
               </span>
             </button>
@@ -473,283 +276,283 @@ export function PredictionArchiveLog({
             {leagues.map((l) => {
               const count = tabLeagueCount(l.id);
               const isSelected = selectedLeague === l.id;
-              const theme = getCountryCardTheme(l.id);
-
+              const country = countryAr(l.id);
               return (
                 <button
                   key={l.id}
                   type="button"
                   onClick={() => setSelectedLeague(l.id)}
-                  className={`p-3 rounded-2xl border transition-all duration-300 cursor-pointer flex items-center justify-between gap-2.5 group backdrop-blur-md ${
-                    isSelected
-                      ? "bg-white text-zinc-950 border-white shadow-xl shadow-white/10 font-black scale-[1.02] ring-2 ring-white/50"
-                      : "bg-gradient-to-b from-white/[0.08] to-white/[0.03] text-white/90 border-white/10 hover:border-white/30 hover:bg-white/[0.12]"
-                  }`}
+                  data-league={l.id.toLowerCase()}
+                  className={filterBtn(isSelected)}
                 >
-                  <div className="flex items-center gap-2.5 min-w-0">
+                  <span className="flex items-center gap-2 min-w-0">
+                    <span className="chip-dot" aria-hidden />
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={leagueEmblemUrl(l.id)}
                       alt=""
-                      className="w-6 h-6 sm:w-7 sm:h-7 object-contain filter drop-shadow-md shrink-0 group-hover:scale-110 transition-transform duration-300"
+                      className="w-5 h-5 object-contain shrink-0"
                       onError={(e) => {
                         e.currentTarget.onerror = null;
                         e.currentTarget.src = "/icon.svg";
                       }}
                     />
-                    <div className="text-start min-w-0">
-                      <span className="text-xs font-black truncate block">{l.name}</span>
-                      <span className={`text-[10px] font-bold block ${isSelected ? "text-zinc-600" : "text-white/50"}`}>
-                        {theme.countryAr}
+                    <span className="min-w-0 text-start">
+                      <span className="text-xs font-semibold truncate block">
+                        {l.name}
                       </span>
-                    </div>
-                  </div>
-                  <span className={`px-2 py-0.5 rounded-lg text-[11px] font-mono font-black shrink-0 ${
-                    isSelected ? "bg-black/10 text-zinc-900" : "bg-white/10 text-white/70"
-                  }`}>
+                      {country ? (
+                        <span className="text-[10px] text-faint block">{country}</span>
+                      ) : null}
+                    </span>
+                  </span>
+                  <span className="tabular text-[11px] font-semibold text-muted shrink-0">
                     {count}
                   </span>
                 </button>
               );
             })}
           </div>
+
+          {visibleTab === "finished" && items.length > 0 ? (
+            <div className="flex flex-wrap items-center gap-2 border-t border-line pt-3">
+              <span className="type-label me-1">تصفية النتائج</span>
+              {(
+                [
+                  ["all", "الكل"],
+                  ["hit", "توقع صائب"],
+                  ["miss", "توقع غير صائب"],
+                  ["dc_hit", "نجاح الفرصة المزدوجة"],
+                ] as const
+              ).map(([key, label]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setSelectedStatus(key)}
+                  className={`press-scale rounded-md px-3 py-1 text-xs font-semibold border motion-colors ${
+                    selectedStatus === key
+                      ? key === "hit"
+                        ? "bg-success-dim text-success border-success/30"
+                        : key === "miss"
+                          ? "bg-danger-dim text-danger border-danger/30"
+                          : key === "dc_hit"
+                            ? "bg-accent-dim text-accent border-accent/30"
+                            : "bg-panel text-ink border-line"
+                      : "bg-surface text-muted border-line hover:text-ink"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          ) : null}
         </div>
+      </section>
 
-        {visibleTab === "finished" && items.length > 0 && (
-          <div className="flex flex-wrap items-center gap-2 pt-3 border-t border-white/10">
-            <span className="text-[11px] font-bold text-white/60 me-1">تصفية النتائج:</span>
-            <button
-              type="button"
-              onClick={() => setSelectedStatus("all")}
-              className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                selectedStatus === "all"
-                  ? "bg-white text-zinc-950"
-                  : "bg-white/10 text-white/70 hover:bg-white/20 border border-white/10"
-              }`}
-            >
-              الكل
-            </button>
-            <button
-              type="button"
-              onClick={() => setSelectedStatus("hit")}
-              className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                selectedStatus === "hit"
-                  ? "bg-emerald-600 text-white shadow-2xs"
-                  : "bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 hover:bg-emerald-500/20"
-              }`}
-            >
-              توقع صائب
-            </button>
-            <button
-              type="button"
-              onClick={() => setSelectedStatus("miss")}
-              className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                selectedStatus === "miss"
-                  ? "bg-rose-600 text-white shadow-2xs"
-                  : "bg-rose-500/10 text-rose-300 border border-rose-500/20 hover:bg-rose-500/20"
-              }`}
-            >
-              توقع غير صائب
-            </button>
-            <button
-              type="button"
-              onClick={() => setSelectedStatus("dc_hit")}
-              className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                selectedStatus === "dc_hit"
-                  ? "bg-blue-600 text-white shadow-2xs"
-                  : "bg-blue-500/10 text-blue-300 border border-blue-500/20 hover:bg-blue-500/20"
-              }`}
-            >
-              نجاح الفرصة المزدوجة
-            </button>
-          </div>
-        )}
-      </div>
+      {visibleTab === "finished" && dailySummaries.length > 0 ? (
+        <div className="space-y-3">
+          {dailySummaries.map((day) => (
+            <div key={`sum-${day.key}`} className="card p-4 sm:p-5 space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  {day.relative ? (
+                    <span className="bg-accent-dim text-accent px-2.5 py-0.5 rounded-md text-[11px] font-semibold border border-accent/20">
+                      {day.relative}
+                    </span>
+                  ) : null}
+                  <h3 className="type-section text-ink">{day.label}</h3>
+                </div>
+                <span className="text-[11px] font-medium text-muted tabular">
+                  {day.n} مباراة مكتملة
+                </span>
+              </div>
 
-      {/* Finished Matches — تبويب النتائج المكتملة فقط */}
-      {visibleTab === "finished" && filtered.length > 0 && (
-        <div className="space-y-4">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <div className="rounded-lg bg-panel border border-line px-3 py-2.5">
+                  <p className="type-label">إصابة التوقع الرئيسي</p>
+                  <p className="mt-1 text-sm font-semibold tabular text-ink">
+                    {day.hits}/{day.n}
+                    <span className="ms-1.5 text-xs text-muted">
+                      ({pct(day.hitRate)})
+                    </span>
+                  </p>
+                </div>
+                <div className="rounded-lg bg-panel border border-line px-3 py-2.5">
+                  <p className="type-label">نجاح الفرصة المزدوجة</p>
+                  <p className="mt-1 text-sm font-semibold tabular text-ink">
+                    {day.dcHits}/{day.n}
+                    <span className="ms-1.5 text-xs text-muted">
+                      ({pct(day.dcRate)})
+                    </span>
+                  </p>
+                </div>
+                <div className="rounded-lg bg-panel border border-line px-3 py-2.5 col-span-2 sm:col-span-1">
+                  <p className="type-label text-success">أفضل إصابة</p>
+                  <p className="mt-1 text-xs font-semibold text-ink truncate">
+                    {day.best
+                      ? `${day.best.homeNameAr} × ${day.best.awayNameAr}`
+                      : "—"}
+                  </p>
+                  {day.best ? (
+                    <p className="text-[10px] font-medium text-muted tabular mt-0.5">
+                      @ {pct(day.best.topProb)}
+                    </p>
+                  ) : null}
+                </div>
+                <div className="rounded-lg bg-panel border border-line px-3 py-2.5 col-span-2 sm:col-span-1">
+                  <p className="type-label text-danger">أقوى إخفاق</p>
+                  <p className="mt-1 text-xs font-semibold text-ink truncate">
+                    {day.worst
+                      ? `${day.worst.homeNameAr} × ${day.worst.awayNameAr}`
+                      : "—"}
+                  </p>
+                  {day.worst ? (
+                    <p className="text-[10px] font-medium text-muted tabular mt-0.5">
+                      توقّع @ {pct(day.worst.topProb)}
+                    </p>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : null}
+
+      {visibleTab === "finished" && filtered.length > 0 ? (
+        <div className="space-y-3">
           {filtered.map((item) => {
             const pHome = item.pHome ?? 0;
             const pDraw = item.pDraw ?? 0;
             const pAway = item.pAway ?? 0;
-            const theme = getCountryCardTheme(item.leagueId);
-
             const predText =
               item.predictedOutcome === "H"
                 ? `فوز ${item.homeNameAr}`
                 : item.predictedOutcome === "D"
-                ? "التعادل"
-                : `فوز ${item.awayNameAr}`;
+                  ? "التعادل"
+                  : `فوز ${item.awayNameAr}`;
 
             return (
-              <div
+              <article
                 key={item.id}
-                style={{ background: theme.flagSplitGradient }}
-                className="relative overflow-hidden rounded-3xl p-5 sm:p-6 shadow-xl transition-all duration-300 hover:shadow-2xl text-white"
+                data-league={item.leagueId?.toLowerCase()}
+                className="card overflow-hidden league-row"
               >
-                {/* National Symbol Pattern Watermark Overlay */}
-                <div
-                  className="absolute inset-0 opacity-25 pointer-events-none"
-                  style={{
-                    backgroundImage: getCountryPatternSvg(item.leagueId),
-                    backgroundRepeat: "repeat",
-                    backgroundSize: "64px 64px",
-                  }}
-                />
-
-                <div className="relative z-10 space-y-4.5">
-                  {/* Header info */}
-                  <div className="flex flex-wrap items-center justify-between gap-2 text-xs border-b border-white/15 pb-3.5">
-                    <div className="flex items-center gap-2">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={leagueEmblemUrl(item.leagueId || "")}
-                        alt=""
-                        className="w-6 h-6 object-contain filter drop-shadow-md"
-                      />
-                      <span className="font-extrabold text-sm sm:text-base text-white tracking-wide">
-                        {item.leagueNameAr}
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-4 py-3">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="chip-dot" aria-hidden />
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={leagueEmblemUrl(item.leagueId || "")}
+                      alt=""
+                      className="w-5 h-5 object-contain"
+                    />
+                    <span className="text-sm font-semibold text-ink truncate">
+                      {item.leagueNameAr}
+                    </span>
+                    {item.matchday != null ? (
+                      <span className="tabular px-2 py-0.5 rounded-md bg-panel border border-line text-[10px] font-semibold text-muted">
+                        الجولة {item.matchday}
                       </span>
-                      {item.matchday != null ? (
-                        <span className="px-2 py-0.5 rounded-md bg-black/35 border border-white/15 text-[10px] font-black font-mono">
-                          الجولة {item.matchday}
-                        </span>
-                      ) : null}
-                    </div>
+                    ) : null}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted tabular">
+                      {new Date(item.utcDate).toLocaleDateString("ar-IQ", {
+                        year: "numeric",
+                        month: "short",
+                        day: "numeric",
+                        timeZone: "Asia/Baghdad",
+                      })}
+                    </span>
+                    <span
+                      className={`verdict-chip ${
+                        item.isHit ? "verdict-chip-hit" : "verdict-chip-miss"
+                      }`}
+                    >
+                      {item.isHit ? "توقع صائب" : "توقع غير صائب"}
+                    </span>
+                  </div>
+                </div>
 
-                    <div className="flex items-center gap-2">
-                      <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-black/35 backdrop-blur-md border border-white/15 text-xs font-semibold text-white/90 font-sans shadow-2xs">
-                        <svg className="w-3.5 h-3.5 text-white/80 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                        </svg>
-                        <span>
-                          {new Date(item.utcDate).toLocaleDateString("ar-IQ", {
-                            year: "numeric",
-                            month: "short",
-                            day: "numeric",
-                            timeZone: "Asia/Baghdad",
-                          })}
-                        </span>
-                      </div>
-                      <span className={`px-3 py-1 rounded-lg text-xs font-bold border backdrop-blur-md shadow-2xs ${item.isHit ? "bg-emerald-500/25 border-emerald-400/40 text-emerald-200" : "bg-rose-500/25 border-rose-400/40 text-rose-200"}`}>
-                        {item.isHit ? "توقع صائب" : "توقع غير صائب"}
-                      </span>
+                <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 px-4 py-4">
+                  <div className="flex items-center justify-end gap-2.5 min-w-0">
+                    <span className="font-semibold text-sm sm:text-base text-ink truncate text-end">
+                      {item.homeNameAr}
+                    </span>
+                    <Crest
+                      src={item.homeCrestUrl}
+                      alt={item.homeNameAr}
+                      size="lg"
+                      className="shrink-0"
+                    />
+                  </div>
+                  <div className="flex items-center justify-center gap-2 px-3 py-1 rounded-lg bg-panel border border-line font-semibold text-xl sm:text-2xl tabular text-ink">
+                    <span>{item.homeGoals ?? 0}</span>
+                    <span className="text-faint text-sm font-normal">–</span>
+                    <span>{item.awayGoals ?? 0}</span>
+                  </div>
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <Crest
+                      src={item.awayCrestUrl}
+                      alt={item.awayNameAr}
+                      size="lg"
+                      className="shrink-0"
+                    />
+                    <span className="font-semibold text-sm sm:text-base text-ink truncate">
+                      {item.awayNameAr}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 px-4 pb-3">
+                  <div className="rounded-lg bg-panel border border-line p-3 space-y-1">
+                    <span className="type-label block">التوقع الرئيسي المسجل</span>
+                    <div className="flex items-center justify-between gap-2 text-sm font-semibold text-ink">
+                      <span>{predText}</span>
+                      <span className="tabular text-accent">{pct(item.topProb)}</span>
                     </div>
                   </div>
-
-                  {/* Matchup: Pure Crests & Large Team Names Without Cliché Borders */}
-                  <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4 py-2">
-                    {/* Home Team */}
-                    <div className="flex items-center justify-end gap-3.5 min-w-0">
-                      <span className="font-black text-base sm:text-xl text-white truncate text-end drop-shadow-sm">
-                        {item.homeNameAr}
-                      </span>
-                      <Crest src={item.homeCrestUrl} alt={item.homeNameAr} size="xl" className="shrink-0 drop-shadow-lg" />
-                    </div>
-
-                    {/* Score */}
-                    <div className="flex items-center justify-center gap-3 px-4 py-1.5 rounded-2xl bg-black/30 backdrop-blur-md font-mono font-black text-2xl sm:text-3xl text-white">
-                      <span>{item.homeGoals ?? 0}</span>
-                      <span className="text-white/40 font-sans text-sm font-normal">-</span>
-                      <span>{item.awayGoals ?? 0}</span>
-                    </div>
-
-                    {/* Away Team */}
-                    <div className="flex items-center gap-3.5 min-w-0">
-                      <Crest src={item.awayCrestUrl} alt={item.awayNameAr} size="xl" className="shrink-0 drop-shadow-lg" />
-                      <span className="font-black text-base sm:text-xl text-white truncate drop-shadow-sm">
-                        {item.awayNameAr}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Predictions Breakdown */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                    <div className="rounded-2xl bg-black/25 backdrop-blur-xs p-3.5 space-y-1">
-                      <span className="text-white/70 block text-[11px] font-semibold font-sans">
-                        التوقع الرئيسي المسجل
-                      </span>
-                      <div className="font-black text-white flex items-center justify-between font-sans">
-                        <span className="font-extrabold">{predText}</span>
-                        <span className={`font-mono text-base ${theme.accentText}`}>{pct(item.topProb)}</span>
-                      </div>
-                    </div>
-
-                    <div className="rounded-2xl bg-black/25 backdrop-blur-xs p-3.5 space-y-1">
-                      <span className="text-white/70 block text-[11px] font-semibold font-sans">
-                        الفرصة المزدوجة (Double Chance)
-                      </span>
-                      <div className="font-black text-white flex items-center justify-between font-sans">
-                        <span className="font-mono font-extrabold">{item.doubleChanceRec}</span>
-                        <span className={item.doubleChanceHit ? "text-emerald-300 font-extrabold" : "text-white/60"}>
-                          {item.doubleChanceHit ? "توقع ناجح" : "غير موفق"}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Visual 1X2 Probability Bar */}
-                  <div className="rounded-2xl bg-black/35 backdrop-blur-md border border-white/15 p-3.5 space-y-2.5 shadow-lg shadow-black/20">
-                    <div className="flex items-center justify-between text-xs font-semibold text-white/90 font-sans">
-                      <span className="font-bold text-white/90 drop-shadow-xs">توزيع الاحتمالات (1X2)</span>
-                      <div className="flex items-center gap-2.5 text-xs font-bold">
-                        <span className="text-emerald-300 drop-shadow-xs">مضيف</span>
-                        <span className="text-white/40 font-normal">•</span>
-                        <span className="text-amber-300 drop-shadow-xs">تعادل</span>
-                        <span className="text-white/40 font-normal">•</span>
-                        <span className="text-rose-300 drop-shadow-xs">ضيف</span>
-                      </div>
-                    </div>
-                    <div className="h-5 sm:h-6 w-full rounded-full bg-black/50 overflow-hidden flex gap-1 p-0.5 shadow-inner border border-white/10">
-                      <div
-                        style={{ width: `${Math.max(pHome * 100, 4)}%` }}
-                        className="h-full bg-emerald-400 rounded-s-full flex items-center justify-center font-mono font-black text-[11px] text-emerald-950 px-1 truncate transition-all duration-300"
-                        title={`فوز المضيف: ${pct(pHome)}`}
+                  <div className="rounded-lg bg-panel border border-line p-3 space-y-1">
+                    <span className="type-label block">الفرصة المزدوجة</span>
+                    <div className="flex items-center justify-between gap-2 text-sm font-semibold text-ink">
+                      <span className="tabular">{item.doubleChanceRec}</span>
+                      <span
+                        className={
+                          item.doubleChanceHit ? "text-success" : "text-muted"
+                        }
                       >
-                        {pct(pHome)}
-                      </div>
-                      <div
-                        style={{ width: `${Math.max(pDraw * 100, 4)}%` }}
-                        className="h-full bg-amber-400 flex items-center justify-center font-mono font-black text-[11px] text-amber-950 px-1 truncate transition-all duration-300"
-                        title={`التعادل: ${pct(pDraw)}`}
-                      >
-                        {pct(pDraw)}
-                      </div>
-                      <div
-                        style={{ width: `${Math.max(pAway * 100, 4)}%` }}
-                        className="h-full bg-rose-400 rounded-e-full flex items-center justify-center font-mono font-black text-[11px] text-rose-950 px-1 truncate transition-all duration-300"
-                        title={`فوز الضيف: ${pct(pAway)}`}
-                      >
-                        {pct(pAway)}
-                      </div>
+                        {item.doubleChanceHit ? "توقع ناجح" : "غير موفق"}
+                      </span>
                     </div>
                   </div>
                 </div>
-              </div>
+
+                <div className="px-4 pb-4">
+                  <ProbBar pHome={pHome} pDraw={pDraw} pAway={pAway} />
+                </div>
+              </article>
             );
           })}
         </div>
-      )}
+      ) : null}
 
-      {visibleTab === "finished" && filtered.length === 0 && (
-        <div className="rounded-2xl border border-line bg-surface p-8 text-center space-y-2">
-          <h3 className="text-sm font-black text-ink">لا نتائج مكتملة بعد</h3>
-          <p className="text-xs text-muted leading-relaxed max-w-md mx-auto">
-            عند انتهاء أي مباراة كانت توقعاتها محفوظة، تُنقل تلقائياً إلى هذا التبويب مع مقارنة النتيجة بالتوقع.
-          </p>
+      {visibleTab === "finished" && filtered.length === 0 ? (
+        <div className="card">
+          <EmptyState
+            title="لا نتائج مكتملة بعد"
+            body="عند صافرة النهاية تنتقل المباراة تلقائياً من «لم تُلعب بعد» إلى هنا، مع مقارنة النتيجة بتوقع النموذج."
+          />
         </div>
-      )}
+      ) : null}
 
-      {/* Upcoming Snapshots — تبويب لم تُلعب بعد */}
-      {visibleTab === "upcoming" && filteredUpcoming.length > 0 && (
-        <div className="space-y-6 pt-2">
-          <div className="flex flex-wrap items-center justify-between gap-2 px-1">
-            <h3 className="text-sm font-black text-ink">
+      {visibleTab === "upcoming" && filteredUpcoming.length > 0 ? (
+        <div className="space-y-6">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h3 className="type-section text-ink">
               التوقعات المحفوظة للجولات القادمة
             </h3>
-            <span className="text-[11px] font-bold text-muted bg-panel px-3 py-1 rounded-full border border-line">
-              {filteredUpcoming.length} مباراة · جولات كاملة
+            <span className="text-[11px] font-medium text-muted bg-panel px-3 py-1 rounded-md border border-line tabular">
+              {filteredUpcoming.length} مباراة
             </span>
           </div>
 
@@ -758,7 +561,9 @@ export function PredictionArchiveLog({
             const uniformRound =
               first?.matchday != null &&
               day.items.every(
-                (x) => x.matchday === first.matchday && x.leagueId === first.leagueId,
+                (x) =>
+                  x.matchday === first.matchday &&
+                  x.leagueId === first.leagueId,
               )
                 ? first.matchday
                 : null;
@@ -770,23 +575,23 @@ export function PredictionArchiveLog({
 
             return (
               <section key={day.key} className="space-y-3">
-                <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-panel px-4 py-2.5 border border-line">
+                <div className="day-rail flex flex-wrap items-center justify-between gap-2 rounded-lg px-4 py-2.5 border border-line">
                   <div className="flex flex-wrap items-center gap-2">
                     {day.relative ? (
-                      <span className="bg-accent-dim text-accent px-3 py-0.5 rounded-full text-xs font-black border border-accent/20">
+                      <span className="bg-accent-dim text-accent px-2.5 py-0.5 rounded-md text-xs font-semibold border border-accent/20">
                         {day.relative}
                       </span>
                     ) : null}
                     {(uniformRound ?? roundLabel) != null ? (
-                      <span className="bg-surface text-ink px-2.5 py-0.5 rounded-md text-[11px] font-black font-mono border border-line">
+                      <span className="bg-surface text-ink px-2 py-0.5 rounded-md text-[11px] font-semibold tabular border border-line">
                         الجولة {uniformRound ?? roundLabel}
                       </span>
                     ) : null}
-                    <h4 className="text-xs sm:text-sm font-black text-ink tracking-tight">
+                    <h4 className="day-rail-label">
                       {formatLongDate(day.items[0]!.utcDate)}
                     </h4>
                   </div>
-                  <span className="text-[11px] font-extrabold text-muted bg-surface px-3 py-1 rounded-full border border-line">
+                  <span className="text-[11px] font-medium text-muted">
                     {day.items.length === 1
                       ? "مباراة واحدة"
                       : day.items.length === 2
@@ -797,112 +602,79 @@ export function PredictionArchiveLog({
                   </span>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {day.items.map((item) => {
                     const pHome = item.pHome ?? 0;
                     const pDraw = item.pDraw ?? 0;
                     const pAway = item.pAway ?? 0;
-                    const theme = getCountryCardTheme(item.leagueId);
 
                     return (
-                      <div
+                      <article
                         key={item.id}
-                        style={{ background: theme.flagSplitGradient }}
-                        className="relative overflow-hidden rounded-3xl p-4 sm:p-5 shadow-lg transition-all duration-300 hover:shadow-xl text-white"
+                        data-league={item.leagueId?.toLowerCase()}
+                        className="card overflow-hidden league-row"
                       >
-                        <div
-                          className="absolute inset-0 opacity-25 pointer-events-none"
-                          style={{
-                            backgroundImage: getCountryPatternSvg(item.leagueId),
-                            backgroundRepeat: "repeat",
-                            backgroundSize: "64px 64px",
-                          }}
-                        />
-
-                        <div className="relative z-10 space-y-4">
-                          <div className="flex items-center justify-between text-xs border-b border-white/15 pb-3">
-                            <div className="flex items-center gap-2">
-                              {/* eslint-disable-next-line @next/next/no-img-element */}
-                              <img
-                                src={leagueEmblemUrl(item.leagueId || "")}
-                                alt=""
-                                className="w-5 h-5 object-contain filter drop-shadow-md"
-                              />
-                              <span className="font-extrabold text-xs sm:text-sm text-white tracking-wide">
-                                {item.leagueNameAr}
-                              </span>
-                              {item.matchday != null ? (
-                                <span className="px-2 py-0.5 rounded-md bg-black/35 border border-white/15 text-[10px] font-black font-mono">
-                                  ج{item.matchday}
-                                </span>
-                              ) : null}
-                            </div>
-
-                            <div className="flex items-center gap-2 text-xs font-semibold text-white/90 font-sans">
-                              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-black/35 backdrop-blur-md border border-white/15 shadow-2xs">
-                                <span>{formatShortDate(item.utcDate)}</span>
-                              </div>
-                              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-black/35 backdrop-blur-md border border-white/15 shadow-2xs">
-                                <span>{formatMatchTime(item.utcDate)}</span>
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 py-1">
-                            <div className="flex items-center justify-end gap-3 min-w-0">
-                              <span className="font-bold text-sm sm:text-base text-white truncate text-end">
-                                {item.homeNameAr}
-                              </span>
-                              <Crest src={item.homeCrestUrl} alt={item.homeNameAr} size="lg" className="shrink-0 drop-shadow-md" />
-                            </div>
-                            <span className="text-xs font-bold text-white/80 px-3 py-1 rounded-xl bg-black/25 font-sans">
-                              VS
+                        <div className="flex items-center justify-between gap-2 border-b border-line px-4 py-2.5 text-xs">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="chip-dot" aria-hidden />
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={leagueEmblemUrl(item.leagueId || "")}
+                              alt=""
+                              className="w-4 h-4 object-contain"
+                            />
+                            <span className="font-semibold text-ink truncate">
+                              {item.leagueNameAr}
                             </span>
-                            <div className="flex items-center gap-3 min-w-0">
-                              <Crest src={item.awayCrestUrl} alt={item.awayNameAr} size="lg" className="shrink-0 drop-shadow-md" />
-                              <span className="font-bold text-sm sm:text-base text-white truncate">
-                                {item.awayNameAr}
+                            {item.matchday != null ? (
+                              <span className="tabular px-1.5 py-0.5 rounded bg-panel border border-line text-[10px] font-semibold text-muted">
+                                ج{item.matchday}
                               </span>
-                            </div>
+                            ) : null}
                           </div>
-
-                          <div className="rounded-2xl bg-black/35 backdrop-blur-md border border-white/15 p-3 space-y-2 shadow-lg shadow-black/20">
-                            <div className="flex items-center justify-between text-xs font-semibold text-white/90 font-sans">
-                              <span className="font-bold text-white/90 drop-shadow-xs">توزيع الاحتمالات (1X2)</span>
-                              <div className="flex items-center gap-2 text-xs font-bold">
-                                <span className="text-emerald-300 drop-shadow-xs">مضيف</span>
-                                <span className="text-white/40 font-normal">•</span>
-                                <span className="text-amber-300 drop-shadow-xs">تعادل</span>
-                                <span className="text-white/40 font-normal">•</span>
-                                <span className="text-rose-300 drop-shadow-xs">ضيف</span>
-                              </div>
-                            </div>
-                            <div className="h-4 sm:h-5 w-full rounded-full bg-black/50 overflow-hidden flex gap-1 p-0.5 shadow-inner border border-white/10">
-                              <div
-                                style={{ width: `${Math.max(pHome * 100, 4)}%` }}
-                                className="h-full bg-emerald-400 rounded-s-full flex items-center justify-center font-mono font-black text-[10px] text-emerald-950 px-1 truncate transition-all duration-300"
-                                title={`فوز المضيف: ${pct(pHome)}`}
-                              >
-                                {pct(pHome)}
-                              </div>
-                              <div
-                                style={{ width: `${Math.max(pDraw * 100, 4)}%` }}
-                                className="h-full bg-amber-400 flex items-center justify-center font-mono font-black text-[10px] text-amber-950 px-1 truncate transition-all duration-300"
-                                title={`التعادل: ${pct(pDraw)}`}
-                              >
-                                {pct(pDraw)}
-                              </div>
-                              <div
-                                style={{ width: `${Math.max(pAway * 100, 4)}%` }}
-                                className="h-full bg-rose-400 rounded-e-full flex items-center justify-center font-mono font-black text-[10px] text-rose-950 px-1 truncate transition-all duration-300"
-                                title={`فوز الضيف: ${pct(pAway)}`}
-                              >
-                                {pct(pAway)}
-                              </div>
-                            </div>
+                          <div className="flex items-center gap-2 text-muted tabular shrink-0">
+                            <span>{formatShortDate(item.utcDate)}</span>
+                            <span>{formatMatchTime(item.utcDate)}</span>
                           </div>
                         </div>
-                      </div>
+
+                        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 px-4 py-3">
+                          <div className="flex items-center justify-end gap-2 min-w-0">
+                            <span className="font-semibold text-sm text-ink truncate text-end">
+                              {item.homeNameAr}
+                            </span>
+                            <Crest
+                              src={item.homeCrestUrl}
+                              alt={item.homeNameAr}
+                              size="md"
+                              className="shrink-0"
+                            />
+                          </div>
+                          <span className="text-[10px] font-semibold text-faint px-2">
+                            VS
+                          </span>
+                          <div className="flex items-center gap-2 min-w-0">
+                            <Crest
+                              src={item.awayCrestUrl}
+                              alt={item.awayNameAr}
+                              size="md"
+                              className="shrink-0"
+                            />
+                            <span className="font-semibold text-sm text-ink truncate">
+                              {item.awayNameAr}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="px-4 pb-4">
+                          <ProbBar
+                            pHome={pHome}
+                            pDraw={pDraw}
+                            pAway={pAway}
+                            compact
+                          />
+                        </div>
+                      </article>
                     );
                   })}
                 </div>
@@ -910,17 +682,16 @@ export function PredictionArchiveLog({
             );
           })}
         </div>
-      )}
+      ) : null}
 
-      {visibleTab === "upcoming" && filteredUpcoming.length === 0 && (
-        <div className="rounded-2xl border border-line bg-surface p-8 text-center space-y-2">
-          <h3 className="text-sm font-black text-ink">لا مباريات قادمة في هذه التصفية</h3>
-          <p className="text-xs text-muted leading-relaxed max-w-md mx-auto">
-            جرّب دورياً آخر أو امسح البحث. المباريات ذات التوقعات المحفوظة تظهر هنا قبل انطلاقها.
-          </p>
+      {visibleTab === "upcoming" && filteredUpcoming.length === 0 ? (
+        <div className="card">
+          <EmptyState
+            title="لا مباريات قادمة في هذه التصفية"
+            body="جرّب دورياً آخر أو امسح البحث. المباريات ذات التوقعات المحفوظة تظهر هنا قبل انطلاقها."
+          />
         </div>
-      )}
-
+      ) : null}
     </div>
   );
 }

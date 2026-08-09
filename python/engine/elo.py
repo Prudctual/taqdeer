@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 
 @dataclass
@@ -28,24 +28,38 @@ def goal_multiplier(goal_diff: int) -> float:
     return (11.0 + gd) / 8.0
 
 
+def log_home_adv_to_elo(log_ha: float) -> float:
+    """
+    يحوّل أفضلية الأرض اللوغاريتمية (Dixon–Coles / بروفايل الدوري)
+    إلى نقاط Elo تقريباً: λ_ratio ≈ exp(log_ha) → Elo gap عبر 400*log10.
+    """
+    import math
+
+    ratio = math.exp(float(log_ha))
+    # نسبة قوة هجومية منزلية → فرق Elo تقريبي
+    return float(400.0 * math.log10(max(ratio, 1.01)))
+
+
 def update_elo(
     matches: List[EloMatch],
     k: float = 20.0,
     home_adv: float = 80.0,
     initial: float = 1500.0,
     seeds: Dict[str, float] | None = None,
+    *,
+    early_season_boost: bool = False,
 ) -> Tuple[Dict[str, float], List[Tuple[str, str, float]]]:
     """`seeds` overrides `initial` per team at first appearance (promoted-team prior)."""
     seeds = seeds or {}
     ratings: Dict[str, float] = {}
     history: List[Tuple[str, str, float]] = []
+    base_k = k * (1.35 if early_season_boost else 1.0)
 
     def get_k_factor(team_id: str) -> float:
-        # Sangmu military teams have rapid roster turnover due to military service cycles
         tid_lower = team_id.lower()
         if "sangmu" in tid_lower or "gimcheon" in tid_lower:
-            return k * 2.5
-        return k
+            return base_k * 2.5
+        return base_k
 
     for m in matches:
         rh = ratings.get(m.home, seeds.get(m.home, initial))
@@ -70,17 +84,24 @@ def update_elo(
 
 
 def elo_outcome_probs(
-    elo_home: float, elo_away: float, home_adv: float = 80.0, draw_base: float = 0.26
+    elo_home: float,
+    elo_away: float,
+    home_adv: float = 80.0,
+    draw_base: float = 0.26,
 ) -> Tuple[float, float, float]:
     """Map Elo gap to 1X2 with a simple logistic + draw mass."""
     gap = (elo_home + home_adv) - elo_away
-    # win probability ignoring draws
     p_home_nd = 1.0 / (1.0 + 10 ** (-gap / 400.0))
     p_away_nd = 1.0 - p_home_nd
-    # shrink draw when gap large
     draw = draw_base * (1.0 - min(abs(gap) / 400.0, 0.7))
     remain = 1.0 - draw
     p_home = remain * p_home_nd
     p_away = remain * p_away_nd
     s = p_home + draw + p_away
     return p_home / s, draw / s, p_away / s
+
+
+def elo_home_adv_from_profile(log_ha: Optional[float], fallback: float = 80.0) -> float:
+    if log_ha is None:
+        return fallback
+    return float(min(max(log_home_adv_to_elo(log_ha), 45.0), 120.0))

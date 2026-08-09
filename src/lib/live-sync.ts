@@ -1,11 +1,16 @@
 import fs from "fs";
 import path from "path";
 import { getDb } from "./db";
+import {
+  estimateMinuteFromKickoff,
+  liveStatusFromFotmob,
+  parseLiveMinute,
+} from "./live-clock";
 import { resolveTeamName } from "./team-aliases";
 import { nameAr, slugify } from "./team-names";
 
 function loadEnvIfNeeded() {
-  if (process.env.API_FOOTBALL_KEY) return;
+  if (process.env.API_FOOTBALL_KEY || process.env.API_SPORTS_KEY) return;
   const envPath = path.join(process.cwd(), ".env");
   if (!fs.existsSync(envPath)) return;
   for (const line of fs.readFileSync(envPath, "utf8").split("\n")) {
@@ -17,206 +22,621 @@ function loadEnvIfNeeded() {
 }
 
 let lastSyncTimestamp = 0;
-const SYNC_THROTTLE_MS = 15000; // 15 seconds minimum between live API calls
+const SYNC_THROTTLE_MS = 3_000;
 
-export async function syncRealLiveMatches(): Promise<number> {
-  loadEnvIfNeeded();
-  const now = Date.now();
-  if (now - lastSyncTimestamp < SYNC_THROTTLE_MS) {
-    return 0; // Throttled
+const FOTMOB_LEAGUES: Record<number, string> = {
+  47: "pl",
+  87: "pd",
+  54: "bl1",
+  55: "sa",
+  53: "fl1",
+  61: "ppd",
+  57: "ded",
+  71: "tur1",
+  59: "no1", // Eliteserien
+};
+
+const APIF_LEAGUES: Record<number, string> = {
+  39: "pl",
+  140: "pd",
+  135: "sa",
+  78: "bl1",
+  61: "fl1",
+  94: "ppd",
+  88: "ded",
+  203: "tur1",
+  103: "no1",
+};
+
+type LiveEvent = {
+  time: { elapsed: number; extra?: number | null };
+  team: { name: string; id?: string | null };
+  player: { name: string };
+  assist?: { name: string } | null;
+  type: string;
+  detail: string;
+};
+
+function normName(s: string): string {
+  return resolveTeamName(s)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function namesMatch(a: string, b: string): boolean {
+  const na = normName(a);
+  const nb = normName(b);
+  if (!na || !nb) return false;
+  if (na === nb) return true;
+  if (na.includes(nb) || nb.includes(na)) return true;
+  const ta = new Set(na.split(" ").filter((w) => w.length > 2));
+  const tb = new Set(nb.split(" ").filter((w) => w.length > 2));
+  let overlap = 0;
+  for (const w of ta) if (tb.has(w)) overlap++;
+  return overlap > 0 && overlap >= Math.min(ta.size, tb.size);
+}
+
+function todayKeys(): string[] {
+  const now = new Date();
+  const utc = now.toISOString().slice(0, 10);
+  const bag = new Date(now.getTime() + 3 * 3600_000).toISOString().slice(0, 10);
+  return [...new Set([utc, bag])];
+}
+
+function findMatchId(
+  db: ReturnType<typeof getDb>,
+  leagueId: string,
+  homeName: string,
+  awayName: string,
+  utcDate: string,
+  externalId?: string | null,
+): string | null {
+  if (externalId) {
+    const byExt = db
+      .prepare(`SELECT id FROM matches WHERE external_id = ? OR id = ? LIMIT 1`)
+      .get(String(externalId), String(externalId)) as { id: string } | undefined;
+    if (byExt?.id) return byExt.id;
+    const byEnrich = db
+      .prepare(
+        `SELECT match_id AS id FROM match_enrichment WHERE sofascore_event_id = ? LIMIT 1`,
+      )
+      .get(String(externalId)) as { id: string } | undefined;
+    if (byEnrich?.id) return byEnrich.id;
   }
-  lastSyncTimestamp = now;
 
-  const apiKey = process.env.API_FOOTBALL_KEY?.trim() || process.env.API_SPORTS_KEY?.trim();
+  const day = utcDate.slice(0, 10);
+  const candidates = db
+    .prepare(
+      `SELECT m.id, th.name_en AS homeEn, ta.name_en AS awayEn,
+              th.name_ar AS homeAr, ta.name_ar AS awayAr
+       FROM matches m
+       JOIN teams th ON th.id = m.home_team_id
+       JOIN teams ta ON ta.id = m.away_team_id
+       WHERE m.league_id = ?
+         AND date(m.utc_date) BETWEEN date(?, '-1 day') AND date(?, '+1 day')
+         AND m.source NOT IN ('preview-holdout','synthetic','demo')`,
+    )
+    .all(leagueId, day, day) as Array<{
+    id: string;
+    homeEn: string;
+    awayEn: string;
+    homeAr: string;
+    awayAr: string;
+  }>;
+
+  for (const c of candidates) {
+    if (
+      (namesMatch(homeName, c.homeEn) || namesMatch(homeName, c.homeAr)) &&
+      (namesMatch(awayName, c.awayEn) || namesMatch(awayName, c.awayAr))
+    ) {
+      return c.id;
+    }
+  }
+  return null;
+}
+
+function applyLiveUpdate(
+  db: ReturnType<typeof getDb>,
+  matchId: string,
+  fields: {
+    status: string;
+    homeGoals: number | null;
+    awayGoals: number | null;
+    minute: number | null;
+    liveStatusAr: string | null;
+    eventsJson: string | null;
+    statsJson?: string | null;
+    externalId?: string | null;
+  },
+) {
+  db.prepare(
+    `UPDATE matches SET
+       status = ?,
+       home_goals = COALESCE(?, home_goals),
+       away_goals = COALESCE(?, away_goals),
+       minute = ?,
+       live_status_ar = ?,
+       live_events_json = COALESCE(?, live_events_json),
+       live_stats_json = COALESCE(?, live_stats_json),
+       external_id = COALESCE(external_id, ?)
+     WHERE id = ?`,
+  ).run(
+    fields.status,
+    fields.homeGoals,
+    fields.awayGoals,
+    fields.minute,
+    fields.liveStatusAr,
+    fields.eventsJson,
+    fields.statsJson ?? null,
+    fields.externalId ?? null,
+    matchId,
+  );
+}
+
+function mapFotmobEvents(
+  events: unknown,
+  homeName: string,
+  awayName: string,
+): LiveEvent[] {
+  if (!Array.isArray(events)) return [];
+  const out: LiveEvent[] = [];
+  for (const raw of events) {
+    const e = raw as Record<string, unknown>;
+    const typeName = String(e.type || e.card || e.incidentType || "").toLowerCase();
+    let type = "Var";
+    let detail = String(e.typeStr || e.name || e.type || "حدث");
+    if (typeName.includes("goal") || e.isGoal) {
+      type = "Goal";
+      detail = e.ownGoal ? "Own Goal" : "Normal Goal";
+    } else if (typeName.includes("card") || e.card) {
+      type = "Card";
+      const card = String(e.card || detail).toLowerCase();
+      detail = card.includes("red") || card.includes("أحمر") ? "Red Card" : "Yellow Card";
+    } else if (typeName.includes("subst")) {
+      type = "subst";
+      detail = "Substitution";
+    }
+
+    const elapsed =
+      parseLiveMinute(e.timeStr || e.time || e.minutesElapsed) ??
+      (typeof e.time === "number" ? e.time : 0);
+    const isHome = e.isHome != null ? !!e.isHome : String(e.teamId || "") === "home";
+    const playerName =
+      String(
+        (e.player as { name?: string } | undefined)?.name ||
+          e.nameStr ||
+          e.playerName ||
+          e.name ||
+          "",
+      ) || "—";
+
+    out.push({
+      time: { elapsed, extra: null },
+      team: { name: isHome ? homeName : awayName },
+      player: { name: playerName },
+      type,
+      detail,
+    });
+  }
+  return out.slice(0, 40);
+}
+
+type FotmobDayPayload = {
+  leagues?: Array<{
+    primaryId?: number;
+    name?: string;
+    matches?: Array<{
+      id?: number;
+      status?: Record<string, unknown>;
+      home?: { id?: number; name?: string; score?: number };
+      away?: { id?: number; name?: string; score?: number };
+    }>;
+  }>;
+};
+
+async function syncFromFotmob(db: ReturnType<typeof getDb>): Promise<number> {
+  let synced = 0;
+  const dates = todayKeys().map((d) => d.replace(/-/g, ""));
+
+  for (const yyyymmdd of dates) {
+    let data: FotmobDayPayload | null = null;
+
+    try {
+      const res = await fetch(`https://www.fotmob.com/api/data/matches?date=${yyyymmdd}`, {
+        headers: {
+          Accept: "application/json",
+          Referer: "https://www.fotmob.com/",
+          "User-Agent":
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        },
+        cache: "no-store",
+      });
+      if (!res.ok) continue;
+      data = (await res.json()) as FotmobDayPayload;
+    } catch {
+      continue;
+    }
+
+    for (const lg of data?.leagues || []) {
+      const leagueId = lg.primaryId != null ? FOTMOB_LEAGUES[lg.primaryId] : undefined;
+      if (!leagueId) continue;
+
+      for (const m of lg.matches || []) {
+        const st = (m.status || {}) as {
+          started?: boolean;
+          finished?: boolean;
+          ongoing?: boolean;
+          utcTime?: string;
+          liveTime?: { short?: string; long?: string };
+          halfs?: Record<string, string>;
+        };
+        const homeName = m.home?.name || "";
+        const awayName = m.away?.name || "";
+        if (!homeName || !awayName || !m.id) continue;
+
+        const utcDate = st.utcTime || `${yyyymmdd.slice(0, 4)}-${yyyymmdd.slice(4, 6)}-${yyyymmdd.slice(6, 8)}T12:00:00Z`;
+        const matchId = findMatchId(
+          db,
+          leagueId,
+          homeName,
+          awayName,
+          utcDate,
+          String(m.id),
+        );
+        if (!matchId) continue;
+
+        const mapped = liveStatusFromFotmob(st);
+        // تجاهل المباريات التي لم تبدأ بعد
+        if (mapped.statusStr === "SCHEDULED" && !st.started && !st.ongoing) continue;
+
+        let eventsJson: string | null = null;
+        let statsJson: string | null = null;
+
+        if (mapped.statusStr === "IN_PLAY" || mapped.statusStr === "FINISHED") {
+          try {
+            const detailRes = await fetch(
+              `https://www.fotmob.com/api/data/matchDetails?matchId=${m.id}`,
+              {
+                headers: {
+                  Accept: "application/json",
+                  Referer: "https://www.fotmob.com/",
+                  "User-Agent":
+                    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+                },
+                cache: "no-store",
+              },
+            );
+            if (detailRes.ok) {
+              const detail = (await detailRes.json()) as {
+                header?: {
+                  status?: typeof st;
+                  teams?: Array<{ name?: string; score?: number }>;
+                };
+                content?: {
+                  matchFacts?: { events?: { events?: unknown[] } };
+                  stats?: unknown;
+                };
+              };
+              const dst = detail.header?.status;
+              if (dst) {
+                const remapped = liveStatusFromFotmob(dst);
+                mapped.minute = remapped.minute;
+                mapped.liveStatusAr = remapped.liveStatusAr;
+                mapped.statusStr = remapped.statusStr;
+              }
+              const teams = detail.header?.teams || [];
+              if (teams[0]?.score != null) m.home!.score = teams[0].score;
+              if (teams[1]?.score != null) m.away!.score = teams[1].score;
+
+              const events = mapFotmobEvents(
+                detail.content?.matchFacts?.events?.events,
+                homeName,
+                awayName,
+              );
+              if (events.length) eventsJson = JSON.stringify(events);
+
+              const periods = (detail.content?.stats as { Periods?: unknown })?.Periods;
+              if (periods) statsJson = JSON.stringify(periods);
+            }
+          } catch {
+            /* keep list-level fields */
+          }
+        }
+
+        applyLiveUpdate(db, matchId, {
+          status: mapped.statusStr,
+          homeGoals: m.home?.score ?? 0,
+          awayGoals: m.away?.score ?? 0,
+          minute: mapped.minute,
+          liveStatusAr: mapped.liveStatusAr || "مباشر الآن",
+          eventsJson,
+          statsJson,
+          externalId: String(m.id),
+        });
+
+        // خزّن معرّف FotMob للمرات القادمة
+        try {
+          db.prepare(
+            `INSERT INTO match_enrichment (match_id, sofascore_event_id, source, updated_at)
+             VALUES (?, ?, 'fotmob-live', datetime('now'))
+             ON CONFLICT(match_id) DO UPDATE SET
+               sofascore_event_id = COALESCE(excluded.sofascore_event_id, match_enrichment.sofascore_event_id),
+               source = COALESCE(match_enrichment.source, excluded.source),
+               updated_at = excluded.updated_at`,
+          ).run(matchId, String(m.id));
+        } catch {
+          /* enrichment table may be absent in tests */
+        }
+
+        synced++;
+      }
+    }
+  }
+
+  return synced;
+}
+
+async function syncFromApiFootball(db: ReturnType<typeof getDb>): Promise<number> {
+  const apiKey =
+    process.env.API_FOOTBALL_KEY?.trim() || process.env.API_SPORTS_KEY?.trim();
   if (!apiKey) return 0;
 
   try {
     const res = await fetch("https://v3.football.api-sports.io/fixtures?live=all", {
       headers: { "x-apisports-key": apiKey },
+      cache: "no-store",
     });
-
     if (!res.ok) return 0;
     const data = (await res.json()) as {
+      errors?: unknown;
       response?: Array<{
         fixture: {
           id: number;
           date: string;
-          status: { short: string; long?: string; elapsed?: number | null };
+          status: { short: string; elapsed?: number | null };
           referee?: string | null;
         };
-        league: {
-          id: number;
-          name: string;
-          country: string;
-          season: number;
-        };
+        league: { id: number; season: number };
         teams: {
-          home: { id: number; name: string; logo?: string };
-          away: { id: number; name: string; logo?: string };
+          home: { name: string; logo?: string };
+          away: { name: string; logo?: string };
         };
         goals: { home?: number | null; away?: number | null };
-        events?: Array<{
-          time: { elapsed: number };
-          team: { name: string };
-          player: { name: string };
-          type: string;
-          detail: string;
-        }>;
+        events?: LiveEvent[];
       }>;
     };
+    if (data.errors && Object.keys(data.errors as object).length) return 0;
 
-    const fixtures = data.response ?? [];
-    if (fixtures.length === 0) return 0;
+    let synced = 0;
+    for (const item of data.response ?? []) {
+      const leagueId = APIF_LEAGUES[item.league.id];
+      if (!leagueId) continue;
 
-    const db = getDb();
-
-    const KNOWN_LEAGUES: Record<number, string> = {
-      39: "pl",
-      140: "pd",
-      135: "sa",
-      78: "bl1",
-      61: "fl1",
-      94: "ppd",
-      88: "ded",
-      203: "tur1",
-    };
-
-    const upsertTeam = db.prepare(`
-      INSERT INTO teams (id, league_id, name_ar, name_en, short_name, crest_url)
-      VALUES (?, ?, ?, ?, ?, ?)
-      ON CONFLICT(id) DO UPDATE SET
-        crest_url = COALESCE(excluded.crest_url, teams.crest_url)
-    `);
-
-    // المباراة الحقيقية موجودة مسبقاً في الجدول (من مزامنة الجداول) —
-    // تُحدَّث في مكانها فيبقى توقعها الحقيقي ولقطته مرتبطين بها، بلا صفوف مكررة
-    const findExisting = db.prepare(`
-      SELECT id FROM matches
-      WHERE league_id = ? AND home_team_id = ? AND away_team_id = ?
-        AND date(utc_date) = date(?)
-      LIMIT 1
-    `);
-
-    const updateLive = db.prepare(`
-      UPDATE matches SET
-        status = ?,
-        home_goals = ?,
-        away_goals = ?,
-        minute = ?,
-        live_status_ar = ?,
-        live_events_json = ?,
-        referee_name = COALESCE(referee_name, ?)
-      WHERE id = ?
-    `);
-
-    // احتياط نادر: مباراة غير موجودة في جداولنا (تأجيل لم يصلنا مثلاً) — تُنشأ بلا توقع مختلق
-    const insertMatch = db.prepare(`
-      INSERT INTO matches (
-        id, league_id, season, matchday, utc_date, status,
-        home_team_id, away_team_id, home_goals, away_goals, referee_name, source, external_id,
-        minute, live_status_ar, live_events_json
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'api-football-live', ?, ?, ?, ?)
-      ON CONFLICT(id) DO UPDATE SET
-        utc_date = excluded.utc_date,
-        status = excluded.status,
-        home_goals = excluded.home_goals,
-        away_goals = excluded.away_goals,
-        minute = excluded.minute,
-        live_status_ar = excluded.live_status_ar,
-        live_events_json = excluded.live_events_json
-    `);
-
-    let syncedCount = 0;
-
-    for (const item of fixtures) {
-      const knownLeagueCode = KNOWN_LEAGUES[item.league.id];
-      // IF NOT IN OUR TRACKED LEAGUES, SKIP!
-      if (!knownLeagueCode) continue;
-
-      const f = item.fixture;
-      const leagueId = knownLeagueCode;
-
-      const homeResolved = resolveTeamName(item.teams.home.name);
-      const awayResolved = resolveTeamName(item.teams.away.name);
-      const homeTeamId = `${leagueId}-${slugify(homeResolved)}`;
-      const awayTeamId = `${leagueId}-${slugify(awayResolved)}`;
-
-      upsertTeam.run(
-        homeTeamId,
+      const homeName = item.teams.home.name;
+      const awayName = item.teams.away.name;
+      const matchId = findMatchId(
+        db,
         leagueId,
-        nameAr(homeResolved),
-        homeResolved,
-        homeResolved.slice(0, 12),
-        item.teams.home.logo ?? null,
+        homeName,
+        awayName,
+        item.fixture.date,
+        String(item.fixture.id),
       );
 
-      upsertTeam.run(
-        awayTeamId,
-        leagueId,
-        nameAr(awayResolved),
-        awayResolved,
-        awayResolved.slice(0, 12),
-        item.teams.away.logo ?? null,
-      );
-
-      const statusShort = f.status.short || "1H";
-      const isFinished = ["FT", "AET", "PEN", "FINISHED"].includes(statusShort);
-      const statusStr = isFinished ? "FINISHED" : "IN_PLAY";
-      const elapsed = f.status.elapsed ?? 0;
-
+      const short = item.fixture.status.short || "1H";
+      const finished = ["FT", "AET", "PEN", "FINISHED"].includes(short);
+      const elapsed = item.fixture.status.elapsed ?? 0;
       let liveStatusAr = "مباشر الآن";
-      if (statusShort === "1H") liveStatusAr = `الشوط الأول · د ${elapsed}'`;
-      else if (statusShort === "HT") liveStatusAr = "استراحة الشوطين";
-      else if (statusShort === "2H") liveStatusAr = `الشوط الثاني · د ${elapsed}'`;
-      else if (statusShort === "ET") liveStatusAr = `الوقت الإضافي · د ${elapsed}'`;
-      else if (statusShort === "P") liveStatusAr = "ركلات ترجيح";
+      if (short === "1H") liveStatusAr = `الشوط الأول · د ${elapsed}'`;
+      else if (short === "HT") liveStatusAr = "استراحة الشوطين";
+      else if (short === "2H") liveStatusAr = `الشوط الثاني · د ${elapsed}'`;
+      else if (short === "ET") liveStatusAr = `الوقت الإضافي · د ${elapsed}'`;
+      else if (short === "P") liveStatusAr = "ركلات ترجيح";
 
-      const hg = item.goals.home ?? 0;
-      const ag = item.goals.away ?? 0;
+      const eventsJson = item.events?.length
+        ? JSON.stringify(item.events.slice(0, 40))
+        : null;
 
-      const eventsJson = item.events ? JSON.stringify(item.events.slice(0, 10)) : null;
-
-      const existing = findExisting.get(leagueId, homeTeamId, awayTeamId, f.date) as
-        | { id: string }
-        | undefined;
-
-      if (existing) {
-        updateLive.run(
-          statusStr,
-          hg,
-          ag,
-          elapsed,
-          liveStatusAr,
+      if (matchId) {
+        applyLiveUpdate(db, matchId, {
+          status: finished ? "FINISHED" : "IN_PLAY",
+          homeGoals: item.goals.home ?? 0,
+          awayGoals: item.goals.away ?? 0,
+          minute: elapsed,
+          liveStatusAr: finished ? "انتهت" : liveStatusAr,
           eventsJson,
-          f.referee ?? null,
-          existing.id,
-        );
-      } else {
-        insertMatch.run(
-          `live-apif-${f.id}`,
-          leagueId,
-          String(item.league.season || new Date().getUTCFullYear()),
-          null,
-          f.date,
-          statusStr,
-          homeTeamId,
-          awayTeamId,
-          hg,
-          ag,
-          f.referee ?? null,
-          String(f.id),
-          elapsed,
-          liveStatusAr,
-          eventsJson,
-        );
+          externalId: String(item.fixture.id),
+        });
+        synced++;
+        continue;
       }
 
-      syncedCount++;
+      // احتياط: إنشاء صف إن لم تُعرف المباراة
+      const homeTeamId = `${leagueId}-${slugify(resolveTeamName(homeName))}`;
+      const awayTeamId = `${leagueId}-${slugify(resolveTeamName(awayName))}`;
+      db.prepare(
+        `INSERT INTO teams (id, league_id, name_ar, name_en, short_name, crest_url)
+         VALUES (?, ?, ?, ?, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET crest_url = COALESCE(excluded.crest_url, teams.crest_url)`,
+      ).run(
+        homeTeamId,
+        leagueId,
+        nameAr(resolveTeamName(homeName)),
+        resolveTeamName(homeName),
+        resolveTeamName(homeName).slice(0, 12),
+        item.teams.home.logo ?? null,
+      );
+      db.prepare(
+        `INSERT INTO teams (id, league_id, name_ar, name_en, short_name, crest_url)
+         VALUES (?, ?, ?, ?, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET crest_url = COALESCE(excluded.crest_url, teams.crest_url)`,
+      ).run(
+        awayTeamId,
+        leagueId,
+        nameAr(resolveTeamName(awayName)),
+        resolveTeamName(awayName),
+        resolveTeamName(awayName).slice(0, 12),
+        item.teams.away.logo ?? null,
+      );
+      db.prepare(
+        `INSERT INTO matches (
+           id, league_id, season, matchday, utc_date, status,
+           home_team_id, away_team_id, home_goals, away_goals, source, external_id,
+           minute, live_status_ar, live_events_json
+         ) VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, 'api-football-live', ?, ?, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET
+           status = excluded.status,
+           home_goals = excluded.home_goals,
+           away_goals = excluded.away_goals,
+           minute = excluded.minute,
+           live_status_ar = excluded.live_status_ar,
+           live_events_json = COALESCE(excluded.live_events_json, matches.live_events_json)`,
+      ).run(
+        `live-apif-${item.fixture.id}`,
+        leagueId,
+        String(item.league.season || new Date().getUTCFullYear()),
+        item.fixture.date,
+        finished ? "FINISHED" : "IN_PLAY",
+        homeTeamId,
+        awayTeamId,
+        item.goals.home ?? 0,
+        item.goals.away ?? 0,
+        String(item.fixture.id),
+        elapsed,
+        finished ? "انتهت" : liveStatusAr,
+        eventsJson,
+      );
+      synced++;
     }
-
-    return syncedCount;
+    return synced;
   } catch (e) {
-    console.error("Live sync error:", e);
+    console.error("API-Football live sync error:", e);
     return 0;
   }
+}
+
+/** ترقية محلية: انطلاق الموعد داخل نافذة اللعب → جارية مع ساعة تقديرية */
+function promoteKickoffLocal(db: ReturnType<typeof getDb>): number {
+  const rows = db
+    .prepare(
+      `SELECT id, utc_date, status, minute, live_status_ar, home_goals, away_goals
+       FROM matches
+       WHERE status IN ('SCHEDULED','TIMED','IN_PLAY','PAUSED','LIVE','1H','2H','HT')
+         AND datetime(utc_date) <= datetime('now')
+         AND datetime(utc_date) >= datetime('now', '-125 minutes')
+         AND source NOT IN ('preview-holdout','synthetic','demo')`,
+    )
+    .all() as Array<{
+    id: string;
+    utc_date: string;
+    status: string;
+    minute: number | null;
+    live_status_ar: string | null;
+    home_goals: number | null;
+    away_goals: number | null;
+  }>;
+
+  let n = 0;
+  const now = Date.now();
+  for (const r of rows) {
+    const est = estimateMinuteFromKickoff(r.utc_date, now);
+    if (!est || est.period === "FT") continue;
+    // لا تستبدل دقيقة مصدر حقيقي أحدث إن وُجدت
+    if (r.minute != null && r.live_status_ar && r.status === "IN_PLAY") continue;
+    applyLiveUpdate(db, r.id, {
+      status: "IN_PLAY",
+      homeGoals: r.home_goals ?? 0,
+      awayGoals: r.away_goals ?? 0,
+      minute: r.minute ?? est.minute,
+      liveStatusAr: r.live_status_ar || est.liveStatusAr,
+      eventsJson: null,
+    });
+    n++;
+  }
+  return n;
+}
+
+/** إنهاء مباريات خرجت من نافذة اللعب — تنتقل بعدها إلى سجل التوقعات */
+function finalizeStaleLive(db: ReturnType<typeof getDb>): number {
+  const result = db
+    .prepare(
+      `UPDATE matches SET
+         status = 'FINISHED',
+         live_status_ar = 'انتهت',
+         minute = COALESCE(minute, 90),
+         home_goals = COALESCE(home_goals, 0),
+         away_goals = COALESCE(away_goals, 0)
+       WHERE status IN ('IN_PLAY','PAUSED','LIVE','1H','2H','HT','ET','P','BREAK')
+         AND datetime(utc_date) < datetime('now', '-115 minutes')`,
+    )
+    .run();
+  return result.changes;
+}
+
+/** قفل لقطة التوقع عند الصافرة النهائية (للسجل) إن وُجد توقع حيّ */
+function lockSnapshotsForFinished(db: ReturnType<typeof getDb>): void {
+  try {
+    db.prepare(
+      `INSERT INTO prediction_snapshots (
+         id, match_id, league_id, utc_date,
+         p_home, p_draw, p_away, p_btts_yes, p_over25,
+         lambda_home, lambda_away, elo_home, elo_away,
+         confidence, model_version, snapshot_at
+       )
+       SELECT
+         lower(hex(randomblob(16))),
+         m.id, m.league_id, m.utc_date,
+         p.p_home, p.p_draw, p.p_away,
+         COALESCE(p.p_btts_yes, 0), COALESCE(p.p_over25, 0),
+         COALESCE(p.lambda_home, 0), COALESCE(p.lambda_away, 0),
+         p.elo_home, p.elo_away,
+         COALESCE(p.confidence, 0),
+         COALESCE(p.model_version, 'ensemble-v3'),
+         datetime('now')
+       FROM matches m
+       JOIN predictions p ON p.match_id = m.id
+       WHERE m.status = 'FINISHED'
+         AND datetime(m.utc_date) >= datetime('now', '-8 hours')
+         AND NOT EXISTS (
+           SELECT 1 FROM prediction_snapshots ps WHERE ps.match_id = m.id
+         )`,
+    ).run();
+  } catch (e) {
+    console.error("lockSnapshotsForFinished:", e);
+  }
+}
+
+export async function syncRealLiveMatches(): Promise<number> {
+  loadEnvIfNeeded();
+  const now = Date.now();
+  if (now - lastSyncTimestamp < SYNC_THROTTLE_MS) return 0;
+  lastSyncTimestamp = now;
+
+  const db = getDb();
+  let total = 0;
+
+  // 1) FotMob — مجاني ويعمل حتى عند استنفاد API-Football
+  try {
+    total += await syncFromFotmob(db);
+  } catch (e) {
+    console.error("FotMob live sync error:", e);
+  }
+
+  // 2) API-Football إن بقي رصيد
+  try {
+    total += await syncFromApiFootball(db);
+  } catch (e) {
+    console.error("API-Football live sync error:", e);
+  }
+
+  // 3) ترقية محلية لأي مباراة انطلقت ولم تصلها تغذية بعد
+  total += promoteKickoffLocal(db);
+  // 4) إنهاء المنتهية → تظهر في سجل التوقعات
+  total += finalizeStaleLive(db);
+  lockSnapshotsForFinished(db);
+
+  return total;
 }

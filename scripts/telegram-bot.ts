@@ -59,13 +59,15 @@ function parseUtcDate(utcDateStr: string): Date {
 
 function formatMatchTimeBaghdad(utcDateStr: string): string {
   const d = parseUtcDate(utcDateStr);
-  if (isNaN(d.getTime())) return "١٥:٠٠";
+  if (isNaN(d.getTime())) return "15:00";
+  // تاريخ فقط من المصدر (منتصف الليل UTC) — لا نخترع ساعة
+  if (/T00:00:00(\.0+)?Z?$/i.test(utcDateStr.trim())) return "—";
 
-  return new Intl.DateTimeFormat("ar-EG", {
-    timeZone: "Asia/Riyadh",
-    hour: "numeric",
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Baghdad",
+    hour: "2-digit",
     minute: "2-digit",
-    hour12: true,
+    hourCycle: "h23",
   }).format(d);
 }
 

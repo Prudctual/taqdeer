@@ -22,6 +22,7 @@ LEAGUE_TOURNAMENTS: Dict[str, int] = {
     "ppd": 238,
     "ded": 37,
     "tur1": 52,
+    "no1": 20,  # Eliteserien
 }
 
 _last_req = 0.0

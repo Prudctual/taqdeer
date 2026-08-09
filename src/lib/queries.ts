@@ -762,7 +762,7 @@ export const getLeagues = cache(function getLeagues() {
   const db = getDb();
   const validIds = LEAGUES.map((l) => l.id);
   const placeholders = validIds.map(() => "?").join(",");
-  return db
+  const rows = db
     .prepare(
       `SELECT l.*,
         (
@@ -773,8 +773,7 @@ export const getLeagues = cache(function getLeagues() {
           LIMIT 1
         ) AS crest_url
        FROM leagues l
-       WHERE l.id IN (${placeholders})
-       ORDER BY l.name_ar`,
+       WHERE l.id IN (${placeholders})`,
     )
     .all(...validIds) as Array<{
     id: string;
@@ -784,7 +783,108 @@ export const getLeagues = cache(function getLeagues() {
     country_ar: string;
     crest_url: string | null;
   }>;
+  // حافظ على ترتيب LEAGUES المعرّف (إنجلترا→…→النرويج) بدل ترتيب أبجدي عشوائي
+  const order = new Map(validIds.map((id, i) => [id, i]));
+  return rows.sort((a, b) => (order.get(a.id) ?? 99) - (order.get(b.id) ?? 99));
 });
+
+export type LeagueOverview = {
+  id: string;
+  code: string;
+  name_ar: string;
+  name_en: string;
+  country_ar: string;
+  crest_url: string | null;
+  season: string;
+  teams: number;
+  finished: number;
+  upcoming: number;
+  live: number;
+  leaderNameAr: string | null;
+  leaderNameEn: string | null;
+  leaderPts: number | null;
+  leaderPlayed: number | null;
+  top3: Array<{
+    position: number;
+    team_id: string;
+    name_ar: string;
+    name_en: string;
+    points: number;
+    played: number;
+    crest_url: string | null;
+  }>;
+  seasonStarted: boolean;
+};
+
+/** نظرة موسمية كاملة لكل دوري — للصفحة الرئيسية /leagues */
+export const getLeaguesOverview = cache(function getLeaguesOverview(): LeagueOverview[] {
+  const current = String(latestSeasonStartYear());
+  return getLeagues().map((l) => {
+    const seasons = getAvailableSeasons(l.id);
+    // الموسم الجاري إن وُجدت له مباريات/ترتيب، وإلا أحدث موسم فيه ترتيب
+    let season = current;
+    const curStandings = getStandings(l.id, current);
+    const curCounts = getLeagueMatchCountsForSeason(l.id, current);
+    if (curStandings.length === 0 && curCounts.finished + curCounts.scheduled === 0) {
+      season =
+        seasons.find((s) => getStandings(l.id, s).length > 0) ||
+        seasons[0] ||
+        current;
+    }
+    const standings = getStandings(l.id, season);
+    const counts = getLeagueMatchCountsForSeason(l.id, season);
+    const leader = standings[0] ?? null;
+    return {
+      id: l.id,
+      code: l.code,
+      name_ar: l.name_ar,
+      name_en: l.name_en,
+      country_ar: l.country_ar,
+      crest_url: l.crest_url,
+      season,
+      teams: standings.length,
+      finished: counts.finished,
+      upcoming: counts.scheduled,
+      live: counts.live,
+      leaderNameAr: leader?.name_ar ?? null,
+      leaderNameEn: leader?.name_en ?? null,
+      leaderPts: leader?.points ?? null,
+      leaderPlayed: leader?.played ?? null,
+      top3: standings.slice(0, 3).map((r) => ({
+        position: r.position,
+        team_id: r.team_id,
+        name_ar: r.name_ar,
+        name_en: r.name_en,
+        points: r.points,
+        played: r.played,
+        crest_url: r.crest_url,
+      })),
+      seasonStarted: counts.finished > 0,
+    };
+  });
+});
+
+function getLeagueMatchCountsForSeason(leagueId: string, season: string) {
+  const db = getDb();
+  const row = db
+    .prepare(
+      `SELECT
+         SUM(status IN ('SCHEDULED','TIMED')) AS scheduled,
+         SUM(status = 'FINISHED') AS finished,
+         SUM(status IN ('IN_PLAY','PAUSED','LIVE')) AS live
+       FROM matches WHERE league_id = ? AND season = ?`,
+    )
+    .get(leagueId, season) as {
+    scheduled: number | null;
+    finished: number | null;
+    live: number | null;
+  };
+  return {
+    scheduled: row.scheduled ?? 0,
+    finished: row.finished ?? 0,
+    live: row.live ?? 0,
+  };
+}
 
 /**
  * فرق بلا أي نتيجة في القاعدة (صاعدة جديدة): تقديرها من الأولويات وحدها،
@@ -884,6 +984,94 @@ export function getMeta(key: string): string | null {
     return null;
   }
 }
+
+export type DoubleChanceMatch = {
+  id: string;
+  leagueId: string;
+  leagueNameAr: string;
+  homeNameAr: string;
+  awayNameAr: string;
+  homeNameEn: string;
+  awayNameEn: string;
+  homeCrestUrl: string | null;
+  awayCrestUrl: string | null;
+  utcDate: string;
+  status: string;
+  pHome: number;
+  pDraw: number;
+  pAway: number;
+  confidence: number | null;
+};
+
+/** مباريات قادمة بتوقعات جاهزة — لصفحة الفرصة المزدوجة */
+export const getDoubleChanceMatches = cache(function getDoubleChanceMatches(
+  daysAhead = 14,
+): DoubleChanceMatch[] {
+  try {
+    const db = getDb();
+    const days = Math.min(30, Math.max(1, Math.floor(daysAhead)));
+    const rows = db
+      .prepare(
+        `
+      SELECT m.id, m.league_id, l.name_ar AS league_name_ar,
+             ht.name_ar AS home_name_ar, at.name_ar AS away_name_ar,
+             ht.name_en AS home_name_en, at.name_en AS away_name_en,
+             ht.crest_url AS home_crest, at.crest_url AS away_crest,
+             m.utc_date, m.status,
+             p.p_home, p.p_draw, p.p_away, p.confidence
+      FROM predictions p
+      JOIN matches m ON m.id = p.match_id
+      JOIN leagues l ON l.id = m.league_id
+      JOIN teams ht ON ht.id = m.home_team_id
+      JOIN teams at ON at.id = m.away_team_id
+      WHERE substr(m.utc_date, 1, 19) >= strftime('%Y-%m-%dT%H:%M:%S', 'now', '-3 hours')
+        AND substr(m.utc_date, 1, 19) <= strftime('%Y-%m-%dT%H:%M:%S', 'now', '+${days} days')
+        AND m.status IN ('SCHEDULED', 'TIMED', 'IN_PLAY', 'PAUSED')
+        AND p.p_home IS NOT NULL AND p.p_draw IS NOT NULL AND p.p_away IS NOT NULL
+      ORDER BY m.utc_date ASC
+      LIMIT 200
+    `,
+      )
+      .all() as Array<{
+      id: string;
+      league_id: string;
+      league_name_ar: string;
+      home_name_ar: string;
+      away_name_ar: string;
+      home_name_en: string;
+      away_name_en: string;
+      home_crest: string | null;
+      away_crest: string | null;
+      utc_date: string;
+      status: string;
+      p_home: number;
+      p_draw: number;
+      p_away: number;
+      confidence: number | null;
+    }>;
+
+    return rows.map((r) => ({
+      id: r.id,
+      leagueId: r.league_id,
+      leagueNameAr: r.league_name_ar,
+      homeNameAr: r.home_name_ar,
+      awayNameAr: r.away_name_ar,
+      homeNameEn: r.home_name_en,
+      awayNameEn: r.away_name_en,
+      homeCrestUrl: r.home_crest,
+      awayCrestUrl: r.away_crest,
+      utcDate: r.utc_date,
+      status: r.status,
+      pHome: r.p_home,
+      pDraw: r.p_draw,
+      pAway: r.p_away,
+      confidence: r.confidence,
+    }));
+  } catch (e) {
+    console.error("getDoubleChanceMatches:", e);
+    return [];
+  }
+});
 
 export const getValueMatches = cache(function getValueMatches(): Array<{
   id: string;
@@ -1290,8 +1478,15 @@ export type FinishedPredictionItem = MatchCard & {
   isSnapshotLocked?: boolean;
 };
 
+/** بداية سجل التوقعات الجديد (تقويم بغداد) — لا نُرجع أرشيف ما قبل إعادة التشغيل */
+export const PREDICTION_ARCHIVE_FROM = "2026-08-07";
+
 export const getFinishedPredictionsHistory = cache(
-  (leagueId?: string, limit = 200): FinishedPredictionItem[] => {
+  (
+    leagueId?: string,
+    limit = 200,
+    opts?: { fromDate?: string; allowSeasonFallback?: boolean },
+  ): FinishedPredictionItem[] => {
     try {
       const db = getDb();
       const sql = `
@@ -1315,14 +1510,14 @@ export const getFinishedPredictionsHistory = cache(
         JOIN teams th ON th.id = m.home_team_id
         JOIN teams ta ON ta.id = m.away_team_id
         LEFT JOIN predictions p
-          ON p.match_id = m.id AND p.model_version != 'live-v1'
+          ON p.match_id = m.id AND COALESCE(p.model_version, '') != 'live-v1'
         LEFT JOIN prediction_snapshots ps
-          ON ps.match_id = m.id AND ps.model_version != 'live-v1'
+          ON ps.match_id = m.id AND COALESCE(ps.model_version, '') != 'live-v1'
         WHERE m.status = 'FINISHED'
-          AND m.utc_date >= ?
+          AND date(m.utc_date, '+3 hours') >= date(?)
           AND (p.p_home IS NOT NULL OR ps.p_home IS NOT NULL)
+          AND m.source NOT IN ('preview-holdout','synthetic','demo')
       `;
-      // الموسم الجاري؛ إن لم تُسجَّل نتائج بعد نرجع لموسم سابق لملء الأرشيف
       const run = (from: string) => {
         const params: (string | number)[] = [from];
         let q = sql;
@@ -1335,8 +1530,9 @@ export const getFinishedPredictionsHistory = cache(
         return db.prepare(q).all(...params) as (MatchCard & { isSnapshotLocked: number })[];
       };
 
-      let rows = run(`${latestSeasonStartYear()}-08-01`);
-      if (rows.length === 0) {
+      const fromDate = opts?.fromDate ?? `${latestSeasonStartYear()}-08-01`;
+      let rows = run(fromDate);
+      if (rows.length === 0 && opts?.allowSeasonFallback !== false && !opts?.fromDate) {
         rows = run(`${latestSeasonStartYear() - 1}-08-01`);
       }
 

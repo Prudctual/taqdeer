@@ -18,7 +18,8 @@ export const metadata: Metadata = {
     "مقاييس الدقة وBrier وRPS لنماذج تقدير على شريحة walk-forward — مقارنة شفافة مع خط السوق.",
 };
 
-export const revalidate = 300;
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 /** شرح المقاييس بلغة عادية — لا رياضيات إلا عند الحاجة */
 const GLOSSARY: { term: string; body: string }[] = [
@@ -105,7 +106,7 @@ export default function AccuracyPage() {
         {/* Hero Header Banner */}
         <div className="rounded-2xl border border-line bg-panel p-6 sm:p-8 space-y-4 shadow-2xs mt-2">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-home font-black text-xs">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-home font-semibold text-xs">
               سجل المعايرة واختبار النماذج
             </span>
 
@@ -129,7 +130,7 @@ export default function AccuracyPage() {
           </div>
 
           <div className="space-y-2">
-            <h1 className="text-2xl sm:text-4xl font-black text-ink tracking-tight leading-tight">
+            <h1 className="text-2xl sm:text-4xl font-semibold text-ink tracking-tight leading-tight">
               دقة النموذج وسجل الاختبار المباشر
             </h1>
             <p className="text-xs sm:text-sm font-semibold text-muted leading-relaxed max-w-3xl">
@@ -215,17 +216,17 @@ export default function AccuracyPage() {
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 p-4 sm:p-5">
                 <div className="rounded-xl border border-line bg-panel p-3.5 space-y-1">
                   <span className="text-xs font-bold text-muted">إجمالي الرهانات</span>
-                  <div className="text-xl font-black text-ink font-mono tabular">{vb.total.n_bets}</div>
+                  <div className="text-xl font-semibold text-ink font-mono tabular">{vb.total.n_bets}</div>
                 </div>
 
                 <div className="rounded-xl border border-line bg-panel p-3.5 space-y-1">
                   <span className="text-xs font-bold text-muted">نسبة النجاح</span>
-                  <div className="text-xl font-black text-ink font-mono tabular">{pct(vb.total.hits / vb.total.n_bets, 0)}</div>
+                  <div className="text-xl font-semibold text-ink font-mono tabular">{pct(vb.total.hits / vb.total.n_bets, 0)}</div>
                 </div>
 
                 <div className="rounded-xl border border-line bg-panel p-3.5 space-y-1">
                   <span className="text-xs font-bold text-muted">عائد الاستثمار (ROI)</span>
-                  <div className={`text-xl font-black font-mono tabular ${vb.total.pnl >= 0 ? "text-success" : "text-danger"}`}>
+                  <div className={`text-xl font-semibold font-mono tabular ${vb.total.pnl >= 0 ? "text-success" : "text-danger"}`}>
                     {vb.total.pnl >= 0 ? "+" : ""}
                     {((vb.total.pnl / vb.total.staked) * 100).toFixed(1)}%
                   </div>
@@ -233,7 +234,7 @@ export default function AccuracyPage() {
 
                 <div className="rounded-xl border border-line bg-panel p-3.5 space-y-1">
                   <span className="text-xs font-bold text-muted">الصافي الإجمالي</span>
-                  <div className={`text-xl font-black font-mono tabular ${vb.total.pnl >= 0 ? "text-success" : "text-danger"}`}>
+                  <div className={`text-xl font-semibold font-mono tabular ${vb.total.pnl >= 0 ? "text-success" : "text-danger"}`}>
                     {vb.total.pnl >= 0 ? "+" : ""}
                     {vb.total.pnl.toFixed(2)} وحدة
                   </div>
@@ -288,11 +289,11 @@ export default function AccuracyPage() {
                     return (
                       <Fragment key={m.id}>
                         <tr className="hover:bg-panel/50 transition-colors">
-                          <td className="py-3.5 px-4 font-black text-ink">
+                          <td className="py-3.5 px-4 font-semibold text-ink">
                             <div className="flex items-center gap-2">
                               <span>{name}</span>
                               {isBest && (
-                                <span className="bg-home text-on-fill font-extrabold text-[10px] px-2 py-0.5 rounded-full shadow-xs">
+                                <span className="bg-home text-on-fill font-semibold text-[10px] px-2 py-0.5 rounded-full shadow-xs">
                                   الأعلى دقة
                                 </span>
                               )}
@@ -302,7 +303,7 @@ export default function AccuracyPage() {
                           <td className="py-3.5 px-3 text-center font-mono font-bold text-ink tabular">{m.n_matches}</td>
                           <td className="py-3.5 px-3">
                             <div className="flex items-center gap-2.5">
-                              <span className={`w-12 shrink-0 font-mono font-black ${isBest ? "text-home" : "text-ink"}`}>
+                              <span className={`w-12 shrink-0 font-mono font-semibold ${isBest ? "text-home" : "text-ink"}`}>
                                 {pct(m.accuracy, 1)}
                               </span>
                               <div className="h-2 w-20 rounded-full bg-panel overflow-hidden border border-line">
@@ -348,7 +349,7 @@ export default function AccuracyPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 sm:p-5">
               {GLOSSARY.map((g) => (
                 <div key={g.term} className="rounded-xl border border-line bg-panel p-4 space-y-1.5">
-                  <span className="font-black text-ink text-sm sm:text-base block">{g.term}</span>
+                  <span className="font-semibold text-ink text-sm sm:text-base block">{g.term}</span>
                   <p className="text-xs font-semibold text-muted leading-relaxed">{g.body}</p>
                 </div>
               ))}
@@ -367,14 +368,14 @@ export default function AccuracyPage() {
 
           {/* تفسير النسبة الطبيعية */}
           <div className="rounded-2xl border border-blue-500/30 bg-blue-500/10 p-5 sm:p-6 space-y-2">
-            <h3 className="font-black text-home text-base">لماذا تُعتبر دقة 47٪ رقم طبيعي وقوي في كرة القدم؟</h3>
+            <h3 className="font-semibold text-home text-base">لماذا تُعتبر دقة 47٪ رقم طبيعي وقوي في كرة القدم؟</h3>
             <div className="text-xs sm:text-sm font-semibold text-ink leading-relaxed space-y-2">
               <p>
                 في رياضة يتنافس فيها طرفان على 3 نتائج محتملة (فوز، تعادل، خسارة)، فإن التوقع العشوائي يصيب نحو 33٪ فقط. ترجيح المضيف في كافة المباريات لا يتجاوز 44٪.
               </p>
               <p>
                 لذلك تستقر معظم النماذج الرياضية في نطاق 45–55٪. الفارق الحقيقي بين النماذج لا يكمن فقط في عدد المباريات المصابة بل في صدق احتمالات Brier وLog-loss. لمزيد من التفاصيل المعمقة،{" "}
-                <Link href="/methodology" className="font-black text-accent underline">
+                <Link href="/methodology" className="font-semibold text-accent underline">
                   إطلع على المنهجية الحسابية
                 </Link>.
               </p>

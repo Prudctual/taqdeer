@@ -5,6 +5,9 @@ import { getArticleBySlug, getArticles } from "@/lib/queries";
 import { BookOpen, Clock, Sparkles, ArrowRight, Calendar } from "lucide-react";
 import { ReactNode } from "react";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 interface ArticlePageProps {
   params: Promise<{ slug: string }>;
 }
@@ -51,7 +54,7 @@ function renderMarkdownBlocks(text: string): ReactNode[] {
       blocks.push(
         <h2
           key={idx}
-          className="text-2xl sm:text-3xl font-black text-ink mt-8 mb-4 border-e-4 border-accent pe-3"
+          className="text-2xl sm:text-3xl font-semibold text-ink mt-8 mb-4 border-e-4 border-accent pe-3"
         >
           {trimmed.replace(/^#\s+/, "")}
         </h2>,

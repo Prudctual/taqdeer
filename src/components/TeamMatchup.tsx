@@ -45,7 +45,7 @@ export function TeamMatchup({
           />
           <div className="min-w-0">
             <span className="text-xs font-bold text-home block">المضيف</span>
-            <span className="text-base sm:text-xl font-black text-ink group-hover:text-accent transition-colors block truncate">
+            <span className="text-base sm:text-xl font-semibold text-ink group-hover:text-accent transition-colors block truncate">
               {homeName}
             </span>
           </div>
@@ -55,7 +55,7 @@ export function TeamMatchup({
         <div className="flex flex-col items-center justify-center shrink-0 px-3">
           {score ? (
             <span
-              className={`text-2xl sm:text-4xl font-mono font-black tabular ${
+              className={`text-2xl sm:text-4xl font-mono font-semibold tabular ${
                 isLive
                   ? "text-live"
                   : "text-ink"
@@ -64,7 +64,7 @@ export function TeamMatchup({
               {score}
             </span>
           ) : (
-            <span className="text-xs font-black text-on-fill bg-accent px-3 py-1 rounded-full">
+            <span className="text-xs font-semibold text-on-fill bg-accent px-3 py-1 rounded-full">
               {placeholder}
             </span>
           )}
@@ -83,7 +83,7 @@ export function TeamMatchup({
         >
           <div className="min-w-0">
             <span className="text-xs font-bold text-away block">الضيف</span>
-            <span className="text-base sm:text-xl font-black text-ink group-hover:text-accent transition-colors block truncate">
+            <span className="text-base sm:text-xl font-semibold text-ink group-hover:text-accent transition-colors block truncate">
               {awayName}
             </span>
           </div>
@@ -120,19 +120,19 @@ export function TeamNamesInline({
       {/* Home Team - Pushed close to VS badge in center */}
       <div className="flex items-center gap-1.5 min-w-0 justify-end">
         <Crest src={homeCrestUrl} alt={homeName} size="chip" fallback={crestInitials(homeName)} tone="home" />
-        <span className="truncate text-ink font-black">{homeName}</span>
+        <span className="truncate text-ink font-semibold">{homeName}</span>
       </div>
 
       {/* VS / Score Badge - Exactly Centered Column */}
       <div className="w-13 shrink-0 text-center flex items-center justify-center mx-auto">
-        <span className="inline-flex items-center justify-center px-1.5 py-0.5 rounded-md bg-panel border border-line font-mono font-black text-xs text-ink tabular min-w-[2.75rem]">
+        <span className="inline-flex items-center justify-center px-1.5 py-0.5 rounded-md bg-panel border border-line font-mono font-semibold text-xs text-ink tabular min-w-[2.75rem]">
           {score || placeholder}
         </span>
       </div>
 
       {/* Away Team - Pushed close to VS badge in center */}
       <div className="flex items-center gap-1.5 min-w-0 justify-start">
-        <span className="truncate text-ink font-black">{awayName}</span>
+        <span className="truncate text-ink font-semibold">{awayName}</span>
         <Crest src={awayCrestUrl} alt={awayName} size="chip" fallback={crestInitials(awayName)} tone="away" />
       </div>
     </div>

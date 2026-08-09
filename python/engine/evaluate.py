@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import math
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 
 def brier_score(probs: List[Tuple[float, float, float]], outcomes: List[str]) -> float:
@@ -53,3 +53,55 @@ def summarize(
         "log_loss": log_loss(probs, outcomes),
         "rps": rps(probs, outcomes),
     }
+
+
+def summarize_with_closing(
+    probs: List[Tuple[float, float, float]],
+    outcomes: List[str],
+    close_odds: List[Optional[Tuple[float, float, float]]],
+) -> Dict[str, float]:
+    """مقاييس walk-forward + مقارنة NLL بخط الإغلاق."""
+    from .sharp_market import log_loss_vs_closing
+
+    base = summarize(probs, outcomes)
+    cl = log_loss_vs_closing(probs, close_odds, outcomes)
+    base["close_n"] = cl["n"]
+    base["close_nll"] = cl["close_nll"]
+    base["model_nll_close"] = cl["model_nll"]
+    base["nll_edge_vs_close"] = cl["nll_edge"]
+    return base
+
+
+def binary_log_loss(probs: List[float], labels: List[int]) -> float:
+    total = 0.0
+    for p, y in zip(probs, labels):
+        pp = min(max(float(p), 1e-12), 1.0 - 1e-12)
+        total -= y * math.log(pp) + (1 - y) * math.log(1.0 - pp)
+    return total / max(len(probs), 1)
+
+
+def fit_binary_temperature(
+    probs: List[float], labels: List[int], bounds=(0.5, 4.0)
+) -> float:
+    """حرارة لوغاريتمية بسيطة لأسواق ثنائية (O2.5 / BTTS)."""
+    if len(probs) < 40:
+        return 1.0
+    from scipy.optimize import minimize_scalar
+
+    def nll(t: float) -> float:
+        scaled = []
+        for p in probs:
+            # map p through temperature on logit
+            pp = min(max(float(p), 1e-9), 1.0 - 1e-9)
+            logit = math.log(pp / (1.0 - pp)) / max(t, 1e-3)
+            scaled.append(1.0 / (1.0 + math.exp(-logit)))
+        return binary_log_loss(scaled, labels)
+
+    res = minimize_scalar(nll, bounds=bounds, method="bounded")
+    return float(res.x) if res.success else 1.0
+
+
+def apply_binary_temperature(p: float, temperature: float) -> float:
+    pp = min(max(float(p), 1e-9), 1.0 - 1e-9)
+    logit = math.log(pp / (1.0 - pp)) / max(float(temperature), 1e-3)
+    return float(1.0 / (1.0 + math.exp(-logit)))

@@ -1,9 +1,18 @@
-"""فحص ذاتي كامل لمنطق v3 ومكونات المحرك الرياضي — يفشل بصوت عالٍ إن انكسر المنطق."""
+"""فحص ذاتي كامل لمنطق v4 ومكونات المحرك الرياضي — يفشل بصوت عالٍ إن انكسر المنطق."""
 
 import numpy as np
 from .dixon_coles import DixonColesResult, MatchObs, fit_dixon_coles, score_matrix, tau_vec
 from .elo import EloMatch, update_elo
-from .ensemble import DEFAULT_WEIGHTS, align_matrix_to_probs, blend_components, fit_weights, predict_match, value_signal
+from .ensemble import (
+    DEFAULT_WEIGHTS,
+    FORM_BLEND_WEIGHT,
+    align_matrix_to_probs,
+    blend_components,
+    fit_weights,
+    lock_form_weight,
+    predict_match,
+    value_signal,
+)
 from .evaluate import rps, summarize
 from .form import (
     FormMatch,
@@ -17,11 +26,20 @@ from .logistics_engine import evaluate_logistics_and_external_factors
 from .pi_ratings import PiMatch, update_pi
 from .player_impact import apply_absence_penalties, apply_rapm_to_xg
 from .referee_engine import evaluate_referee_impact
-from .sharp_market import detect_steam, steam_confidence_bonus
+from .sharp_market import (
+    closing_line_value,
+    detect_steam,
+    pick_market_odds,
+    steam_confidence_bonus,
+)
 from .strengths_weaknesses import analyze_team_strengths_weaknesses
 from .tactical_matchup import LAMBDA_MULT_HI, LAMBDA_MULT_LO, evaluate_tactical_matchup
 from .weather_engine import apply_weather_to_lambdas, weather_goal_multiplier
-from .xg_engine import compute_advanced_metrics
+from .xg_engine import compute_advanced_metrics, prefer_true_xg
+from .elo import elo_home_adv_from_profile, log_home_adv_to_elo
+from .form import apply_congestion, congestion_lambda_mult
+from .evaluate import apply_binary_temperature, fit_binary_temperature
+from .player_impact import xi_delta_impact
 
 
 def main() -> None:
@@ -82,6 +100,12 @@ def main() -> None:
         outs.append(o)
     w = fit_weights(comps, outs)
     assert abs(sum(w.values()) - 1.0) < 1e-9
+    assert abs(w["form"] - FORM_BLEND_WEIGHT) < 1e-9, w
+    assert abs(DEFAULT_WEIGHTS["form"] - FORM_BLEND_WEIGHT) < 1e-9
+    locked = lock_form_weight({"dc": 0.5, "pi": 0.1, "elo": 0.1, "form": 0.05, "market": 0.1, "context": 0.05})
+    assert abs(locked["form"] - FORM_BLEND_WEIGHT) < 1e-9
+    assert abs(sum(locked.values()) - 1.0) < 1e-9
+    # مع فورم مقفول؛ الكتلة المتعلَّمة على DC يجب أن ترتفع فوق الافتراضي داخل الـ80٪
     assert w["dc"] > DEFAULT_WEIGHTS["dc"], w
 
     # 4. كيلي والإشارات المجدية
@@ -249,7 +273,59 @@ def main() -> None:
     # Enrich / fit share the same repredict meta key name
     assert "enrich_repredict_matches" == "enrich_repredict_matches"
 
-    print("selftest ok — all mathematical engine components verified cleanly!")
+    # 15. true xG preference + sharp/CLV + congestion + HA profile
+    assert prefer_true_xg(1.7, 1.1) == 1.7
+    assert prefer_true_xg(None, 1.1) == 1.1
+    odds, src = pick_market_odds(sharp=(1.9, 3.5, 4.2), current=(2.0, 3.4, 3.8))
+    assert src == "sharp" and odds[0] == 1.9
+    clv = closing_line_value((0.55, 0.25, 0.20), close_odds=(2.0, 3.5, 4.0), side="home")
+    assert clv["applied"]
+    assert congestion_lambda_mult(3) < 1.0
+    lh, mu = apply_congestion(1.0, 1.0, home_matches_7d=3, away_matches_7d=1)
+    assert lh < 1.0 and mu == 1.0
+    assert elo_home_adv_from_profile(0.22) >= 45
+    assert log_home_adv_to_elo(0.29) > log_home_adv_to_elo(0.18)
+    assert 0.4 < apply_binary_temperature(0.55, 1.2) < 0.7
+    assert fit_binary_temperature([0.6] * 50, [1] * 25 + [0] * 25) > 0.5
+
+    # 16. XI delta: missing star vs weak bench raises attack delta
+    xi = xi_delta_impact(
+        confirmed_starters=[{"name": "A", "position": "F"}],
+        missing=[{"player_name": "Star", "position": "F", "status": "out", "strength": 1.35}],
+        bench=[{"name": "Bench", "position": "F", "strength": 0.8}],
+    )
+    assert xi["applied"] and xi["attack_delta"] > 0
+
+    # 17. predict_match with true-xg DC parallel + early season + sharp
+    full2 = predict_match(
+        home="teamA",
+        away="teamB",
+        dc=dc_model,
+        elo_home=1550.0,
+        elo_away=1480.0,
+        pi=pi_state,
+        form_home=avg,
+        form_away=leaky,
+        market_odds=(1.95, 3.40, 4.10),
+        sharp_odds=(1.90, 3.50, 4.20),
+        close_odds=(1.85, 3.60, 4.40),
+        temperature=1.0,
+        dc_shots=dc_model,
+        dc_true_xg=dc_model,
+        days_into_season=20.0,
+        home_matches_7d=3.0,
+        home_missing=[{"player_name": "Star FW", "position": "F", "status": "injured", "strength": 1.3}],
+        lineup_confirmed=True,
+        home_xi=[{"name": "Other", "position": "M"}],
+        home_bench=[{"name": "Bench", "position": "F", "strength": 0.85}],
+        home_strength={"star fw": 1.3},
+    )
+    assert full2["components"]["true_xg_dc"] is not None
+    assert full2["components"]["market"]["source"] == "sharp"
+    assert full2["components"]["early_season"] is True
+    assert full2["clv"]["applied"]
+
+    print("selftest ok — ensemble-v4 mathematical engine verified cleanly!")
 
 
 if __name__ == "__main__":

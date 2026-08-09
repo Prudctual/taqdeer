@@ -93,7 +93,7 @@ export function MatchRow({
       className={`match-row ${
         showLeague ? "league-row" : ""
       } grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-2 px-4 py-2.5 text-ink no-underline sm:gap-y-0 ${rowGrid} ${
-        isLive ? "bg-live-dim border-e-4 border-e-live" : ""
+        isLive ? "bg-live-dim" : ""
       }`}
     >
       {/* ١ · الموعد */}

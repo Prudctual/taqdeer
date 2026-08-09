@@ -161,7 +161,7 @@ export function MatchTabContainer({
                 <div className="flex items-center gap-3 min-w-0">
                   <div className="flex flex-col gap-0.5 min-w-0">
                     <div className="flex items-center gap-2.5">
-                      <h2 className="text-sm sm:text-base font-black text-ink tracking-tight truncate group-hover:text-accent transition-colors">
+                      <h2 className="text-sm sm:text-base font-semibold text-ink tracking-tight truncate group-hover:text-accent transition-colors">
                         {section.title}
                       </h2>
                       <span className="hidden sm:inline-block rounded-md bg-panel px-2 py-0.5 text-[11px] font-bold text-muted border border-line">

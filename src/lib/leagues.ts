@@ -83,6 +83,14 @@ export const LEAGUES: LeagueDef[] = [
     fdOrgCode: "TR1",
     fdUkCode: "T1",
   },
+  {
+    id: "no1",
+    code: "NO1",
+    nameAr: "الدوري النرويجي",
+    nameEn: "Eliteserien",
+    countryAr: "النرويج",
+    fdOrgCode: "NO1",
+  },
 ];
 
 export function leagueByCode(code: string) {
@@ -111,6 +119,7 @@ const LEAGUE_EMBLEM_MAP: Record<string, string> = {
   DED: "https://crests.football-data.org/ED.png",
   TR1: "https://flagcdn.com/w40/tr.png",
   TUR1: "https://flagcdn.com/w40/tr.png",
+  NO1: "https://flagcdn.com/w40/no.png",
   UEL: "https://crests.football-data.org/EL.png",
   UCL: "https://crests.football-data.org/CL.png",
 };

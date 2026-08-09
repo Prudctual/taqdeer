@@ -7,41 +7,28 @@ import {
   formatMatchTime,
   formatRelativeDay,
   formatShortDate,
+  hasKnownKickoffTime,
 } from "@/lib/format";
+import { LiveMatchClock } from "@/components/LiveMatchClock";
 
 type Variant = "row" | "inline" | "detail";
 
 /**
  * ساعة العميل — تُقرأ بعد التركيب فقط.
  * الخادم وأول رسم في المتصفح يتفقان على null، فلا ينحرف الترطيب.
- * الوقت المطلق يبقى في HTML من الخادم؛ التسميات النسبية تُضاف بعد التركيب.
+ * الوقت المطلق يبقى في HTML من الخادم بتوقيت العرض الثابت (بغداد).
  */
-function useClientNow(tick: boolean): Date | null {
+function useClientNow(tick: boolean, intervalMs = 60_000): Date | null {
   const [now, setNow] = useState<Date | null>(null);
 
   useEffect(() => {
     setNow(new Date());
     if (!tick) return;
-    const id = window.setInterval(() => setNow(new Date()), 60_000);
+    const id = window.setInterval(() => setNow(new Date()), intervalMs);
     return () => window.clearInterval(id);
-  }, [tick]);
+  }, [tick, intervalMs]);
 
   return now;
-}
-
-function useClientTz(): string | undefined {
-  const [tz, setTz] = useState<string | undefined>(undefined);
-
-  useEffect(() => {
-    try {
-      const userTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      if (userTz) setTz(userTz);
-    } catch {
-      // fallback to default DISPLAY_TZ
-    }
-  }, []);
-
-  return tz;
 }
 
 /**
@@ -73,38 +60,62 @@ export function MatchWhen({
   hideRelative?: boolean;
   className?: string;
 }) {
-  /** هل ينتظر السطر عدّاً تنازلياً؟ يُحجز مكانه مسبقاً فلا يقفز السطر */
-  const live = showCountdown && !finished && !isLive && !awaiting;
-  const now = useClientNow(live);
-  const clientTz = useClientTz();
+  /** عدّ تنازلي قبل الانطلاق */
+  const preKick = showCountdown && !finished && !isLive && !awaiting;
+  const now = useClientNow(preKick, 60_000);
 
-  // مطلق — مشتق من التاريخ وحده بتوقيت جهاز القارئ
-  const time = formatMatchTime(iso, clientTz);
-  const shortDate = formatShortDate(iso, clientTz);
-  const longDate = formatLongDate(iso, clientTz);
+  // مطلق — دائماً بتوقيت العرض المعلن (بغداد)، بلا تبديل لمنطقة المتصفح
+  const knownTime = hasKnownKickoffTime(iso);
+  const time = formatMatchTime(iso);
+  const shortDate = formatShortDate(iso);
+  const longDate = formatLongDate(iso);
 
-  // نسبي — مشتق من الساعة، بعد التركيب فقط
+  // نسبي — مشتق من الساعة، بعد التركيب فقط (نفس تقويم منطقة العرض)
   const relative = now && !hideRelative ? formatRelativeDay(iso, now) : null;
-  const countdown = live && now ? formatCountdown(iso, now) : null;
+  const countdown = preKick && knownTime && now ? formatCountdown(iso, now) : null;
 
   if (isLive) {
-    const liveText = liveStatusAr || (liveMinute ? `د ${liveMinute}'` : "مباشر الآن");
     if (variant === "row") {
       return (
-        <div className={`min-w-0 tabular ${className}`}>
-          <span className="live-badge">
-            <span className="live-badge-dot live-pulse-dot" />
-            <span>{liveText}</span>
-          </span>
+        <LiveMatchClock
+          utcDate={iso}
+          liveMinute={liveMinute}
+          liveStatusAr={liveStatusAr}
+          size="row"
+          className={className}
+        />
+      );
+    }
+    if (variant === "detail") {
+      return (
+        <div className={`min-w-0 space-y-1 ${className}`}>
+          <LiveMatchClock
+            utcDate={iso}
+            liveMinute={liveMinute}
+            liveStatusAr={liveStatusAr}
+            size="hero"
+          />
+          <p className="text-[11px] font-semibold text-muted">
+            <time dateTime={iso}>{longDate}</time>
+            {knownTime ? (
+              <>
+                <span className="mx-1.5 text-faint">·</span>
+                <span className="tabular">{time}</span>
+              </>
+            ) : null}
+          </p>
         </div>
       );
     }
-
     return (
-      <span className={`live-badge ${className}`}>
-        <span className="live-badge-dot live-pulse-dot" />
-        <span>مباشر · {liveText}</span>
-      </span>
+      <LiveMatchClock
+        utcDate={iso}
+        liveMinute={liveMinute}
+        liveStatusAr={liveStatusAr}
+        size="chip"
+        showPeriod={false}
+        className={className}
+      />
     );
   }
 
@@ -112,7 +123,7 @@ export function MatchWhen({
     if (variant === "row") {
       return (
         <div className={`min-w-0 tabular ${className}`}>
-          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-panel border border-line text-muted font-extrabold text-[11px]">
+          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-panel border border-line text-muted font-semibold text-[11px]">
             {finished ? "انتهت" : "بانتظار النتيجة"}
           </span>
           {!hideRelative ? (
@@ -138,7 +149,7 @@ export function MatchWhen({
           suppressHydrationWarning
           className="block text-[13px] font-semibold leading-none text-ink"
         >
-          {time}
+          {knownTime ? time : shortDate}
         </time>
         {!hideRelative ? (
           <div
@@ -147,10 +158,10 @@ export function MatchWhen({
               relative ? "text-accent" : "text-faint"
             }`}
           >
-            {relative ?? shortDate}
+            {knownTime ? (relative ?? shortDate) : (relative ?? "يوم المباراة")}
           </div>
         ) : null}
-        {live ? (
+        {preKick && knownTime ? (
           <div
             suppressHydrationWarning
             className="mt-1.5 min-h-[0.6875rem] truncate text-[11px] leading-none text-faint"
@@ -170,12 +181,18 @@ export function MatchWhen({
           <time dateTime={iso} suppressHydrationWarning>
             {longDate}
           </time>
-          <span className="mx-1.5 text-faint" aria-hidden>
-            ·
-          </span>
-          <span className="tabular" suppressHydrationWarning>
-            {time}
-          </span>
+          {knownTime ? (
+            <>
+              <span className="mx-1.5 text-faint" aria-hidden>
+                ·
+              </span>
+              <span className="tabular" suppressHydrationWarning>
+                {time}
+              </span>
+            </>
+          ) : (
+            <span className="ms-1.5 text-xs font-semibold text-muted">· التوقيت غير مؤكد</span>
+          )}
         </p>
         <p
           suppressHydrationWarning
@@ -204,10 +221,14 @@ export function MatchWhen({
       ) : (
         <time dateTime={iso}>{longDate}</time>
       )}
-      <span className="mx-1.5 text-faint" aria-hidden>
-        ·
-      </span>
-      <span className="font-medium text-ink">{time}</span>
+      {knownTime ? (
+        <>
+          <span className="mx-1.5 text-faint" aria-hidden>
+            ·
+          </span>
+          <span className="font-medium text-ink">{time}</span>
+        </>
+      ) : null}
     </span>
   );
 }

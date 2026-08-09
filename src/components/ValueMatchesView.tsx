@@ -30,6 +30,7 @@ const LEAGUES_CONFIG = [
   { id: "ppd", name: "الدوري البرتغالي", icon: "🇵🇹" },
   { id: "ded", name: "الدوري الهولندي", icon: "🇳🇱" },
   { id: "tur1", name: "الدوري التركي", icon: "🇹🇷" },
+  { id: "no1", name: "الدوري النرويجي", icon: "🇳🇴" },
 ];
 
 export function ValueMatchesView({ matches }: { matches: ValueMatchItem[] }) {
@@ -79,7 +80,7 @@ export function ValueMatchesView({ matches }: { matches: ValueMatchItem[] }) {
     <div className="space-y-4">
       {matches.length === 0 ? (
         <div className="rounded-2xl border border-line bg-surface p-8 text-center space-y-2">
-          <h2 className="text-sm font-black text-ink">لا توجد فرص قيمة حالياً</h2>
+          <h2 className="text-sm font-semibold text-ink">لا توجد فرص قيمة حالياً</h2>
           <p className="text-xs text-muted max-w-lg mx-auto leading-relaxed">
             عند ظهور انحراف إيجابي بين احتمال النموذج وأسعار السوق ستظهر الفرص هنا تلقائياً.
           </p>
@@ -89,7 +90,7 @@ export function ValueMatchesView({ matches }: { matches: ValueMatchItem[] }) {
       {/* 1. Hero Header & Overview Metrics */}
       <div className="rounded-2xl border border-success/30 bg-panel p-4 sm:p-5 space-y-4 shadow-2xs">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-success-dim border border-success/25 text-success font-black text-[11px]">
+          <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-success-dim border border-success/25 text-success font-semibold text-[11px]">
             تحليل فرص القيمة والسيولة (+EV)
           </span>
 
@@ -99,11 +100,11 @@ export function ValueMatchesView({ matches }: { matches: ValueMatchItem[] }) {
         </div>
 
         <div className="space-y-1">
-          <h1 className="text-xl sm:text-3xl font-black text-ink tracking-tight leading-tight">
+          <h1 className="text-xl sm:text-3xl font-semibold text-ink tracking-tight leading-tight">
             المباريات ذات القيمة (+EV Value Bets)
           </h1>
           <p className="text-xs font-semibold text-muted leading-relaxed max-w-3xl">
-            يستعرض هذا القسم جميع المباريات المجدولة التي يُظهر فيها نموذج التحليل انحرافاً إيجابياً ومزايا رياضية (+EV ≥ 3%) مقارنة بأسعار إغلاق سوق المراهنين، مع حساب حصة رهان كيلي الربع الموصى بها.
+            يستعرض هذا القسم المباريات المجدولة ذات انحراف إيجابي بين احتمال النموذج وأسعار السوق (+EV بين 3٪ و40٪ خلال الأسابيع الثلاثة القادمة)، مع حصة كيلي الربع الموصى بها. القيم الأعلى من ذلك غالباً أودز قديمة فتُستبعد.
           </p>
         </div>
 
@@ -112,19 +113,19 @@ export function ValueMatchesView({ matches }: { matches: ValueMatchItem[] }) {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-2.5 border-t border-line">
             <div className="rounded-xl border border-line bg-surface p-2.5 space-y-0.5">
               <span className="text-[10px] font-bold text-muted block">عدد الفرص المتاحة</span>
-              <span className="text-xl font-black text-success font-mono tabular">{matches.length}</span>
+              <span className="text-xl font-semibold text-success font-mono tabular">{matches.length}</span>
             </div>
             <div className="rounded-xl border border-line bg-surface p-2.5 space-y-0.5">
               <span className="text-[10px] font-bold text-muted block">أعلى عائد (+EV)</span>
-              <span className="text-xl font-black text-home font-mono tabular">+{(maxEv * 100).toFixed(1)}%</span>
+              <span className="text-xl font-semibold text-home font-mono tabular">+{(maxEv * 100).toFixed(1)}%</span>
             </div>
             <div className="rounded-xl border border-line bg-surface p-2.5 space-y-0.5">
               <span className="text-[10px] font-bold text-muted block">متوسط الفائدة</span>
-              <span className="text-xl font-black text-purple-600 dark:text-purple-400 font-mono tabular">+{(avgEv * 100).toFixed(1)}%</span>
+              <span className="text-xl font-semibold text-purple-600 dark:text-purple-400 font-mono tabular">+{(avgEv * 100).toFixed(1)}%</span>
             </div>
             <div className="rounded-xl border border-line bg-surface p-2.5 space-y-0.5">
               <span className="text-[10px] font-bold text-muted block">مخاطرة المحفظة</span>
-              <span className="text-xs font-black text-ink block pt-1">تحفّظ منضبط</span>
+              <span className="text-xs font-semibold text-ink block pt-1">تحفّظ منضبط</span>
             </div>
           </div>
         )}
@@ -133,7 +134,7 @@ export function ValueMatchesView({ matches }: { matches: ValueMatchItem[] }) {
       {/* 2. League Tabs Navigation Bar */}
       <div className="space-y-2.5">
         <div className="flex items-center justify-between gap-2 px-1">
-          <h2 className="text-xs sm:text-sm font-black text-ink flex items-center gap-1.5">
+          <h2 className="text-xs sm:text-sm font-semibold text-ink flex items-center gap-1.5">
             <span>🏆</span>
             <span>تصنيف القيمة حسب الدوري</span>
           </h2>
@@ -156,14 +157,14 @@ export function ValueMatchesView({ matches }: { matches: ValueMatchItem[] }) {
                   onClick={() => setSelectedLeague(league.id)}
                   className={`shrink-0 press-scale flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap ${
                     isActive
-                      ? "bg-surface text-ink border border-success/60 shadow-2xs font-black ring-1 ring-success/30"
+                      ? "bg-surface text-ink border border-success/60 shadow-2xs font-semibold ring-1 ring-success/30"
                       : "text-muted hover:text-ink hover:bg-surface/50 border border-transparent"
                   }`}
                 >
                   <span className="text-xs shrink-0">{league.icon}</span>
                   <span className="shrink-0">{league.name}</span>
                   <span
-                    className={`shrink-0 px-1.5 py-0.2 rounded-full text-[9px] font-mono font-black ${
+                    className={`shrink-0 px-1.5 py-0.2 rounded-full text-[9px] font-mono font-semibold ${
                       isActive
                         ? "bg-success text-on-fill"
                         : "bg-surface border border-line text-muted"
@@ -190,7 +191,7 @@ export function ValueMatchesView({ matches }: { matches: ValueMatchItem[] }) {
             <button
               type="button"
               onClick={() => setSearchQuery("")}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-muted hover:text-ink"
+              className="absolute start-3 top-1/2 -translate-y-1/2 text-xs font-bold text-muted hover:text-ink"
             >
               ✕ إلغاء
             </button>
@@ -202,7 +203,7 @@ export function ValueMatchesView({ matches }: { matches: ValueMatchItem[] }) {
       {filteredMatches.length === 0 ? (
         <div className="rounded-2xl border border-line bg-surface p-8 text-center space-y-2 shadow-2xs">
           <span className="text-2xl block">🔍</span>
-          <h3 className="text-xs font-black text-ink">لا توجد مواجهات مطابقة للفلتر المحدد</h3>
+          <h3 className="text-xs font-semibold text-ink">لا توجد مواجهات مطابقة للفلتر المحدد</h3>
           <p className="text-[11px] text-muted max-w-md mx-auto">
             جرّب اختيار تبويب دوري آخر أو إعادة ضبط نص البحث لاستعراض كافة فرص القيمة.
           </p>
@@ -220,7 +221,14 @@ export function ValueMatchesView({ matches }: { matches: ValueMatchItem[] }) {
       ) : (
         <div className="grid grid-cols-1 gap-3">
           {filteredMatches.map((m) => {
-            const analytics = m.analytics_json ? JSON.parse(m.analytics_json) : null;
+            let analytics: { value?: { side?: string; odds?: number; ev?: number; stake?: number } } | null = null;
+            if (m.analytics_json) {
+              try {
+                analytics = JSON.parse(m.analytics_json);
+              } catch {
+                analytics = null;
+              }
+            }
             const val = analytics?.value;
             const sideLabel =
               val?.side === "home"
@@ -244,7 +252,7 @@ export function ValueMatchesView({ matches }: { matches: ValueMatchItem[] }) {
                 {/* Card Top Pill & Date */}
                 <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line pb-2.5">
                   <div className="flex items-center gap-2">
-                    <span className="px-2.5 py-0.5 rounded-md bg-success-dim text-success font-black text-[11px]">
+                    <span className="px-2.5 py-0.5 rounded-md bg-success-dim text-success font-semibold text-[11px]">
                       {m.league_name_ar}
                     </span>
                     <span className="text-[11px] font-bold text-muted">
@@ -254,7 +262,7 @@ export function ValueMatchesView({ matches }: { matches: ValueMatchItem[] }) {
 
                   <Link
                     href={`/match/${encodeURIComponent(m.id)}`}
-                    className="press-scale inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-panel border border-line hover:border-success text-ink hover:text-success dark:hover:text-success font-black text-xs no-underline transition-all shadow-2xs"
+                    className="press-scale inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-panel border border-line hover:border-success text-ink hover:text-success dark:hover:text-success font-semibold text-xs no-underline transition-all shadow-2xs"
                   >
                     <span>تحليل المباراة</span>
                     <span>←</span>
@@ -265,7 +273,7 @@ export function ValueMatchesView({ matches }: { matches: ValueMatchItem[] }) {
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
                   {/* Teams & Probabilities */}
                   <div className="space-y-1">
-                    <h3 className="text-sm sm:text-base font-black text-ink tracking-tight">
+                    <h3 className="text-sm sm:text-base font-semibold text-ink tracking-tight">
                       {m.home_name_ar} <span className="text-muted font-normal me-1 ms-1">ضد</span> {m.away_name_ar}
                     </h3>
                     <div className="flex items-center gap-1.5 text-[11px] font-semibold text-muted">
@@ -283,22 +291,22 @@ export function ValueMatchesView({ matches }: { matches: ValueMatchItem[] }) {
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs shrink-0">
                       <div className="rounded-lg border border-line bg-panel p-2 text-center space-y-0.5 shadow-2xs min-w-[5rem]">
                         <span className="text-[9px] font-bold text-muted block">الجانب المرشح</span>
-                        <div className={`font-black truncate text-xs ${sideTextColor}`}>{sideLabel}</div>
+                        <div className={`font-semibold truncate text-xs ${sideTextColor}`}>{sideLabel}</div>
                       </div>
 
                       <div className="rounded-lg border border-line bg-panel p-2 text-center space-y-0.5 shadow-2xs min-w-[4.5rem]">
                         <span className="text-[9px] font-bold text-muted block">السعر المتاح</span>
-                        <div className="font-mono font-black text-ink text-xs tabular">{val.odds}</div>
+                        <div className="font-mono font-semibold text-ink text-xs tabular">{val.odds}</div>
                       </div>
 
                       <div className="rounded-lg border border-success/30 bg-success-dim p-2 text-center space-y-0.5 shadow-2xs min-w-[5rem]">
                         <span className="text-[9px] font-bold text-success block">الفائدة (+EV)</span>
-                        <div className="font-mono font-black text-success text-xs tabular">+{(val.ev * 100).toFixed(1)}%</div>
+                        <div className="font-mono font-semibold text-success text-xs tabular">+{((val.ev ?? 0) * 100).toFixed(1)}%</div>
                       </div>
 
                       <div className="rounded-lg border border-line bg-panel p-2 text-center space-y-0.5 shadow-2xs min-w-[4.5rem]">
                         <span className="text-[9px] font-bold text-muted block">رهان كيلي الربع</span>
-                        <div className="font-mono font-black text-ink text-xs tabular">{(val.stake * 100).toFixed(1)}%</div>
+                        <div className="font-mono font-semibold text-ink text-xs tabular">{((val.stake ?? 0) * 100).toFixed(1)}%</div>
                       </div>
                     </div>
                   )}

@@ -33,6 +33,16 @@ export function SiteSidebar() {
       ),
     },
     {
+      href: "/double-chance",
+      label: "الفرصة المزدوجة",
+      active: pathname.startsWith("/double-chance"),
+      icon: (
+        <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M8 7h8M8 12h8M8 17h5M5 7v10a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2z" />
+        </svg>
+      ),
+    },
+    {
       href: "/leagues",
       label: "الدوريات والجدول",
       active: pathname.startsWith("/leagues"),
@@ -109,11 +119,11 @@ export function SiteSidebar() {
       {/* Brand Header */}
       <div className="sidebar-brand">
         <Link href="/" className="flex items-center gap-3 no-underline group">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent font-black text-sm text-on-fill group-hover:scale-105 active:scale-95 transition-transform duration-150 shadow-xs">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent font-semibold text-sm text-on-fill group-hover:scale-105 active:scale-95 transition-transform duration-150 shadow-xs">
             ت
           </div>
           <div className="flex flex-col">
-            <span className="font-black text-[0.9375rem] tracking-tight text-ink leading-tight">تقدير</span>
+            <span className="font-semibold text-[0.9375rem] tracking-tight text-ink leading-tight">تقدير</span>
             <span className="text-[10px] font-bold text-muted leading-tight">تحليلات متقدمة</span>
           </div>
         </Link>
@@ -128,7 +138,7 @@ export function SiteSidebar() {
             href={item.href}
             className={`sidebar-link flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-bold transition-colors ${
               item.active
-                ? "bg-accent/10 text-accent font-black"
+                ? "bg-accent/10 text-accent font-semibold"
                 : "text-muted hover:bg-panel hover:text-ink"
             }`}
           >
@@ -161,7 +171,7 @@ export function SiteSidebar() {
           onClick={toggleAdvancedMode}
           className={`sidebar-btn w-full flex items-center justify-between px-3 py-2 rounded-xl border text-xs font-bold transition-colors cursor-pointer ${
             isAdvancedMode
-              ? "border-accent/30 bg-accent/10 text-accent font-black"
+              ? "border-accent/30 bg-accent/10 text-accent font-semibold"
               : "border-line bg-surface text-muted hover:bg-panel hover:text-ink"
           }`}
         >
@@ -190,7 +200,7 @@ export function SiteSidebar() {
               </>
             ) : (
               <>
-                <svg className="h-4 w-4 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <svg className="h-4 w-4 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
                 </svg>
                 <span>النمط الداكن</span>

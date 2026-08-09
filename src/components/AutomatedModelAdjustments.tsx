@@ -20,8 +20,10 @@ type EnrichSignals = {
   player_impact?: {
     applied?: boolean;
     summary?: string | null;
-    home?: { n?: number };
-    away?: { n?: number };
+    delta_lambda_home?: number;
+    delta_lambda_away?: number;
+    home?: { n?: number; notables?: Array<{ name?: string }> };
+    away?: { n?: number; notables?: Array<{ name?: string }> };
   } | null;
   referee?: {
     applied?: boolean;
@@ -34,6 +36,12 @@ type EnrichSignals = {
     summary?: string | null;
     side?: string | null;
     magnitude?: number;
+    market_source?: string | null;
+  } | null;
+  clv?: {
+    applied?: boolean;
+    summary?: string | null;
+    clv_points?: number;
   } | null;
 };
 
@@ -69,6 +77,14 @@ export function AutomatedModelAdjustments({
   const players = enrich?.player_impact;
   const referee = enrich?.referee;
   const sharp = enrich?.sharp;
+  const clv = enrich?.clv;
+
+  const playerImpact =
+    players?.delta_lambda_home != null || players?.delta_lambda_away != null
+      ? `Δλ ${Number(players.delta_lambda_home ?? 0).toFixed(3)} / ${Number(players.delta_lambda_away ?? 0).toFixed(3)}`
+      : players?.applied
+        ? "خصم غياب موزون بالقوة على λ"
+        : "غير مفعّل";
 
   const adjustments: AdjustmentItem[] = [
     {
@@ -86,10 +102,10 @@ export function AutomatedModelAdjustments({
       Icon: ZapIcon,
       label: "مزج أسعار السوق",
       value: hasMarketOdds
-        ? "أودز حقيقية مُزجت بعد إزالة هامش المراهن"
+        ? "تفضيل الخط الحاد (Pinnacle/PS) عند التوفر بعد إزالة الهامش"
         : "لا أودز سوق — التوقع من المحركات الإحصائية فقط",
-      impact: hasMarketOdds ? "وزن مُتعلَّم" : "غير مفعّل",
-      detail: "عند توفر الأسعار تُحوَّل لاحتمالات نقية وتدخل المزيج.",
+      impact: hasMarketOdds ? "وزن مُتعلَّم · sharp أولاً" : "غير مفعّل",
+      detail: "عند توفر الأسعار الحادة تُفضَّل على متوسط الكتب الناعمة في مكوّن السوق.",
       positive: !!hasMarketOdds,
     },
     {
@@ -113,8 +129,9 @@ export function AutomatedModelAdjustments({
       value: players?.summary
         ? players.summary
         : `لا غيابات مسجّلة · ${awayTeam} / ${homeTeam}`,
-      impact: players?.applied ? "خصم غياب بالمركز على λ" : "غير مفعّل",
-      detail: "مصدر FotMob — خصم تقريبي حسب المركز، ليس تقييم RAPM لاعبين.",
+      impact: playerImpact,
+      detail:
+        "مصدر FotMob — خصم بالمركز × قوة اللاعب، مع XI delta عند تأكيد التشكيلة.",
       positive: !!players?.applied,
     },
     {
@@ -136,17 +153,28 @@ export function AutomatedModelAdjustments({
       detail: "من تغيّر الاحتمال الضمني بين أودز الافتتاح والحالي — بلا اختراع EV.",
       positive: !!sharp?.applied,
     },
+    {
+      Icon: ZapIcon,
+      label: "قيمة خط الإغلاق (CLV)",
+      value: clv?.summary ?? "يُحسب بعد تثبيت خط الإغلاق للمباراة المنتهية",
+      impact:
+        clv?.applied && clv.clv_points != null
+          ? `${(Number(clv.clv_points) * 100).toFixed(1)} نقطة`
+          : "غير مفعّل",
+      detail: "فرق احتمال النموذج العادل مقابل احتمال الإغلاق الحاد — مقياس صدق الـedge.",
+      positive: !!clv?.applied && (clv.clv_points ?? 0) > 0,
+    },
   ];
 
   return (
     <div className="bg-surface p-6 sm:p-8 space-y-6 rounded-2xl border-0 shadow-none">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line pb-4">
         <div className="flex items-center gap-3">
-          <h3 className="text-base font-black text-ink tracking-tight leading-snug">
+          <h3 className="text-base font-semibold text-ink tracking-tight leading-snug">
             المحركات والإثراء الحي
           </h3>
         </div>
-        <span className="text-xs font-black text-accent bg-accent-dim px-4 py-1.5 rounded-full border-0">
+        <span className="text-xs font-semibold text-accent bg-accent-dim px-4 py-1.5 rounded-full border-0">
           بيانات حقيقية فقط
         </span>
       </div>
@@ -166,12 +194,12 @@ export function AutomatedModelAdjustments({
             >
               <div className="space-y-3">
                 <div className="flex items-start justify-between gap-3">
-                  <span className="text-sm font-black text-ink flex items-center gap-2.5 leading-snug">
+                  <span className="text-sm font-semibold text-ink flex items-center gap-2.5 leading-snug">
                     <IconComp className="h-4 w-4 shrink-0 text-accent" />
                     {adj.label}
                   </span>
                   <span
-                    className={`text-[10px] font-black px-2 py-1 rounded-full whitespace-nowrap ${
+                    className={`text-[10px] font-semibold px-2 py-1 rounded-full whitespace-nowrap ${
                       isNeutral
                         ? "bg-panel text-muted"
                         : adj.positive

@@ -16,7 +16,7 @@ class LeagueProfile:
     turf_teams: list[str]      # Teams with artificial pitch advantage
     noise_factor: float        # Calibration temperature scale default
     elo_weight_mult: float     # Relative importance of Elo / historical strength
-    form_weight_mult: float    # Relative importance of recent 5-match form
+    form_weight_mult: float    # حِدّة إشارة الفورم (logistic steepness) — لا حصة المزيج (ثابتة 20٪)
 
 
 LEAGUE_PROFILES: Dict[str, LeagueProfile] = {
@@ -115,6 +115,18 @@ LEAGUE_PROFILES: Dict[str, LeagueProfile] = {
         noise_factor=1.10,
         elo_weight_mult=1.05,
         form_weight_mult=1.15,
+    ),
+    # 🇳🇴 Eliteserien (Norway) — موسم تقويمي، أهداف أعلى نسبياً
+    "no1": LeagueProfile(
+        league_id="no1",
+        name_ar="الدوري النرويجي",
+        home_advantage=0.23,
+        draw_baseline=0.22,
+        avg_match_goals=3.05,
+        turf_teams=[],
+        noise_factor=1.08,
+        elo_weight_mult=1.05,
+        form_weight_mult=1.12,
     ),
 }
 

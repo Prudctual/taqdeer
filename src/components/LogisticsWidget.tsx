@@ -42,19 +42,19 @@ export function LogisticsWidget({
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
         <div className="rounded-2xl border border-blue-500/30 bg-surface overflow-hidden shadow-2xs">
           <div className="bg-blue-500/10 border-b border-blue-500/20 px-3.5 py-2">
-            <span className="text-xs font-black text-home">الملعب</span>
+            <span className="text-xs font-semibold text-home">الملعب</span>
           </div>
           <div className="p-3.5 space-y-1 text-start">
-            <div className="text-sm font-black text-ink truncate">{info.stadiumName}</div>
+            <div className="text-sm font-semibold text-ink truncate">{info.stadiumName}</div>
           </div>
         </div>
 
         <div className="rounded-2xl border border-accent/30 bg-surface overflow-hidden shadow-2xs">
           <div className="bg-accent-dim border-b border-accent/25 px-3.5 py-2">
-            <span className="text-xs font-black text-accent">الحكم</span>
+            <span className="text-xs font-semibold text-accent">الحكم</span>
           </div>
           <div className="p-3.5 space-y-1 text-start">
-            <div className="text-sm font-black text-ink truncate">
+            <div className="text-sm font-semibold text-ink truncate">
               {info.refereeName ?? "لم يُعلن بعد"}
             </div>
             {refereeSummary ? (
@@ -67,12 +67,12 @@ export function LogisticsWidget({
 
         <div className="rounded-2xl border border-sky-500/30 bg-surface overflow-hidden shadow-2xs">
           <div className="bg-sky-500/10 border-b border-sky-500/20 px-3.5 py-2">
-            <span className="text-xs font-black text-sky-600 dark:text-sky-400">الطقس</span>
+            <span className="text-xs font-semibold text-sky-600 dark:text-sky-400">الطقس</span>
           </div>
           <div className="p-3.5 space-y-1 text-start">
             {weather?.summary || weather?.tempC != null ? (
               <>
-                <div className="text-sm font-black text-ink">
+                <div className="text-sm font-semibold text-ink">
                   {weather.summary ??
                     `${weather.tempC?.toFixed?.(0) ?? weather.tempC}°C`}
                 </div>
@@ -90,11 +90,11 @@ export function LogisticsWidget({
 
         <div className="rounded-2xl border border-success/30 bg-surface overflow-hidden shadow-2xs">
           <div className="bg-success-dim border-b border-success/25 px-3.5 py-2">
-            <span className="text-xs font-black text-success">الراحة</span>
+            <span className="text-xs font-semibold text-success">الراحة</span>
           </div>
           <div className="p-3.5 space-y-1 text-start">
             {logistics?.rest_days_home != null || logistics?.rest_days_away != null ? (
-              <div className="text-xs font-black text-ink space-y-0.5">
+              <div className="text-xs font-semibold text-ink space-y-0.5">
                 {logistics?.rest_days_home != null && (
                   <p>
                     مضيف:{" "}

@@ -563,6 +563,8 @@ function ingestCsv(
       home_team_id, away_team_id, home_goals, away_goals, source, external_id,
       odds_home, odds_draw, odds_away,
       odds_open_home, odds_open_draw, odds_open_away,
+      odds_sharp_home, odds_sharp_draw, odds_sharp_away,
+      odds_close_home, odds_close_draw, odds_close_away,
       shots_home, shots_away, sot_home, sot_away,
       fouls_home, fouls_away, corners_home, corners_away,
       referee_name, yellow_home, yellow_away, red_home, red_away
@@ -571,6 +573,8 @@ function ingestCsv(
       @home_team_id, @away_team_id, @home_goals, @away_goals, @source, @external_id,
       @odds_home, @odds_draw, @odds_away,
       @odds_open_home, @odds_open_draw, @odds_open_away,
+      @odds_sharp_home, @odds_sharp_draw, @odds_sharp_away,
+      @odds_close_home, @odds_close_draw, @odds_close_away,
       @shots_home, @shots_away, @sot_home, @sot_away,
       @fouls_home, @fouls_away, @corners_home, @corners_away,
       @referee_name, @yellow_home, @yellow_away, @red_home, @red_away
@@ -585,6 +589,12 @@ function ingestCsv(
       odds_open_home=excluded.odds_open_home,
       odds_open_draw=excluded.odds_open_draw,
       odds_open_away=excluded.odds_open_away,
+      odds_sharp_home=COALESCE(excluded.odds_sharp_home, matches.odds_sharp_home),
+      odds_sharp_draw=COALESCE(excluded.odds_sharp_draw, matches.odds_sharp_draw),
+      odds_sharp_away=COALESCE(excluded.odds_sharp_away, matches.odds_sharp_away),
+      odds_close_home=COALESCE(excluded.odds_close_home, matches.odds_close_home),
+      odds_close_draw=COALESCE(excluded.odds_close_draw, matches.odds_close_draw),
+      odds_close_away=COALESCE(excluded.odds_close_away, matches.odds_close_away),
       shots_home=excluded.shots_home,
       shots_away=excluded.shots_away,
       sot_home=excluded.sot_home,
@@ -644,6 +654,13 @@ function ingestCsv(
         odds_open_home: num(r.PSH) ?? num(r.B365H),
         odds_open_draw: num(r.PSD) ?? num(r.B365D),
         odds_open_away: num(r.PSA) ?? num(r.B365A),
+        odds_sharp_home: num(r.PSH) ?? num(r.PPH) ?? null,
+        odds_sharp_draw: num(r.PSD) ?? num(r.PPD) ?? null,
+        odds_sharp_away: num(r.PSA) ?? num(r.PPA) ?? null,
+        // للمباريات المنتهية في CSV: خط الإغلاق ≈ آخر سعر حاد/متوسط متاح
+        odds_close_home: num(r.PSH) ?? num(r.B365H) ?? num(r.AvgH),
+        odds_close_draw: num(r.PSD) ?? num(r.B365D) ?? num(r.AvgD),
+        odds_close_away: num(r.PSA) ?? num(r.B365A) ?? num(r.AvgA),
         shots_home: num(r.HS),
         shots_away: num(r.AS),
         sot_home: num(r.HST),
@@ -675,7 +692,42 @@ const API_FOOTBALL_LEAGUE_IDS: Record<number, string> = {
   94: "ppd",
   88: "ded",
   203: "tur1",
+  103: "no1",
 };
+
+function extractBookmakerOdds(
+  bookmakers: Array<{
+    id?: number;
+    name?: string;
+    bets?: Array<{ id?: number; name?: string; values?: Array<{ value: string; odd: string }> }>;
+  }>,
+  preferNames: string[],
+): { home: number; draw: number; away: number } | null {
+  const prefer = preferNames.map((n) => n.toLowerCase());
+  const ordered = [...bookmakers].sort((a, b) => {
+    const an = (a.name || "").toLowerCase();
+    const bn = (b.name || "").toLowerCase();
+    const as = prefer.some((p) => an.includes(p)) ? 0 : 1;
+    const bs = prefer.some((p) => bn.includes(p)) ? 0 : 1;
+    return as - bs;
+  });
+  for (const bm of ordered) {
+    const name = (bm.name || "").toLowerCase();
+    if (!prefer.some((p) => name.includes(p)) && prefer.length) continue;
+    for (const bet of bm.bets ?? []) {
+      if (bet.id !== 1 && bet.name !== "Match Winner" && bet.name !== "1X2") continue;
+      const vals: Record<string, number> = {};
+      for (const v of bet.values ?? []) {
+        const n = Number(v.odd);
+        if (Number.isFinite(n) && n > 1) vals[v.value] = n;
+      }
+      if (vals.Home && vals.Draw && vals.Away) {
+        return { home: vals.Home, draw: vals.Draw, away: vals.Away };
+      }
+    }
+  }
+  return null;
+}
 
 function avgMatchWinnerOdds(
   bookmakers: Array<{
@@ -738,10 +790,25 @@ async function syncUpcomingOddsFromApiFootball(
     )
     .get() as { n: number };
 
+  // مواعيد منتصف الليل في النافذة تحتاج fixtures?date= حتى لو كانت الأودز مكتملة
+  const dateOnlyInWindow = db
+    .prepare(
+      `SELECT COUNT(*) AS n FROM matches
+       WHERE status IN ('SCHEDULED', 'TIMED')
+         AND utc_date LIKE '%T00:00:00%'
+         AND datetime(utc_date) BETWEEN datetime('now', '-1 day')
+             AND datetime('now', '+14 days')`,
+    )
+    .get() as { n: number };
+
   const last = db
     .prepare(`SELECT value FROM app_meta WHERE key = 'last_odds_api_sync'`)
     .get() as { value: string } | undefined;
-  if (last?.value && (missingInWindow?.n ?? 0) === 0) {
+  if (
+    last?.value &&
+    (missingInWindow?.n ?? 0) === 0 &&
+    (dateOnlyInWindow?.n ?? 0) === 0
+  ) {
     const ageH = (Date.now() - Date.parse(last.value)) / 3_600_000;
     if (Number.isFinite(ageH) && ageH < THROTTLE_H) {
       console.log(
@@ -809,7 +876,7 @@ async function syncUpcomingOddsFromApiFootball(
   }
 
   const findMatch = db.prepare(`
-    SELECT id, odds_home FROM matches
+    SELECT id, odds_home, utc_date FROM matches
     WHERE league_id = ? AND home_team_id = ? AND away_team_id = ?
       AND status IN ('SCHEDULED', 'TIMED', 'IN_PLAY', 'PAUSED')
       AND abs(julianday(utc_date) - julianday(?)) <= 1.5
@@ -822,15 +889,24 @@ async function syncUpcomingOddsFromApiFootball(
       odds_open_home = COALESCE(odds_open_home, @oh),
       odds_open_draw = COALESCE(odds_open_draw, @od),
       odds_open_away = COALESCE(odds_open_away, @oa),
+      odds_sharp_home = COALESCE(@sh, odds_sharp_home),
+      odds_sharp_draw = COALESCE(@sd, odds_sharp_draw),
+      odds_sharp_away = COALESCE(@sa, odds_sharp_away),
       referee_name = COALESCE(@ref, referee_name)
     WHERE id = @id
   `);
   const updRefOnly = db.prepare(`
     UPDATE matches SET referee_name = COALESCE(?, referee_name) WHERE id = ?
   `);
+  // تصحيح موعد الانطلاق من API (أدق من جداول fixturedownload المؤقتة / منتصف الليل)
+  const updKickoff = db.prepare(`
+    UPDATE matches SET utc_date = ? WHERE id = ?
+  `);
+  const isDateOnlyKickoff = (iso: string) => /T00:00:00(\.0+)?Z?$/i.test(iso.trim());
 
   let oddsUpdated = 0;
   let refsUpdated = 0;
+  let kickoffsUpdated = 0;
   let oddsCalls = 0;
 
   type ResolvedHit = FxHit & { matchId: string; hasOdds: boolean };
@@ -841,12 +917,26 @@ async function syncUpcomingOddsFromApiFootball(
     const homeId = teamId(h.leagueId, h.home);
     const awayId = teamId(h.leagueId, h.away);
     const row = findMatch.get(h.leagueId, homeId, awayId, h.date, h.date) as
-      | { id: string; odds_home: number | null }
+      | { id: string; odds_home: number | null; utc_date: string }
       | undefined;
     if (!row) continue;
     if (h.referee) {
       const r = updRefOnly.run(h.referee, row.id);
       refsUpdated += r.changes;
+    }
+    const apiMs = Date.parse(h.date);
+    if (Number.isFinite(apiMs)) {
+      const apiIso = new Date(apiMs).toISOString();
+      if (!isDateOnlyKickoff(apiIso)) {
+        const curMs = Date.parse(row.utc_date);
+        const shouldFix =
+          isDateOnlyKickoff(row.utc_date) ||
+          !Number.isFinite(curMs) ||
+          Math.abs(curMs - apiMs) > 60_000;
+        if (shouldFix) {
+          kickoffsUpdated += updKickoff.run(apiIso, row.id).changes;
+        }
+      }
     }
     resolved.push({
       ...h,
@@ -887,10 +977,18 @@ async function syncUpcomingOddsFromApiFootball(
       const books = data.response?.[0]?.bookmakers ?? [];
       const avg = avgMatchWinnerOdds(books);
       if (!avg) continue;
+      const pinnacle = extractBookmakerOdds(books as Array<{
+        id?: number;
+        name?: string;
+        bets?: Array<{ id?: number; name?: string; values?: Array<{ value: string; odd: string }> }>;
+      }>, ["pinnacle"]);
       const r = updOdds.run({
         oh: avg.home,
         od: avg.draw,
         oa: avg.away,
+        sh: pinnacle?.home ?? null,
+        sd: pinnacle?.draw ?? null,
+        sa: pinnacle?.away ?? null,
         ref: h.referee,
         id: h.matchId,
       });
@@ -910,7 +1008,7 @@ async function syncUpcomingOddsFromApiFootball(
   }
 
   console.log(
-    `  أودز API-Football: ${oddsUpdated} مباراة · حكّام ${refsUpdated} · طلبات ~${oddsCalls + DAY_WINDOW}${hit429 ? " (429)" : ""}`,
+    `  أودز API-Football: ${oddsUpdated} مباراة · مواعيد ${kickoffsUpdated} · حكّام ${refsUpdated} · طلبات ~${oddsCalls + DAY_WINDOW}${hit429 ? " (429)" : ""}`,
   );
   return oddsUpdated;
 }
@@ -959,7 +1057,10 @@ export async function syncUpcomingOdds(db: ReturnType<typeof getDb>) {
           WHEN ABS(odds_open_away - odds_away) < 1e-9
                AND ABS(odds_open_away - @book_a) >= 1e-9 THEN @book_a
           ELSE odds_open_away
-        END
+        END,
+        odds_sharp_home = COALESCE(@book_h, odds_sharp_home),
+        odds_sharp_draw = COALESCE(@book_d, odds_sharp_draw),
+        odds_sharp_away = COALESCE(@book_a, odds_sharp_away)
       WHERE id = (
         SELECT id FROM matches
         WHERE league_id = @league AND home_team_id = @home AND away_team_id = @away
@@ -1113,6 +1214,18 @@ export function recomputeStandings(db: ReturnType<typeof getDb>, leagueId: strin
       table.set(id, { played: 0, won: 0, drawn: 0, lost: 0, gf: 0, ga: 0, pts: 0 });
     return table.get(id)!;
   };
+
+  // كل الفرق المشاركة في الموسم (مجدولة أو منتهية) تظهر في الجدول حتى قبل أن تلعب
+  const seasonTeams = db
+    .prepare(
+      `SELECT DISTINCT team_id FROM (
+         SELECT home_team_id AS team_id FROM matches WHERE league_id=? AND season=?
+         UNION
+         SELECT away_team_id AS team_id FROM matches WHERE league_id=? AND season=?
+       )`,
+    )
+    .all(leagueId, season, leagueId, season) as Array<{ team_id: string }>;
+  for (const t of seasonTeams) ensure(t.team_id);
 
   for (const m of matches) {
     const h = ensure(m.home_team_id);
@@ -1386,7 +1499,16 @@ async function syncFixturesFromApi(db: ReturnType<typeof getDb>) {
   for (const league of LEAGUES) {
     if (!league.fdOrgCode) continue;
     const url = `https://api.football-data.org/v4/competitions/${league.fdOrgCode}/matches?status=SCHEDULED`;
-    const res = await fdOrgFetch(url, key);
+    let res: Response;
+    try {
+      res = await fdOrgFetch(url, key);
+    } catch (e) {
+      console.warn(
+        `  API ${league.code}: شبكة/مهلة —`,
+        e instanceof Error ? e.message : e,
+      );
+      continue;
+    }
     if (!res.ok) {
       console.warn(`  API ${league.code}: ${res.status}`);
       continue;
@@ -1456,6 +1578,18 @@ async function main() {
     return;
   }
 
+  // ثبّت خط الإغلاق للمباريات المنتهية من آخر أودز حية إن لم يُحفظ بعد
+  const freezeClose = db.prepare(`
+    UPDATE matches SET
+      odds_close_home = COALESCE(odds_close_home, odds_sharp_home, odds_home),
+      odds_close_draw = COALESCE(odds_close_draw, odds_sharp_draw, odds_draw),
+      odds_close_away = COALESCE(odds_close_away, odds_sharp_away, odds_away)
+    WHERE status = 'FINISHED'
+      AND odds_close_home IS NULL
+      AND odds_home IS NOT NULL
+  `);
+  freezeClose.run();
+
   seedLeagues(db);
   mergeAliasTeams(db);
 
@@ -1502,12 +1636,26 @@ async function main() {
   }
 
   console.log("مزامنة المباريات المجدولة…");
-  await syncFixturesFromApi(db);
+  try {
+    await syncFixturesFromApi(db);
+  } catch (e) {
+    console.warn(
+      "  تخطّي مزامنة الجداول عبر API (الشبكة/المهلة) — نتائج CSV تبقى صالحة:",
+      e instanceof Error ? e.message : e,
+    );
+  }
 
   cleanupOrphanTeams(db);
 
   console.log("مزامنة شعارات الأندية…");
-  await syncTeamCrests(db);
+  try {
+    await syncTeamCrests(db);
+  } catch (e) {
+    console.warn(
+      "  تخطّي مزامنة الشعارات:",
+      e instanceof Error ? e.message : e,
+    );
+  }
 
   db.prepare(
     `INSERT INTO app_meta (key, value) VALUES ('last_sync', ?)

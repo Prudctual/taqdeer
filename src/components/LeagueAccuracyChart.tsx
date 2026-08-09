@@ -32,7 +32,7 @@ export function LeagueAccuracyChart({
   if (data.length === 0) {
     return (
       <div className="rounded-2xl border border-line bg-panel p-5 sm:p-6 text-center space-y-1 shadow-2xs">
-        <h3 className="text-sm font-black text-ink">دقة النموذج حسب الدوري</h3>
+        <h3 className="text-sm font-semibold text-ink">دقة النموذج حسب الدوري</h3>
         <p className="text-xs font-semibold text-muted">
           لا مقاييس دقة متاحة بعد — تُحسب تلقائياً بعد اكتمال دورة التدريب القادمة.
         </p>
@@ -45,7 +45,7 @@ export function LeagueAccuracyChart({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
-            <h3 className="text-base sm:text-lg font-black text-ink">
+            <h3 className="text-base sm:text-lg font-semibold text-ink">
               دقة النموذج حسب الدوري (Walk-Forward)
             </h3>
           </div>
@@ -54,7 +54,7 @@ export function LeagueAccuracyChart({
           </p>
         </div>
 
-        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-home font-extrabold text-xs">
+        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-home font-semibold text-xs">
           <span>دقة النموذج الأعلى أفضل</span>
         </div>
       </div>
@@ -75,11 +75,11 @@ export function LeagueAccuracyChart({
           return (
             <div key={item.leagueId} className="space-y-1.5">
               <div className="flex items-center justify-between text-xs font-bold">
-                <span className="text-ink font-black flex items-center gap-2">
+                <span className="text-ink font-semibold flex items-center gap-2">
                   <span>{item.leagueNameAr}</span>
                   <span className="text-[10px] font-bold text-muted">({item.matches} مباراة)</span>
                 </span>
-                <span className="font-mono font-black text-ink tabular text-sm">
+                <span className="font-mono font-semibold text-ink tabular text-sm">
                   {pctVal}%
                 </span>
               </div>
@@ -90,7 +90,7 @@ export function LeagueAccuracyChart({
                   className={`h-full rounded-lg ${barColor} transition-all duration-500 flex items-center justify-end px-2`}
                   style={{ width: barWidth }}
                 >
-                  <span className="text-[10px] font-black text-on-fill font-mono opacity-90">
+                  <span className="text-[10px] font-semibold text-on-fill font-mono opacity-90">
                     {pctVal}%
                   </span>
                 </div>
@@ -104,7 +104,7 @@ export function LeagueAccuracyChart({
       <div className="pt-3 border-t border-line flex flex-wrap items-center justify-between text-xs text-muted font-semibold gap-2">
         <span>خط الأساس العشوائي المستهدف: 33.3% لكل نتيجة</span>
         {avgAcc != null && (
-          <span className="font-mono font-black text-ink">
+          <span className="font-mono font-semibold text-ink">
             متوسط الدقة العام: {(avgAcc * 100).toFixed(1)}%
           </span>
         )}

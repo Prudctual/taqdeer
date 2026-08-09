@@ -13,16 +13,36 @@ import {
 import type { MatchCard } from "@/lib/queries";
 
 export function EvAreaChart({ match }: { match?: MatchCard | null }) {
-  const homeName = match?.homeNameAr ?? "ريال مدريد";
-  const awayName = match?.awayNameAr ?? "برشلونة";
+  const hasOdds =
+    match != null &&
+    match.oddsHome != null &&
+    match.oddsDraw != null &&
+    match.oddsAway != null &&
+    match.pHome != null &&
+    match.pDraw != null &&
+    match.pAway != null;
 
-  const pHome = match?.pHome ?? 0.48;
-  const pDraw = match?.pDraw ?? 0.27;
-  const pAway = match?.pAway ?? 0.25;
+  if (!hasOdds) {
+    return (
+      <div className="rounded-2xl border border-line bg-panel p-5 sm:p-6 space-y-3 shadow-2xs">
+        <h3 className="text-base sm:text-lg font-semibold text-ink">
+          مقارنة القيمة المتوقعة (+EV)
+        </h3>
+        <p className="text-xs font-semibold text-muted leading-relaxed">
+          لا تتوفر أسعار سوق حقيقية لهذه المباراة — لا يمكن حساب +EV بدون أودز مسجّلة.
+        </p>
+      </div>
+    );
+  }
 
-  const oddsHome = match?.oddsHome ?? (pHome > 0 ? Number((1 / pHome).toFixed(2)) : 2.1);
-  const oddsDraw = match?.oddsDraw ?? (pDraw > 0 ? Number((1 / pDraw).toFixed(2)) : 3.5);
-  const oddsAway = match?.oddsAway ?? (pAway > 0 ? Number((1 / pAway).toFixed(2)) : 4.0);
+  const homeName = match.homeNameAr;
+  const awayName = match.awayNameAr;
+  const pHome = match.pHome!;
+  const pDraw = match.pDraw!;
+  const pAway = match.pAway!;
+  const oddsHome = match.oddsHome!;
+  const oddsDraw = match.oddsDraw!;
+  const oddsAway = match.oddsAway!;
 
   const evHome = Number(((pHome * oddsHome - 1) * 100).toFixed(1));
   const evDraw = Number(((pDraw * oddsDraw - 1) * 100).toFixed(1));
@@ -41,7 +61,7 @@ export function EvAreaChart({ match }: { match?: MatchCard | null }) {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
-            <h3 className="text-base sm:text-lg font-black text-ink">
+            <h3 className="text-base sm:text-lg font-semibold text-ink">
               مقارنة القيمة المتوقعة (+EV) لأسعار هذه المباراة
             </h3>
           </div>
@@ -50,7 +70,7 @@ export function EvAreaChart({ match }: { match?: MatchCard | null }) {
           </p>
         </div>
 
-        <div className="flex items-center gap-2 font-mono font-black text-xs">
+        <div className="flex items-center gap-2 font-mono font-semibold text-xs">
           <span className="bg-success-dim border border-success/30 text-success px-3 py-1 rounded-full">
             أعلى فائدة: {maxEv >= 0 ? `+${maxEv}% EV` : "متوازنة مع السوق"}
           </span>
@@ -88,7 +108,7 @@ export function EvAreaChart({ match }: { match?: MatchCard | null }) {
 
       <div className="pt-3 border-t border-line flex flex-wrap items-center justify-between text-xs text-muted font-semibold gap-2">
         <span>الأسعار المعروضة: {oddsHome} (مضيف) | {oddsDraw} (تعادل) | {oddsAway} (ضيف)</span>
-        <span className="font-mono font-black text-success">
+        <span className="font-mono font-semibold text-success">
           توصية كيلي: {maxEv >= 3 ? "رهان جزئي 2.5%" : "لا توجد مخاطرة"}
         </span>
       </div>

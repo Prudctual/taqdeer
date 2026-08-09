@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { LiveMatchClock, useLiveMatchClock } from "@/components/LiveMatchClock";
 import { matchDisplay } from "@/lib/match-status";
 
 interface MatchCountdownHeroProps {
@@ -37,9 +38,16 @@ export function MatchCountdownHero({
     now,
   });
 
+  const awaitingClock = useLiveMatchClock({
+    utcDate,
+    liveMinute: minute,
+    liveStatusAr,
+    active: phase === "awaiting",
+  });
+
   if (isFinished) {
     return (
-      <div className="inline-flex items-center gap-2 rounded-full bg-panel px-4 py-1.5 text-xs font-black text-ink">
+      <div className="inline-flex items-center gap-2 rounded-full bg-panel px-4 py-1.5 text-xs font-semibold text-ink">
         {score ? (
           <span>
             نتيجة منتهية:{" "}
@@ -54,31 +62,37 @@ export function MatchCountdownHero({
 
   if (isLive) {
     return (
-      <div className="live-badge px-4 py-1.5 text-xs">
-        <span>
-          جارية الآن
-          {score ? (
-            <>
-              {" · "}
-              <strong className="tabular font-bold">{score.replace("–", " - ")}</strong>
-            </>
-          ) : null}
-        </span>
+      <div className="inline-flex flex-wrap items-center gap-2">
+        <LiveMatchClock
+          utcDate={utcDate}
+          liveMinute={minute}
+          liveStatusAr={liveStatusAr}
+          size="hero"
+        />
+        {score ? (
+          <span className="inline-flex items-center rounded-full bg-panel border border-line px-3 py-1 text-xs font-semibold tabular text-ink">
+            {score.replace("–", " - ")}
+          </span>
+        ) : null}
       </div>
     );
   }
 
   if (phase === "awaiting") {
     return (
-      <div className="inline-flex items-center gap-2 rounded-full bg-warn-dim px-4 py-1.5 text-xs font-black text-warn border border-line">
-        <span>انطلقت · بانتظار النتيجة</span>
+      <div className="inline-flex items-center gap-2 rounded-full bg-warn-dim px-4 py-1.5 text-xs font-semibold text-warn border border-line">
+        <span className="live-badge-dot live-pulse-dot" />
+        <span className="font-mono tabular">
+          {awaitingClock?.display || "—"}
+        </span>
+        <span>· بانتظار التحديث الحي</span>
       </div>
     );
   }
 
   if (phase === "postponed") {
     return (
-      <div className="inline-flex items-center gap-2 rounded-full bg-panel px-4 py-1.5 text-xs font-black text-muted">
+      <div className="inline-flex items-center gap-2 rounded-full bg-panel px-4 py-1.5 text-xs font-semibold text-muted">
         مؤجّلة
       </div>
     );
@@ -86,7 +100,7 @@ export function MatchCountdownHero({
 
   if (phase === "cancelled") {
     return (
-      <div className="inline-flex items-center gap-2 rounded-full bg-panel px-4 py-1.5 text-xs font-black text-muted">
+      <div className="inline-flex items-center gap-2 rounded-full bg-panel px-4 py-1.5 text-xs font-semibold text-muted">
         ملغاة
       </div>
     );
@@ -108,14 +122,16 @@ export function MatchCountdownHero({
   return (
     <div className="inline-flex flex-wrap items-center gap-2 rounded-2xl bg-panel/80 px-4 py-2 text-xs font-bold text-ink border-0 shadow-none">
       <span className="text-muted text-[11px]">ينطلق خلال:</span>
-      <div className="flex items-center gap-1.5 font-mono text-xs tabular text-accent font-black">
+      <div className="flex items-center gap-1.5 font-mono text-xs tabular text-accent font-semibold">
         <span className="rounded-md bg-surface px-2 py-0.5">{days} يوم</span>
         <span className="text-muted">:</span>
         <span className="rounded-md bg-surface px-2 py-0.5">{hours} س</span>
         <span className="text-muted">:</span>
         <span className="rounded-md bg-surface px-2 py-0.5">{minutes} د</span>
         <span className="text-muted">:</span>
-        <span className="rounded-md bg-surface px-2 py-0.5">{seconds} ث</span>
+        <span className="rounded-md bg-surface px-2 py-0.5 transition-all duration-300">
+          {seconds} ث
+        </span>
       </div>
     </div>
   );

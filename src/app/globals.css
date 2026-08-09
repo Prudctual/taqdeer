@@ -47,10 +47,11 @@
 
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
-  --ease-apple-smooth: cubic-bezier(0.25, 1, 0.5, 1);
-  --ease-apple-spring: cubic-bezier(0.175, 0.885, 0.32, 1.1);
   --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
   --ease: cubic-bezier(0.2, 0, 0, 1);
+  /* aliases kept for existing class refs — same curve as --ease */
+  --ease-apple-smooth: var(--ease);
+  --ease-apple-spring: var(--ease);
 
   --motion-instant: 90ms;
   --motion-fast: 140ms;
@@ -134,7 +135,7 @@ body {
   font-family: var(--font-arabic), "IBM Plex Sans Arabic", system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  transition: background-color var(--motion-fast) var(--ease-apple-smooth), color var(--motion-fast) var(--ease-apple-smooth);
+  transition: background-color var(--motion-fast) var(--ease), color var(--motion-fast) var(--ease);
 }
 
 .motion-colors {
@@ -158,59 +159,60 @@ a {
   color: var(--accent);
 }
 
-/* ——— Apple Optical Typography (Dynamic Sizing, Tracking & Leading) ——— */
+/* ——— Typography — DESIGN.md scale (IBM Plex Sans Arabic 400/500/600) ——— */
 
 .tabular {
   font-variant-numeric: tabular-nums;
 }
 
 .type-display {
-  font-size: clamp(1.85rem, 3vw, 2.5rem);
-  font-weight: 800;
-  line-height: 1.15;
-  letter-spacing: -0.02em; /* Apple display text tracking */
-  font-optical-sizing: auto;
+  font-size: 1.625rem;
+  font-weight: 600;
+  line-height: 1.25;
 }
 
 .type-page {
-  font-size: clamp(1.5rem, 2.4vw, 2rem);
-  font-weight: 800;
-  line-height: 1.2;
-  letter-spacing: -0.015em;
-  font-optical-sizing: auto;
+  font-size: 1.3125rem;
+  font-weight: 600;
+  line-height: 1.3;
 }
 
 .type-section {
-  font-size: 1.15rem;
-  font-weight: 700;
-  line-height: 1.3;
-  letter-spacing: -0.01em;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  line-height: 1.35;
 }
 
 .type-label {
-  font-size: 0.75rem;
-  font-weight: 600;
+  font-size: 0.6875rem;
+  font-weight: 500;
   line-height: 1.35;
-  letter-spacing: 0.015em; /* Small text looser tracking */
   color: var(--muted);
 }
 
 .type-figure {
-  font-size: 1.75rem;
-  font-weight: 800;
-  line-height: 1.05;
+  font-size: 1.5rem;
+  font-weight: 600;
+  line-height: 1.1;
   font-variant-numeric: tabular-nums;
-  letter-spacing: -0.02em;
 }
 
-/* ——— أسطح وطبقات مادية (Flat Solid Surfaces, No Borders, No Shadows) ——— */
+@media (min-width: 640px) {
+  .type-display {
+    font-size: 1.75rem;
+  }
+  .type-page {
+    font-size: 1.4rem;
+  }
+}
+
+/* ——— Surfaces: hairline border, no decorative shadow ——— */
 
 .card {
   background: var(--surface);
-  border: 0;
-  border-radius: var(--radius, 0.875rem);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
   box-shadow: none;
-  transition: transform var(--motion-fast) var(--ease-apple-smooth), background-color var(--motion-fast);
 }
 
 .card-head {
@@ -229,43 +231,37 @@ a {
   color: var(--muted);
 }
 
-/* ——— Apple Fluid Response: Pointer-Down Direct Tactile Feedback ——— */
-
 .press-scale {
-  transition: transform 90ms var(--ease-apple-smooth),
-    background-color var(--motion-fast) var(--ease-apple-smooth);
-  will-change: transform;
-}
-
-.press-scale:hover {
-  transform: translateY(-1px);
+  transition:
+    color var(--motion-fast) var(--ease),
+    background-color var(--motion-fast) var(--ease),
+    border-color var(--motion-fast) var(--ease);
 }
 
 .press-scale:active {
-  transform: scale(0.97) translateY(0);
-  transition-duration: 60ms;
+  opacity: 0.92;
 }
 
 .card-interactive {
   background: var(--surface);
-  border: 0;
-  border-radius: var(--radius, 0.875rem);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
   box-shadow: none;
-  transition: transform var(--motion-fast) var(--ease-apple-smooth),
-    background-color var(--motion-fast);
-  will-change: transform;
+  transition:
+    background-color var(--motion-fast) var(--ease),
+    border-color var(--motion-fast) var(--ease);
 }
 
 .card-interactive:hover {
-  transform: translateY(-1.5px);
+  background: var(--panel);
+  border-color: var(--line-strong);
 }
 
 .card-interactive:active {
-  transform: scale(0.985) translateY(0);
-  transition-duration: 60ms;
+  opacity: 0.95;
 }
 
-/* ——— الرأس العلوي الفاتح/الداكن ——— */
+/* ——— الرأس العلوي ——— */
 
 .site-header {
   position: sticky;
@@ -273,8 +269,6 @@ a {
   z-index: 30;
   background: var(--surface);
   border-bottom: 1px solid var(--line);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
-  transition: box-shadow var(--motion-fast) var(--ease-apple-smooth), background-color var(--motion-fast);
 }
 
 .site-header-bar {
@@ -288,24 +282,19 @@ a {
   padding-inline: 1rem;
 }
 
-/* ——— صفوف المباريات والتفاعل السلس ——— */
+/* ——— صفوف المباريات ——— */
 
 .match-row {
-  transition: background-color var(--motion-fast) var(--ease-apple-smooth),
-    transform var(--motion-fast) var(--ease-apple-smooth),
-    box-shadow var(--motion-fast) var(--ease-apple-smooth);
-  will-change: transform;
+  transition: background-color var(--motion-fast) var(--ease);
 }
 
 .match-row:hover,
 .match-row:focus-visible {
   background: var(--panel) !important;
-  transform: translateX(-2px);
 }
 
 .match-row:active {
-  transform: scale(0.99) translateX(-1px);
-  transition-duration: 60ms;
+  background: var(--raised) !important;
 }
 
 /* سكة اليوم اللاصقة داخل القائمة */
@@ -319,12 +308,11 @@ a {
 
 .day-rail-label {
   font-size: 0.75rem;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--ink);
-  letter-spacing: 0.01em;
 }
 
-/* ——— شريط الاحتمال والمقاييس المايكروية (Animated Data Bars) ——— */
+/* ——— شريط الاحتمال ——— */
 
 .prob-track {
   display: flex;
@@ -338,7 +326,7 @@ a {
   min-width: 0;
   height: 100%;
   width: 0;
-  transition: width 260ms var(--ease-apple-smooth), opacity 200ms var(--ease-apple-smooth);
+  transition: width var(--motion-base) var(--ease), opacity var(--motion-fast) var(--ease);
 }
 
 .is-inview .prob-fill,
@@ -350,23 +338,18 @@ a {
   height: 100%;
   border-radius: 999px;
   width: 0;
-  transition: width 260ms var(--ease-apple-smooth);
+  transition: width var(--motion-base) var(--ease);
 }
 
-/* ——— أشرطة 1X2 التفاعلية المتحركة ——— */
+/* ——— أشرطة 1X2 ——— */
 
 .prob-segment {
   height: 100%;
   transform-origin: right;
   transform: scaleX(0);
-  transition: transform 260ms var(--ease-apple-smooth), filter 140ms var(--ease-apple-smooth);
+  transition: transform var(--motion-base) var(--ease);
   position: relative;
   cursor: default;
-}
-
-.prob-segment:hover {
-  filter: brightness(1.15);
-  z-index: 1;
 }
 
 .is-inview .prob-segment,
@@ -374,42 +357,38 @@ a {
   transform: scaleX(1);
 }
 
-.is-inview .prob-segment:nth-child(1) {
-  transition-delay: 0ms;
-}
-
-.is-inview .prob-segment:nth-child(2) {
-  transition-delay: 30ms;
-}
-
-.is-inview .prob-segment:nth-child(3) {
-  transition-delay: 60ms;
-}
-
-/* تلميح الشريط — tooltip origin-aware scale entry */
+/* تلميح الشريط */
 .prob-segment[data-tooltip]::after {
   content: attr(data-tooltip);
   position: absolute;
   bottom: calc(100% + 6px);
-  left: 50%;
+  inset-inline-start: 50%;
   transform: translateX(-50%) scale(0.95);
   background: var(--ink);
-  color: var(--surface);
+  color: var(--bg);
   font-size: 0.625rem;
-  font-weight: 700;
+  font-weight: 600;
   padding: 0.25rem 0.5rem;
   border-radius: 0.375rem;
   white-space: nowrap;
   pointer-events: none;
   opacity: 0;
-  transition: opacity 120ms var(--ease-apple-smooth), transform 120ms var(--ease-apple-smooth);
+  transition: opacity var(--motion-fast) var(--ease), transform var(--motion-fast) var(--ease);
   transform-origin: bottom center;
   z-index: 10;
+}
+
+[dir="rtl"] .prob-segment[data-tooltip]::after {
+  transform: translateX(50%) scale(0.95);
 }
 
 .prob-segment:hover[data-tooltip]::after {
   opacity: 1;
   transform: translateX(-50%) scale(1);
+}
+
+[dir="rtl"] .prob-segment:hover[data-tooltip]::after {
+  transform: translateX(50%) scale(1);
 }
 
 /* شارات وخانات الدوريات */
@@ -426,27 +405,32 @@ a {
   color: var(--ink);
   text-decoration: none;
   background: var(--surface) !important;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
-  transition: transform var(--motion-fast) var(--ease-apple-spring),
-    border-color var(--motion-fast) var(--ease-apple-smooth),
-    box-shadow var(--motion-fast) var(--ease-apple-smooth);
-  will-change: transform;
+  transition:
+    border-color var(--motion-fast) var(--ease),
+    background-color var(--motion-fast) var(--ease);
 }
 
 .chip-filter:hover {
   border-color: var(--accent) !important;
-  transform: scale(1.05) translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  background: var(--panel) !important;
 }
 
 .chip-filter:active {
-  transform: scale(0.95);
-  transition-duration: 60ms;
+  opacity: 0.92;
 }
 
 .chip-filter[aria-current="page"] {
   border-color: var(--accent) !important;
-  box-shadow: 0 0 0 3px var(--accent-dim);
+  background: var(--accent-dim) !important;
+}
+
+.chip-dot {
+  display: inline-block;
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 999px;
+  background: var(--league, var(--accent));
+  flex-shrink: 0;
 }
 
 /* ——— ألوان الدوريات ——— */
@@ -474,6 +458,9 @@ a {
 [data-league="tur1"] {
   --league: oklch(0.55 0.20 25);
 }
+[data-league="no1"] {
+  --league: oklch(0.55 0.14 250);
+}
 
 .league-band {
   display: flex;
@@ -483,7 +470,7 @@ a {
   padding: 0.5rem 1rem;
   background: var(--panel);
   border-bottom: 1px solid var(--line);
-  box-shadow: inset 3px 0 0 0 var(--league, transparent);
+  border-inline-start: 2px solid var(--league, transparent);
 }
 
 .league-name-chip {
@@ -512,7 +499,7 @@ a {
   padding: 0.2rem 0.45rem;
   border-radius: 0.4rem;
   font-size: 0.6875rem;
-  font-weight: 800;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
   color: var(--on-fill);
   line-height: 1.2;
@@ -524,7 +511,7 @@ a {
   padding: 0.15rem 0.4rem;
   border-radius: 0.35rem;
   font-size: 0.625rem;
-  font-weight: 800;
+  font-weight: 600;
   line-height: 1.2;
 }
 
@@ -550,7 +537,7 @@ a {
   background: var(--live-dim);
   border: 1px solid color-mix(in oklch, var(--live) 35%, transparent);
   color: var(--live);
-  font-weight: 800;
+  font-weight: 600;
   font-size: 0.6875rem;
   line-height: 1.2;
 }
@@ -563,71 +550,81 @@ a {
   flex-shrink: 0;
 }
 
-/* ——— أنميشن دخول الكروت وعناصر الواجهة — scale(0.95) start state ——— */
-
 @keyframes fadeInUp {
   from {
     opacity: 0;
-    transform: translateY(6px) scale(0.98);
   }
   to {
     opacity: 1;
-    transform: translateY(0) scale(1);
   }
 }
 
 .animate-fade-in-up {
-  animation: fadeInUp var(--motion-base) var(--ease-apple-smooth) forwards;
+  animation: fadeInUp var(--motion-base) var(--ease) forwards;
 }
 
-/* Modal entry transition */
 .modal-enter {
   opacity: 1;
-  transform: scale(1);
-  transition: opacity 160ms var(--ease-apple-smooth), transform 160ms var(--ease-apple-smooth);
+  transition: opacity var(--motion-base) var(--ease);
 
   @starting-style {
     opacity: 0;
-    transform: scale(0.95);
   }
 }
 
-/* Crossfade micro-blur bridge */
-.crossfade-blur {
-  transition: filter 160ms var(--ease-apple-smooth), opacity 160ms var(--ease-apple-smooth);
-}
-
-.crossfade-blur.is-swapping {
-  filter: blur(1.5px);
-  opacity: 0.85;
-}
-
-@keyframes pulseGlow {
-  0%, 100% {
-    opacity: 1;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 0.5;
-    transform: scale(1.15);
-  }
-}
-
+/* نقطة مباشر ثابتة — بلا نبض مستمر */
 .live-pulse-dot {
-  animation: pulseGlow 1.8s infinite var(--ease-in-out);
+  background: var(--live);
 }
 
-/* إلغاء الحركة لمستخدمي إعداد التباين وتخفيف الحركة (Apple Reduced Motion) */
+/* وجه ساعة البث — عرض ثابت العرض كاللوحات الرياضية */
+.live-clock-face {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+  min-width: 4.5ch;
+  display: inline-block;
+  text-align: center;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  *, ::before, ::after {
+  *,
+  ::before,
+  ::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
-  .press-scale:hover, .card-interactive:hover, .chip-filter:hover {
-    transform: none !important;
-  }
+}
+
+.skeleton-pulse {
+  background: var(--panel);
+}
+
+.table-clean {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+}
+
+.table-clean th {
+  text-align: start;
+  font-weight: 500;
+  font-size: 0.6875rem;
+  color: var(--muted);
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.table-clean td {
+  padding: 0.625rem 0.75rem;
+  border-bottom: 1px solid var(--line);
+  vertical-align: middle;
+}
+
+.league-row {
+  border-inline-start: 2px solid var(--league, transparent);
 }
 
 /* ═══════════════════════════════════════════════
@@ -915,35 +912,16 @@ a {
   display: none;
 }
 
-/* ——— Accordion & Interactive Animations ——— */
+/* ——— Accordion ——— */
 .accordion-wrapper {
   display: grid;
   grid-template-rows: 0fr;
-  transition: grid-template-rows 240ms var(--ease-apple-smooth);
+  transition: grid-template-rows var(--motion-base) var(--ease);
 }
 .accordion-wrapper.is-open {
   grid-template-rows: 1fr;
 }
 .accordion-content {
   overflow: hidden;
-}
-
-.meter-fill {
-  transition: width 0.5s var(--ease-apple-smooth), background-color var(--motion-fast);
-}
-
-@keyframes fadeInUp {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.animate-fade-in-up {
-  animation: fadeInUp 200ms var(--ease-apple-smooth) forwards;
 }
 

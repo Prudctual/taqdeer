@@ -12,12 +12,26 @@ import type { MatchCard } from "@/lib/queries";
 import { pct } from "@/lib/format";
 
 export function OutcomePieChart({ match }: { match?: MatchCard | null }) {
-  const pHome = match?.pHome ?? 0.48;
-  const pDraw = match?.pDraw ?? 0.27;
-  const pAway = match?.pAway ?? 0.25;
+  const hasPred =
+    match?.pHome != null && match?.pDraw != null && match?.pAway != null;
 
-  const homeName = match?.homeNameAr ?? "ريال مدريد (المضيف)";
-  const awayName = match?.awayNameAr ?? "برشلونة (الضيف)";
+  if (!hasPred) {
+    return (
+      <div className="rounded-2xl border border-line bg-panel p-8 text-center space-y-2">
+        <h3 className="text-sm font-semibold text-ink">لا تتوفر نسب نموذج لهذه المباراة</h3>
+        <p className="text-xs text-muted leading-relaxed max-w-md mx-auto">
+          تُعرض الرسوم فقط بعد كتابة توقعات ensemble الحالية في قاعدة البيانات.
+        </p>
+      </div>
+    );
+  }
+
+  const pHome = match!.pHome!;
+  const pDraw = match!.pDraw!;
+  const pAway = match!.pAway!;
+  const homeName = match!.homeNameAr;
+  const awayName = match!.awayNameAr;
+  const pOver25 = match!.pOver25;
 
   const outcomeData = [
     { name: `فوز ${homeName}`, value: Number((pHome * 100).toFixed(1)), color: "var(--home)" },
@@ -25,26 +39,25 @@ export function OutcomePieChart({ match }: { match?: MatchCard | null }) {
     { name: `فوز ${awayName}`, value: Number((pAway * 100).toFixed(1)), color: "var(--away)" },
   ];
 
-  const pOver25 = match?.pOver25 ?? 0.58;
-  const pUnder25 = 1 - pOver25;
-
-  const goalMarketsData = [
-    { name: "أكثر من 2.5 هدف (Over)", value: Number((pOver25 * 100).toFixed(1)), color: "var(--success)" },
-    { name: "أقل من 2.5 هدف (Under)", value: Number((pUnder25 * 100).toFixed(1)), color: "var(--warn)" },
-  ];
+  const goalMarketsData =
+    pOver25 != null
+      ? [
+          { name: "أكثر من 2.5 هدف (Over)", value: Number((pOver25 * 100).toFixed(1)), color: "var(--success)" },
+          { name: "أقل من 2.5 هدف (Under)", value: Number(((1 - pOver25) * 100).toFixed(1)), color: "var(--warn)" },
+        ]
+      : null;
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-      {/* 1. 1X2 Outcome Distribution */}
       <div className="rounded-2xl border border-line bg-panel p-5 sm:p-6 space-y-4 shadow-2xs">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
-            <h3 className="text-base sm:text-lg font-black text-ink">
+            <h3 className="text-base sm:text-lg font-semibold text-ink">
               توزيع احتمالات النتيجة (1X2) لهذه المباراة
             </h3>
           </div>
           <p className="text-xs font-semibold text-muted">
-            نسبة توزيع الاحتمالات المحسوبة بنموذج Poisson المزدوج للمواجهة المحددة
+            نسب النموذج الحالية (ensemble) لهذه المواجهة — بلا قيم افتراضية
           </p>
         </div>
 
@@ -81,61 +94,82 @@ export function OutcomePieChart({ match }: { match?: MatchCard | null }) {
         </div>
 
         <div className="pt-2 border-t border-line flex items-center justify-between text-xs text-muted font-bold">
-          <span>النتيجة الأرجح: <strong className="text-ink">{pHome >= pAway && pHome >= pDraw ? `فوز ${homeName}` : pAway >= pHome && pAway >= pDraw ? `فوز ${awayName}` : "التعادل"}</strong></span>
-          <span className="font-mono font-black text-home">{pct(Math.max(pHome, pDraw, pAway))}</span>
+          <span>
+            النتيجة الأرجح:{" "}
+            <strong className="text-ink">
+              {pHome >= pAway && pHome >= pDraw
+                ? `فوز ${homeName}`
+                : pAway >= pHome && pAway >= pDraw
+                  ? `فوز ${awayName}`
+                  : "التعادل"}
+            </strong>
+          </span>
+          <span className="font-mono font-semibold text-home">
+            {pct(Math.max(pHome, pDraw, pAway))}
+          </span>
         </div>
       </div>
 
-      {/* 2. Goal Markets Distribution */}
-      <div className="rounded-2xl border border-line bg-panel p-5 sm:p-6 space-y-4 shadow-2xs">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <h3 className="text-base sm:text-lg font-black text-ink">
-              احتمالية أهداف المباراة (Over / Under 2.5)
-            </h3>
+      {goalMarketsData ? (
+        <div className="rounded-2xl border border-line bg-panel p-5 sm:p-6 space-y-4 shadow-2xs">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <h3 className="text-base sm:text-lg font-semibold text-ink">
+                احتمالية أهداف المباراة (Over / Under 2.5)
+              </h3>
+            </div>
+            <p className="text-xs font-semibold text-muted">
+              من ناتج النموذج الحالي لنفس المباراة
+            </p>
           </div>
-          <p className="text-xs font-semibold text-muted">
-            توقع وتوزيع معدل الأهداف لهذه المباراة بناءً على القدرة الهجومية والدفاعية
-          </p>
-        </div>
 
-        <div className="h-64 w-full pt-2">
-          <ResponsiveContainer width="100%" height="100%">
-            <PieChart>
-              <Pie
-                data={goalMarketsData}
-                cx="50%"
-                cy="50%"
-                innerRadius={55}
-                outerRadius={85}
-                paddingAngle={4}
-                dataKey="value"
-              >
-                {goalMarketsData.map((entry, index) => (
-                  <Cell key={`cell-goal-${index}`} fill={entry.color} stroke="var(--panel)" strokeWidth={2} />
-                ))}
-              </Pie>
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: "var(--panel)",
-                  borderColor: "var(--line)",
-                  borderRadius: "12px",
-                  fontSize: "12px",
-                  fontWeight: "bold",
-                  color: "var(--ink)",
-                }}
-                formatter={(value) => [`${value}%`, ""]}
-              />
-              <Legend wrapperStyle={{ fontSize: "12px", fontWeight: "bold" }} />
-            </PieChart>
-          </ResponsiveContainer>
-        </div>
+          <div className="h-64 w-full pt-2">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={goalMarketsData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={55}
+                  outerRadius={85}
+                  paddingAngle={4}
+                  dataKey="value"
+                >
+                  {goalMarketsData.map((entry, index) => (
+                    <Cell key={`cell-goal-${index}`} fill={entry.color} stroke="var(--panel)" strokeWidth={2} />
+                  ))}
+                </Pie>
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: "var(--panel)",
+                    borderColor: "var(--line)",
+                    borderRadius: "12px",
+                    fontSize: "12px",
+                    fontWeight: "bold",
+                    color: "var(--ink)",
+                  }}
+                  formatter={(value) => [`${value}%`, ""]}
+                />
+                <Legend wrapperStyle={{ fontSize: "12px", fontWeight: "bold" }} />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
 
-        <div className="pt-2 border-t border-line flex items-center justify-between text-xs text-muted font-bold">
-          <span>سوق الأهداف: <strong className="text-ink">{pOver25 >= 0.5 ? "مباراة هجومية (Over 2.5)" : "مباراة متوازنة (Under 2.5)"}</strong></span>
-          <span className="font-mono font-black text-success">{pct(pOver25)} Over</span>
+          <div className="pt-2 border-t border-line flex items-center justify-between text-xs text-muted font-bold">
+            <span>
+              سوق الأهداف:{" "}
+              <strong className="text-ink">
+                {pOver25! >= 0.5 ? "مباراة هجومية (Over 2.5)" : "مباراة متوازنة (Under 2.5)"}
+              </strong>
+            </span>
+            <span className="font-mono font-semibold text-success">{pct(pOver25!)} Over</span>
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="rounded-2xl border border-line bg-panel p-8 text-center space-y-2">
+          <h3 className="text-sm font-semibold text-ink">لا يتوفر Over/Under لهذه المباراة</h3>
+        </div>
+      )}
     </div>
   );
 }

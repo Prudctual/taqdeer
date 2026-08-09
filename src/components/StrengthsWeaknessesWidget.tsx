@@ -33,11 +33,11 @@ export function StrengthsWeaknessesWidget({
         <div className="rounded-2xl border border-blue-500/20 bg-surface overflow-hidden space-y-0 shadow-2xs">
           <div className="flex items-center justify-between bg-blue-500/10 border-b border-blue-500/20 px-4 py-3 sm:px-5 sm:py-3.5">
             <div className="flex items-center gap-2">
-              <span className="font-black text-home text-sm sm:text-base">
+              <span className="font-semibold text-home text-sm sm:text-base">
                 {homeTeam}
               </span>
             </div>
-            <span className="rounded-full bg-home text-on-fill px-2.5 py-0.5 text-[11px] font-extrabold shadow-2xs">
+            <span className="rounded-full bg-home text-on-fill px-2.5 py-0.5 text-[11px] font-semibold shadow-2xs">
               المضيف
             </span>
           </div>
@@ -45,7 +45,7 @@ export function StrengthsWeaknessesWidget({
           <div className="p-4 sm:p-5 space-y-3">
             {/* Strengths */}
             <div className="space-y-2">
-              <div className="flex items-center gap-1.5 text-xs font-extrabold text-ink">
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-ink">
                 <span className="flex h-4 w-4 items-center justify-center rounded-full bg-blue-500/15 text-home font-mono text-[10px] font-bold">
                   +
                 </span>
@@ -65,7 +65,7 @@ export function StrengthsWeaknessesWidget({
 
             {/* Weaknesses */}
             <div className="space-y-2 pt-2 border-t border-line">
-              <div className="flex items-center gap-1.5 text-xs font-extrabold text-ink">
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-ink">
                 <span className="flex h-4 w-4 items-center justify-center rounded-full bg-draw-fill text-draw font-mono text-[10px] font-bold">
                   −
                 </span>
@@ -89,11 +89,11 @@ export function StrengthsWeaknessesWidget({
         <div className="rounded-2xl border border-danger/25 bg-surface overflow-hidden space-y-0 shadow-2xs">
           <div className="flex items-center justify-between bg-danger-dim border-b border-danger/25 px-4 py-3 sm:px-5 sm:py-3.5">
             <div className="flex items-center gap-2">
-              <span className="font-black text-danger text-sm sm:text-base">
+              <span className="font-semibold text-danger text-sm sm:text-base">
                 {awayTeam}
               </span>
             </div>
-            <span className="rounded-full bg-danger text-on-fill px-2.5 py-0.5 text-[11px] font-extrabold shadow-2xs">
+            <span className="rounded-full bg-danger text-on-fill px-2.5 py-0.5 text-[11px] font-semibold shadow-2xs">
               الضيف
             </span>
           </div>
@@ -101,7 +101,7 @@ export function StrengthsWeaknessesWidget({
           <div className="p-4 sm:p-5 space-y-3">
             {/* Strengths */}
             <div className="space-y-2">
-              <div className="flex items-center gap-1.5 text-xs font-extrabold text-ink">
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-ink">
                 <span className="flex h-4 w-4 items-center justify-center rounded-full bg-danger-dim text-danger font-mono text-[10px] font-bold">
                   +
                 </span>
@@ -121,7 +121,7 @@ export function StrengthsWeaknessesWidget({
 
             {/* Weaknesses */}
             <div className="space-y-2 pt-2 border-t border-line">
-              <div className="flex items-center gap-1.5 text-xs font-extrabold text-ink">
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-ink">
                 <span className="flex h-4 w-4 items-center justify-center rounded-full bg-draw-fill text-draw font-mono text-[10px] font-bold">
                   −
                 </span>

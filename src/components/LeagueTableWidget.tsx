@@ -52,7 +52,7 @@ export function LeagueTableWidget({
       headerRight={
         <Link
           href={`/leagues/${activeLeague.id}`}
-          className="press-scale inline-flex items-center gap-1 text-xs font-black text-amber-600 dark:text-amber-400 hover:underline"
+          className="press-scale inline-flex items-center gap-1 text-xs font-semibold text-amber-600 dark:text-amber-400 hover:underline"
         >
           عرض الجدول الكامل ←
         </Link>
@@ -70,7 +70,7 @@ export function LeagueTableWidget({
                   key={l.id}
                   type="button"
                   onClick={() => setSelectedLeagueId(l.id)}
-                  className={`press-scale flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer whitespace-nowrap border ${
+                  className={`press-scale flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer whitespace-nowrap border ${
                     isSelected
                       ? "bg-warn text-on-fill border-warn shadow-xs"
                       : "bg-panel text-ink border-line hover:bg-surface"
@@ -96,7 +96,7 @@ export function LeagueTableWidget({
                 <th scope="col" className="p-3 text-center tabular">تعادل</th>
                 <th scope="col" className="p-3 text-center tabular">خسر</th>
                 <th scope="col" className="p-3 text-center tabular hidden sm:table-cell">فارق الأهداف</th>
-                <th scope="col" className="p-3 text-center tabular font-black text-ink">النقاط</th>
+                <th scope="col" className="p-3 text-center tabular font-semibold text-ink">النقاط</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-line">
@@ -115,7 +115,7 @@ export function LeagueTableWidget({
                         alt={team.name_ar}
                         size="chip"
                       />
-                      <span className="font-extrabold text-ink">
+                      <span className="font-semibold text-ink">
                         {team.name_ar}
                       </span>
                     </div>
@@ -127,7 +127,7 @@ export function LeagueTableWidget({
                   <td className="p-3 text-center tabular font-semibold text-muted hidden sm:table-cell">
                     {team.goal_difference > 0 ? `+${team.goal_difference}` : team.goal_difference}
                   </td>
-                  <td className="p-3 text-center tabular font-black text-sm text-amber-600 dark:text-amber-400">
+                  <td className="p-3 text-center tabular font-semibold text-sm text-amber-600 dark:text-amber-400">
                     {team.points}
                   </td>
                 </tr>

@@ -164,7 +164,7 @@ export function ProbBar({
         >
           {segments.map((s) => {
             const hot = pick.key === s.key;
-            const displayVal = `${Math.round((inView ? animValues[s.key] : values[s.key] * 100))}٪`;
+            const displayVal = `${(inView ? animValues[s.key] : values[s.key] * 100).toFixed(1)}٪`;
             return (
               <span
                 key={s.key}

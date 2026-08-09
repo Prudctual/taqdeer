@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import type { MatchCard } from "@/lib/queries";
 
-export function useLiveScores(intervalMs = 12000) {
+export function useLiveScores(intervalMs = 3000) {
   const [liveMatches, setLiveMatches] = useState<MatchCard[]>([]);
   const [isLiveActive, setIsLiveActive] = useState<boolean>(false);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);

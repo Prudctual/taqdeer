@@ -237,6 +237,16 @@ function migrate(db: Database.Database) {
     ["odds_open_home", "REAL"],
     ["odds_open_draw", "REAL"],
     ["odds_open_away", "REAL"],
+    ["odds_close_home", "REAL"],
+    ["odds_close_draw", "REAL"],
+    ["odds_close_away", "REAL"],
+    ["odds_sharp_home", "REAL"],
+    ["odds_sharp_draw", "REAL"],
+    ["odds_sharp_away", "REAL"],
+    ["xg_true_home", "REAL"],
+    ["xg_true_away", "REAL"],
+    ["matches_7d_home", "REAL"],
+    ["matches_7d_away", "REAL"],
     ["referee_name", "TEXT"],
     ["yellow_home", "INTEGER"],
     ["yellow_away", "INTEGER"],
@@ -313,6 +323,18 @@ function migrate(db: Database.Database) {
       UNIQUE(team_id, name_en)
     );
     CREATE INDEX IF NOT EXISTS idx_players_team ON players(team_id);
+
+    CREATE TABLE IF NOT EXISTS player_strength (
+      id TEXT PRIMARY KEY,
+      team_id TEXT NOT NULL REFERENCES teams(id),
+      player_name TEXT NOT NULL,
+      position TEXT,
+      strength REAL NOT NULL DEFAULT 1.0,
+      minutes REAL NOT NULL DEFAULT 0,
+      appearances INTEGER NOT NULL DEFAULT 0,
+      updated_at TEXT NOT NULL,
+      UNIQUE(team_id, player_name)
+    );
 
     CREATE TABLE IF NOT EXISTS match_enrichment (
       match_id TEXT PRIMARY KEY REFERENCES matches(id) ON DELETE CASCADE,

@@ -2,6 +2,11 @@ import { NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
 import { getLiveMatches, getUpcomingByLeague } from "@/lib/queries";
 import { syncRealLiveMatches } from "@/lib/live-sync";
+import {
+  calculateInPlayProbs,
+  countRedCards,
+  parseLiveEvents,
+} from "@/lib/in-play-probs";
 import { isLiveStatus, resolveMatchPhase } from "@/lib/match-status";
 import {
   checkRateLimit,
@@ -9,55 +14,8 @@ import {
   getSecureApiHeaders,
 } from "@/lib/rate-limit";
 
-function calculateInPlayProbs(
-  lambdaHome: number,
-  lambdaAway: number,
-  minute: number,
-  homeScore: number,
-  awayScore: number,
-) {
-  const remMin = Math.max(0, 90 - Math.min(minute, 90));
-  const r = remMin / 90.0;
-  const remLamHome = Math.max(0.01, lambdaHome * r);
-  const remLamAway = Math.max(0.01, lambdaAway * r);
-
-  function poisson(k: number, lam: number): number {
-    let fact = 1;
-    for (let i = 1; i <= k; i++) fact *= i;
-    return (Math.pow(lam, k) * Math.exp(-lam)) / fact;
-  }
-
-  const MAX_GOALS = 5;
-  let pHomeWin = 0;
-  let pDraw = 0;
-  let pAwayWin = 0;
-  let pBtts = 0;
-  let pOver25 = 0;
-
-  for (let i = 0; i <= MAX_GOALS; i++) {
-    for (let j = 0; j <= MAX_GOALS; j++) {
-      const pCell = poisson(i, remLamHome) * poisson(j, remLamAway);
-      const finalHome = homeScore + i;
-      const finalAway = awayScore + j;
-
-      if (finalHome > finalAway) pHomeWin += pCell;
-      else if (finalHome === finalAway) pDraw += pCell;
-      else pAwayWin += pCell;
-
-      if (finalHome >= 1 && finalAway >= 1) pBtts += pCell;
-      if (finalHome + finalAway >= 3) pOver25 += pCell;
-    }
-  }
-
-  const total = pHomeWin + pDraw + pAwayWin || 1;
-  return {
-    pHome: parseFloat((pHomeWin / total).toFixed(4)),
-    pDraw: parseFloat((pDraw / total).toFixed(4)),
-    pAway: parseFloat((pAwayWin / total).toFixed(4)),
-    pBttsYes: parseFloat((pBtts / total).toFixed(4)),
-    pOver25: parseFloat((pOver25 / total).toFixed(4)),
-  };
-}
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export async function GET(request: Request) {
   const rl = checkRateLimit(request);
@@ -66,13 +24,10 @@ export async function GET(request: Request) {
   }
 
   try {
-    // Sync real active live matches currently playing right now
     await syncRealLiveMatches();
 
     const now = new Date();
 
-    // لا تُعرض إلا المباريات التي تثبت مرحلتها أنها جارية فعلاً،
-    // فحالة قديمة لم يحدّثها المصدر لا تُحوّل إلى بث مباشر.
     const rawLiveMatches = getLiveMatches().filter(
       (m) =>
         resolveMatchPhase({
@@ -86,14 +41,14 @@ export async function GET(request: Request) {
         }) === "live",
     );
 
-    // Map and enrich live matches
     const liveMatches = rawLiveMatches.map((m) => {
       let minute = m.minute;
       let liveStatusAr = m.liveStatusAr;
 
-      // تقدير الدقيقة للمباريات ذات الحالة المباشرة التي لم يرسل مصدرها الدقيقة
       if (minute == null && isLiveStatus(m.status)) {
-        const elapsedMins = Math.floor((now.getTime() - Date.parse(m.utcDate)) / 60000);
+        const elapsedMins = Math.floor(
+          (now.getTime() - Date.parse(m.utcDate)) / 60000,
+        );
         if (elapsedMins >= 0 && elapsedMins <= 120) {
           if (elapsedMins <= 45) {
             minute = elapsedMins;
@@ -110,8 +65,9 @@ export async function GET(request: Request) {
 
       const homeGoals = m.homeGoals ?? 0;
       const awayGoals = m.awayGoals ?? 0;
+      const events = parseLiveEvents(m.liveEventsJson);
+      const reds = countRedCards(events, m.homeNameAr, m.awayNameAr);
 
-      // إعادة حساب الاحتمالات اللحظية — وعند غياب توقع النموذج تبقى null بلا اختلاق
       let liveProbs: {
         pHome: number | null;
         pDraw: number | null;
@@ -133,6 +89,7 @@ export async function GET(request: Request) {
           minute,
           homeGoals,
           awayGoals,
+          { homeReds: reds.homeReds, awayReds: reds.awayReds },
         );
       }
 
@@ -143,6 +100,8 @@ export async function GET(request: Request) {
         liveStatusAr: liveStatusAr || "مباشر الآن",
         homeGoals,
         awayGoals,
+        homeReds: reds.homeReds,
+        awayReds: reds.awayReds,
         ...liveProbs,
       };
     });
@@ -176,21 +135,32 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    const { match_id, home_goals, away_goals, status, minute, live_status_ar, live_events_json } = body;
+    const {
+      match_id,
+      home_goals,
+      away_goals,
+      status,
+      minute,
+      live_status_ar,
+      live_events_json,
+    } = body;
 
     if (!match_id) {
-      return NextResponse.json({ success: false, error: "match_id required" }, { status: 400 });
+      return NextResponse.json(
+        { success: false, error: "match_id required" },
+        { status: 400, headers: getSecureApiHeaders(rl) },
+      );
     }
 
     const db = getDb();
     db.prepare(
-      `UPDATE matches
-       SET home_goals = COALESCE(?, home_goals),
-           away_goals = COALESCE(?, away_goals),
-           status = COALESCE(?, status),
-           minute = COALESCE(?, minute),
-           live_status_ar = COALESCE(?, live_status_ar),
-           live_events_json = COALESCE(?, live_events_json)
+      `UPDATE matches SET
+         home_goals = COALESCE(?, home_goals),
+         away_goals = COALESCE(?, away_goals),
+         status = COALESCE(?, status),
+         minute = COALESCE(?, minute),
+         live_status_ar = COALESCE(?, live_status_ar),
+         live_events_json = COALESCE(?, live_events_json)
        WHERE id = ?`,
     ).run(
       home_goals ?? null,
@@ -198,12 +168,12 @@ export async function POST(request: Request) {
       status ?? null,
       minute ?? null,
       live_status_ar ?? null,
-      live_events_json ? JSON.stringify(live_events_json) : null,
+      live_events_json ?? null,
       match_id,
     );
 
     return NextResponse.json(
-      { success: true, message: `Match ${match_id} updated live` },
+      { success: true },
       { headers: getSecureApiHeaders(rl) },
     );
   } catch (err: unknown) {

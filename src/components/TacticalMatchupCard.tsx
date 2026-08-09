@@ -42,11 +42,11 @@ export function TacticalMatchupCard({
           <div className="rounded-2xl border border-blue-500/20 bg-surface overflow-hidden space-y-0 shadow-2xs">
             <div className="flex items-center justify-between bg-blue-500/10 border-b border-blue-500/20 px-4 py-3 sm:px-5 sm:py-3.5">
               <div className="flex items-center gap-2">
-                <span className="font-black text-home text-sm sm:text-base">
+                <span className="font-semibold text-home text-sm sm:text-base">
                   {homeTeam}
                 </span>
               </div>
-              <span className="rounded-full bg-home text-on-fill px-2.5 py-0.5 text-[11px] font-extrabold shadow-2xs">
+              <span className="rounded-full bg-home text-on-fill px-2.5 py-0.5 text-[11px] font-semibold shadow-2xs">
                 المضيف
               </span>
             </div>
@@ -54,7 +54,7 @@ export function TacticalMatchupCard({
             <div className="p-4 sm:p-5 space-y-2">
               <div className="flex items-baseline justify-between">
                 <span className="text-xs font-bold text-muted">التشكيلة المتوقعة</span>
-                <span className="text-xl font-black text-home tabular font-mono">
+                <span className="text-xl font-semibold text-home tabular font-mono">
                   {hForm}
                 </span>
               </div>
@@ -71,11 +71,11 @@ export function TacticalMatchupCard({
           <div className="rounded-2xl border border-danger/25 bg-surface overflow-hidden space-y-0 shadow-2xs">
             <div className="flex items-center justify-between bg-danger-dim border-b border-danger/25 px-4 py-3 sm:px-5 sm:py-3.5">
               <div className="flex items-center gap-2">
-                <span className="font-black text-danger text-sm sm:text-base">
+                <span className="font-semibold text-danger text-sm sm:text-base">
                   {awayTeam}
                 </span>
               </div>
-              <span className="rounded-full bg-danger text-on-fill px-2.5 py-0.5 text-[11px] font-extrabold shadow-2xs">
+              <span className="rounded-full bg-danger text-on-fill px-2.5 py-0.5 text-[11px] font-semibold shadow-2xs">
                 الضيف
               </span>
             </div>
@@ -83,7 +83,7 @@ export function TacticalMatchupCard({
             <div className="p-4 sm:p-5 space-y-2">
               <div className="flex items-baseline justify-between">
                 <span className="text-xs font-bold text-muted">التشكيلة المتوقعة</span>
-                <span className="text-xl font-black text-danger tabular font-mono">
+                <span className="text-xl font-semibold text-danger tabular font-mono">
                   {aForm}
                 </span>
               </div>
@@ -100,7 +100,7 @@ export function TacticalMatchupCard({
         {/* Tactical Matchup Commentary Banner */}
         <div className="rounded-2xl border border-line bg-panel/70 p-4 sm:p-5 space-y-1.5 shadow-2xs">
           <div className="flex items-center gap-2">
-            <span className="font-extrabold text-xs text-ink">ملاحظة التوافق التكتيكي:</span>
+            <span className="font-semibold text-xs text-ink">ملاحظة التوافق التكتيكي:</span>
           </div>
           <p className="text-xs font-semibold text-muted leading-relaxed pe-2">
             {commentary}

@@ -54,7 +54,7 @@ export function OddsMovementChart({
       quiet
     >
       {steamSide ? (
-        <div className="mb-3 text-[11px] font-black text-accent bg-accent-dim inline-flex px-2.5 py-1 rounded-full">
+        <div className="mb-3 text-[11px] font-semibold text-accent bg-accent-dim inline-flex px-2.5 py-1 rounded-full">
           حراك نحو{" "}
           {steamSide === "home"
             ? homeTeam
