@@ -1015,7 +1015,7 @@ def main() -> None:
 
         targets = conn.execute(
             """
-            SELECT id, home_team_id, away_team_id, odds_home, odds_draw, odds_away,
+            SELECT id, home_team_id, away_team_id, utc_date, odds_home, odds_draw, odds_away,
                    odds_open_home, odds_open_draw, odds_open_away,
                    referee_name, status, season
             FROM matches
