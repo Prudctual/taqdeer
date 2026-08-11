@@ -136,11 +136,15 @@ export function mergeAliasTeams(db: ReturnType<typeof getDb>) {
       db.prepare(`UPDATE matches SET away_team_id = ? WHERE away_team_id = ?`).run(canonicalId, t.id);
       db.prepare(`UPDATE OR IGNORE players SET team_id = ? WHERE team_id = ?`).run(canonicalId, t.id);
       db.prepare(`UPDATE OR IGNORE elo_snapshots SET team_id = ? WHERE team_id = ?`).run(canonicalId, t.id);
+      db.prepare(`UPDATE OR IGNORE player_strength SET team_id = ? WHERE team_id = ?`).run(canonicalId, t.id);
+      db.prepare(`UPDATE OR IGNORE player_availability SET team_id = ? WHERE team_id = ?`).run(canonicalId, t.id);
       // بقايا لم تُنقل بسبب قيود التفرد + صفوف الترتيب/القوة تُعاد حسابياً لاحقاً
       db.prepare(`DELETE FROM players WHERE team_id = ?`).run(t.id);
       db.prepare(`DELETE FROM elo_snapshots WHERE team_id = ?`).run(t.id);
       db.prepare(`DELETE FROM standings WHERE team_id = ?`).run(t.id);
       db.prepare(`DELETE FROM team_strengths WHERE team_id = ?`).run(t.id);
+      db.prepare(`DELETE FROM player_strength WHERE team_id = ?`).run(t.id);
+      db.prepare(`DELETE FROM player_availability WHERE team_id = ?`).run(t.id);
       db.prepare(`DELETE FROM teams WHERE id = ?`).run(t.id);
     });
     tx();
@@ -167,6 +171,8 @@ export function cleanupOrphanTeams(db: ReturnType<typeof getDb>) {
       db.prepare(`DELETE FROM elo_snapshots WHERE team_id = ?`).run(o.id);
       db.prepare(`DELETE FROM standings WHERE team_id = ?`).run(o.id);
       db.prepare(`DELETE FROM team_strengths WHERE team_id = ?`).run(o.id);
+      db.prepare(`DELETE FROM player_strength WHERE team_id = ?`).run(o.id);
+      db.prepare(`DELETE FROM player_availability WHERE team_id = ?`).run(o.id);
       db.prepare(`DELETE FROM teams WHERE id = ?`).run(o.id);
     }
   });
