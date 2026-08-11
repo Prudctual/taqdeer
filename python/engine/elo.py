@@ -13,6 +13,7 @@ class EloMatch:
     home_goals: int
     away_goals: int
     date: str
+    season: str = ""
 
 
 def expected_score(r_a: float, r_b: float) -> float:
@@ -48,12 +49,15 @@ def update_elo(
     seeds: Dict[str, float] | None = None,
     *,
     early_season_boost: bool = False,
+    mean_reversion: float = 0.33,
 ) -> Tuple[Dict[str, float], List[Tuple[str, str, float]]]:
     """`seeds` overrides `initial` per team at first appearance (promoted-team prior)."""
     seeds = seeds or {}
     ratings: Dict[str, float] = {}
     history: List[Tuple[str, str, float]] = []
     base_k = k * (1.35 if early_season_boost else 1.0)
+    
+    team_seasons: Dict[str, str] = {}
 
     def get_k_factor(team_id: str) -> float:
         tid_lower = team_id.lower()
@@ -62,6 +66,15 @@ def update_elo(
         return base_k
 
     for m in matches:
+        if m.season:
+            if m.home in ratings and m.home in team_seasons and team_seasons[m.home] != m.season:
+                ratings[m.home] = initial + (ratings[m.home] - initial) * (1.0 - mean_reversion)
+            team_seasons[m.home] = m.season
+            
+            if m.away in ratings and m.away in team_seasons and team_seasons[m.away] != m.season:
+                ratings[m.away] = initial + (ratings[m.away] - initial) * (1.0 - mean_reversion)
+            team_seasons[m.away] = m.season
+
         rh = ratings.get(m.home, seeds.get(m.home, initial))
         ra = ratings.get(m.away, seeds.get(m.away, initial))
         eh = expected_score(rh + home_adv, ra)

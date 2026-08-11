@@ -3,6 +3,7 @@
 import Link from "next/link";
 
 export default function TeamError({
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   error: _error,
   reset,
 }: {

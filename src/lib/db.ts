@@ -5,21 +5,23 @@ import path from "path";
 const dataDir = path.join(process.cwd(), "data");
 const dbPath = path.join(dataDir, "taqdeer.db");
 
-let _db: Database.Database | null = null;
+/** HMR-safe: globalThis يعيش بين دورات HMR فلا تضيع الاتصالات */
+const globalForDb = globalThis as unknown as { __taqdeerDb?: Database.Database };
 
 export function getDb() {
-  if (_db) return _db;
+  if (globalForDb.__taqdeerDb) return globalForDb.__taqdeerDb;
   if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
-  _db = new Database(dbPath);
-  _db.pragma("journal_mode = WAL");
-  _db.pragma("busy_timeout = 10000");
-  _db.pragma("synchronous = NORMAL");
-  _db.pragma("cache_size = -64000");
-  _db.pragma("temp_store = MEMORY");
-  _db.pragma("mmap_size = 268435456");
-  _db.pragma("foreign_keys = ON");
-  initSchema(_db);
-  return _db;
+  const db = new Database(dbPath);
+  db.pragma("journal_mode = WAL");
+  db.pragma("busy_timeout = 10000");
+  db.pragma("synchronous = NORMAL");
+  db.pragma("cache_size = -64000");
+  db.pragma("temp_store = MEMORY");
+  db.pragma("mmap_size = 268435456");
+  db.pragma("foreign_keys = ON");
+  initSchema(db);
+  globalForDb.__taqdeerDb = db;
+  return db;
 }
 
 function initSchema(db: Database.Database) {
@@ -390,8 +392,8 @@ function migrate(db: Database.Database) {
 }
 
 export function closeDb() {
-  if (_db) {
-    _db.close();
-    _db = null;
+  if (globalForDb.__taqdeerDb) {
+    globalForDb.__taqdeerDb.close();
+    globalForDb.__taqdeerDb = undefined;
   }
 }

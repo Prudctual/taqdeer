@@ -777,7 +777,7 @@ async function syncUpcomingOddsFromApiFootball(
   }
 
   const DAY_WINDOW = 14;
-  const MAX_ODDS_CALLS = 25;
+  const MAX_ODDS_CALLS = 60;
   const THROTTLE_H = 12;
 
   const missingInWindow = db
@@ -1117,7 +1117,8 @@ export async function syncUpcomingOdds(db: ReturnType<typeof getDb>) {
 }
 
 /** أحدث موسم له نتائج فعلية — لا نعتمد على تقويم ثابت قد يسبق صدور البيانات */
-function latestSeasonWithResults(
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function _latestSeasonWithResults(
   db: ReturnType<typeof getDb>,
   leagueId: string,
 ): string | null {
@@ -1578,8 +1579,15 @@ async function main() {
     return;
   }
 
-  // ثبّت خط الإغلاق للمباريات المنتهية من آخر أودز حية إن لم يُحفظ بعد
-  const freezeClose = db.prepare(`
+  // sharp من open إن نقص؛ ثم ثبّت closing للمنتهية
+  db.prepare(`
+    UPDATE matches SET
+      odds_sharp_home = COALESCE(odds_sharp_home, odds_open_home),
+      odds_sharp_draw = COALESCE(odds_sharp_draw, odds_open_draw),
+      odds_sharp_away = COALESCE(odds_sharp_away, odds_open_away)
+    WHERE odds_sharp_home IS NULL AND odds_open_home IS NOT NULL
+  `).run();
+  db.prepare(`
     UPDATE matches SET
       odds_close_home = COALESCE(odds_close_home, odds_sharp_home, odds_home),
       odds_close_draw = COALESCE(odds_close_draw, odds_sharp_draw, odds_draw),
@@ -1587,8 +1595,7 @@ async function main() {
     WHERE status = 'FINISHED'
       AND odds_close_home IS NULL
       AND odds_home IS NOT NULL
-  `);
-  freezeClose.run();
+  `).run();
 
   seedLeagues(db);
   mergeAliasTeams(db);

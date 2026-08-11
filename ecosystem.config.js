@@ -1,4 +1,6 @@
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 const os = require("os");
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 const path = require("path");
 const HOME = process.env.HOME || os.homedir() || "/home/ubuntu";
 const ROOT = process.env.TAQDEER_ROOT || path.join(HOME, "taqdeer");

@@ -166,11 +166,19 @@ function searchMatchesByTeam(term: string): MatchRow[] {
   return db.query(query).all(pattern, pattern, pattern, pattern) as MatchRow[];
 }
 
+function escapeHTML(str?: string | null): string {
+  if (!str) return "";
+  return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;").trim();
+}
+
 function formatMatchCard(m: MatchRow): string {
   const dateLabel = formatMatchDateLabel(m.utc_date);
+  const home = escapeHTML(m.home_team);
+  const away = escapeHTML(m.away_team);
+  const league = escapeHTML(m.league_name);
 
-  let text = `⚽ <b>${m.home_team} × ${m.away_team}</b>\n`;
-  text += `🏆 <i>${m.league_name}</i> · ⏰ ${dateLabel}\n`;
+  let text = `⚽ <b>${home} × ${away}</b>\n`;
+  text += `🏆 <i>${league}</i> · ⏰ ${dateLabel}\n`;
 
   if (m.status === "FINISHED" && m.home_goals !== null) {
     text += `🏁 <b>النتيجة النهائية:</b> ${m.home_goals} - ${m.away_goals}\n`;
@@ -184,10 +192,10 @@ function formatMatchCard(m: MatchRow): string {
     let pick = "التعادل";
     let pickP = pD;
     if (pH >= pD && pH >= pA) {
-      pick = `فوز ${m.home_team}`;
+      pick = `فوز ${home}`;
       pickP = pH;
     } else if (pA >= pH && pA >= pD) {
-      pick = `فوز ${m.away_team}`;
+      pick = `فوز ${away}`;
       pickP = pA;
     }
 
@@ -195,9 +203,9 @@ function formatMatchCard(m: MatchRow): string {
 
     text += `\n🎯 <b>التشخيص الكمّي:</b> ${pick} (ثقة ${conf}%)\n`;
     text += `📊 <b>توزيع الاحتمالات:</b>\n`;
-    text += `  • 🏠 ${m.home_team}: <b>${pH}%</b>\n`;
+    text += `  • 🏠 ${home}: <b>${pH}%</b>\n`;
     text += `  • 🤝 التعادل: <b>${pD}%</b>\n`;
-    text += `  • ✈️ ${m.away_team}: <b>${pA}%</b>\n`;
+    text += `  • ✈️ ${away}: <b>${pA}%</b>\n`;
   } else {
     text += `\n🔄 <i>جاري تحليل بيانات المواجهة...</i>\n`;
   }
@@ -216,8 +224,12 @@ function getConciseHighlights(): string {
       const dateLabel = formatMatchDateLabel(m.utc_date);
       const hasPreds = m.p_home != null && m.p_draw != null && m.p_away != null && (m.p_home > 0 || m.p_draw > 0 || m.p_away > 0);
 
-      text += `⚽ <b>${m.home_team} × ${m.away_team}</b>\n`;
-      text += `🏆 <i>${m.league_name}</i> · ⏰ ${dateLabel}\n`;
+      const home = escapeHTML(m.home_team);
+      const away = escapeHTML(m.away_team);
+      const league = escapeHTML(m.league_name);
+
+      text += `⚽ <b>${home} × ${away}</b>\n`;
+      text += `🏆 <i>${league}</i> · ⏰ ${dateLabel}\n`;
 
       if (hasPreds) {
         const pH = Math.round(m.p_home! * 100);
@@ -225,8 +237,8 @@ function getConciseHighlights(): string {
         const pA = Math.round(m.p_away! * 100);
         const conf = m.confidence && m.confidence > 0 ? Math.round(m.confidence * 100) : Math.max(pH, pD, pA);
 
-        let pick = `فوز ${m.home_team}`;
-        if (pA > pH && pA > pD) pick = `فوز ${m.away_team}`;
+        let pick = `فوز ${home}`;
+        if (pA > pH && pA > pD) pick = `فوز ${away}`;
         if (pD > pH && pD > pA) pick = "التعادل";
 
         text += `🎯 التوقع: <b>${pick}</b> (${conf}% ثقة)\n`;
@@ -687,10 +699,10 @@ async function handleUpdate(update: TelegramUpdate) {
     if (text && !text.startsWith("/")) {
       const matches = searchMatchesByTeam(text);
       if (!matches.length) {
-        await sendMessage(chatId, `لم نجد مباريات مطابقة للبحث: "<b>${text}</b>"`, MAIN_KEYBOARD);
+        await sendMessage(chatId, `لم نجد مباريات مطابقة للبحث: "<b>${escapeHTML(text)}</b>"`, MAIN_KEYBOARD);
         return;
       }
-      let reply = `<b>نتائج البحث عن "${text}":</b>\n\n`;
+      let reply = `<b>نتائج البحث عن "${escapeHTML(text)}":</b>\n\n`;
       reply += matches.map((m) => formatMatchCard(m)).join("\n──────────────\n");
       await sendMessage(chatId, reply, MAIN_KEYBOARD);
       return;
@@ -745,14 +757,16 @@ async function handleUpdate(update: TelegramUpdate) {
     } else if (data?.startsWith("cmd_league_")) {
       const leagueId = data.replace("cmd_league_", "");
       const standings = getLeagueStandings(leagueId);
-      let reply = `🏆 <b>جدول ترتيب ${standings.leagueName}</b>\n\n`;
+      const leagueName = escapeHTML(standings.leagueName);
+      let reply = `🏆 <b>جدول ترتيب ${leagueName}</b>\n\n`;
       if (standings.rows.length > 0) {
         const numberMedals = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣"];
         for (let i = 0; i < standings.rows.length; i++) {
           const r = standings.rows[i]!;
           const medal = numberMedals[i] || `${r.position}.`;
           const gdStr = r.goal_difference > 0 ? `+${r.goal_difference}` : `${r.goal_difference}`;
-          reply += `${medal} <b>${r.name_ar}</b>\n`;
+          const teamName = escapeHTML(r.name_ar);
+          reply += `${medal} <b>${teamName}</b>\n`;
           reply += `   📊 <b>${r.points}</b> نقطة · لعب ${r.played} (فاز ${r.won} / تعادل ${r.drawn} / خسر ${r.lost}) · فارق (${gdStr})\n\n`;
         }
       } else {

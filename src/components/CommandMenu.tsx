@@ -35,6 +35,50 @@ export function CommandMenu() {
   } = useTheme();
 
   const [query, setQuery] = useState("");
+  const modalRef = React.useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (commandOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [commandOpen]);
+
+  useEffect(() => {
+    if (!commandOpen) return;
+    
+    const handleTab = (e: KeyboardEvent) => {
+      if (e.key !== "Tab" || !modalRef.current) return;
+      
+      const focusableElements = modalRef.current.querySelectorAll(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      );
+      
+      if (focusableElements.length === 0) return;
+
+      const firstElement = focusableElements[0] as HTMLElement;
+      const lastElement = focusableElements[focusableElements.length - 1] as HTMLElement;
+      
+      if (e.shiftKey) {
+        if (document.activeElement === firstElement) {
+          lastElement.focus();
+          e.preventDefault();
+        }
+      } else {
+        if (document.activeElement === lastElement) {
+          firstElement.focus();
+          e.preventDefault();
+        }
+      }
+    };
+    
+    window.addEventListener("keydown", handleTab);
+    return () => window.removeEventListener("keydown", handleTab);
+  }, [commandOpen]);
 
   useEffect(() => {
     if (!commandOpen) setQuery("");
@@ -71,7 +115,10 @@ export function CommandMenu() {
         aria-hidden="true"
       />
 
-      <div className="relative w-full max-w-xl rounded-2xl border border-line bg-surface overflow-hidden z-10 modal-enter">
+      <div
+        ref={modalRef}
+        className="relative w-full max-w-xl rounded-2xl border border-line bg-surface overflow-hidden z-10 modal-enter"
+      >
         <div className="flex items-center gap-3 border-b border-line px-4 py-3 bg-panel">
           <span className="text-muted text-base" aria-hidden>
             ⌕

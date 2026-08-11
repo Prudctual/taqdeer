@@ -658,6 +658,7 @@ def repredict_flagged(conn: sqlite3.Connection) -> int:
                 home_goals=int(m["home_goals"]),
                 away_goals=int(m["away_goals"]),
                 date=m["utc_date"],
+                season=m.get("season", ""),
             )
             for m in train
         ]
@@ -945,6 +946,7 @@ def main() -> None:
                 home_goals=int(m["home_goals"]),
                 away_goals=int(m["away_goals"]),
                 date=m["utc_date"],
+                season=m.get("season", ""),
             )
             for m in elo_source
         ]

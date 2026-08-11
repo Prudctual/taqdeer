@@ -162,6 +162,28 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
             except Exception:
                 pass
     conn.commit()
+    # املأ sharp/close من open/current إن نقصت (تاريخي + قادم)
+    conn.execute(
+        """
+        UPDATE matches SET
+          odds_sharp_home = COALESCE(odds_sharp_home, odds_open_home),
+          odds_sharp_draw = COALESCE(odds_sharp_draw, odds_open_draw),
+          odds_sharp_away = COALESCE(odds_sharp_away, odds_open_away)
+        WHERE odds_sharp_home IS NULL AND odds_open_home IS NOT NULL
+        """
+    )
+    conn.execute(
+        """
+        UPDATE matches SET
+          odds_close_home = COALESCE(odds_close_home, odds_sharp_home, odds_home),
+          odds_close_draw = COALESCE(odds_close_draw, odds_sharp_draw, odds_draw),
+          odds_close_away = COALESCE(odds_close_away, odds_sharp_away, odds_away)
+        WHERE status = 'FINISHED'
+          AND odds_close_home IS NULL
+          AND odds_home IS NOT NULL
+        """
+    )
+    conn.commit()
 
 
 def meta_get(conn: sqlite3.Connection, key: str) -> float:
@@ -352,7 +374,10 @@ def tier_a_odds_steam(conn: sqlite3.Connection) -> None:
                 WHEN ABS(odds_open_away - ?) < 1e-9
                      AND ABS(odds_open_away - ?) >= 1e-9 THEN ?
                 ELSE odds_open_away
-              END
+              END,
+              odds_sharp_home = COALESCE(odds_sharp_home, ?),
+              odds_sharp_draw = COALESCE(odds_sharp_draw, ?),
+              odds_sharp_away = COALESCE(odds_sharp_away, ?)
             WHERE id=?
             """,
             (
@@ -360,6 +385,7 @@ def tier_a_odds_steam(conn: sqlite3.Connection) -> None:
                 book_h, oh, book_h, book_h,
                 book_d, od, book_d, book_d,
                 book_a, oa, book_a, book_a,
+                book_h, book_d, book_a,
                 mid,
             ),
         )

@@ -3,6 +3,7 @@
 import Link from "next/link";
 
 export default function LeagueError({
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   error: _error,
   reset,
 }: {
