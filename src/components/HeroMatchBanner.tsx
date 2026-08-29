@@ -3,7 +3,12 @@
 import Link from "next/link";
 import { Crest } from "./Crest";
 import { LiveMatchClock } from "./LiveMatchClock";
-import { formatKickoffAbsolute } from "@/lib/format";
+import {
+  formatKickoffAbsolute,
+  formatCountdown,
+  formatRelativeDay,
+  hasKnownKickoffTime,
+} from "@/lib/format";
 import { matchDisplay } from "@/lib/match-status";
 import type { MatchCard } from "@/lib/queries";
 
@@ -18,6 +23,10 @@ export function HeroMatchBanner({ match }: { match: MatchCard | null }) {
     minute: match.minute,
     liveStatusAr: match.liveStatusAr,
   });
+  const knownTime = hasKnownKickoffTime(match.utcDate);
+  const countdown = knownTime ? formatCountdown(match.utcDate) : null;
+  const relativeDay = formatRelativeDay(match.utcDate);
+
   const hasPred =
     match.pHome != null && match.pDraw != null && match.pAway != null;
   const pHome = hasPred ? match.pHome! * 100 : null;
@@ -31,8 +40,20 @@ export function HeroMatchBanner({ match }: { match: MatchCard | null }) {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         {/* Left Info & Teams */}
         <div className="space-y-4 flex-1">
-          <div className="flex items-center gap-2 text-xs font-semibold text-accent">
-            <span>🏆 {match.leagueNameAr}</span>
+          <div className="flex flex-wrap items-center gap-2 text-xs font-semibold">
+            <span className="bg-accent-dim/60 text-accent px-2.5 py-0.5 rounded-md border border-accent/20">
+              🏆 {match.leagueNameAr}
+            </span>
+            {relativeDay ? (
+              <span className="bg-panel text-ink px-2.5 py-0.5 rounded-md border border-line">
+                {relativeDay}
+              </span>
+            ) : null}
+            {countdown && isScheduled ? (
+              <span className="bg-panel text-accent px-2.5 py-0.5 rounded-md border border-accent/30 tabular font-medium">
+                {countdown}
+              </span>
+            ) : null}
             <span className="text-faint">•</span>
             {isLive ? (
               <>
@@ -48,7 +69,7 @@ export function HeroMatchBanner({ match }: { match: MatchCard | null }) {
                 </span>
               </>
             ) : (
-              <span className="text-muted tabular">{formatKickoffAbsolute(match.utcDate)}</span>
+              <span className="text-muted tabular font-medium">{formatKickoffAbsolute(match.utcDate)}</span>
             )}
           </div>
 

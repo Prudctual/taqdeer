@@ -7,7 +7,6 @@ import { HeroMatchBanner } from "@/components/HeroMatchBanner";
 import { LiveInteractiveScores } from "@/components/LiveInteractiveScores";
 import { BankerPicksWidget, type BankerPick } from "@/components/BankerPicksWidget";
 import { LeagueTableWidget, type StandingTeam } from "@/components/LeagueTableWidget";
-import { NextKickoff } from "@/components/NextKickoff";
 import { useLiveScores } from "@/lib/hooks/useLiveScores";
 import { resolveMatchPhase } from "@/lib/match-status";
 import type { MatchCard } from "@/lib/queries";
@@ -103,8 +102,7 @@ export function StudioHomeView({
       <LiveInteractiveScores />
 
       {showKickoffHero && heroMatch ? (
-        <section aria-label="المباراة التالية" className="space-y-3">
-          <NextKickoff m={heroMatch} />
+        <section aria-label="المباراة القادمة">
           <HeroMatchBanner match={heroMatch} />
         </section>
       ) : null}
