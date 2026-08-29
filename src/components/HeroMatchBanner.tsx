@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Crest } from "./Crest";
 import { LiveMatchClock } from "./LiveMatchClock";
-import { formatShortDate } from "@/lib/format";
+import { formatKickoffAbsolute } from "@/lib/format";
 import { matchDisplay } from "@/lib/match-status";
 import type { MatchCard } from "@/lib/queries";
 
@@ -35,15 +35,20 @@ export function HeroMatchBanner({ match }: { match: MatchCard | null }) {
             <span>🏆 {match.leagueNameAr}</span>
             <span className="text-faint">•</span>
             {isLive ? (
-              <LiveMatchClock
-                utcDate={match.utcDate}
-                liveMinute={match.minute}
-                liveStatusAr={match.liveStatusAr}
-                size="chip"
-                showPeriod={false}
-              />
+              <>
+                <LiveMatchClock
+                  utcDate={match.utcDate}
+                  liveMinute={match.minute}
+                  liveStatusAr={match.liveStatusAr}
+                  size="chip"
+                  showPeriod={false}
+                />
+                <span className="text-muted tabular font-medium">
+                  {formatKickoffAbsolute(match.utcDate)}
+                </span>
+              </>
             ) : (
-              <span className="text-muted">{formatShortDate(match.utcDate)}</span>
+              <span className="text-muted tabular">{formatKickoffAbsolute(match.utcDate)}</span>
             )}
           </div>
 

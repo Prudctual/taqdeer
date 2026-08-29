@@ -3,7 +3,7 @@
 import { useState } from "react";
 import dynamic from "next/dynamic";
 import type { MatchCard, MatchRow } from "@/lib/queries";
-import { formatMatchTime, cleanSpace } from "@/lib/format";
+import { formatKickoffAbsolute, cleanSpace } from "@/lib/format";
 import { LeagueAccuracyChart } from "@/components/LeagueAccuracyChart";
 import { Crest } from "@/components/Crest";
 
@@ -114,7 +114,7 @@ export function MatchChartsInteractiveContainer({
               </p>
               {activeMatch.utcDate && (
                 <span className="text-[11px] font-mono font-bold text-ink" suppressHydrationWarning>
-                  {cleanSpace(formatMatchTime(activeMatch.utcDate))}
+                  {cleanSpace(formatKickoffAbsolute(activeMatch.utcDate))}
                 </span>
               )}
             </div>

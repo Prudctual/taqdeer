@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import Link from "next/link";
-import { formatShortDate } from "@/lib/format";
+import { formatKickoffAbsolute } from "@/lib/format";
 
 export interface ValueMatchItem {
   id: string;
@@ -256,7 +256,7 @@ export function ValueMatchesView({ matches }: { matches: ValueMatchItem[] }) {
                       {m.league_name_ar}
                     </span>
                     <span className="text-[11px] font-bold text-muted">
-                      {formatShortDate(m.utc_date)}
+                      {formatKickoffAbsolute(m.utc_date)}
                     </span>
                   </div>
 

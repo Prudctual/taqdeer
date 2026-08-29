@@ -2,11 +2,16 @@
 
 import { useEffect, useState } from "react";
 import {
+  DATA_TZ,
+  DATA_TZ_LABEL,
+  DISPLAY_TZ_LABEL,
+  dayKey,
+  dayKeyInTz,
   formatCountdown,
+  formatKickoffAbsolute,
   formatLongDate,
   formatMatchTime,
   formatRelativeDay,
-  formatShortDate,
   hasKnownKickoffTime,
 } from "@/lib/format";
 import { LiveMatchClock } from "@/components/LiveMatchClock";
@@ -15,8 +20,8 @@ type Variant = "row" | "inline" | "detail";
 
 /**
  * ساعة العميل — تُقرأ بعد التركيب فقط.
- * الخادم وأول رسم في المتصفح يتفقان على null، فلا ينحرف الترطيب.
- * الوقت المطلق يبقى في HTML من الخادم بتوقيت العرض الثابت (بغداد).
+ * الخادم وأول رسم يتفقان على null، فلا ينحرف الترطيب.
+ * الوقت المطلق من الخادم: أونتاريو للعرض، العراق للبيانات.
  */
 function useClientNow(tick: boolean, intervalMs = 60_000): Date | null {
   const [now, setNow] = useState<Date | null>(null);
@@ -31,21 +36,55 @@ function useClientNow(tick: boolean, intervalMs = 60_000): Date | null {
   return now;
 }
 
-/**
- * عرض موحّد لموعد المباراة — تاريخ / وقت / عدّ تنازلي.
- * row: عمود القائمة · inline: سطر واحد · detail: صفحة المباراة
- */
+function DualStamp({ iso, knownTime }: { iso: string; knownTime: boolean }) {
+  const userDate = formatLongDate(iso);
+  const dataDate = formatLongDate(iso, DATA_TZ);
+  const userTime = formatMatchTime(iso);
+  const dataTime = formatMatchTime(iso, DATA_TZ);
+  const sameDay = dayKey(iso) === dayKeyInTz(iso, DATA_TZ);
+
+  return (
+    <time dateTime={iso} suppressHydrationWarning>
+      {userDate}
+      {knownTime ? (
+        <>
+          <span className="mx-1.5 text-faint" aria-hidden>
+            ·
+          </span>
+          <span className="tabular">
+            {userTime} {DISPLAY_TZ_LABEL}
+          </span>
+          <span className="mx-1.5 text-faint" aria-hidden>
+            ·
+          </span>
+          <span className="tabular text-muted">
+            {sameDay ? null : `${dataDate} · `}
+            {dataTime} {DATA_TZ_LABEL}
+          </span>
+        </>
+      ) : sameDay ? null : (
+        <>
+          <span className="mx-1.5 text-faint" aria-hidden>
+            ·
+          </span>
+          <span className="text-muted">
+            {DISPLAY_TZ_LABEL} · {dataDate} {DATA_TZ_LABEL}
+          </span>
+        </>
+      )}
+    </time>
+  );
+}
+
 export function MatchWhen({
   iso,
   variant = "inline",
   showCountdown = true,
   finished = false,
   isLive = false,
-  /** انطلقت لكن لم تصل بياناتها بعد */
   awaiting = false,
   liveMinute = null,
   liveStatusAr = null,
-  /** إخفاء «اليوم/غداً» عند وجودها في سكة الأيام أعلاه */
   hideRelative = false,
   className = "",
 }: {
@@ -60,30 +99,32 @@ export function MatchWhen({
   hideRelative?: boolean;
   className?: string;
 }) {
-  /** عدّ تنازلي قبل الانطلاق */
   const preKick = showCountdown && !finished && !isLive && !awaiting;
   const now = useClientNow(preKick, 60_000);
 
-  // مطلق — دائماً بتوقيت العرض المعلن (بغداد)، بلا تبديل لمنطقة المتصفح
   const knownTime = hasKnownKickoffTime(iso);
-  const time = formatMatchTime(iso);
-  const shortDate = formatShortDate(iso);
-  const longDate = formatLongDate(iso);
-
-  // نسبي — مشتق من الساعة، بعد التركيب فقط (نفس تقويم منطقة العرض)
+  const userTime = formatMatchTime(iso);
+  const dataTime = formatMatchTime(iso, DATA_TZ);
+  const userDate = formatLongDate(iso);
+  const dataDate = formatLongDate(iso, DATA_TZ);
+  const sameDay = dayKey(iso) === dayKeyInTz(iso, DATA_TZ);
   const relative = now && !hideRelative ? formatRelativeDay(iso, now) : null;
   const countdown = preKick && knownTime && now ? formatCountdown(iso, now) : null;
 
   if (isLive) {
     if (variant === "row") {
       return (
-        <LiveMatchClock
-          utcDate={iso}
-          liveMinute={liveMinute}
-          liveStatusAr={liveStatusAr}
-          size="row"
-          className={className}
-        />
+        <div className={`min-w-0 tabular ${className}`}>
+          <LiveMatchClock
+            utcDate={iso}
+            liveMinute={liveMinute}
+            liveStatusAr={liveStatusAr}
+            size="row"
+          />
+          <div className="mt-1.5 text-[11px] leading-snug text-muted">
+            <DualStamp iso={iso} knownTime={knownTime} />
+          </div>
+        </div>
       );
     }
     if (variant === "detail") {
@@ -96,26 +137,24 @@ export function MatchWhen({
             size="hero"
           />
           <p className="text-[11px] font-semibold text-muted">
-            <time dateTime={iso}>{longDate}</time>
-            {knownTime ? (
-              <>
-                <span className="mx-1.5 text-faint">·</span>
-                <span className="tabular">{time}</span>
-              </>
-            ) : null}
+            <DualStamp iso={iso} knownTime={knownTime} />
           </p>
         </div>
       );
     }
     return (
-      <LiveMatchClock
-        utcDate={iso}
-        liveMinute={liveMinute}
-        liveStatusAr={liveStatusAr}
-        size="chip"
-        showPeriod={false}
-        className={className}
-      />
+      <span className={`inline-flex flex-wrap items-center gap-x-1.5 ${className}`}>
+        <LiveMatchClock
+          utcDate={iso}
+          liveMinute={liveMinute}
+          liveStatusAr={liveStatusAr}
+          size="chip"
+          showPeriod={false}
+        />
+        <span className="text-[11px] text-muted tabular">
+          <DualStamp iso={iso} knownTime={knownTime} />
+        </span>
+      </span>
     );
   }
 
@@ -123,19 +162,12 @@ export function MatchWhen({
     if (variant === "row") {
       return (
         <div className={`min-w-0 tabular ${className}`}>
-          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-panel border border-line text-muted font-semibold text-[11px]">
+          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-panel border border-line text-muted font-semibold text-[11px]">
             {finished ? "انتهت" : "بانتظار النتيجة"}
           </span>
-          {!hideRelative ? (
-            <div
-              suppressHydrationWarning
-              className={`mt-1.5 truncate text-[11px] leading-none ${
-                relative ? "text-accent" : "text-faint"
-              }`}
-            >
-              {relative ?? shortDate}
-            </div>
-          ) : null}
+          <div className="mt-1.5 text-[11px] leading-snug text-muted">
+            <DualStamp iso={iso} knownTime={knownTime} />
+          </div>
         </div>
       );
     }
@@ -147,24 +179,27 @@ export function MatchWhen({
         <time
           dateTime={iso}
           suppressHydrationWarning
-          className="block text-[13px] font-semibold leading-none text-ink"
+          className="block text-[12px] font-semibold leading-snug text-ink"
         >
-          {knownTime ? time : shortDate}
+          {knownTime ? `${userTime} ${DISPLAY_TZ_LABEL}` : userDate}
         </time>
-        {!hideRelative ? (
-          <div
-            suppressHydrationWarning
-            className={`mt-1.5 truncate text-[11px] leading-none ${
-              relative ? "text-accent" : "text-faint"
-            }`}
-          >
-            {knownTime ? (relative ?? shortDate) : (relative ?? "يوم المباراة")}
+        <div
+          suppressHydrationWarning
+          className="mt-1.5 text-[11px] leading-snug text-muted"
+        >
+          {relative ? <span className="text-accent">{relative} · </span> : null}
+          {knownTime ? userDate : "التوقيت غير مؤكد بعد"}
+        </div>
+        {knownTime ? (
+          <div className="mt-1 text-[11px] leading-snug text-faint tabular">
+            {sameDay ? null : `${dataDate} · `}
+            {dataTime} {DATA_TZ_LABEL}
           </div>
         ) : null}
         {preKick && knownTime ? (
           <div
             suppressHydrationWarning
-            className="mt-1.5 min-h-[0.6875rem] truncate text-[11px] leading-none text-faint"
+            className="mt-1.5 min-h-[0.6875rem] text-[11px] leading-snug text-faint"
           >
             {countdown}
           </div>
@@ -178,21 +213,7 @@ export function MatchWhen({
     return (
       <div className={`min-w-0 ${className}`}>
         <p className="text-sm font-semibold text-ink">
-          <time dateTime={iso} suppressHydrationWarning>
-            {longDate}
-          </time>
-          {knownTime ? (
-            <>
-              <span className="mx-1.5 text-faint" aria-hidden>
-                ·
-              </span>
-              <span className="tabular" suppressHydrationWarning>
-                {time}
-              </span>
-            </>
-          ) : (
-            <span className="ms-1.5 text-xs font-semibold text-muted">· التوقيت غير مؤكد</span>
-          )}
+          <DualStamp iso={iso} knownTime={knownTime} />
         </p>
         <p
           suppressHydrationWarning
@@ -210,25 +231,22 @@ export function MatchWhen({
     );
   }
 
-  // inline
   return (
     <span
       suppressHydrationWarning
       className={`tabular text-xs text-muted ${className}`}
     >
       {relative ? (
-        <span className="font-medium text-accent">{relative}</span>
-      ) : (
-        <time dateTime={iso}>{longDate}</time>
-      )}
-      {knownTime ? (
         <>
+          <span className="font-medium text-accent">{relative}</span>
           <span className="mx-1.5 text-faint" aria-hidden>
             ·
           </span>
-          <span className="font-medium text-ink">{time}</span>
         </>
       ) : null}
+      <time dateTime={iso} className="text-ink">
+        {formatKickoffAbsolute(iso)}
+      </time>
     </span>
   );
 }

@@ -5,8 +5,8 @@ import { Crest } from "./Crest";
 import { ProbBar } from "./ProbBar";
 import { EmptyState } from "./ui";
 import {
-  formatMatchTime,
-  formatShortDate,
+  DISPLAY_TZ_LABEL,
+  formatKickoffAbsolute,
   formatLongDate,
   groupByDay,
   pct,
@@ -457,12 +457,7 @@ export function PredictionArchiveLog({
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-muted tabular">
-                      {new Date(item.utcDate).toLocaleDateString("ar-IQ", {
-                        year: "numeric",
-                        month: "short",
-                        day: "numeric",
-                        timeZone: "Asia/Baghdad",
-                      })}
+                      {formatKickoffAbsolute(item.utcDate)}
                     </span>
                     <span
                       className={`verdict-chip ${
@@ -589,6 +584,9 @@ export function PredictionArchiveLog({
                     ) : null}
                     <h4 className="day-rail-label">
                       {formatLongDate(day.items[0]!.utcDate)}
+                      <span className="ms-2 text-[11px] font-medium text-faint">
+                        {DISPLAY_TZ_LABEL}
+                      </span>
                     </h4>
                   </div>
                   <span className="text-[11px] font-medium text-muted">
@@ -633,8 +631,9 @@ export function PredictionArchiveLog({
                             ) : null}
                           </div>
                           <div className="flex items-center gap-2 text-muted tabular shrink-0">
-                            <span>{formatShortDate(item.utcDate)}</span>
-                            <span>{formatMatchTime(item.utcDate)}</span>
+                            <span className="text-xs text-muted tabular">
+                              {formatKickoffAbsolute(item.utcDate)}
+                            </span>
                           </div>
                         </div>
 

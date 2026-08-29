@@ -159,7 +159,9 @@ const ALIASES: Record<string, string> = {
   "FC St. Pauli": "St Pauli",
   "1. FC Heidenheim": "Heidenheim",
   "VfL Bochum": "Bochum",
+  "Paris Saint-Germain": "Paris SG",
   "Paris Saint Germain": "Paris SG",
+  "Paris Saint Germain FC": "Paris SG",
   "Saint Etienne": "St Etienne",
   "SV Elversberg": "Elversberg",
 

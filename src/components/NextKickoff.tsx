@@ -5,6 +5,11 @@ import { ChevronIcon } from "./ChevronIcon";
 import { Crest } from "./Crest";
 import { LiveMatchClock } from "./LiveMatchClock";
 import {
+  DATA_TZ,
+  DATA_TZ_LABEL,
+  DISPLAY_TZ_LABEL,
+  dayKey,
+  dayKeyInTz,
   formatCountdown,
   formatLongDate,
   formatMatchTime,
@@ -15,7 +20,7 @@ import {
 } from "@/lib/format";
 import { ProbBar } from "./ProbBar";
 import { matchDisplay } from "@/lib/match-status";
-import type { MatchCard } from "@/lib/queries";
+import type { MatchRowItem } from "./MatchRow";
 
 const GLYPH: Record<string, string> = { H: "1", D: "X", A: "2", EQ: "⚖" };
 const TONE: Record<string, string> = {
@@ -58,7 +63,7 @@ function TeamLine({
   );
 }
 
-export function NextKickoff({ m }: { m: MatchCard }) {
+export function NextKickoff({ m }: { m: MatchRowItem }) {
   const { isLive, isScheduled, score, label } = matchDisplay({
     status: m.status,
     utcDate: m.utcDate,
@@ -73,6 +78,9 @@ export function NextKickoff({ m }: { m: MatchCard }) {
   const longDate = formatLongDate(m.utcDate);
   const knownTime = hasKnownKickoffTime(m.utcDate);
   const time = formatMatchTime(m.utcDate);
+  const iraqTime = formatMatchTime(m.utcDate, DATA_TZ);
+  const iraqDate = formatLongDate(m.utcDate, DATA_TZ);
+  const sameDay = dayKey(m.utcDate) === dayKeyInTz(m.utcDate, DATA_TZ);
   const countdown = knownTime ? formatCountdown(m.utcDate) : null;
   const tone = m.leagueId?.toLowerCase() || undefined;
 
@@ -126,8 +134,15 @@ export function NextKickoff({ m }: { m: MatchCard }) {
                     ·
                   </span>
                   <time dateTime={m.utcDate} className="font-medium text-ink">
-                    {time}
+                    {time} {DISPLAY_TZ_LABEL}
                   </time>
+                  <span className="text-line" aria-hidden>
+                    ·
+                  </span>
+                  <span>
+                    {sameDay ? null : `${iraqDate} · `}
+                    {iraqTime} {DATA_TZ_LABEL}
+                  </span>
                 </>
               ) : null}
               {countdown ? (

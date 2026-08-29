@@ -2,8 +2,28 @@ import Link from "next/link";
 import { MatchWhen } from "./MatchWhen";
 import { ProbBar } from "./ProbBar";
 import { TeamNamesInline } from "./TeamMatchup";
-import type { MatchCard } from "@/lib/queries";
 import { actualOutcome, pct, topOutcome } from "@/lib/format";
+
+/** حقول الصف — MatchCard أو البطاقة المختصرة للقائمة */
+export type MatchRowItem = {
+  id: string;
+  leagueId: string;
+  leagueNameAr: string;
+  utcDate: string;
+  status: string;
+  homeNameAr: string;
+  awayNameAr: string;
+  homeCrestUrl: string | null;
+  awayCrestUrl: string | null;
+  homeGoals: number | null;
+  awayGoals: number | null;
+  pHome: number | null;
+  pDraw: number | null;
+  pAway: number | null;
+  matchday?: number | null;
+  minute?: number | null;
+  liveStatusAr?: string | null;
+};
 import { matchDisplay } from "@/lib/match-status";
 
 /** لون النتيجة يملأ الشارة — النص بـ on-fill للقراءة على الخلفية الملوّنة */
@@ -25,7 +45,7 @@ const pickName: Record<string, string> = {
 
 /** شبكة موحّدة للرأس والصف — المحاذاة داخل كل عمود تتبع عنصره */
 export const rowGrid =
-  "sm:grid-cols-[6rem_minmax(0,1fr)_minmax(8.5rem,10rem)_5rem] sm:items-center sm:gap-x-4";
+  "sm:grid-cols-[minmax(9.5rem,13rem)_minmax(0,1fr)_minmax(8.5rem,10rem)_5rem] sm:items-center sm:gap-x-4";
 
 export function MatchListHeader({
   leagueId,
@@ -60,7 +80,7 @@ export function MatchRow({
   /** عند التجميع باليوم نخفي التسمية النسبية المكررة */
   hideRelative = false,
 }: {
-  m: MatchCard;
+  m: MatchRowItem;
   showLeague?: boolean;
   hideRelative?: boolean;
 }) {

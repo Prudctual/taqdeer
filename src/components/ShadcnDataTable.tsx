@@ -4,7 +4,7 @@ import React, { useState, useMemo } from "react";
 import Link from "next/link";
 import { ProbBar } from "./ProbBar";
 import { Crest } from "./Crest";
-import { formatShortDate } from "@/lib/format";
+import { formatKickoffAbsolute } from "@/lib/format";
 import { matchDisplay } from "@/lib/match-status";
 
 export interface MatchTableRow {
@@ -196,7 +196,7 @@ export function ShadcnDataTable({
                       <div className="flex flex-col gap-0.5">
                         <span className="font-bold text-ink">{m.leagueNameAr}</span>
                         <span className="text-[11px] text-faint tabular">
-                          {formatShortDate(m.utcDate)}
+                          {formatKickoffAbsolute(m.utcDate)}
                         </span>
                       </div>
                     </td>

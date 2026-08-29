@@ -2,6 +2,7 @@ import { Database } from "bun:sqlite";
 import path from "path";
 
 import fs from "fs";
+import { dayKey, formatMatchDate } from "../src/lib/format";
 
 // Load environment variables
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
@@ -48,57 +49,10 @@ interface MatchRow {
 }
 
 
-function parseUtcDate(utcDateStr: string): Date {
-  let s = (utcDateStr || "").trim();
-  if (!s) return new Date();
-  if (!s.endsWith("Z") && !s.includes("+") && !s.includes("-", 10)) {
-    s = s.replace(" ", "T") + "Z";
-  }
-  return new Date(s);
-}
-
-function formatMatchTimeBaghdad(utcDateStr: string): string {
-  const d = parseUtcDate(utcDateStr);
-  if (isNaN(d.getTime())) return "15:00";
-  // تاريخ فقط من المصدر (منتصف الليل UTC) — لا نخترع ساعة
-  if (/T00:00:00(\.0+)?Z?$/i.test(utcDateStr.trim())) return "—";
-
-  return new Intl.DateTimeFormat("en-GB", {
-    timeZone: "Asia/Baghdad",
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23",
-  }).format(d);
-}
-
 function formatMatchDateLabel(utcDateStr: string): string {
-  const d = parseUtcDate(utcDateStr);
-  if (isNaN(d.getTime())) return "قريباً";
-
-  const now = new Date();
-
-  const getDayKey = (dt: Date) =>
-    new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Riyadh" }).format(dt);
-
-  const matchDayKey = getDayKey(d);
-  const todayDayKey = getDayKey(now);
-
-  const tomorrowDate = new Date(now.getTime() + 24 * 3600 * 1000);
-  const tomorrowDayKey = getDayKey(tomorrowDate);
-
-  const timeStr = formatMatchTimeBaghdad(utcDateStr);
-
-  if (matchDayKey === todayDayKey) {
-    return `اليوم · ${timeStr}`;
-  } else if (matchDayKey === tomorrowDayKey) {
-    return `غداً · ${timeStr}`;
-  } else {
-    const dayName = new Intl.DateTimeFormat("ar-EG", { timeZone: "Asia/Riyadh", weekday: "long" }).format(d);
-    const dayNum = new Intl.DateTimeFormat("ar-EG", { timeZone: "Asia/Riyadh", day: "numeric" }).format(d);
-    const monthName = new Intl.DateTimeFormat("ar-EG", { timeZone: "Asia/Riyadh", month: "long" }).format(d);
-
-    return `${dayName}، ${dayNum} ${monthName} · ${timeStr}`;
-  }
+  const t = Date.parse(utcDateStr);
+  if (!Number.isFinite(t)) return "قريباً";
+  return formatMatchDate(utcDateStr);
 }
 
 function getTodayMatches(): MatchRow[] {
@@ -115,11 +69,14 @@ function getTodayMatches(): MatchRow[] {
     JOIN teams ht ON ht.id = m.home_team_id
     JOIN teams at ON at.id = m.away_team_id
     LEFT JOIN predictions p ON p.match_id = m.id
-    WHERE m.utc_date >= date('now', 'start of day')
-      AND m.utc_date < date('now', '+1 day', 'start of day')
+    WHERE m.utc_date >= datetime('now', '-1 day')
+      AND m.utc_date < datetime('now', '+2 days')
     ORDER BY m.utc_date ASC;
   `;
-  return db.query(query).all() as MatchRow[];
+  const today = dayKey(new Date().toISOString());
+  return (db.query(query).all() as MatchRow[]).filter(
+    (m) => dayKey(m.utc_date) === today,
+  );
 }
 
 function getUpcomingMatches(limit: number = 8): MatchRow[] {

@@ -1,7 +1,6 @@
 import { DayRail } from "./DayRail";
-import { MatchListHeader, MatchRow } from "./MatchRow";
-import type { MatchCard } from "@/lib/queries";
-import { formatLongDate, groupByDay } from "@/lib/format";
+import { MatchListHeader, MatchRow, type MatchRowItem } from "./MatchRow";
+import { DISPLAY_TZ_LABEL, formatLongDate, groupByDay } from "@/lib/format";
 
 function formatMatchCount(count: number): string {
   if (count === 1) return "مباراة واحدة";
@@ -16,7 +15,7 @@ export function MatchList({
   showLeague = true,
   leagueId,
 }: {
-  matches: MatchCard[];
+  matches: MatchRowItem[];
   groupDays?: boolean;
   showLeague?: boolean;
   leagueId?: string | null;
@@ -73,6 +72,9 @@ export function MatchList({
                   ) : null}
                   <h3 className="text-xs sm:text-sm font-semibold text-ink tracking-tight">
                     {formatLongDate(day.items[0]!.utcDate)}
+                    <span className="ms-2 text-[11px] font-medium text-faint">
+                      {DISPLAY_TZ_LABEL}
+                    </span>
                   </h3>
                 </div>
 

@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { buildDoubleChance, type DcCode } from "@/lib/double-chance";
-import { formatMatchTime, formatShortDate, pct } from "@/lib/format";
+import { formatKickoffAbsolute, pct } from "@/lib/format";
 import type { DoubleChanceMatch } from "@/lib/queries";
 
 const LEAGUES_CONFIG = [
@@ -266,7 +266,7 @@ export function DoubleChanceMatchesView({ matches }: { matches: DoubleChanceMatc
                         {m.leagueNameAr}
                       </span>
                       <span className="text-[11px] font-bold text-muted">
-                        {formatShortDate(m.utcDate)} · {formatMatchTime(m.utcDate)}
+                        {formatKickoffAbsolute(m.utcDate)}
                       </span>
                       {(m.status === "IN_PLAY" || m.status === "PAUSED") && (
                         <span className="text-[10px] font-bold text-danger bg-danger-dim px-2 py-0.5 rounded-md">

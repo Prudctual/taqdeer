@@ -51,6 +51,7 @@ const STADIUM_MAP: Record<string, string> = {
   "sa-atalanta": "ملعب جيويس (بيرغامو)",
 
   // Ligue 1
+  "fl1-paris-sg": "ملعب حديقة الأمراء (باريس)",
   "fl1-paris-saint-germain": "ملعب حديقة الأمراء (باريس)",
   "fl1-marseille": "ملعب أورانج فيلودروم (مارسيليا)",
   "fl1-lyon": "ملعب غروباما (ليون)",

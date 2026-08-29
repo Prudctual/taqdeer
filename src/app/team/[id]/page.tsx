@@ -13,7 +13,7 @@ import {
   PageNav,
 } from "@/components/ui";
 
-import { formatShortDate } from "@/lib/format";
+import { formatKickoffAbsolute } from "@/lib/format";
 import {
   getEloHistory,
   getLeagueMatches,
@@ -268,7 +268,7 @@ export default async function TeamPage({
                   <Link
                     href={`/match/${encodeURIComponent(f.id)}`}
                     className={`press-scale flex h-9 w-9 items-center justify-center rounded-xl font-mono text-xs font-semibold no-underline shadow-2xs transition-all hover:scale-110 ${RESULT[f.key].bg}`}
-                    title={`${RESULT[f.key].label} ${f.gf}–${f.ga} · أمام ${f.opponent} · ${formatShortDate(f.date)}`}
+                    title={`${RESULT[f.key].label} ${f.gf}–${f.ga} · أمام ${f.opponent} · ${formatKickoffAbsolute(f.date)}`}
                   >
                     <span>{RESULT[f.key].glyph}</span>
                   </Link>

@@ -9,22 +9,28 @@ export function pctCss(p: number, digits = 2): string {
 }
 
 /**
- * الصفحات تُرسم على الخادم وتُخزَّن مؤقتاً، فلا يوجد "توقيت محلي" للقارئ وقت الرسم.
- * نثبّت منطقة عرض واحدة معلنة بدل توقيت الخادم العشوائي.
+ * الصفحات تُرسم على الخادم، فلا يوجد توقيت متصفح موثوق وقت الرسم.
+ * العرض للقارئ: أونتاريو. ختم البيانات: العراق (المصدر المخزّن بعد التحويل من UTC).
  */
-export const DISPLAY_TZ = "Asia/Baghdad";
-export const DISPLAY_TZ_LABEL = "بتوقيت العراق (GMT+3)";
+export const DATA_TZ = "Asia/Baghdad";
+export const DATA_TZ_LABEL = "العراق";
+export const DISPLAY_TZ = "America/Toronto";
+export const DISPLAY_TZ_LABEL = "أونتاريو";
 
 function parseDate(iso: string): Date {
   return new Date(iso);
 }
 
-const isoDayFmt = new Intl.DateTimeFormat("en-CA", {
-  timeZone: DISPLAY_TZ,
-  year: "numeric",
-  month: "2-digit",
-  day: "2-digit",
-});
+function isoDayFmtFor(tz: string) {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: tz,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+}
+
+const isoDayFmt = isoDayFmtFor(DISPLAY_TZ);
 
 /** رقم اليوم التقويمي في منطقة العرض */
 function dayNumber(d: Date): number {
@@ -58,8 +64,8 @@ export function hasKnownKickoffTime(iso: string): boolean {
 }
 
 /**
- * ساعة الانطلاق بتوقيت العرض الثابت (العراق GMT+3).
- * صيغة 24 ساعة بأرقام لاتينية — معيار القنوات الرياضية العربية (21:00 لا 09:00 م).
+ * ساعة الانطلاق. الافتراضي أونتاريو. مرّر DATA_TZ لتوقيت العراق المخزّن.
+ * صيغة 24 ساعة بأرقام لاتينية (21:00 لا 09:00 م).
  */
 export function formatMatchTime(iso: string, tz?: string): string {
   if (!hasKnownKickoffTime(iso)) return "—";
@@ -84,7 +90,7 @@ export function formatShortDate(iso: string, tz?: string): string {
   );
 }
 
-/** يوم كامل بدون وقت: السبت ١٥ أغسطس */
+/** يوم كامل بدون وقت: السبت ١٥ أغسطس ٢٠٢٦ */
 export function formatLongDate(iso: string, tz?: string): string {
   return cleanSpace(
     new Intl.DateTimeFormat("ar", {
@@ -92,23 +98,45 @@ export function formatLongDate(iso: string, tz?: string): string {
       weekday: "long",
       day: "numeric",
       month: "long",
+      year: "numeric",
     }).format(parseDate(iso))
   );
 }
 
-/** عنوان سكة الأيام: اليوم · السبت ١٥ أغسطس */
+export function dayKeyInTz(iso: string, tz: string): string {
+  return isoDayFmtFor(tz).format(parseDate(iso));
+}
+
+/** موعد كامل للجدول: تاريخ أونتاريو + ساعته + ساعة العراق للبيانات */
+export function formatKickoffAbsolute(iso: string): string {
+  const ontDate = formatLongDate(iso, DISPLAY_TZ);
+  if (!hasKnownKickoffTime(iso)) {
+    const irqDate = formatLongDate(iso, DATA_TZ);
+    return ontDate === irqDate
+      ? ontDate
+      : `${ontDate} ${DISPLAY_TZ_LABEL} · ${irqDate} ${DATA_TZ_LABEL}`;
+  }
+  const ontTime = formatMatchTime(iso, DISPLAY_TZ);
+  const irqTime = formatMatchTime(iso, DATA_TZ);
+  if (dayKey(iso) === dayKeyInTz(iso, DATA_TZ)) {
+    return `${ontDate} · ${ontTime} ${DISPLAY_TZ_LABEL} · ${irqTime} ${DATA_TZ_LABEL}`;
+  }
+  const irqDate = formatLongDate(iso, DATA_TZ);
+  return `${ontDate} · ${ontTime} ${DISPLAY_TZ_LABEL} · ${irqDate} · ${irqTime} ${DATA_TZ_LABEL}`;
+}
+
+/** عنوان سكة الأيام: اليوم · السبت ١٥ أغسطس ٢٠٢٦ */
 export function formatDayHeading(iso: string, now = new Date()): string {
   const rel = formatRelativeDay(iso, now);
   const full = formatLongDate(iso);
   return rel ? `${rel} · ${full}` : full;
 }
 
-/** سطر موعد المباراة: غداً · ٢٠:٣٠ أو السبت ١٥ أغسطس · ٢٠:٣٠ */
+/** سطر موعد المباراة مع اليوم النسبي إن وُجد */
 export function formatMatchDate(iso: string, now = new Date()): string {
   const rel = formatRelativeDay(iso, now);
-  const time = formatMatchTime(iso);
-  if (rel) return `${rel} · ${time}`;
-  return `${formatLongDate(iso)} · ${time}`;
+  const abs = formatKickoffAbsolute(iso);
+  return rel ? `${rel} · ${abs}` : abs;
 }
 
 /** ختم زمني للميتا (آخر تدريب) */
@@ -170,6 +198,7 @@ export function formatCountdown(iso: string, now = new Date()): string {
 /** أجزاء جاهزة لواجهة الموعد */
 export function kickoffParts(iso: string, now = new Date()) {
   const rel = formatRelativeDay(iso, now);
+  const knownTime = hasKnownKickoffTime(iso);
   return {
     relative: rel,
     weekday: new Intl.DateTimeFormat("ar", { timeZone: DISPLAY_TZ, weekday: "long" }).format(
@@ -178,9 +207,13 @@ export function kickoffParts(iso: string, now = new Date()) {
     date: formatShortDate(iso),
     longDate: formatLongDate(iso),
     time: formatMatchTime(iso),
+    dataTime: formatMatchTime(iso, DATA_TZ),
+    dataDate: formatLongDate(iso, DATA_TZ),
+    knownTime,
     countdown: formatCountdown(iso, now),
     dayHeading: formatDayHeading(iso, now),
     line: formatMatchDate(iso, now),
+    absolute: formatKickoffAbsolute(iso),
   };
 }
 
@@ -227,6 +260,12 @@ export function confidenceLabel(c: number): string {
   return "مباراة متقاربة";
 }
 
+export const BANKER_EDGE_GAP = 0.08;
+/** أأمن التوقعات: ثقة «إشارة متوسطة» على الأقل */
+export const BANKER_MIN_CONFIDENCE = 0.55;
+/** أأمن التوقعات: أفضلية حقيقية لـ 1 أو 2، لا تعادل ولا سباق متقارب */
+export const BANKER_MIN_PROBABILITY = 0.5;
+
 export type OutcomeKey = "H" | "D" | "A" | "EQ";
 
 export function topOutcome(
@@ -245,7 +284,7 @@ export function topOutcome(
 
   // حد التكافؤ: أقل من 8٪ بين الأول والثاني → لا نُقدّم «إشارة حاسمة»
   // (حالة ساندفيورد 40٪ مقابل 33٪ كانت ستُعامل كمتكافئة)
-  if (top1.p - top2.p < 0.08) {
+  if (top1.p - top2.p < BANKER_EDGE_GAP) {
     return {
       key: "EQ",
       label: "مواجهة متكافئة",
@@ -255,6 +294,29 @@ export function topOutcome(
   }
 
   return top1;
+}
+
+/**
+ * اختيار بنكر صريح: فوز مضيف أو ضيف بفجوة وثقة كافيتين.
+ * المواجهة المتكافئة تُستبعد — لا نُعلن فائزاً بفارق 1–2٪.
+ */
+export function selectBankerSide(
+  pHome: number,
+  pDraw: number,
+  pAway: number,
+  confidence: number | null | undefined,
+): { key: "H" | "A"; label: string; p: number } | null {
+  const pick = topOutcome(pHome, pDraw, pAway);
+  if (pick.isEquallyBalanced || pick.key === "EQ" || pick.key === "D") {
+    return null;
+  }
+  if (pick.p < BANKER_MIN_PROBABILITY) return null;
+  if ((confidence ?? 0) < BANKER_MIN_CONFIDENCE) return null;
+  return {
+    key: pick.key,
+    label: pick.key === "H" ? "فوز المضيف (1)" : "فوز الضيف (2)",
+    p: pick.p,
+  };
 }
 
 export function outcomeLabel(pHome: number, pDraw: number, pAway: number): string {

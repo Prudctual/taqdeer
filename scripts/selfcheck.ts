@@ -5,7 +5,9 @@ import { historicalSeasons, latestSeasonStartYear } from "../src/lib/leagues";
 import {
   calendarDayOffset,
   crestInitials,
+  DATA_TZ,
   dayKey,
+  formatKickoffAbsolute,
   formatMatchTime,
 } from "../src/lib/format";
 import {
@@ -28,9 +30,9 @@ assert.deepEqual(historicalSeasons(new Date("2026-07-26T00:00:00Z")), [
   2021, 2022, 2023, 2024, 2025,
 ]);
 
-// منطقة العرض مثبّتة — لا تتبع توقيت الخادم (شغّل بـ TZ مختلفة للتأكد)
+// منطقة العرض: أونتاريو · ختم البيانات: العراق
 assert.equal(dayKey("2025-08-15T19:00:00.000Z"), "2025-08-15");
-assert.equal(dayKey("2025-08-15T23:30:00.000Z"), "2025-08-16"); // 02:30 بالرياض
+assert.equal(dayKey("2025-08-15T23:30:00.000Z"), "2025-08-15"); // 19:30 تورونتو
 assert.equal(
   calendarDayOffset(
     "2025-08-16T10:00:00.000Z",
@@ -38,7 +40,24 @@ assert.equal(
   ),
   1,
 );
-assert.match(formatMatchTime("2025-08-15T19:00:00.000Z"), /22:00/); // 22:00 بالرياض
+assert.match(formatMatchTime("2025-08-15T19:00:00.000Z"), /15:00/); // أونتاريو EDT
+assert.match(formatMatchTime("2025-08-15T19:00:00.000Z", DATA_TZ), /22:00/); // العراق
+{
+  const abs = formatKickoffAbsolute("2025-08-15T19:00:00.000Z");
+  assert.match(abs, /15:00/);
+  assert.match(abs, /22:00/);
+  assert.match(abs, /أونتاريو/);
+  assert.match(abs, /العراق/);
+}
+// منتصف الليل بين أونتاريو والعراق: 03:00 UTC = 23:00 أونتاريو 15 أغسطس، 06:00 العراق 16 أغسطس
+assert.equal(dayKey("2025-08-16T03:00:00.000Z"), "2025-08-15");
+{
+  const split = formatKickoffAbsolute("2025-08-16T03:00:00.000Z");
+  assert.match(split, /23:00/);
+  assert.match(split, /06:00/);
+  assert.match(split, /15 أغسطس/);
+  assert.match(split, /16 أغسطس/);
+}
 
 // بديل الشعار يعرّف الفريق: يتخطّى الأرقام ويصمد على اسم فارغ
 assert.equal(crestInitials("غانغوون"), "غا");
