@@ -6,7 +6,6 @@ import { LatestArticlesWidget } from "@/components/LatestArticlesWidget";
 import { LatestNewsWidget } from "@/components/LatestNewsWidget";
 import {
   getUpcomingByLeague,
-  getRecentFinishedByLeague,
   getMeta,
   matchCount,
   getLeagues,
@@ -38,7 +37,6 @@ export default function HomePage() {
   const count = matchCount();
   // جولة كاملة قادمة لكل دوري — لا تُقصّ الجولات في منتصفها
   const upcomingByLeague = getUpcomingByLeague(9);
-  const recentByLeague = getRecentFinishedByLeague(8);
   const lastFit = getMeta("last_fit");
   const leagues = getLeagues();
   const bankerPicks = getBankerPicks(4);
@@ -84,13 +82,14 @@ export default function HomePage() {
     );
   }
 
-  // Format matches into ShadcnDataTable rows
+  // Format matches into ShadcnDataTable rows (المباريات القادمة والمباشرة فقط)
   const allMatchesList: MatchTableRow[] = [];
 
   // Add upcoming matches
   groups.forEach((g) => {
     g.matches.forEach((m) => {
       const matchStatus = toTableStatus(m);
+      if (matchStatus === "FINISHED") return;
 
       allMatchesList.push({
         id: m.id,
@@ -114,32 +113,6 @@ export default function HomePage() {
     });
   });
 
-  // Add recent finished matches
-  recentByLeague.forEach((g) => {
-    g.matches.forEach((m) => {
-      const matchStatus = toTableStatus(m);
-
-      allMatchesList.push({
-        id: m.id,
-        utcDate: m.utcDate,
-        status: matchStatus,
-        leagueId: m.leagueId,
-        leagueNameAr: m.leagueNameAr,
-        homeTeam: m.homeNameEn,
-        homeTeamAr: m.homeNameAr,
-        awayTeam: m.awayNameEn,
-        awayTeamAr: m.awayNameAr,
-        homeScore: m.homeGoals,
-        awayScore: m.awayGoals,
-        pHome: m.pHome,
-        pDraw: m.pDraw,
-        pAway: m.pAway,
-        homeElo: m.eloHome ?? undefined,
-        awayElo: m.eloAway ?? undefined,
-      });
-    });
-  });
-
   return (
     <div className="space-y-8">
       <StudioHomeView
@@ -149,7 +122,6 @@ export default function HomePage() {
         leagues={leagues}
         tableMatches={allMatchesList}
         groups={groups}
-        recentGroups={recentByLeague}
         nextMatch={nextMatch}
         standingsByLeague={standingsByLeague}
         bankerPicks={bankerPicks}

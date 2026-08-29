@@ -191,8 +191,8 @@ export default async function LeaguePage({
 
   const standings = getStandings(id, activeSeason);
   const strengths = getStrengthTable(id);
-  // الجدول القادم كاملاً (يستوعب موسماً كاملاً) + آخر النتائج
-  const matches = getLeagueMatches(id, 400, 24);
+  // الجدول القادم للمواجهات المجدولة
+  const matches = getLeagueMatches(id, 400);
   const counts = getLeagueMatchCounts(id);
   const n = standings.length;
   const isCurrentSeason = activeSeason === currentSeasonYear;
@@ -600,7 +600,7 @@ export default async function LeaguePage({
             جدول ومواعيد مباريات الدوري
           </h2>
           <p className="text-xs text-muted font-medium">
-            أقرب المواعيد القادمة وآخر نتائج المباريات المكتملة
+            المواجهات القادمة والمجدولة للدوري (تتحول المباريات المنتهية تلقائياً لسجل حفظ التوقعات وترتيب الفرق)
           </p>
         </div>
 

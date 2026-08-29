@@ -4,7 +4,6 @@ import { PredictionArchiveLog } from "@/components/PredictionArchiveLog";
 import {
   getFinishedPredictionsHistory,
   getUpcomingSnapshotMatches,
-  PREDICTION_ARCHIVE_FROM,
 } from "@/lib/queries";
 
 export const metadata: Metadata = {
@@ -18,11 +17,8 @@ export const revalidate = 0;
 
 export default function HistoryPage() {
   const upcomingSnapshots = getUpcomingSnapshotMatches(20);
-  // المكتملة من يوم إعادة التشغيل فصاعداً — عند انتهاء المباراة تظهر هنا
-  const finishedItems = getFinishedPredictionsHistory("all", 300, {
-    fromDate: PREDICTION_ARCHIVE_FROM,
-    allowSeasonFallback: false,
-  });
+  // المكتملة والنتائج — عند انتهاء المباراة تظهر هنا تلقائياً مع النتيجة ومطابقة التوقع
+  const finishedItems = getFinishedPredictionsHistory("all", 500);
 
   return (
     <div className="space-y-6">

@@ -9,6 +9,7 @@ import { BankerPicksWidget, type BankerPick } from "@/components/BankerPicksWidg
 import { LeagueTableWidget, type StandingTeam } from "@/components/LeagueTableWidget";
 import { NextKickoff } from "@/components/NextKickoff";
 import { useLiveScores } from "@/lib/hooks/useLiveScores";
+import { resolveMatchPhase } from "@/lib/match-status";
 import type { MatchCard } from "@/lib/queries";
 
 interface LeagueItem {
@@ -32,7 +33,7 @@ interface StudioHomeViewProps {
   tableMatches: unknown[];
   groups: MatchGroup[];
   recentGroups?: MatchGroup[];
-  nextMatch?: MatchCard;
+  nextMatch?: MatchCard | null;
   standingsByLeague?: Record<string, StandingTeam[]>;
   bankerPicks?: BankerPick[];
 }
@@ -55,14 +56,39 @@ export function StudioHomeView({
     ? groups.flatMap((g) => g.matches || g.items || [])
     : [];
 
-  const upcomingMatchesList = initialMatchesList.map((m) => {
-    const liveUpdate = liveMatches.find((lm) => lm.id === m.id);
-    return liveUpdate ? { ...m, ...liveUpdate } : m;
-  });
+  const upcomingMatchesList = initialMatchesList
+    .map((m) => {
+      const liveUpdate = liveMatches.find((lm) => lm.id === m.id);
+      return liveUpdate ? { ...m, ...liveUpdate } : m;
+    })
+    .filter((m) => {
+      const phase = resolveMatchPhase({
+        status: m.status,
+        utcDate: m.utcDate,
+        homeGoals: m.homeGoals,
+        awayGoals: m.awayGoals,
+        minute: m.minute,
+        liveStatusAr: m.liveStatusAr,
+      });
+      return phase !== "finished" && phase !== "cancelled" && phase !== "postponed";
+    });
 
   upcomingMatchesList.sort((a, b) => a.utcDate.localeCompare(b.utcDate));
 
-  const heroMatch = nextMatch || upcomingMatchesList[0];
+  const heroMatch =
+    (nextMatch &&
+      resolveMatchPhase({
+        status: nextMatch.status,
+        utcDate: nextMatch.utcDate,
+        homeGoals: nextMatch.homeGoals,
+        awayGoals: nextMatch.awayGoals,
+        minute: nextMatch.minute,
+        liveStatusAr: nextMatch.liveStatusAr,
+      }) !== "finished"
+      ? nextMatch
+      : null) ||
+    upcomingMatchesList[0] ||
+    null;
   const showKickoffHero = Boolean(heroMatch) && !isLiveActive;
 
   const tabClass = (active: boolean) =>

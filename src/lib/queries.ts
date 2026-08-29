@@ -237,11 +237,14 @@ export function getUpcomingByLeague(perLeague = 9): {
 }[] {
   const db = getDb();
 
-  // المباريات القادمة والمباشرة (SCHEDULED, TIMED, IN_PLAY, etc.) النشطة اليوم أو في المستقبل فقط
+  // المباريات القادمة والمباشرة فقط — المباريات المنتهية تستبعد تماماً وتتحول لسجل التوقعات
   const activeStmt = db.prepare(
     `${LIST_SELECT}
      WHERE m.status IN ('SCHEDULED','TIMED','IN_PLAY','PAUSED','LIVE','1H','2H','HT','ET','P','BREAK')
-       AND (datetime(m.utc_date) >= datetime('now', '-1 day') OR m.status IN ('IN_PLAY','PAUSED','LIVE','1H','2H','HT','ET','P','BREAK'))
+       AND (
+         (m.status IN ('SCHEDULED','TIMED') AND datetime(m.utc_date) >= datetime('now', '-115 minutes'))
+         OR (m.status IN ('IN_PLAY','PAUSED','LIVE','1H','2H','HT','ET','P','BREAK') AND datetime(m.utc_date) >= datetime('now', '-4 hours'))
+       )
        AND m.league_id = ?
        AND m.source NOT IN ('preview-holdout','synthetic','demo')
      ORDER BY m.utc_date ASC
@@ -439,36 +442,30 @@ export function getMatchById(id: string): MatchRow | null {
 }
 
 /**
- * مباريات الدوري للواجهة: كل القادمة أولاً، ثم أحدث النتائج.
- * الحد الافتراضي يستوعب موسماً كاملاً (380 مباراة) فلا يُقصّ الجدول.
+ * مباريات الدوري المجدولة والقادمة للواجهة.
+ * المباريات المنتهية لا تظهر هنا وتتحول لسجل حفظ التوقعات وترتيب الدوري.
  */
 export function getLeagueMatches(
   leagueId: string,
   upcomingLimit = 400,
-  recentLimit = 48,
 ): MatchCard[] {
   const db = getDb();
   const upcoming = db
     .prepare(
       `${LIST_SELECT}
        WHERE m.league_id = ?
-         AND m.status IN ('SCHEDULED','TIMED','IN_PLAY','PAUSED')
+         AND m.status IN ('SCHEDULED','TIMED','IN_PLAY','PAUSED','LIVE','1H','2H','HT','ET','P','BREAK')
+         AND (
+           (m.status IN ('SCHEDULED','TIMED') AND datetime(m.utc_date) >= datetime('now', '-115 minutes'))
+           OR (m.status IN ('IN_PLAY','PAUSED','LIVE','1H','2H','HT','ET','P','BREAK') AND datetime(m.utc_date) >= datetime('now', '-4 hours'))
+         )
+         AND m.source NOT IN ('preview-holdout','synthetic','demo')
        ORDER BY m.utc_date ASC
        LIMIT ?`,
     )
     .all(leagueId, upcomingLimit) as MatchCard[];
 
-  const recent = db
-    .prepare(
-      `${LIST_SELECT}
-       WHERE m.league_id = ?
-         AND m.status = 'FINISHED'
-       ORDER BY m.utc_date DESC
-       LIMIT ?`,
-    )
-    .all(leagueId, recentLimit) as MatchCard[];
-
-  return [...upcoming, ...recent];
+  return upcoming;
 }
 
 /** عدّ حقيقي لمباريات الدوري — لا طول القائمة المقطوعة بـ LIMIT */
@@ -1484,12 +1481,12 @@ export const PREDICTION_ARCHIVE_FROM = "2026-08-07";
 export const getFinishedPredictionsHistory = cache(
   (
     leagueId?: string,
-    limit = 200,
+    limit = 300,
     opts?: { fromDate?: string; allowSeasonFallback?: boolean },
   ): FinishedPredictionItem[] => {
     try {
       const db = getDb();
-      const sql = `
+      let sql = `
         SELECT 
           m.id, m.league_id AS leagueId, l.name_ar AS leagueNameAr, m.season, m.matchday,
           m.utc_date AS utcDate, m.status, m.home_goals AS homeGoals, m.away_goals AS awayGoals,
@@ -1513,28 +1510,23 @@ export const getFinishedPredictionsHistory = cache(
           ON p.match_id = m.id AND COALESCE(p.model_version, '') != 'live-v1'
         LEFT JOIN prediction_snapshots ps
           ON ps.match_id = m.id AND COALESCE(ps.model_version, '') != 'live-v1'
-        WHERE m.status = 'FINISHED'
-          AND date(m.utc_date, '+3 hours') >= date(?)
+        WHERE (m.status = 'FINISHED' OR (m.home_goals IS NOT NULL AND m.away_goals IS NOT NULL))
           AND (p.p_home IS NOT NULL OR ps.p_home IS NOT NULL)
           AND m.source NOT IN ('preview-holdout','synthetic','demo')
       `;
-      const run = (from: string) => {
-        const params: (string | number)[] = [from];
-        let q = sql;
-        if (leagueId && leagueId !== "all") {
-          q += ` AND m.league_id = ?`;
-          params.push(leagueId);
-        }
-        q += ` ORDER BY m.utc_date DESC LIMIT ?`;
-        params.push(limit);
-        return db.prepare(q).all(...params) as (MatchCard & { isSnapshotLocked: number })[];
-      };
-
-      const fromDate = opts?.fromDate ?? `${latestSeasonStartYear()}-08-01`;
-      let rows = run(fromDate);
-      if (rows.length === 0 && opts?.allowSeasonFallback !== false && !opts?.fromDate) {
-        rows = run(`${latestSeasonStartYear() - 1}-08-01`);
+      const params: (string | number)[] = [];
+      if (opts?.fromDate) {
+        sql += ` AND date(m.utc_date, '+3 hours') >= date(?)`;
+        params.push(opts.fromDate);
       }
+      if (leagueId && leagueId !== "all") {
+        sql += ` AND m.league_id = ?`;
+        params.push(leagueId);
+      }
+      sql += ` ORDER BY m.utc_date DESC LIMIT ?`;
+      params.push(limit);
+
+      const rows = db.prepare(sql).all(...params) as (MatchCard & { isSnapshotLocked: number })[];
 
       return rows.map((m) => {
         const pHome = m.pHome ?? 0;

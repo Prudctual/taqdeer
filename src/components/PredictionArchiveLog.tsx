@@ -40,7 +40,7 @@ export function PredictionArchiveLog({
   showFinished?: boolean;
 }) {
   const [activeTab, setActiveTab] = useState<"upcoming" | "finished">(() =>
-    !showFinished || upcomingSnapshots.length > 0 ? "upcoming" : "finished",
+    items.length > 0 ? "finished" : "upcoming",
   );
   const [selectedLeague, setSelectedLeague] = useState<string>("all");
   const [selectedStatus, setSelectedStatus] = useState<

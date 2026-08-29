@@ -68,7 +68,7 @@ export default async function TeamPage({
   const maxElo = Math.max(...eloHist.map((e) => e.elo), team.elo);
   const span = Math.max(maxElo - minElo, 1);
 
-  const upcoming = getLeagueMatches(team.league_id, 250, 0)
+  const upcoming = getLeagueMatches(team.league_id, 250)
     .filter(
       (m) =>
         m.status !== "FINISHED" &&
