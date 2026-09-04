@@ -52,7 +52,6 @@ import {
   getRestDays,
   getStandings,
   getStandingsAt,
-  getStandingsSeason,
   getTeamPlayers,
   getVenueRecord,
 } from "@/lib/queries";
@@ -368,9 +367,7 @@ export default async function MatchPage({
   // من نتائج ما قبلها، فلا يظهر ترتيب اليوم على مباراة الأمس
   const standings = finished
     ? getStandingsAt(match.leagueId, match.season, match.utc_date)
-    : getStandingsSeason(match.leagueId) === match.season
-      ? getStandings(match.leagueId)
-      : [];
+    : getStandings(match.leagueId, match.season);
   const homeRank = standings.find((s) => s.team_id === match.home_id);
   const awayRank = standings.find((s) => s.team_id === match.away_id);
 

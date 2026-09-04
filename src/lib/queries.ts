@@ -530,13 +530,27 @@ export function getStandings(leagueId: string, seasonParam?: string) {
 
   return db
     .prepare(
-      `SELECT s.*, t.name_ar, t.name_en, t.elo, t.attack, t.defense, t.crest_url
+      `SELECT s.*, t.name_ar, t.name_en,
+              COALESCE(
+                (SELECT elo FROM elo_snapshots WHERE team_id = t.id AND date <= (
+                   SELECT COALESCE(MAX(utc_date), '9999-12-31') FROM matches WHERE league_id = s.league_id AND season = s.season AND status = 'FINISHED'
+                 ) ORDER BY date DESC LIMIT 1),
+                t.elo
+              ) AS elo,
+              COALESCE(ts.attack, t.attack) AS attack,
+              COALESCE(ts.defense, t.defense) AS defense,
+              t.crest_url
        FROM standings s
        JOIN teams t ON t.id = s.team_id
+       LEFT JOIN team_strengths ts ON ts.team_id = t.id AND ts.league_id = s.league_id AND ts.season = (
+         SELECT season FROM team_strengths WHERE team_id = t.id AND league_id = ?
+         ORDER BY (season = ?) DESC, season DESC
+         LIMIT 1
+       )
        WHERE s.league_id = ? AND s.season = ?
        ORDER BY s.position ASC`,
     )
-    .all(leagueId, season) as Array<{
+    .all(leagueId, season, leagueId, season) as Array<{
     position: number;
     season: string;
     played: number;
@@ -639,11 +653,44 @@ export function getStandingsAt(
   leagueId: string,
   season: string,
   beforeIso: string,
-): Array<{ team_id: string; position: number; points: number }> {
+): Array<{
+  team_id: string;
+  name_ar: string;
+  name_en: string;
+  crest_url: string | null;
+  position: number;
+  points: number;
+  played: number;
+  won: number;
+  drawn: number;
+  lost: number;
+  goals_for: number;
+  goals_against: number;
+  goal_difference: number;
+}> {
   const rows = getDb()
     .prepare(
-      `SELECT team_id, SUM(pts) as points, SUM(gf - ga) as gd, SUM(gf) as gf
+      `SELECT all_teams.team_id,
+              t.name_ar, t.name_en, t.crest_url,
+              COUNT(m.pts) as played,
+              COALESCE(SUM(CASE WHEN m.pts = 3 THEN 1 ELSE 0 END), 0) as won,
+              COALESCE(SUM(CASE WHEN m.pts = 1 THEN 1 ELSE 0 END), 0) as drawn,
+              COALESCE(SUM(CASE WHEN m.pts = 0 THEN 1 ELSE 0 END), 0) as lost,
+              COALESCE(SUM(m.gf), 0) as goals_for,
+              COALESCE(SUM(m.ga), 0) as goals_against,
+              COALESCE(SUM(m.gf - m.ga), 0) as gd,
+              COALESCE(SUM(m.pts), 0) as points
        FROM (
+         SELECT DISTINCT team_id FROM (
+           SELECT team_id FROM standings WHERE league_id = ? AND season = ?
+           UNION
+           SELECT home_team_id as team_id FROM matches WHERE league_id = ? AND season = ?
+           UNION
+           SELECT away_team_id as team_id FROM matches WHERE league_id = ? AND season = ?
+         )
+       ) all_teams
+       JOIN teams t ON t.id = all_teams.team_id
+       LEFT JOIN (
          SELECT home_team_id as team_id,
                 CASE WHEN home_goals > away_goals THEN 3
                      WHEN home_goals = away_goals THEN 1 ELSE 0 END as pts,
@@ -659,18 +706,51 @@ export function getStandingsAt(
          FROM matches
          WHERE league_id = ? AND season = ? AND status = 'FINISHED'
            AND utc_date < ? AND home_goals IS NOT NULL
-       )
-       GROUP BY team_id
-       ORDER BY points DESC, gd DESC, gf DESC`,
+       ) m ON m.team_id = all_teams.team_id
+       GROUP BY all_teams.team_id, t.name_ar, t.name_en, t.crest_url
+       ORDER BY points DESC, gd DESC, goals_for DESC, all_teams.team_id ASC`,
     )
-    .all(leagueId, season, beforeIso, leagueId, season, beforeIso) as Array<{
+    .all(
+      leagueId,
+      season,
+      leagueId,
+      season,
+      leagueId,
+      season,
+      leagueId,
+      season,
+      beforeIso,
+      leagueId,
+      season,
+      beforeIso,
+    ) as Array<{
     team_id: string;
+    name_ar: string;
+    name_en: string;
+    crest_url: string | null;
     points: number;
+    played: number;
+    won: number;
+    drawn: number;
+    lost: number;
+    goals_for: number;
+    goals_against: number;
+    gd: number;
   }>;
   return rows.map((r, i) => ({
     team_id: r.team_id,
+    name_ar: r.name_ar,
+    name_en: r.name_en,
+    crest_url: r.crest_url,
     position: i + 1,
     points: r.points,
+    played: r.played,
+    won: r.won,
+    drawn: r.drawn,
+    lost: r.lost,
+    goals_for: r.goals_for,
+    goals_against: r.goals_against,
+    goal_difference: r.gd,
   }));
 }
 
@@ -902,25 +982,30 @@ export const getColdTeamIds = cache(function getColdTeamIds(): Set<string> {
   return new Set(rows.map((r) => r.id));
 });
 
-export function getStrengthTable(leagueId: string) {
+export function getStrengthTable(leagueId: string, seasonParam?: string) {
   const db = getDb();
-  const season = latestStandingsSeason(leagueId);
+  const season = seasonParam || latestStandingsSeason(leagueId);
   if (!season) {
     return db
       .prepare(
-        `SELECT t.id, t.name_ar, t.name_en, t.crest_url, t.elo, t.attack, t.defense,
+        `SELECT t.id, t.name_ar, t.name_en, t.crest_url,
+                t.elo,
+                COALESCE(s.attack, t.attack) AS attack,
+                COALESCE(s.defense, t.defense) AS defense,
                 s.home_adv, s.rho
          FROM teams t
-         LEFT JOIN team_strengths s ON s.team_id = t.id
+         LEFT JOIN team_strengths s ON s.team_id = t.id AND s.league_id = t.league_id AND s.season = (
+           SELECT season FROM team_strengths WHERE team_id = t.id AND league_id = ? ORDER BY season DESC LIMIT 1
+         )
          WHERE t.league_id = ?
            AND EXISTS (
              SELECT 1 FROM matches m
              WHERE m.status = 'FINISHED'
                AND (m.home_team_id = t.id OR m.away_team_id = t.id)
            )
-         ORDER BY t.elo DESC`,
+         ORDER BY t.elo DESC, t.name_ar ASC`,
       )
-      .all(leagueId) as Array<{
+      .all(leagueId, leagueId) as Array<{
       id: string;
       name_ar: string;
       name_en: string;
@@ -935,15 +1020,27 @@ export function getStrengthTable(leagueId: string) {
 
   return db
     .prepare(
-      `SELECT t.id, t.name_ar, t.name_en, t.crest_url, t.elo, t.attack, t.defense,
+      `SELECT t.id, t.name_ar, t.name_en, t.crest_url,
+              COALESCE(
+                (SELECT elo FROM elo_snapshots WHERE team_id = t.id AND date <= (
+                   SELECT COALESCE(MAX(utc_date), '9999-12-31') FROM matches WHERE league_id = st.league_id AND season = st.season AND status = 'FINISHED'
+                 ) ORDER BY date DESC LIMIT 1),
+                t.elo
+              ) AS elo,
+              COALESCE(ts.attack, t.attack) AS attack,
+              COALESCE(ts.defense, t.defense) AS defense,
               ts.home_adv, ts.rho
        FROM standings st
        JOIN teams t ON t.id = st.team_id
-       LEFT JOIN team_strengths ts ON ts.team_id = t.id
+       LEFT JOIN team_strengths ts ON ts.team_id = t.id AND ts.league_id = st.league_id AND ts.season = (
+         SELECT season FROM team_strengths WHERE team_id = t.id AND league_id = ?
+         ORDER BY (season = ?) DESC, season DESC
+         LIMIT 1
+       )
        WHERE st.league_id = ? AND st.season = ?
-       ORDER BY t.elo DESC`,
+       ORDER BY elo DESC, t.name_ar ASC`,
     )
-    .all(leagueId, season) as Array<{
+    .all(leagueId, season, leagueId, season) as Array<{
     id: string;
     name_ar: string;
     name_en: string;

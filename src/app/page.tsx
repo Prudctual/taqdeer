@@ -6,6 +6,7 @@ import { LatestArticlesWidget } from "@/components/LatestArticlesWidget";
 import { LatestNewsWidget } from "@/components/LatestNewsWidget";
 import {
   getUpcomingByLeague,
+  getRecentFinished,
   getMeta,
   matchCount,
   getLeagues,
@@ -55,6 +56,8 @@ export default function HomePage() {
         lost: s.lost,
         goal_difference: s.goal_difference,
         points: s.points,
+        position: s.position,
+        elo: Math.round(s.elo),
       }));
     }
   });
@@ -82,25 +85,28 @@ export default function HomePage() {
     );
   }
 
-  // Format matches into ShadcnDataTable rows (المباريات القادمة والمباشرة فقط)
+  // Format matches into ShadcnDataTable rows (المباريات القادمة والمباشرة مع أحدث المنتهية)
   const allMatchesList: MatchTableRow[] = [];
+  const seenMatchIds = new Set<string>();
 
-  // Add upcoming matches
+  // Add upcoming & live matches
   groups.forEach((g) => {
     g.matches.forEach((m) => {
-      const matchStatus = toTableStatus(m);
-      if (matchStatus === "FINISHED") return;
-
+      seenMatchIds.add(m.id);
       allMatchesList.push({
         id: m.id,
         utcDate: m.utcDate,
-        status: matchStatus,
+        status: toTableStatus(m),
         leagueId: m.leagueId,
         leagueNameAr: m.leagueNameAr,
+        homeId: m.homeId,
         homeTeam: m.homeNameEn,
         homeTeamAr: m.homeNameAr,
+        homeCrestUrl: m.homeCrestUrl,
+        awayId: m.awayId,
         awayTeam: m.awayNameEn,
         awayTeamAr: m.awayNameAr,
+        awayCrestUrl: m.awayCrestUrl,
         homeScore: m.homeGoals,
         awayScore: m.awayGoals,
         // null = بانتظار التوقع؛ لا تُعرض احتمالات وهمية 33/34/33
@@ -110,6 +116,35 @@ export default function HomePage() {
         homeElo: m.eloHome ?? undefined,
         awayElo: m.eloAway ?? undefined,
       });
+    });
+  });
+
+  // Add recent finished matches so table status filters (المكتملة) work properly
+  const recentFinished = getRecentFinished(36);
+  recentFinished.forEach((m) => {
+    if (seenMatchIds.has(m.id)) return;
+    seenMatchIds.add(m.id);
+    allMatchesList.push({
+      id: m.id,
+      utcDate: m.utcDate,
+      status: "FINISHED",
+      leagueId: m.leagueId,
+      leagueNameAr: m.leagueNameAr,
+      homeId: m.homeId,
+      homeTeam: m.homeNameEn,
+      homeTeamAr: m.homeNameAr,
+      homeCrestUrl: m.homeCrestUrl,
+      awayId: m.awayId,
+      awayTeam: m.awayNameEn,
+      awayTeamAr: m.awayNameAr,
+      awayCrestUrl: m.awayCrestUrl,
+      homeScore: m.homeGoals,
+      awayScore: m.awayGoals,
+      pHome: m.pHome,
+      pDraw: m.pDraw,
+      pAway: m.pAway,
+      homeElo: m.eloHome ?? undefined,
+      awayElo: m.eloAway ?? undefined,
     });
   });
 

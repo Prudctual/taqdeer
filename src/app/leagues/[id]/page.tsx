@@ -20,60 +20,15 @@ import {
   getStrengthTable,
   getBankerPicks,
 } from "@/lib/queries";
-import { latestSeasonStartYear, leagueEmblemUrl, tournamentEmblemUrl, type TournamentType } from "@/lib/leagues";
+import {
+  latestSeasonStartYear,
+  leagueEmblemUrl,
+  tournamentEmblemUrl,
+  getLeagueZone as zoneOf,
+} from "@/lib/leagues";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
-
-type Zone = {
-  color: string;
-  bgColor: string;
-  textColor: string;
-  positionBgColor: string;
-  positionTextColor: string;
-  borderColor: string;
-  label: string;
-  tournamentType?: TournamentType;
-};
-
-function zoneOf(position: number, total: number): Zone | null {
-  if (position <= 4) {
-    return {
-      color: "var(--home)",
-      bgColor: "bg-blue-500/10 hover:bg-blue-500/20",
-      textColor: "text-blue-500 font-semibold",
-      positionBgColor: "bg-blue-500/20",
-      positionTextColor: "text-blue-500",
-      borderColor: "border-blue-500/30",
-      label: "دوري أبطال أوروبا",
-      tournamentType: "ucl",
-    };
-  }
-  if (position === 5 || position === 6) {
-    return {
-      color: "var(--warn)",
-      bgColor: "bg-orange-500/10 hover:bg-orange-500/20",
-      textColor: "text-orange-500 font-semibold",
-      positionBgColor: "bg-orange-500/20",
-      positionTextColor: "text-orange-500",
-      borderColor: "border-orange-500/30",
-      label: "الدوري الأوروبي",
-      tournamentType: "uel",
-    };
-  }
-  if (total >= 8 && position >= total - 2) {
-    return {
-      color: "var(--danger)",
-      bgColor: "bg-danger-dim hover:bg-danger-dim",
-      textColor: "text-danger font-semibold",
-      positionBgColor: "bg-danger-dim",
-      positionTextColor: "text-danger",
-      borderColor: "border-danger/30",
-      label: "منطقة الهبوط",
-    };
-  }
-  return null;
-}
 
 function NumTh({ children, full }: { children: ReactNode; full?: string }) {
   return (
@@ -157,10 +112,6 @@ function cmpDesc(a: number, b: number) {
   return a < b ? 1 : a > b ? -1 : 0;
 }
 
-function cmpAsc(a: number, b: number) {
-  return a < b ? -1 : a > b ? 1 : 0;
-}
-
 export default async function LeaguePage({
   params,
   searchParams,
@@ -190,7 +141,7 @@ export default async function LeaguePage({
       : defaultSeason;
 
   const standings = getStandings(id, activeSeason);
-  const strengths = getStrengthTable(id);
+  const strengths = getStrengthTable(id, activeSeason);
   // الجدول القادم للمواجهات المجدولة
   const matches = getLeagueMatches(id, 400);
   const counts = getLeagueMatchCounts(id);
@@ -198,29 +149,33 @@ export default async function LeaguePage({
   const isCurrentSeason = activeSeason === currentSeasonYear;
   const anyPlayed = standings.some((r) => r.played > 0);
   const seasonPrep = n === 0 && isCurrentSeason;
-  const seasonLabel = `${activeSeason}/${Number(activeSeason) + 1}`;
+  const seasonLabel =
+    id === "no1" ? activeSeason : `${activeSeason}/${Number(activeSeason) + 1}`;
 
   const totalFinishedMatchesInSeason =
     standings.reduce((acc, r) => acc + r.played, 0) / 2;
 
-  const maxAttack = Math.max(...strengths.map((t) => t.attack ?? 0), 0.01);
-  const maxDefenseAbs = Math.max(
-    ...strengths.map((t) => Math.abs(t.defense ?? 0)),
-    0.01,
-  );
+  const attackStrengths = strengths.filter((t) => t.attack != null);
+  const defenseStrengths = strengths.filter((t) => t.defense != null);
+
+  const minAttack = attackStrengths.length ? Math.min(...attackStrengths.map((t) => t.attack!)) : 0;
+  const maxAttack = attackStrengths.length ? Math.max(...attackStrengths.map((t) => t.attack!)) : 1;
+  const attackSpan = Math.max(maxAttack - minAttack, 0.01);
+
+  const minDefense = defenseStrengths.length ? Math.min(...defenseStrengths.map((t) => t.defense!)) : 0;
+  const maxDefense = defenseStrengths.length ? Math.max(...defenseStrengths.map((t) => t.defense!)) : 1;
+  const defenseSpan = Math.max(maxDefense - minDefense, 0.01);
+
   const eloValues = strengths.map((t) => t.elo);
   const minElo = eloValues.length ? Math.min(...eloValues) : 0;
   const eloSpan = Math.max((eloValues.length ? Math.max(...eloValues) : 0) - minElo, 1);
 
   const byElo = [...strengths].sort((a, b) => cmpDesc(a.elo, b.elo));
-  const byAttack = [...strengths].sort((a, b) =>
-    cmpDesc(a.attack ?? Number.NEGATIVE_INFINITY, b.attack ?? Number.NEGATIVE_INFINITY),
+  const byAttack = [...attackStrengths].sort((a, b) =>
+    cmpDesc(a.attack!, b.attack!),
   );
-  const byDefense = [...strengths].sort((a, b) =>
-    cmpAsc(
-      Math.abs(a.defense ?? Number.POSITIVE_INFINITY),
-      Math.abs(b.defense ?? Number.POSITIVE_INFINITY),
-    ),
+  const byDefense = [...defenseStrengths].sort((a, b) =>
+    cmpDesc(a.defense!, b.defense!),
   );
 
   const leader = standings[0] ?? null;
@@ -429,8 +384,8 @@ export default async function LeaguePage({
                 </thead>
                 <tbody className="divide-y divide-line">
                   {standings.map((r) => {
-                    const zone = zoneOf(r.position, n);
-                    const isRelegation = zone?.label === "منطقة الهبوط" || zone?.label === "مرحلة الهبوط / التصفيات";
+                    const zone = zoneOf(r.position, n, id);
+                    const isRelegation = zone?.label === "منطقة الهبوط" || zone?.label === "منطقة الهبوط المباشر" || zone?.label === "مرحلة الهبوط / التصفيات";
                     const isQualified = !!zone && !isRelegation;
 
                     return (
@@ -509,7 +464,7 @@ export default async function LeaguePage({
               {(() => {
                 const seen = new Map<string, string>();
                 standings.forEach((r) => {
-                  const z = zoneOf(r.position, n);
+                  const z = zoneOf(r.position, n, id);
                   if (z && !seen.has(z.label)) seen.set(z.label, z.color);
                 });
                 return Array.from(seen.entries()).map(([label, color]) => (
@@ -554,33 +509,33 @@ export default async function LeaguePage({
               ))}
             </RankedList>
 
-            <RankedList title="القوة الهجومية" hint="الأخطر أولاً" icon="⚔️">
+            <RankedList title="القوة الهجومية" hint="الأعلى غزارة أولاً" icon="⚔️">
               {byAttack.map((t, i) => (
                 <MeterRow
                   key={t.id}
                   rank={i + 1}
                   teamId={t.id}
                   name={t.name_ar}
-                  value={t.attack?.toFixed(2) ?? "—"}
+                  value={t.attack != null ? (t.attack > 0 ? `+${t.attack.toFixed(2)}` : t.attack.toFixed(2)) : "—"}
                   pct={Math.min(
                     100,
-                    (Math.max(0, t.attack ?? 0) / maxAttack) * 100,
+                    Math.max(8, (((t.attack ?? 0) - minAttack) / attackSpan) * 100),
                   )}
                 />
               ))}
             </RankedList>
 
-            <RankedList title="الصلابة الدفاعية" hint="الأقرب للصفر أولاً" icon="🛡️">
+            <RankedList title="الصلابة الدفاعية" hint="الأصلب دفاعياً أولاً" icon="🛡️">
               {byDefense.map((t, i) => (
                 <MeterRow
                   key={t.id}
                   rank={i + 1}
                   teamId={t.id}
                   name={t.name_ar}
-                  value={t.defense?.toFixed(2) ?? "—"}
+                  value={t.defense != null ? (t.defense > 0 ? `+${t.defense.toFixed(2)}` : t.defense.toFixed(2)) : "—"}
                   pct={Math.min(
                     100,
-                    (Math.abs(t.defense ?? 0) / maxDefenseAbs) * 100,
+                    Math.max(8, (((t.defense ?? 0) - minDefense) / defenseSpan) * 100),
                   )}
                 />
               ))}

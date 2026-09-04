@@ -4,7 +4,7 @@ import React, { useState, useMemo } from "react";
 import Link from "next/link";
 import { ProbBar } from "./ProbBar";
 import { Crest } from "./Crest";
-import { formatKickoffAbsolute } from "@/lib/format";
+import { formatKickoffAbsolute, topOutcome } from "@/lib/format";
 import { matchDisplay } from "@/lib/match-status";
 
 export interface MatchTableRow {
@@ -13,10 +13,14 @@ export interface MatchTableRow {
   status: "FINISHED" | "SCHEDULED" | "IN_PLAY" | "PAUSED";
   leagueId: string;
   leagueNameAr: string;
+  homeId?: string;
   homeTeam: string;
   homeTeamAr: string;
+  homeCrestUrl?: string | null;
+  awayId?: string;
   awayTeam: string;
   awayTeamAr: string;
+  awayCrestUrl?: string | null;
   homeScore?: number | null;
   awayScore?: number | null;
   /** null = لا توقع بعد للنموذج — تُعرض حالة صادقة بدل احتمالات وهمية */
@@ -39,7 +43,7 @@ export function ShadcnDataTable({
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
   const [sortBy, setSortBy] = useState<"date" | "confidence">("date");
   const [currentPage, setCurrentPage] = useState(1);
-  const pageSize = 8;
+  const pageSize = 10;
 
   // Extract unique leagues
   const leagues = useMemo(() => {
@@ -50,35 +54,41 @@ export function ShadcnDataTable({
 
   // Filter & Sort matches
   const filteredMatches = useMemo(() => {
-    return matches.filter((m) => {
-      // Query filter (team names)
-      const matchesQuery =
-        !filterQuery ||
-        m.homeTeamAr.toLowerCase().includes(filterQuery.toLowerCase()) ||
-        m.awayTeamAr.toLowerCase().includes(filterQuery.toLowerCase()) ||
-        m.homeTeam.toLowerCase().includes(filterQuery.toLowerCase()) ||
-        m.awayTeam.toLowerCase().includes(filterQuery.toLowerCase());
+    return matches
+      .filter((m) => {
+        // Query filter (team names)
+        const matchesQuery =
+          !filterQuery ||
+          m.homeTeamAr.toLowerCase().includes(filterQuery.toLowerCase()) ||
+          m.awayTeamAr.toLowerCase().includes(filterQuery.toLowerCase()) ||
+          m.homeTeam.toLowerCase().includes(filterQuery.toLowerCase()) ||
+          m.awayTeam.toLowerCase().includes(filterQuery.toLowerCase());
 
-      // League filter
-      const matchesLeague =
-        selectedLeague === "ALL" || m.leagueId === selectedLeague;
+        // League filter
+        const matchesLeague =
+          selectedLeague === "ALL" || m.leagueId === selectedLeague;
 
-      // Status filter
-      const matchesStatus =
-        statusFilter === "ALL" ||
-        (statusFilter === "LIVE" && (m.status === "IN_PLAY" || m.status === "PAUSED")) ||
-        (statusFilter === "SCHEDULED" && m.status === "SCHEDULED") ||
-        (statusFilter === "FINISHED" && m.status === "FINISHED");
+        // Status filter
+        const matchesStatus =
+          statusFilter === "ALL" ||
+          (statusFilter === "LIVE" &&
+            (m.status === "IN_PLAY" || m.status === "PAUSED")) ||
+          (statusFilter === "SCHEDULED" && m.status === "SCHEDULED") ||
+          (statusFilter === "FINISHED" && m.status === "FINISHED");
 
-      return matchesQuery && matchesLeague && matchesStatus;
-    }).sort((a, b) => {
-      if (sortBy === "confidence") {
-        const maxA = Math.max(a.pHome ?? 0, a.pDraw ?? 0, a.pAway ?? 0);
-        const maxB = Math.max(b.pHome ?? 0, b.pDraw ?? 0, b.pAway ?? 0);
-        return maxB - maxA;
-      }
-      return new Date(a.utcDate).getTime() - new Date(b.utcDate).getTime();
-    });
+        return matchesQuery && matchesLeague && matchesStatus;
+      })
+      .sort((a, b) => {
+        if (sortBy === "confidence") {
+          const maxA = Math.max(a.pHome ?? 0, a.pDraw ?? 0, a.pAway ?? 0);
+          const maxB = Math.max(b.pHome ?? 0, b.pDraw ?? 0, b.pAway ?? 0);
+          return maxB - maxA;
+        }
+        if (statusFilter === "FINISHED") {
+          return b.utcDate.localeCompare(a.utcDate);
+        }
+        return a.utcDate.localeCompare(b.utcDate);
+      });
   }, [matches, filterQuery, selectedLeague, statusFilter, sortBy]);
 
   // Pagination
@@ -102,7 +112,7 @@ export function ShadcnDataTable({
               setCurrentPage(1);
             }}
             placeholder="تصفية باسم الفريق..."
-            className="w-full rounded-lg border border-line bg-surface px-3 py-1.5 pe-8 text-xs text-ink placeholder-faint focus:border-accent focus:outline-none transition-all"
+            className="w-full rounded-lg border border-line bg-surface ps-8 pe-3 py-1.5 text-xs text-ink placeholder-faint focus:border-accent focus:outline-none transition-all"
           />
           <span className="absolute start-2.5 top-1/2 -translate-y-1/2 text-faint text-xs">
             🔍
@@ -146,9 +156,10 @@ export function ShadcnDataTable({
           {/* Sort Toggle */}
           <button
             type="button"
-            onClick={() =>
-              setSortBy((prev) => (prev === "date" ? "confidence" : "date"))
-            }
+            onClick={() => {
+              setSortBy((prev) => (prev === "date" ? "confidence" : "date"));
+              setCurrentPage(1);
+            }}
             className="rounded-lg border border-line bg-surface px-3 py-1.5 text-muted hover:text-ink font-semibold transition-colors cursor-pointer"
           >
             ترتيب: {sortBy === "date" ? "حسب الموعد 🕒" : "حسب ثقة النموذج 🎯"}
@@ -162,8 +173,12 @@ export function ShadcnDataTable({
           <thead>
             <tr className="border-b border-line bg-panel/60 text-muted font-bold">
               <th className="px-4 py-3 text-start">الدوري والحالة</th>
-              <th className="px-4 py-3 text-center min-w-[200px]">المواجهة والنتيجة</th>
-              <th className="px-4 py-3 text-center min-w-[180px]">احتمالات 1X2 (Dixon-Coles)</th>
+              <th className="px-4 py-3 text-center min-w-[200px]">
+                المواجهة والنتيجة
+              </th>
+              <th className="px-4 py-3 text-center min-w-[180px]">
+                احتمالات 1X2 (النموذج الإحصائي)
+              </th>
               <th className="px-4 py-3 text-center">أرجح نتيجة</th>
               <th className="px-4 py-3 text-center">الإجراء</th>
             </tr>
@@ -173,17 +188,12 @@ export function ShadcnDataTable({
               paginatedMatches.map((m) => {
                 const hasPrediction =
                   m.pHome != null && m.pDraw != null && m.pAway != null;
+                const outcome = hasPrediction
+                  ? topOutcome(m.pHome!, m.pDraw!, m.pAway!)
+                  : null;
                 const maxProb = hasPrediction
                   ? Math.max(m.pHome!, m.pDraw!, m.pAway!)
                   : null;
-                const pickLabel =
-                  maxProb == null
-                    ? null
-                    : maxProb === m.pHome
-                      ? "فوز المضيف 1"
-                      : maxProb === m.pDraw
-                        ? "تعادل X"
-                        : "فوز الضيف 2";
 
                 return (
                   <tr
@@ -194,7 +204,9 @@ export function ShadcnDataTable({
                     {/* League & Status */}
                     <td className="px-4 py-3 text-start align-middle">
                       <div className="flex flex-col gap-0.5">
-                        <span className="font-bold text-ink">{m.leagueNameAr}</span>
+                        <span className="font-bold text-ink">
+                          {m.leagueNameAr}
+                        </span>
                         <span className="text-[11px] text-faint tabular">
                           {formatKickoffAbsolute(m.utcDate)}
                         </span>
@@ -204,14 +216,33 @@ export function ShadcnDataTable({
                     {/* Matchup */}
                     <td className="px-4 py-3 text-center align-middle">
                       <div className="grid grid-cols-[1fr_3.25rem_1fr] items-center gap-1.5 max-w-sm mx-auto">
-                        {/* Home Team - Pushed close to center VS */}
+                        {/* Home Team */}
                         <div className="flex items-center gap-1.5 justify-end min-w-0">
-                          <Crest alt={m.homeTeamAr} size="chip" />
-                          <span className="font-bold text-ink truncate">{m.homeTeamAr}</span>
+                          <div className="flex flex-col items-end min-w-0">
+                            {m.homeId ? (
+                              <Link
+                                href={`/team/${m.homeId}`}
+                                onClick={(e) => e.stopPropagation()}
+                                className="font-bold text-ink truncate hover:text-accent no-underline max-w-[125px]"
+                              >
+                                {m.homeTeamAr}
+                              </Link>
+                            ) : (
+                              <span className="font-bold text-ink truncate max-w-[125px]">
+                                {m.homeTeamAr}
+                              </span>
+                            )}
+                            {m.homeElo != null ? (
+                              <span className="text-[10px] font-mono text-faint tabular">
+                                Elo {Math.round(m.homeElo)}
+                              </span>
+                            ) : null}
+                          </div>
+                          <Crest src={m.homeCrestUrl} alt={m.homeTeamAr} size="chip" />
                         </div>
 
                         {/* Score or VS */}
-                        <div className="w-13 shrink-0 text-center flex items-center justify-center mx-auto">
+                        <div className="w-[3.25rem] shrink-0 text-center flex items-center justify-center mx-auto">
                           {(() => {
                             const { isLive, score, badge } = matchDisplay({
                               status: m.status,
@@ -220,21 +251,42 @@ export function ShadcnDataTable({
                               awayGoals: m.awayScore,
                             });
                             return (
-                              <span className={`inline-flex items-center justify-center px-1.5 py-0.5 rounded-md border font-mono font-semibold text-xs tabular min-w-[2.75rem] ${
-                                isLive
-                                  ? "bg-live/10 border-live/40 text-live"
-                                  : "bg-panel border-line text-ink"
-                              }`}>
+                              <span
+                                className={`inline-flex items-center justify-center px-1.5 py-0.5 rounded-md border font-mono font-semibold text-xs tabular min-w-[2.75rem] ${
+                                  isLive
+                                    ? "bg-live/10 border-live/40 text-live"
+                                    : "bg-panel border-line text-ink"
+                                }`}
+                              >
                                 {score ?? badge}
                               </span>
                             );
                           })()}
                         </div>
 
-                        {/* Away Team - Pushed close to center VS */}
+                        {/* Away Team */}
                         <div className="flex items-center gap-1.5 justify-start min-w-0">
-                          <span className="font-bold text-ink truncate">{m.awayTeamAr}</span>
-                          <Crest alt={m.awayTeamAr} size="chip" />
+                          <Crest src={m.awayCrestUrl} alt={m.awayTeamAr} size="chip" />
+                          <div className="flex flex-col items-start min-w-0">
+                            {m.awayId ? (
+                              <Link
+                                href={`/team/${m.awayId}`}
+                                onClick={(e) => e.stopPropagation()}
+                                className="font-bold text-ink truncate hover:text-accent no-underline max-w-[125px]"
+                              >
+                                {m.awayTeamAr}
+                              </Link>
+                            ) : (
+                              <span className="font-bold text-ink truncate max-w-[125px]">
+                                {m.awayTeamAr}
+                              </span>
+                            )}
+                            {m.awayElo != null ? (
+                              <span className="text-[10px] font-mono text-faint tabular">
+                                Elo {Math.round(m.awayElo)}
+                              </span>
+                            ) : null}
+                          </div>
                         </div>
                       </div>
                     </td>
@@ -259,12 +311,22 @@ export function ShadcnDataTable({
 
                     {/* Verdict */}
                     <td className="px-4 py-3 text-center align-middle">
-                      {pickLabel && maxProb != null ? (
-                        <span className="inline-flex items-center rounded-full border border-line bg-panel px-2.5 py-1 text-[11px] font-bold text-ink shadow-2xs">
-                          {pickLabel} ({(maxProb * 100).toFixed(0)}٪)
+                      {outcome && maxProb != null ? (
+                        <span
+                          className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-bold shadow-2xs ${
+                            outcome.isEquallyBalanced
+                              ? "bg-panel border-line text-muted"
+                              : "bg-panel border-accent/30 text-ink"
+                          }`}
+                        >
+                          {outcome.isEquallyBalanced
+                            ? "مواجهة متكافئة"
+                            : `${outcome.label} (${(maxProb * 100).toFixed(0)}٪)`}
                         </span>
                       ) : (
-                        <span className="text-[11px] font-bold text-faint">—</span>
+                        <span className="text-[11px] font-bold text-faint">
+                          —
+                        </span>
                       )}
                     </td>
 
@@ -295,8 +357,15 @@ export function ShadcnDataTable({
       {/* Pagination Footer */}
       <div className="flex items-center justify-between border-t border-line pt-3 text-xs text-muted">
         <div>
-          عرض <span className="font-bold text-ink tabular">{paginatedMatches.length}</span> من{" "}
-          <span className="font-bold text-ink tabular">{filteredMatches.length}</span> مباراة
+          عرض{" "}
+          <span className="font-bold text-ink tabular">
+            {paginatedMatches.length}
+          </span>{" "}
+          من{" "}
+          <span className="font-bold text-ink tabular">
+            {filteredMatches.length}
+          </span>{" "}
+          مباراة
         </div>
         <div className="flex items-center gap-1.5">
           <button

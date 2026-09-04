@@ -20,6 +20,7 @@ import {
   getTeam,
   getTeamMatches,
   getTeamPlayers,
+  getStrengthTable,
 } from "@/lib/queries";
 import { toSquadStars } from "@/lib/players";
 
@@ -82,6 +83,37 @@ export default async function TeamPage({
     true,
     8,
   );
+
+  const leagueStrengths = getStrengthTable(team.league_id);
+  const teamStrength = leagueStrengths.find((s) => s.id === team.id);
+  const attackVal = teamStrength?.attack ?? team.attack;
+  const defenseVal = teamStrength?.defense ?? team.defense;
+
+  const validAttacks = leagueStrengths.filter((s) => s.attack != null);
+  const validDefenses = leagueStrengths.filter((s) => s.defense != null);
+
+  const minAttack = validAttacks.length ? Math.min(...validAttacks.map((s) => s.attack!)) : -0.8;
+  const maxAttack = validAttacks.length ? Math.max(...validAttacks.map((s) => s.attack!)) : 0.8;
+  const attackSpan = Math.max(maxAttack - minAttack, 0.01);
+
+  const minDefense = validDefenses.length ? Math.min(...validDefenses.map((s) => s.defense!)) : -0.8;
+  const maxDefense = validDefenses.length ? Math.max(...validDefenses.map((s) => s.defense!)) : 0.8;
+  const defenseSpan = Math.max(maxDefense - minDefense, 0.01);
+
+  const attackPct = attackVal != null
+    ? Math.min(100, Math.max(8, ((attackVal - minAttack) / attackSpan) * 100))
+    : 50;
+
+  const defensePct = defenseVal != null
+    ? Math.min(100, Math.max(8, ((defenseVal - minDefense) / defenseSpan) * 100))
+    : 50;
+
+  const attackRank = attackVal != null && validAttacks.length > 0
+    ? validAttacks.filter((s) => s.attack! > attackVal).length + 1
+    : null;
+  const defenseRank = defenseVal != null && validDefenses.length > 0
+    ? validDefenses.filter((s) => s.defense! > defenseVal).length + 1
+    : null;
 
   const form = matches
     .filter((m) => m.homeGoals != null && m.awayGoals != null)
@@ -199,49 +231,53 @@ export default async function TeamPage({
           <div className="bg-panel p-4 rounded-xl border border-line text-center space-y-1">
             <span className="text-xs font-semibold text-muted block">معامل الهجوم</span>
             <span className="text-2xl sm:text-3xl font-semibold text-ink font-mono block">
-              {team.attack?.toFixed(2) ?? "—"}
+              {attackVal != null ? (attackVal > 0 ? `+${attackVal.toFixed(2)}` : attackVal.toFixed(2)) : "—"}
             </span>
-            <span className="text-[11px] font-bold text-muted block">أعلى = أكثر خطورة</span>
+            <span className="text-[11px] font-bold text-muted block">
+              {attackRank != null ? `المركز ${attackRank} هجومياً بالدوري` : "أعلى = أكثر خطورة"}
+            </span>
           </div>
 
           <div className="bg-panel p-4 rounded-xl border border-line text-center space-y-1">
             <span className="text-xs font-semibold text-muted block">معامل الدفاع</span>
             <span className="text-2xl sm:text-3xl font-semibold text-ink font-mono block">
-              {team.defense?.toFixed(2) ?? "—"}
+              {defenseVal != null ? (defenseVal > 0 ? `+${defenseVal.toFixed(2)}` : defenseVal.toFixed(2)) : "—"}
             </span>
-            <span className="text-[11px] font-bold text-muted block">أقل = أكثر صلابة</span>
+            <span className="text-[11px] font-bold text-muted block">
+              {defenseRank != null ? `المركز ${defenseRank} دفاعياً بالدوري` : "أعلى = أكثر صلابة"}
+            </span>
           </div>
         </div>
 
         {/* Attack & Defense Meters */}
-        {(team.attack != null || team.defense != null) && (
+        {(attackVal != null || defenseVal != null) && (
           <RevealOnView className="space-y-3 border-t border-line pt-5">
-            {team.attack != null && (
+            {attackVal != null && (
               <div className="flex items-center gap-3 text-xs">
-                <span className="w-16 font-semibold text-ink shrink-0">القوة الهجومية</span>
+                <span className="w-20 font-semibold text-ink shrink-0">القوة الهجومية</span>
                 <div className="h-3 flex-1 rounded-full bg-panel overflow-hidden">
                   <div
                     className="h-full bg-success rounded-full transition-all"
-                    style={{ width: `${Math.min(100, (team.attack / 2.2) * 100)}%` }}
+                    style={{ width: `${attackPct}%` }}
                   />
                 </div>
-                <span className="w-12 text-end font-mono font-semibold text-ink shrink-0">
-                  {team.attack.toFixed(2)}
+                <span className="w-14 text-end font-mono font-semibold text-ink shrink-0">
+                  {attackVal > 0 ? `+${attackVal.toFixed(2)}` : attackVal.toFixed(2)}
                 </span>
               </div>
             )}
 
-            {team.defense != null && (
+            {defenseVal != null && (
               <div className="flex items-center gap-3 text-xs">
-                <span className="w-16 font-semibold text-ink shrink-0">الصلابة الدفاعية</span>
+                <span className="w-20 font-semibold text-ink shrink-0">الصلابة الدفاعية</span>
                 <div className="h-3 flex-1 rounded-full bg-panel overflow-hidden">
                   <div
                     className="h-full bg-blue-500 rounded-full transition-all"
-                    style={{ width: `${Math.min(100, (Math.abs(team.defense) / 2.2) * 100)}%` }}
+                    style={{ width: `${defensePct}%` }}
                   />
                 </div>
-                <span className="w-12 text-end font-mono font-semibold text-ink shrink-0">
-                  {team.defense.toFixed(2)}
+                <span className="w-14 text-end font-mono font-semibold text-ink shrink-0">
+                  {defenseVal > 0 ? `+${defenseVal.toFixed(2)}` : defenseVal.toFixed(2)}
                 </span>
               </div>
             )}

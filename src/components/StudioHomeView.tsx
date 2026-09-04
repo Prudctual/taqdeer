@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import Link from "next/link";
 import { MatchList } from "@/components/MatchList";
 import { HeroMatchBanner } from "@/components/HeroMatchBanner";
 import { LiveInteractiveScores } from "@/components/LiveInteractiveScores";
 import { BankerPicksWidget, type BankerPick } from "@/components/BankerPicksWidget";
 import { LeagueTableWidget, type StandingTeam } from "@/components/LeagueTableWidget";
+import { ShadcnDataTable, type MatchTableRow } from "@/components/ShadcnDataTable";
 import { useLiveScores } from "@/lib/hooks/useLiveScores";
 import { resolveMatchPhase } from "@/lib/match-status";
 import type { MatchCard } from "@/lib/queries";
@@ -29,7 +30,7 @@ interface StudioHomeViewProps {
   upcomingCount: number;
   lastFit: string | null;
   leagues: LeagueItem[];
-  tableMatches: unknown[];
+  tableMatches?: MatchTableRow[];
   groups: MatchGroup[];
   recentGroups?: MatchGroup[];
   nextMatch?: MatchCard | null;
@@ -40,6 +41,7 @@ interface StudioHomeViewProps {
 export function StudioHomeView({
   upcomingCount,
   leagues = [],
+  tableMatches = [],
   groups = [],
   nextMatch,
   standingsByLeague = {},
@@ -48,6 +50,7 @@ export function StudioHomeView({
   const [activeTab, setActiveTab] = useState<
     "matches" | "value" | "bankers" | "standings"
   >("matches");
+  const [matchesViewMode, setMatchesViewMode] = useState<"cards" | "table">("cards");
 
   const { liveMatches, isLiveActive } = useLiveScores(3000);
 
@@ -73,6 +76,27 @@ export function StudioHomeView({
     });
 
   upcomingMatchesList.sort((a, b) => a.utcDate.localeCompare(b.utcDate));
+
+  const liveTableMatches = useMemo(() => {
+    return (tableMatches || []).map((m) => {
+      const liveUpdate = liveMatches.find((lm) => lm.id === m.id);
+      if (!liveUpdate) return m;
+      const phase = resolveMatchPhase({
+        status: liveUpdate.status,
+        utcDate: liveUpdate.utcDate,
+        homeGoals: liveUpdate.homeGoals,
+        awayGoals: liveUpdate.awayGoals,
+        minute: liveUpdate.minute,
+        liveStatusAr: liveUpdate.liveStatusAr,
+      });
+      return {
+        ...m,
+        homeScore: liveUpdate.homeGoals ?? m.homeScore,
+        awayScore: liveUpdate.awayGoals ?? m.awayScore,
+        status: (phase === "live" ? "IN_PLAY" : phase === "finished" ? "FINISHED" : m.status) as MatchTableRow["status"],
+      };
+    });
+  }, [tableMatches, liveMatches]);
 
   const heroMatch =
     (nextMatch &&
@@ -157,13 +181,47 @@ export function StudioHomeView({
             )}
 
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line pb-3">
-              <h3 className="type-section text-ink">المباريات القادمة</h3>
-              <span className="text-xs font-medium text-muted tabular">
-                {upcomingMatchesList.length} مواجهة
-              </span>
+              <div className="flex items-center gap-3">
+                <h3 className="type-section text-ink">المباريات القادمة</h3>
+                <span className="text-xs font-medium text-muted tabular">
+                  {upcomingMatchesList.length} مواجهة
+                </span>
+              </div>
+              <div className="flex items-center gap-1 rounded-lg bg-panel p-1 border border-line">
+                <button
+                  type="button"
+                  onClick={() => setMatchesViewMode("cards")}
+                  className={`press-scale flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold transition-colors ${
+                    matchesViewMode === "cards"
+                      ? "bg-surface text-ink shadow-xs border border-line"
+                      : "text-muted hover:text-ink"
+                  }`}
+                  aria-label="عرض البطاقات"
+                >
+                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>
+                  <span>بطاقات</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMatchesViewMode("table")}
+                  className={`press-scale flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold transition-colors ${
+                    matchesViewMode === "table"
+                      ? "bg-surface text-ink shadow-xs border border-line"
+                      : "text-muted hover:text-ink"
+                  }`}
+                  aria-label="عرض جدول النموذج"
+                >
+                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 3h18v18H3zM3 9h18M3 15h18M9 3v18M15 3v18"/></svg>
+                  <span>جدول النموذج</span>
+                </button>
+              </div>
             </div>
 
-            {upcomingMatchesList.length > 0 ? (
+            {matchesViewMode === "table" ? (
+              <div className="space-y-3">
+                <ShadcnDataTable matches={liveTableMatches} />
+              </div>
+            ) : upcomingMatchesList.length > 0 ? (
               <div className="card overflow-hidden">
                 <MatchList matches={upcomingMatchesList} groupDays showLeague />
               </div>
