@@ -162,6 +162,7 @@ const ALIASES: Record<string, string> = {
   "Paris Saint-Germain": "Paris SG",
   "Paris Saint Germain": "Paris SG",
   "Paris Saint Germain FC": "Paris SG",
+  "PSG": "Paris SG",
   "Saint Etienne": "St Etienne",
   "SV Elversberg": "Elversberg",
 

@@ -79,11 +79,18 @@ function namesMatch(a: string, b: string): boolean {
   return overlap > 0 && overlap >= Math.min(ta.size, tb.size);
 }
 
-function todayKeys(): string[] {
+function syncDateKeys(): string[] {
   const now = new Date();
-  const utc = now.toISOString().slice(0, 10);
-  const bag = new Date(now.getTime() + 3 * 3600_000).toISOString().slice(0, 10);
-  return [...new Set([utc, bag])];
+  const keys = new Set<string>();
+  // فحص الأيام السابقة (حتى 4 أيام للخلف) واليوم والغد لضمان جلب وتحديث النتائج الحقيقية المكتملة بدقة
+  for (let offsetDays = -4; offsetDays <= 1; offsetDays++) {
+    const t = now.getTime() + offsetDays * 86_400_000;
+    const dUtc = new Date(t).toISOString().slice(0, 10);
+    const dBag = new Date(t + 3 * 3600_000).toISOString().slice(0, 10);
+    keys.add(dUtc);
+    keys.add(dBag);
+  }
+  return Array.from(keys).sort();
 }
 
 function findMatchId(
@@ -116,7 +123,7 @@ function findMatchId(
        JOIN teams th ON th.id = m.home_team_id
        JOIN teams ta ON ta.id = m.away_team_id
        WHERE m.league_id = ?
-         AND date(m.utc_date) BETWEEN date(?, '-1 day') AND date(?, '+1 day')
+         AND date(m.utc_date) BETWEEN date(?, '-2 days') AND date(?, '+2 days')
          AND m.source NOT IN ('preview-holdout','synthetic','demo')`,
     )
     .all(leagueId, day, day) as Array<{
@@ -150,28 +157,33 @@ function applyLiveUpdate(
     eventsJson: string | null;
     statsJson?: string | null;
     externalId?: string | null;
+    utcDate?: string | null;
   },
 ) {
   db.prepare(
     `UPDATE matches SET
        status = ?,
-       home_goals = COALESCE(?, home_goals),
-       away_goals = COALESCE(?, away_goals),
+       home_goals = CASE WHEN ? IS NOT NULL THEN ? ELSE home_goals END,
+       away_goals = CASE WHEN ? IS NOT NULL THEN ? ELSE away_goals END,
        minute = ?,
        live_status_ar = ?,
        live_events_json = COALESCE(?, live_events_json),
        live_stats_json = COALESCE(?, live_stats_json),
-       external_id = COALESCE(external_id, ?)
+       external_id = COALESCE(external_id, ?),
+       utc_date = COALESCE(?, utc_date)
      WHERE id = ?`,
   ).run(
     fields.status,
     fields.homeGoals,
+    fields.homeGoals,
+    fields.awayGoals,
     fields.awayGoals,
     fields.minute,
     fields.liveStatusAr,
     fields.eventsJson,
     fields.statsJson ?? null,
     fields.externalId ?? null,
+    fields.utcDate ?? null,
     matchId,
   );
 }
@@ -239,13 +251,13 @@ type FotmobDayPayload = {
 
 async function syncFromFotmob(db: ReturnType<typeof getDb>): Promise<number> {
   let synced = 0;
-  const dates = todayKeys().map((d) => d.replace(/-/g, ""));
+  const dates = syncDateKeys().map((d) => d.replace(/-/g, ""));
 
   for (const yyyymmdd of dates) {
     let data: FotmobDayPayload | null = null;
 
     try {
-      const res = await fetch(`https://www.fotmob.com/api/data/matches?date=${yyyymmdd}`, {
+      const res = await fetch(`https://www.fotmob.com/api/data/matches?date=${yyyymmdd}&timezone=UTC`, {
         headers: {
           Accept: "application/json",
           Referer: "https://www.fotmob.com/",
@@ -274,11 +286,13 @@ async function syncFromFotmob(db: ReturnType<typeof getDb>): Promise<number> {
           halfs?: Record<string, string>;
         };
         const homeName = m.home?.name || "";
+        const homeLong = (m.home as { longName?: string })?.longName || "";
         const awayName = m.away?.name || "";
-        if (!homeName || !awayName || !m.id) continue;
+        const awayLong = (m.away as { longName?: string })?.longName || "";
+        if ((!homeName && !homeLong) || (!awayName && !awayLong) || !m.id) continue;
 
         const utcDate = st.utcTime || `${yyyymmdd.slice(0, 4)}-${yyyymmdd.slice(4, 6)}-${yyyymmdd.slice(6, 8)}T12:00:00Z`;
-        const matchId = findMatchId(
+        let matchId = findMatchId(
           db,
           leagueId,
           homeName,
@@ -286,6 +300,16 @@ async function syncFromFotmob(db: ReturnType<typeof getDb>): Promise<number> {
           utcDate,
           String(m.id),
         );
+        if (!matchId && (homeLong || awayLong)) {
+          matchId = findMatchId(
+            db,
+            leagueId,
+            homeLong || homeName,
+            awayLong || awayName,
+            utcDate,
+            String(m.id),
+          );
+        }
         if (!matchId) continue;
 
         const mapped = liveStatusFromFotmob(st);
@@ -348,13 +372,14 @@ async function syncFromFotmob(db: ReturnType<typeof getDb>): Promise<number> {
 
         applyLiveUpdate(db, matchId, {
           status: mapped.statusStr,
-          homeGoals: m.home?.score ?? 0,
-          awayGoals: m.away?.score ?? 0,
+          homeGoals: m.home?.score ?? (mapped.statusStr === "FINISHED" ? 0 : null),
+          awayGoals: m.away?.score ?? (mapped.statusStr === "FINISHED" ? 0 : null),
           minute: mapped.minute,
-          liveStatusAr: mapped.liveStatusAr || "مباشر الآن",
+          liveStatusAr: mapped.liveStatusAr || (mapped.statusStr === "FINISHED" ? "انتهت" : "مباشر الآن"),
           eventsJson,
           statsJson,
           externalId: String(m.id),
+          utcDate: st.utcTime || utcDate,
         });
 
         // خزّن معرّف FotMob للمرات القادمة
@@ -524,7 +549,7 @@ function promoteKickoffLocal(db: ReturnType<typeof getDb>): number {
     .prepare(
       `SELECT id, utc_date, status, minute, live_status_ar, home_goals, away_goals
        FROM matches
-       WHERE status IN ('SCHEDULED','TIMED','IN_PLAY','PAUSED','LIVE','1H','2H','HT')
+       WHERE status IN ('SCHEDULED','TIMED')
          AND datetime(utc_date) <= datetime('now')
          AND datetime(utc_date) >= datetime('now', '-125 minutes')
          AND source NOT IN ('preview-holdout','synthetic','demo')`,
@@ -544,12 +569,11 @@ function promoteKickoffLocal(db: ReturnType<typeof getDb>): number {
   for (const r of rows) {
     const est = estimateMinuteFromKickoff(r.utc_date, now);
     if (!est || est.period === "FT") continue;
-    // لا تستبدل دقيقة مصدر حقيقي أحدث إن وُجدت
-    if (r.minute != null && r.live_status_ar && r.status === "IN_PLAY") continue;
+    // لا نضع 0-0 وهمية إن لم تكن مسجلة فعلياً!
     applyLiveUpdate(db, r.id, {
       status: "IN_PLAY",
-      homeGoals: r.home_goals ?? 0,
-      awayGoals: r.away_goals ?? 0,
+      homeGoals: r.home_goals,
+      awayGoals: r.away_goals,
       minute: r.minute ?? est.minute,
       liveStatusAr: r.live_status_ar || est.liveStatusAr,
       eventsJson: null,
@@ -559,17 +583,18 @@ function promoteKickoffLocal(db: ReturnType<typeof getDb>): number {
   return n;
 }
 
-/** إنهاء مباريات خرجت من نافذة اللعب — تنتقل بعدها إلى سجل التوقعات */
+/** إنهاء مباريات خرجت من نافذة اللعب — فقط إذا كانت أهدافها مسجلة وموثقة وليست فارغة */
 function finalizeStaleLive(db: ReturnType<typeof getDb>): number {
+  // المباريات التي مرّ وقتها دون ورود أهداف من مزوّد حقيقي لا يجوز أبداً افتراض أنها 0-0!
   const result = db
     .prepare(
       `UPDATE matches SET
          status = 'FINISHED',
          live_status_ar = 'انتهت',
-         minute = COALESCE(minute, 90),
-         home_goals = COALESCE(home_goals, 0),
-         away_goals = COALESCE(away_goals, 0)
+         minute = COALESCE(minute, 90)
        WHERE status IN ('IN_PLAY','PAUSED','LIVE','1H','2H','HT','ET','P','BREAK')
+         AND home_goals IS NOT NULL
+         AND away_goals IS NOT NULL
          AND datetime(utc_date) < datetime('now', '-115 minutes')`,
     )
     .run();
