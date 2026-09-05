@@ -225,6 +225,7 @@ export function dayKey(iso: string): string {
 export function groupByDay<T extends { utcDate: string }>(
   items: T[],
   now = new Date(),
+  direction: "asc" | "desc" = "asc",
 ): { key: string; label: string; relative: string | null; items: T[] }[] {
   const map = new Map<string, T[]>();
   for (const item of items) {
@@ -234,7 +235,9 @@ export function groupByDay<T extends { utcDate: string }>(
     else map.set(key, [item]);
   }
   return [...map.entries()]
-    .sort(([keyA], [keyB]) => keyA.localeCompare(keyB))
+    .sort(([keyA], [keyB]) =>
+      direction === "desc" ? keyB.localeCompare(keyA) : keyA.localeCompare(keyB),
+    )
     .map(([key, group]) => {
       // Ensure matches inside each day are sorted by kickoff time ascending
       group.sort((a, b) => a.utcDate.localeCompare(b.utcDate));
