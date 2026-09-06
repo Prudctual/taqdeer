@@ -2,7 +2,9 @@
 
 import { useState, useMemo } from "react";
 import Link from "next/link";
-import { pct } from "@/lib/format";
+import { pct, formatShortDate, formatRelativeDay, formatMatchTime, crestInitials } from "@/lib/format";
+import { getTeamColors } from "@/lib/team-colors";
+import { Crest } from "@/components/Crest";
 import type {
   ConfinedPlatformData,
   ParlayCandidateMatch,
@@ -19,7 +21,11 @@ export function HasrTerminalView({ initialData }: HasrTerminalViewProps) {
   const [selectedLeague, setSelectedLeague] = useState<string>("all");
   const [strategyFilter, setStrategyFilter] = useState<"all" | "safety" | "value" | "balanced" | "traps">("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
-  const [viewMode, setViewMode] = useState<"table" | "cards">("table");
+  const [viewMode, setViewMode] = useState<"cards" | "table">("cards");
+  const [sortBy, setSortBy] = useState<"date_asc" | "score_desc" | "prob_desc" | "edge_desc">("date_asc");
+
+  // Selected match for detailed inspection modal
+  const [inspectingMatch, setInspectingMatch] = useState<BankerPick | null>(null);
 
   // Legal modal state (Anti-slop rules 29 & 30)
   const [legalModalOpen, setLegalModalOpen] = useState<"terms" | "privacy" | null>(null);
@@ -32,17 +38,18 @@ export function HasrTerminalView({ initialData }: HasrTerminalViewProps) {
     initialData.parlayCandidates[1] || null
   );
 
-  // Filtered confined matches based on strategy, league, and search query
+  // Filter and sort confined matches
   const filteredConfined = useMemo(() => {
-    let list = initialData.confinedMatches;
+    let list = [...initialData.confinedMatches];
+
     if (strategyFilter === "safety") {
-      list = initialData.strategies.safety;
+      list = [...initialData.strategies.safety];
     } else if (strategyFilter === "value") {
-      list = initialData.strategies.value;
+      list = [...initialData.strategies.value];
     } else if (strategyFilter === "balanced") {
-      list = initialData.strategies.balanced;
+      list = [...initialData.strategies.balanced];
     } else if (strategyFilter === "traps") {
-      list = initialData.strategies.traps;
+      list = [...initialData.strategies.traps];
     }
 
     if (selectedLeague !== "all") {
@@ -72,12 +79,32 @@ export function HasrTerminalView({ initialData }: HasrTerminalViewProps) {
       );
     }
 
-    return list;
-  }, [initialData, selectedLeague, strategyFilter, searchQuery]);
+    // Sort order
+    list.sort((a, b) => {
+      if (sortBy === "date_asc") {
+        const timeA = a.utcDate ? new Date(a.utcDate).getTime() : 0;
+        const timeB = b.utcDate ? new Date(b.utcDate).getTime() : 0;
+        if (timeA !== timeB) return timeA - timeB;
+        return (b.selectionScore ?? 0) - (a.selectionScore ?? 0);
+      }
+      if (sortBy === "score_desc") {
+        return (b.selectionScore ?? 0) - (a.selectionScore ?? 0);
+      }
+      if (sortBy === "prob_desc") {
+        return b.probability - a.probability;
+      }
+      if (sortBy === "edge_desc") {
+        return (b.edge ?? 0) - (a.edge ?? 0);
+      }
+      return 0;
+    });
 
-  // Filtered excluded matches based on league and search query
+    return list;
+  }, [initialData, selectedLeague, strategyFilter, searchQuery, sortBy]);
+
+  // Filtered and sorted excluded matches
   const filteredExcluded = useMemo(() => {
-    let list = initialData.excludedMatches;
+    let list = [...initialData.excludedMatches];
     if (selectedLeague !== "all") {
       list = list.filter((m) => m.leagueId === selectedLeague);
     }
@@ -90,6 +117,8 @@ export function HasrTerminalView({ initialData }: HasrTerminalViewProps) {
           m.leagueNameAr.toLowerCase().includes(q)
       );
     }
+    // Sort excluded matches chronologically ascending
+    list.sort((a, b) => new Date(a.utcDate).getTime() - new Date(b.utcDate).getTime());
     return list;
   }, [initialData.excludedMatches, selectedLeague, searchQuery]);
 
@@ -150,7 +179,7 @@ export function HasrTerminalView({ initialData }: HasrTerminalViewProps) {
       matchId: item.matchId,
       leagueId: "",
       leagueNameAr: item.leagueName,
-      utcDate: "",
+      utcDate: item.utcDate,
       homeTeam: item.homeTeam,
       awayTeam: item.awayTeam,
       recommendedSide: (item.pickKey || "H") as "H" | "D" | "A",
@@ -178,6 +207,19 @@ export function HasrTerminalView({ initialData }: HasrTerminalViewProps) {
     setActiveTab("parlay");
   };
 
+  const formatKickoff = (iso: string) => {
+    if (!iso) return { label: "موعد غير محدد", time: "—", relative: "—" };
+    const rel = formatRelativeDay(iso);
+    const time = formatMatchTime(iso, "Asia/Baghdad");
+    const date = formatShortDate(iso, "Asia/Baghdad");
+    return {
+      label: rel ? `${rel} · ${time}` : `${date} · ${time}`,
+      time,
+      date,
+      relative: rel || date,
+    };
+  };
+
   return (
     <div className="min-h-screen bg-bg text-ink flex flex-col">
       {/* Header */}
@@ -194,71 +236,97 @@ export function HasrTerminalView({ initialData }: HasrTerminalViewProps) {
         {/* TAB 1: SCREENER (المباريات المحصورة) */}
         {activeTab === "screener" && (
           <div className="space-y-4">
-            {/* Control Bar: Search, Category Filters, View Switch */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-line pb-4">
+            {/* Control Bar: Filters, Search, Sort & View Switch */}
+            <div className="flex flex-col gap-3 border-b border-line pb-4">
               {/* Category Filter Buttons */}
-              <div className="flex flex-wrap items-center gap-1.5 text-xs">
-                <button
-                  onClick={() => setStrategyFilter("all")}
-                  className={`px-3 py-1.5 rounded font-medium border transition-colors ${
-                    strategyFilter === "all"
-                      ? "bg-ink text-surface border-ink"
-                      : "bg-panel text-muted hover:text-ink border-line"
-                  }`}
-                >
-                  كافة المحصورة ({initialData.confinedMatches.length})
-                </button>
-                <button
-                  onClick={() => setStrategyFilter("safety")}
-                  className={`px-3 py-1.5 rounded font-medium border transition-colors ${
-                    strategyFilter === "safety"
-                      ? "bg-ink text-surface border-ink"
-                      : "bg-panel text-muted hover:text-ink border-line"
-                  }`}
-                >
-                  الأعلى أماناً ({initialData.strategies.safety.length})
-                </button>
-                <button
-                  onClick={() => setStrategyFilter("value")}
-                  className={`px-3 py-1.5 rounded font-medium border transition-colors ${
-                    strategyFilter === "value"
-                      ? "bg-ink text-surface border-ink"
-                      : "bg-panel text-muted hover:text-ink border-line"
-                  }`}
-                >
-                  أعلى قيمة ({initialData.strategies.value.length})
-                </button>
-                <button
-                  onClick={() => setStrategyFilter("balanced")}
-                  className={`px-3 py-1.5 rounded font-medium border transition-colors ${
-                    strategyFilter === "balanced"
-                      ? "bg-ink text-surface border-ink"
-                      : "bg-panel text-muted hover:text-ink border-line"
-                  }`}
-                >
-                  المتوازنة ({initialData.strategies.balanced.length})
-                </button>
-                <button
-                  onClick={() => setStrategyFilter("traps")}
-                  className={`px-3 py-1.5 rounded font-medium border transition-colors ${
-                    strategyFilter === "traps"
-                      ? "bg-ink text-surface border-ink"
-                      : "bg-panel text-muted hover:text-ink border-line"
-                  }`}
-                >
-                  مصائد السوق ({initialData.strategies.traps.length})
-                </button>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                  <button
+                    onClick={() => setStrategyFilter("all")}
+                    className={`px-3 py-1.5 rounded font-medium border transition-colors ${
+                      strategyFilter === "all"
+                        ? "bg-ink text-surface border-ink"
+                        : "bg-panel text-muted hover:text-ink border-line"
+                    }`}
+                  >
+                    كافة المحصورة ({initialData.confinedMatches.length})
+                  </button>
+                  <button
+                    onClick={() => setStrategyFilter("safety")}
+                    className={`px-3 py-1.5 rounded font-medium border transition-colors ${
+                      strategyFilter === "safety"
+                        ? "bg-ink text-surface border-ink"
+                        : "bg-panel text-muted hover:text-ink border-line"
+                    }`}
+                  >
+                    الأعلى أماناً ({initialData.strategies.safety.length})
+                  </button>
+                  <button
+                    onClick={() => setStrategyFilter("value")}
+                    className={`px-3 py-1.5 rounded font-medium border transition-colors ${
+                      strategyFilter === "value"
+                        ? "bg-ink text-surface border-ink"
+                        : "bg-panel text-muted hover:text-ink border-line"
+                    }`}
+                  >
+                    أعلى قيمة ({initialData.strategies.value.length})
+                  </button>
+                  <button
+                    onClick={() => setStrategyFilter("balanced")}
+                    className={`px-3 py-1.5 rounded font-medium border transition-colors ${
+                      strategyFilter === "balanced"
+                        ? "bg-ink text-surface border-ink"
+                        : "bg-panel text-muted hover:text-ink border-line"
+                    }`}
+                  >
+                    المتوازنة ({initialData.strategies.balanced.length})
+                  </button>
+                  <button
+                    onClick={() => setStrategyFilter("traps")}
+                    className={`px-3 py-1.5 rounded font-medium border transition-colors ${
+                      strategyFilter === "traps"
+                        ? "bg-ink text-surface border-ink"
+                        : "bg-panel text-muted hover:text-ink border-line"
+                    }`}
+                  >
+                    مصائد السوق ({initialData.strategies.traps.length})
+                  </button>
+                </div>
+
+                {/* View Mode Toggle */}
+                <div className="flex items-center border border-line rounded overflow-hidden text-xs">
+                  <button
+                    onClick={() => setViewMode("cards")}
+                    className={`px-3 py-1.5 font-medium transition-colors ${
+                      viewMode === "cards"
+                        ? "bg-ink text-surface"
+                        : "bg-panel text-muted hover:text-ink"
+                    }`}
+                  >
+                    بطاقات مصممة
+                  </button>
+                  <button
+                    onClick={() => setViewMode("table")}
+                    className={`px-3 py-1.5 font-medium transition-colors ${
+                      viewMode === "table"
+                        ? "bg-ink text-surface"
+                        : "bg-panel text-muted hover:text-ink"
+                    }`}
+                  >
+                    جدول مكثف
+                  </button>
+                </div>
               </div>
 
-              {/* Search & View Mode Toggle */}
-              <div className="flex items-center gap-2">
+              {/* Sub-bar: Search & Sorting */}
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
                 <div className="relative">
                   <input
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="بحث عن فريق أو دوري..."
-                    className="text-xs bg-panel border border-line rounded px-3 py-1.5 text-ink placeholder:text-muted focus:outline-hidden focus:border-accent w-48 sm:w-56"
+                    className="text-xs bg-panel border border-line rounded px-3 py-1.5 text-ink placeholder:text-muted focus:outline-hidden focus:border-accent w-64"
                   />
                   {searchQuery && (
                     <button
@@ -270,27 +338,25 @@ export function HasrTerminalView({ initialData }: HasrTerminalViewProps) {
                   )}
                 </div>
 
-                <div className="flex items-center border border-line rounded overflow-hidden text-xs">
-                  <button
-                    onClick={() => setViewMode("table")}
-                    className={`px-2.5 py-1.5 font-medium transition-colors ${
-                      viewMode === "table"
-                        ? "bg-ink text-surface"
-                        : "bg-panel text-muted hover:text-ink"
-                    }`}
+                <div className="flex items-center gap-2 text-xs">
+                  <label htmlFor="sort-select" className="text-muted font-medium">
+                    الترتيب:
+                  </label>
+                  <select
+                    id="sort-select"
+                    value={sortBy}
+                    onChange={(e) =>
+                      setSortBy(
+                        e.target.value as "date_asc" | "score_desc" | "prob_desc" | "edge_desc"
+                      )
+                    }
+                    className="text-xs bg-panel border border-line rounded px-2.5 py-1 text-ink focus:outline-hidden focus:border-accent"
                   >
-                    جدول
-                  </button>
-                  <button
-                    onClick={() => setViewMode("cards")}
-                    className={`px-2.5 py-1.5 font-medium transition-colors ${
-                      viewMode === "cards"
-                        ? "bg-ink text-surface"
-                        : "bg-panel text-muted hover:text-ink"
-                    }`}
-                  >
-                    بطاقات
-                  </button>
+                    <option value="date_asc">الأقرب موعداً (تصاعدياً من الأقرب للابعد)</option>
+                    <option value="score_desc">الأعلى درجة حصر (Selection Score)</option>
+                    <option value="prob_desc">أعلى نسبة احتمال فوز</option>
+                    <option value="edge_desc">أعلى قيمة مضافة (+EV Edge)</option>
+                  </select>
                 </div>
               </div>
             </div>
@@ -301,17 +367,204 @@ export function HasrTerminalView({ initialData }: HasrTerminalViewProps) {
                 <p className="text-sm font-semibold text-ink">لا توجد مباريات مطابقة للبحث أو التصفية</p>
                 <p className="text-xs text-muted">جرب تعديل كلمة البحث أو اختيار دوري واستراتيجية مختلفة</p>
               </div>
-            ) : viewMode === "table" ? (
-              /* Table View: High density, clean tabular figures, zero slop */
+            ) : viewMode === "cards" ? (
+              /* Enhanced Cards View with Distinct Team Colors & Dates */
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {filteredConfined.map((item) => {
+                  const homeCol = getTeamColors(item.homeTeam, item.homeTeamId);
+                  const awayCol = getTeamColors(item.awayTeam, item.awayTeamId);
+                  const kickoff = formatKickoff(item.utcDate);
+
+                  return (
+                    <div
+                      key={item.matchId}
+                      className={`group rounded border transition-all relative overflow-hidden flex flex-col justify-between ${
+                        item.isTrap
+                          ? "bg-rose-500/5 border-rose-500/30"
+                          : "bg-surface border-line hover:border-accent"
+                      }`}
+                    >
+                      {/* Top Bar: League, Matchday, Kickoff */}
+                      <div className="p-3.5 border-b border-line bg-panel/40 flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-ink">{item.leagueName}</span>
+                          {item.matchday ? (
+                            <span className="text-[10px] text-muted px-1.5 py-0.5 rounded bg-surface border border-line tabular">
+                              الجولة {item.matchday}
+                            </span>
+                          ) : null}
+                        </div>
+
+                        {/* Kickoff Timing (Ascending Nearest) */}
+                        <div className="flex items-center gap-1.5">
+                          <span className="inline-block w-1.5 h-1.5 rounded-full bg-accent" />
+                          <span className="text-[11px] font-semibold text-ink tabular">
+                            {kickoff.label}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Card Body: Interactive Click to inspect */}
+                      <div
+                        onClick={() => setInspectingMatch(item)}
+                        className="p-4 space-y-4 cursor-pointer"
+                        title="انقر لعرض تفاصيل المباراة الكاملة"
+                      >
+                        {/* Matchup with Team Colors */}
+                        <div className="space-y-2.5">
+                          {/* Home Team */}
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              {/* Team Color Pill & Crest */}
+                              <span
+                                className="w-1.5 h-5 rounded-xs shrink-0"
+                                style={{ backgroundColor: homeCol.hex }}
+                                title={`لون ${item.homeTeam}`}
+                              />
+                              <Crest
+                                src={item.homeCrestUrl}
+                                alt={item.homeTeam}
+                                size="sm"
+                                fallback={crestInitials(item.homeTeam)}
+                              />
+                              <span className="text-sm font-bold text-ink truncate group-hover:text-accent transition-colors">
+                                {item.homeTeam}
+                              </span>
+                            </div>
+                            <span className="text-xs font-bold text-muted tabular">
+                              {item.pickKey === "H" ? (
+                                <span className="text-accent font-black">
+                                  {pct(item.probability)}
+                                </span>
+                              ) : (
+                                "مضيف"
+                              )}
+                            </span>
+                          </div>
+
+                          {/* Away Team */}
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              {/* Team Color Pill & Crest */}
+                              <span
+                                className="w-1.5 h-5 rounded-xs shrink-0"
+                                style={{ backgroundColor: awayCol.hex }}
+                                title={`لون ${item.awayTeam}`}
+                              />
+                              <Crest
+                                src={item.awayCrestUrl}
+                                alt={item.awayTeam}
+                                size="sm"
+                                fallback={crestInitials(item.awayTeam)}
+                              />
+                              <span className="text-sm font-bold text-ink truncate group-hover:text-accent transition-colors">
+                                {item.awayTeam}
+                              </span>
+                            </div>
+                            <span className="text-xs font-bold text-muted tabular">
+                              {item.pickKey === "A" ? (
+                                <span className="text-accent font-black">
+                                  {pct(item.probability)}
+                                </span>
+                              ) : (
+                                "ضيف"
+                              )}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Pick & Score Bar */}
+                        <div className="p-2.5 rounded bg-panel/70 border border-line flex items-center justify-between text-xs">
+                          <div className="space-y-0.5">
+                            <span className="text-[10px] text-muted block">ترشيح الحصر</span>
+                            <span className="font-bold text-ink">{item.pickLabel}</span>
+                          </div>
+                          <div className="text-end space-y-0.5">
+                            <span className="text-[10px] text-muted block">احتمال النموذج</span>
+                            <span className="text-sm font-black text-ink tabular">
+                              {pct(item.probability)}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* 3 Metrics Row */}
+                        <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                          <div className="p-2 rounded bg-panel/40 border border-line/60">
+                            <span className="text-[10px] text-muted block">سعر السوق</span>
+                            <span className="font-bold tabular text-ink">
+                              {item.odds ? item.odds.toFixed(2) : "—"}
+                            </span>
+                          </div>
+                          <div className="p-2 rounded bg-panel/40 border border-line/60">
+                            <span className="text-[10px] text-muted block">القيمة (Edge)</span>
+                            <span
+                              className={`font-bold tabular ${
+                                (item.edge ?? 0) > 0
+                                  ? "text-emerald-700 dark:text-emerald-400"
+                                  : "text-muted"
+                              }`}
+                            >
+                              {item.edge !== null && item.edge !== undefined
+                                ? `${item.edge > 0 ? "+" : ""}${Math.round(item.edge * 100)}%`
+                                : "—"}
+                            </span>
+                          </div>
+                          <div className="p-2 rounded bg-panel/40 border border-line/60">
+                            <span className="text-[10px] text-muted block">مؤشر الأمان</span>
+                            <span className="font-bold tabular text-ink">
+                              {item.stabilityScore ?? 70}%
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Trap Warning if applicable */}
+                        {item.isTrap && (
+                          <div className="p-2 rounded text-[11px] bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-500/20 font-medium">
+                            تنبيه مصيدة سعرية: السعر المعروض يتطلب احتمالية فوز أعلى من تقدير النموذج
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Card Footer Actions */}
+                      <div className="p-3 border-t border-line bg-panel/20 flex items-center justify-between text-xs gap-2">
+                        <button
+                          onClick={() => setInspectingMatch(item)}
+                          className="text-muted hover:text-ink font-semibold transition-colors text-[11px]"
+                        >
+                          معاينة الفحص ↗
+                        </button>
+
+                        <div className="flex items-center gap-2">
+                          <Link
+                            href={`/match/${item.matchId}`}
+                            className="text-xs text-muted hover:text-accent font-medium underline-offset-4 hover:underline"
+                          >
+                            صفحة اللقاء الكاملة
+                          </Link>
+
+                          <button
+                            onClick={() => addMatchToParlay(item)}
+                            className="px-2.5 py-1 rounded bg-panel hover:bg-ink hover:text-surface text-ink text-[11px] font-semibold border border-line transition-colors"
+                          >
+                            + بارلي
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              /* Dense Table View */
               <div className="overflow-x-auto rounded border border-line bg-surface">
                 <table className="w-full text-xs text-right border-collapse">
                   <thead>
                     <tr className="border-b border-line bg-panel/50 text-muted font-semibold">
-                      <th className="p-3">المباراة</th>
+                      <th className="p-3">الموعد والجولة</th>
+                      <th className="p-3">المباراة والفرق</th>
                       <th className="p-3">الدوري</th>
                       <th className="p-3 text-center">الترشيح</th>
                       <th className="p-3 text-center">احتمال النموذج</th>
-                      <th className="p-3 text-center">فارق الفصل</th>
                       <th className="p-3 text-center">سعر السوق</th>
                       <th className="p-3 text-center">القيمة (Edge)</th>
                       <th className="p-3 text-center">مؤشر الأمان</th>
@@ -320,163 +573,112 @@ export function HasrTerminalView({ initialData }: HasrTerminalViewProps) {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-line">
-                    {filteredConfined.map((item) => (
-                      <tr
-                        key={item.matchId}
-                        className={`hover:bg-panel/30 transition-colors ${
-                          item.isTrap ? "bg-rose-500/5" : ""
-                        }`}
-                      >
-                        <td className="p-3 font-semibold text-ink">
-                          <Link
-                            href={`/match/${item.matchId}`}
-                            className="hover:text-accent underline-offset-4 hover:underline"
-                          >
-                            {item.homeTeam} × {item.awayTeam}
-                          </Link>
-                          {item.isTrap && (
-                            <span className="ms-2 px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-500/20">
-                              مصيدة
+                    {filteredConfined.map((item) => {
+                      const homeCol = getTeamColors(item.homeTeam, item.homeTeamId);
+                      const awayCol = getTeamColors(item.awayTeam, item.awayTeamId);
+                      const kickoff = formatKickoff(item.utcDate);
+
+                      return (
+                        <tr
+                          key={item.matchId}
+                          className={`hover:bg-panel/40 transition-colors cursor-pointer ${
+                            item.isTrap ? "bg-rose-500/5" : ""
+                          }`}
+                          onClick={() => setInspectingMatch(item)}
+                        >
+                          {/* Kickoff & Round */}
+                          <td className="p-3 text-muted tabular whitespace-nowrap">
+                            <span className="font-semibold text-ink block">{kickoff.label}</span>
+                            {item.matchday ? (
+                              <span className="text-[10px] text-faint">الجولة {item.matchday}</span>
+                            ) : null}
+                          </td>
+
+                          {/* Match with Colors */}
+                          <td className="p-3 font-semibold text-ink">
+                            <div className="flex items-center gap-2">
+                              <span
+                                className="w-1 h-3.5 rounded-xs"
+                                style={{ backgroundColor: homeCol.hex }}
+                              />
+                              <span>{item.homeTeam}</span>
+                              <span className="text-muted font-normal text-[11px]">×</span>
+                              <span
+                                className="w-1 h-3.5 rounded-xs"
+                                style={{ backgroundColor: awayCol.hex }}
+                              />
+                              <span>{item.awayTeam}</span>
+                            </div>
+                            {item.isTrap && (
+                              <span className="mt-1 inline-block px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-500/20">
+                                مصيدة قيمة
+                              </span>
+                            )}
+                          </td>
+
+                          <td className="p-3 text-muted">{item.leagueName}</td>
+
+                          <td className="p-3 text-center">
+                            <span className="font-bold text-ink">
+                              {item.pickLabel}
                             </span>
-                          )}
-                        </td>
-                        <td className="p-3 text-muted">{item.leagueName}</td>
-                        <td className="p-3 text-center">
-                          <span className="font-bold text-ink">
-                            {item.pickLabel}
-                          </span>
-                        </td>
-                        <td className="p-3 text-center tabular font-bold text-ink">
-                          {pct(item.probability)}
-                        </td>
-                        <td className="p-3 text-center tabular text-muted">
-                          +{Math.round((item.separationGap ?? 0) * 100)}%
-                        </td>
-                        <td className="p-3 text-center tabular text-ink">
-                          {item.odds ? item.odds.toFixed(2) : "—"}
-                        </td>
-                        <td className="p-3 text-center tabular font-semibold">
-                          <span
-                            className={
-                              (item.edge ?? 0) > 0
-                                ? "text-emerald-700 dark:text-emerald-400"
-                                : "text-muted"
-                            }
+                          </td>
+
+                          <td className="p-3 text-center tabular font-bold text-ink">
+                            {pct(item.probability)}
+                          </td>
+
+                          <td className="p-3 text-center tabular text-ink">
+                            {item.odds ? item.odds.toFixed(2) : "—"}
+                          </td>
+
+                          <td className="p-3 text-center tabular font-semibold">
+                            <span
+                              className={
+                                (item.edge ?? 0) > 0
+                                  ? "text-emerald-700 dark:text-emerald-400"
+                                  : "text-muted"
+                              }
+                            >
+                              {item.edge !== null && item.edge !== undefined
+                                ? `${item.edge > 0 ? "+" : ""}${Math.round(item.edge * 100)}%`
+                                : "—"}
+                            </span>
+                          </td>
+
+                          <td className="p-3 text-center tabular text-muted">
+                            {item.stabilityScore ?? 70}%
+                          </td>
+
+                          <td className="p-3 text-center tabular font-bold text-ink">
+                            {item.selectionScore}
+                          </td>
+
+                          <td
+                            className="p-3 text-center"
+                            onClick={(e) => e.stopPropagation()}
                           >
-                            {item.edge !== null && item.edge !== undefined
-                              ? `${item.edge > 0 ? "+" : ""}${Math.round(item.edge * 100)}%`
-                              : "—"}
-                          </span>
-                        </td>
-                        <td className="p-3 text-center tabular text-muted">
-                          {item.stabilityScore ?? 70}%
-                        </td>
-                        <td className="p-3 text-center tabular font-bold text-ink">
-                          {item.selectionScore}
-                        </td>
-                        <td className="p-3 text-center">
-                          <button
-                            onClick={() => addMatchToParlay(item)}
-                            className="px-2.5 py-1 rounded bg-panel hover:bg-ink hover:text-surface text-ink text-[11px] font-semibold border border-line transition-colors"
-                          >
-                            + بارلي
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
+                            <div className="flex items-center justify-center gap-1.5">
+                              <button
+                                onClick={() => addMatchToParlay(item)}
+                                className="px-2 py-1 rounded bg-panel hover:bg-ink hover:text-surface text-ink text-[11px] font-semibold border border-line transition-colors"
+                              >
+                                + بارلي
+                              </button>
+                              <Link
+                                href={`/match/${item.matchId}`}
+                                className="p-1 text-muted hover:text-accent text-[11px]"
+                                title="فتح صفحة المباراة في تقدير العام"
+                              >
+                                ↗
+                              </Link>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
-              </div>
-            ) : (
-              /* Cards View: Clean, structured, architectural cards */
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                {filteredConfined.map((item) => (
-                  <div
-                    key={item.matchId}
-                    className={`rounded border p-4 space-y-3 transition-colors ${
-                      item.isTrap
-                        ? "bg-rose-500/5 border-rose-500/30"
-                        : "bg-surface border-line hover:border-line-strong"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-muted font-medium">{item.leagueName}</span>
-                      <div className="flex items-center gap-1.5">
-                        <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-panel border border-line text-muted tabular">
-                          أمان {item.stabilityScore ?? 70}%
-                        </span>
-                        <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-panel border border-line text-ink tabular">
-                          {item.selectionScore}/100
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="space-y-1">
-                      <div className="text-sm font-bold text-ink">
-                        {item.homeTeam} × {item.awayTeam}
-                      </div>
-                      <div className="flex items-center justify-between text-xs pt-1">
-                        <span className="text-muted">
-                          الترشيح: <strong className="text-ink font-semibold">{item.pickLabel}</strong>
-                        </span>
-                        <span className="text-muted tabular">
-                          الاحتمال: <strong className="text-ink font-bold">{pct(item.probability)}</strong>
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-2 p-2 rounded bg-panel border border-line text-center text-xs">
-                      <div>
-                        <span className="text-[10px] text-muted block">فارق الفصل</span>
-                        <span className="font-semibold tabular text-ink">
-                          +{Math.round((item.separationGap ?? 0) * 100)}%
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-[10px] text-muted block">سعر السوق</span>
-                        <span className="font-semibold tabular text-ink">
-                          {item.odds ? item.odds.toFixed(2) : "—"}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-[10px] text-muted block">القيمة</span>
-                        <span
-                          className={`font-semibold tabular ${
-                            (item.edge ?? 0) > 0
-                              ? "text-emerald-700 dark:text-emerald-400"
-                              : "text-muted"
-                          }`}
-                        >
-                          {item.edge !== null && item.edge !== undefined
-                            ? `${item.edge > 0 ? "+" : ""}${Math.round(item.edge * 100)}%`
-                            : "—"}
-                        </span>
-                      </div>
-                    </div>
-
-                    {item.isTrap && (
-                      <div className="p-2 rounded text-[11px] bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-500/20 font-medium">
-                        تنبيه مصيدة: السعر المعروض يتطلب احتمالية فوز أعلى من تقدير النموذج
-                      </div>
-                    )}
-
-                    <div className="flex items-center justify-between pt-1 text-xs">
-                      <Link
-                        href={`/match/${item.matchId}`}
-                        className="text-muted hover:text-ink font-medium underline-offset-4 hover:underline"
-                      >
-                        تفاصيل المباراة ↗
-                      </Link>
-
-                      <button
-                        onClick={() => addMatchToParlay(item)}
-                        className="px-2.5 py-1 rounded bg-panel hover:bg-ink hover:text-surface text-ink text-[11px] font-semibold border border-line transition-colors"
-                      >
-                        + ضم لمختبر البارلي
-                      </button>
-                    </div>
-                  </div>
-                ))}
               </div>
             )}
           </div>
@@ -518,8 +720,14 @@ export function HasrTerminalView({ initialData }: HasrTerminalViewProps) {
 
                 {selectedMatch1 ? (
                   <div className="space-y-2 pt-2 border-t border-line">
-                    <div className="text-sm font-bold text-ink">
-                      {selectedMatch1.homeTeam} × {selectedMatch1.awayTeam}
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="w-1.5 h-4 rounded-xs"
+                        style={{ backgroundColor: getTeamColors(selectedMatch1.homeTeam).hex }}
+                      />
+                      <span className="text-sm font-bold text-ink">
+                        {selectedMatch1.homeTeam} × {selectedMatch1.awayTeam}
+                      </span>
                     </div>
                     <div className="flex items-center justify-between text-xs text-muted">
                       <span>الترشيح: <strong className="text-ink font-semibold">{selectedMatch1.recommendedSideLabel}</strong></span>
@@ -554,8 +762,14 @@ export function HasrTerminalView({ initialData }: HasrTerminalViewProps) {
 
                 {selectedMatch2 ? (
                   <div className="space-y-2 pt-2 border-t border-line">
-                    <div className="text-sm font-bold text-ink">
-                      {selectedMatch2.homeTeam} × {selectedMatch2.awayTeam}
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="w-1.5 h-4 rounded-xs"
+                        style={{ backgroundColor: getTeamColors(selectedMatch2.homeTeam).hex }}
+                      />
+                      <span className="text-sm font-bold text-ink">
+                        {selectedMatch2.homeTeam} × {selectedMatch2.awayTeam}
+                      </span>
                     </div>
                     <div className="flex items-center justify-between text-xs text-muted">
                       <span>الترشيح: <strong className="text-ink font-semibold">{selectedMatch2.recommendedSideLabel}</strong></span>
@@ -658,7 +872,7 @@ export function HasrTerminalView({ initialData }: HasrTerminalViewProps) {
                 رادار الاستبعاد الصارم
               </h2>
               <p className="text-xs text-muted">
-                المباريات والفرق التي تم إسقاطها من الحصر والبارلي بسبب فخاخ التعادل أو تراجع الشوط الثاني أو ارتفاع مؤشر العشوائية
+                المباريات والفرق التي تم إسقاطها من الحصر والبارلي مرتبة تصاعدياً حسب موعد اللقاء لتوضيح أسباب الحظر
               </p>
             </div>
 
@@ -667,51 +881,68 @@ export function HasrTerminalView({ initialData }: HasrTerminalViewProps) {
               <table className="w-full text-xs text-right border-collapse">
                 <thead>
                   <tr className="border-b border-line bg-panel/50 text-muted font-semibold">
-                    <th className="p-3">المباراة</th>
+                    <th className="p-3">الموعد</th>
+                    <th className="p-3">المباراة والفرق</th>
                     <th className="p-3 text-center">الدوري</th>
                     <th className="p-3 text-center">مؤشر العشوائية (MRI)</th>
                     <th className="p-3 text-center">مؤشر الأمان</th>
                     <th className="p-3 text-center">السبب المباشر</th>
                     <th className="p-3">التفصيل الإحصائي</th>
-                    <th className="p-3 text-center">الحالة</th>
+                    <th className="p-3 text-center">تفاصيل</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-line">
-                  {filteredExcluded.map((match) => (
-                    <tr key={match.matchId} className="hover:bg-panel/30 transition-colors">
-                      <td className="p-3 font-semibold text-ink">
-                        <Link href={`/match/${match.matchId}`} className="hover:text-accent">
-                          {match.homeTeam} × {match.awayTeam}
-                        </Link>
-                      </td>
-                      <td className="p-3 text-center text-muted">
-                        {match.leagueNameAr}
-                      </td>
-                      <td className="p-3 text-center tabular font-bold text-rose-700 dark:text-rose-400">
-                        {match.matchRandomnessIndex} / 100
-                      </td>
-                      <td className="p-3 text-center tabular text-muted font-medium">
-                        {match.stabilityScore}%
-                      </td>
-                      <td className="p-3 text-center">
-                        <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-500/20">
-                          {match.primaryExclusionPillar === "draw_trap" && "فخ تعادل متكرر"}
-                          {match.primaryExclusionPillar === "second_half_fragility" && "تراجع الشوط الثاني"}
-                          {match.primaryExclusionPillar === "disciplinary_risk" && "مخاطر طرد وبطاقات"}
-                          {match.primaryExclusionPillar === "volatility" && "تذبذب نتائج حاد"}
-                          {match.primaryExclusionPillar === "other" && "عشوائية حرجة"}
-                        </span>
-                      </td>
-                      <td className="p-3 text-muted text-[11px] leading-relaxed max-w-sm">
-                        {match.primaryReasonAr}
-                      </td>
-                      <td className="p-3 text-center">
-                        <span className="text-[11px] font-medium px-2 py-0.5 rounded bg-panel border border-line text-muted">
-                          مستبعدة
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
+                  {filteredExcluded.map((match) => {
+                    const homeCol = getTeamColors(match.homeTeam);
+                    const awayCol = getTeamColors(match.awayTeam);
+                    const kickoff = formatKickoff(match.utcDate);
+
+                    return (
+                      <tr key={match.matchId} className="hover:bg-panel/30 transition-colors">
+                        <td className="p-3 text-muted tabular whitespace-nowrap">
+                          {kickoff.label}
+                        </td>
+                        <td className="p-3 font-semibold text-ink">
+                          <div className="flex items-center gap-1.5">
+                            <span className="w-1 h-3.5 rounded-xs" style={{ backgroundColor: homeCol.hex }} />
+                            <span>{match.homeTeam}</span>
+                            <span className="text-muted font-normal text-[11px]">×</span>
+                            <span className="w-1 h-3.5 rounded-xs" style={{ backgroundColor: awayCol.hex }} />
+                            <span>{match.awayTeam}</span>
+                          </div>
+                        </td>
+                        <td className="p-3 text-center text-muted">
+                          {match.leagueNameAr}
+                        </td>
+                        <td className="p-3 text-center tabular font-bold text-rose-700 dark:text-rose-400">
+                          {match.matchRandomnessIndex} / 100
+                        </td>
+                        <td className="p-3 text-center tabular text-muted font-medium">
+                          {match.stabilityScore}%
+                        </td>
+                        <td className="p-3 text-center">
+                          <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-500/20">
+                            {match.primaryExclusionPillar === "draw_trap" && "فخ تعادل متكرر"}
+                            {match.primaryExclusionPillar === "second_half_fragility" && "تراجع الشوط الثاني"}
+                            {match.primaryExclusionPillar === "disciplinary_risk" && "مخاطر طرد وبطاقات"}
+                            {match.primaryExclusionPillar === "volatility" && "تذبذب نتائج حاد"}
+                            {match.primaryExclusionPillar === "other" && "عشوائية حرجة"}
+                          </span>
+                        </td>
+                        <td className="p-3 text-muted text-[11px] leading-relaxed max-w-sm">
+                          {match.primaryReasonAr}
+                        </td>
+                        <td className="p-3 text-center">
+                          <Link
+                            href={`/match/${match.matchId}`}
+                            className="text-xs text-muted hover:text-accent underline-offset-4 hover:underline"
+                          >
+                            عرض ↗
+                          </Link>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -795,6 +1026,139 @@ export function HasrTerminalView({ initialData }: HasrTerminalViewProps) {
           </div>
         )}
       </main>
+
+      {/* QUICK MATCH INSPECTION MODAL (عند النقر على البطاقة أو الصف تظهر بياناتها بدقة) */}
+      {inspectingMatch && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink/50 backdrop-blur-xs">
+          <div className="bg-surface border border-line rounded max-w-xl w-full p-6 space-y-5 shadow-none animate-fade-in-up">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-line pb-3">
+              <div>
+                <span className="text-xs font-semibold text-muted block">
+                  {inspectingMatch.leagueName} {inspectingMatch.matchday ? `· الجولة ${inspectingMatch.matchday}` : ""}
+                </span>
+                <span className="text-xs text-accent font-medium tabular">
+                  {formatKickoff(inspectingMatch.utcDate).label}
+                </span>
+              </div>
+              <button
+                onClick={() => setInspectingMatch(null)}
+                className="text-muted hover:text-ink text-sm font-bold px-2 py-1"
+                aria-label="إغلاق"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Teams Matchup with Official Colors */}
+            <div className="p-4 rounded border border-line bg-panel/50 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <span
+                    className="w-2 h-6 rounded-xs"
+                    style={{ backgroundColor: getTeamColors(inspectingMatch.homeTeam, inspectingMatch.homeTeamId).hex }}
+                  />
+                  <Crest
+                    src={inspectingMatch.homeCrestUrl}
+                    alt={inspectingMatch.homeTeam}
+                    size="md"
+                    fallback={crestInitials(inspectingMatch.homeTeam)}
+                  />
+                  <span className="text-base font-bold text-ink">
+                    {inspectingMatch.homeTeam}
+                  </span>
+                </div>
+                <span className="text-xs font-semibold text-muted">
+                  المضيف
+                </span>
+              </div>
+
+              <div className="border-t border-line/60 pt-2 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <span
+                    className="w-2 h-6 rounded-xs"
+                    style={{ backgroundColor: getTeamColors(inspectingMatch.awayTeam, inspectingMatch.awayTeamId).hex }}
+                  />
+                  <Crest
+                    src={inspectingMatch.awayCrestUrl}
+                    alt={inspectingMatch.awayTeam}
+                    size="md"
+                    fallback={crestInitials(inspectingMatch.awayTeam)}
+                  />
+                  <span className="text-base font-bold text-ink">
+                    {inspectingMatch.awayTeam}
+                  </span>
+                </div>
+                <span className="text-xs font-semibold text-muted">
+                  الضيف
+                </span>
+              </div>
+            </div>
+
+            {/* Mathematical & Model Analysis */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-center text-xs">
+              <div className="p-2.5 rounded bg-panel border border-line">
+                <span className="text-[10px] text-muted block">الترشيح المحصور</span>
+                <span className="font-bold text-ink text-xs">{inspectingMatch.pickLabel}</span>
+              </div>
+              <div className="p-2.5 rounded bg-panel border border-line">
+                <span className="text-[10px] text-muted block">احتمال النموذج</span>
+                <span className="font-bold text-ink text-xs tabular">{pct(inspectingMatch.probability)}</span>
+              </div>
+              <div className="p-2.5 rounded bg-panel border border-line">
+                <span className="text-[10px] text-muted block">سعر السوق</span>
+                <span className="font-bold text-ink text-xs tabular">{inspectingMatch.odds ? inspectingMatch.odds.toFixed(2) : "—"}</span>
+              </div>
+              <div className="p-2.5 rounded bg-panel border border-line">
+                <span className="text-[10px] text-muted block">القيمة (Edge)</span>
+                <span className="font-bold text-emerald-700 dark:text-emerald-400 text-xs tabular">
+                  {inspectingMatch.edge ? `${inspectingMatch.edge > 0 ? "+" : ""}${Math.round(inspectingMatch.edge * 100)}%` : "—"}
+                </span>
+              </div>
+            </div>
+
+            {/* Anti-Randomness Assessment */}
+            <div className="p-3 rounded bg-panel/30 border border-line text-xs space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-ink">تقييم الأمان الإحصائي:</span>
+                <span className="font-bold text-ink tabular">{inspectingMatch.stabilityScore ?? 70}%</span>
+              </div>
+              <p className="text-muted leading-relaxed text-[11px]">
+                المباراة اجتازت فحص مؤشر العشوائية (MRI) بنجاح، ولا تقع تحت طائلة فخاخ التعادل المزمنة أو الانهيارات البدنية للشوط الثاني.
+              </p>
+            </div>
+
+            {/* Modal Footer Actions */}
+            <div className="border-t border-line pt-3 flex flex-wrap items-center justify-between gap-2">
+              <Link
+                href={`/match/${inspectingMatch.matchId}`}
+                className="px-3.5 py-1.5 rounded bg-ink text-surface text-xs font-semibold hover:bg-accent transition-colors flex items-center gap-1"
+              >
+                <span>صفحة التحليل الشاملة في تقدير</span>
+                <span aria-hidden>↗</span>
+              </Link>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    addMatchToParlay(inspectingMatch);
+                    setInspectingMatch(null);
+                  }}
+                  className="px-3 py-1.5 rounded bg-panel hover:bg-surface text-ink text-xs font-semibold border border-line transition-colors"
+                >
+                  + ضم لمختبر البارلي
+                </button>
+                <button
+                  onClick={() => setInspectingMatch(null)}
+                  className="px-3 py-1.5 rounded text-muted hover:text-ink text-xs font-medium"
+                >
+                  إغلاق
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Footer: Compliant with Anti-Slop Rules 29 & 30 */}
       <footer className="border-t border-line bg-surface mt-12 py-6">

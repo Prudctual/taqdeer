@@ -1297,6 +1297,12 @@ export type BankerPick = {
   matchId: string;
   homeTeam: string;
   awayTeam: string;
+  homeTeamId?: string;
+  awayTeamId?: string;
+  homeCrestUrl?: string | null;
+  awayCrestUrl?: string | null;
+  utcDate: string;
+  matchday?: number | null;
   leagueName: string;
   pickLabel: string;
   pickKey?: "H" | "A" | "D";
@@ -1329,6 +1335,9 @@ export const getBankerPicks = cache(function getBankerPicks(
         `
       SELECT m.id as matchId, l.name_ar as leagueName,
              ht.name_ar as homeTeam, at.name_ar as awayTeam,
+             ht.id as homeTeamId, at.id as awayTeamId,
+             ht.crest_url as homeCrestUrl, at.crest_url as awayCrestUrl,
+             m.matchday,
              p.p_home, p.p_draw, p.p_away, p.confidence, m.utc_date,
              m.odds_home, m.odds_draw, m.odds_away,
              p.analytics_json
@@ -1350,6 +1359,11 @@ export const getBankerPicks = cache(function getBankerPicks(
       leagueName: string;
       homeTeam: string;
       awayTeam: string;
+      homeTeamId: string;
+      awayTeamId: string;
+      homeCrestUrl: string | null;
+      awayCrestUrl: string | null;
+      matchday: number | null;
       p_home: number | null;
       p_draw: number | null;
       p_away: number | null;
@@ -1423,6 +1437,12 @@ export const getBankerPicks = cache(function getBankerPicks(
         matchId: r.matchId,
         homeTeam: r.homeTeam,
         awayTeam: r.awayTeam,
+        homeTeamId: r.homeTeamId,
+        awayTeamId: r.awayTeamId,
+        homeCrestUrl: r.homeCrestUrl,
+        awayCrestUrl: r.awayCrestUrl,
+        utcDate: r.utc_date,
+        matchday: r.matchday,
         leagueName: r.leagueName,
         pickLabel: top1.label,
         pickKey: top1.key,
@@ -2517,10 +2537,10 @@ export const getConfinedPlatformData = cache(function getConfinedPlatformData(
   const parlayCandidates = getParlayCandidates(leagueId, 24);
   const calibration = getCalibrationBins(leagueId);
 
-  // الفرق المحصورة المؤهلة: استبعاد أي مباراة مستبعدة أو منخفضة الأمان
-  const strictlyConfined = allBankers.filter(
-    (p) => !p.isStrictlyExcluded && (p.stabilityScore ?? 50) >= 42
-  );
+  // الفرق المحصورة المؤهلة: استبعاد أي مباراة مستبعدة أو منخفضة الأمان، وترتيبها تصاعدياً حسب موعد اللقاء
+  const strictlyConfined = allBankers
+    .filter((p) => !p.isStrictlyExcluded && (p.stabilityScore ?? 50) >= 42)
+    .sort((a, b) => new Date(a.utcDate).getTime() - new Date(b.utcDate).getTime());
 
   // تقسيم الاستراتيجيات الصارم
   const safety = [...strictlyConfined]
