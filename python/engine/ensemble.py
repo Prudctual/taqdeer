@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Dict, Mapping, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
 import numpy as np
 
@@ -26,6 +26,11 @@ from .sharp_market import closing_line_value, detect_steam, pick_market_odds, st
 from .strengths_weaknesses import analyze_team_strengths_weaknesses
 from .tactical_matchup import evaluate_tactical_matchup
 from .weather_engine import apply_weather_to_lambdas
+from .randomness_engine import (
+    TeamRandomnessStats,
+    compute_team_randomness_profile,
+    evaluate_match_randomness,
+)
 
 
 Prob3 = Tuple[float, float, float]
@@ -132,6 +137,143 @@ def fit_weights(
     return pack(res.x)
 
 
+def decimal_to_american(dec_odds: float) -> int:
+    """تحويل الأودز العشرية إلى أودز أمريكية (+100, -167, +240, -400)."""
+    if dec_odds >= 2.0:
+        return int(round((dec_odds - 1.0) * 100.0))
+    if dec_odds <= 1.001:
+        return -9999
+    return -int(round(100.0 / (dec_odds - 1.0)))
+
+
+def american_to_decimal(am_odds: int) -> float:
+    """تحويل الأودز الأمريكية إلى أودز عشرية (Decimal)."""
+    if am_odds > 0:
+        return float(round(1.0 + am_odds / 100.0, 4))
+    if am_odds < 0:
+        return float(round(1.0 + 100.0 / abs(am_odds), 4))
+    return 1.0
+
+
+def odds_to_implied_prob(dec_odds: float) -> float:
+    """حساب احتمال السوق الضمني من السعر العشري."""
+    if dec_odds <= 1.0:
+        return 1.0
+    return float(round(1.0 / dec_odds, 4))
+
+
+def calculate_edge(model_prob: float, market_dec_odds: float) -> float:
+    """حساب الفارق الاحتمالي الصافي (Model Edge = Model Prob - Implied Market Prob)."""
+    implied = odds_to_implied_prob(market_dec_odds)
+    return float(round(model_prob - implied, 4))
+
+
+def detect_value_trap(
+    model_prob: float, market_dec_odds: float, threshold: float = -0.05
+) -> bool:
+    """
+    كشف مصيدة القيمة (Value Trap):
+    حين يكون الفريق مرشحاً بنسبة جيدة في النموذج، لكن سعر السوق يفرض احتمالاً أعلى بكثير
+    (مثل برشلونة 54.4% بسعر -400 الذي يطلب 80% فيكون الـEdge سالب 25.6%).
+    """
+    edge = calculate_edge(model_prob, market_dec_odds)
+    return bool(edge <= threshold)
+
+
+def calculate_selection_score(
+    top_prob: float, second_prob: float, confidence: float
+) -> int:
+    """
+    حساب مؤشر قوة الترشيح (Selection Score 0–100):
+    يدمج احتمال الفوز الأعلى (top_prob) وهامش الفصل الاحتمالي عن النتيجة الثانية (separation gap)
+    وثقة النموذج، لترتيب أفضلية المباريات بصرامة ودقة.
+    """
+    p1 = max(0.0, min(1.0, float(top_prob)))
+    p2 = max(0.0, min(1.0, float(second_prob)))
+    conf = max(0.0, min(1.0, float(confidence)))
+    separation = max(0.0, p1 - p2)
+
+    score = (
+        30.0
+        + 55.0 * p1
+        + 25.0 * min(separation / 0.35, 1.0)
+        + 15.0 * (conf - 0.5)
+    )
+    return max(10, min(99, int(round(score))))
+
+
+def parlay_analysis(
+    legs: List[Tuple[float, float]],
+) -> Dict[str, Any]:
+    """
+    تحليل رهان البارلي / التجميعي (Parlay / Accumulator):
+    يحسب احتمال النجاح المشترك بفرض الاستقلالية، والأودز العادلة،
+    ويقارنها بأودز السوق لكشف ما إذا كان التجميع إيجابي القيمة أم مصيدة سالبة (-EV).
+    """
+    if not legs:
+        return {}
+
+    model_prob = 1.0
+    market_dec_odds = 1.0
+    leg_details = []
+    has_trap = False
+
+    for p, dec_odds in legs:
+        model_prob *= p
+        market_dec_odds *= dec_odds
+        implied = odds_to_implied_prob(dec_odds)
+        edge = calculate_edge(p, dec_odds)
+        is_trap = detect_value_trap(p, dec_odds)
+        if is_trap:
+            has_trap = True
+        leg_ev = float(round((p * dec_odds) - 1.0, 4))
+        leg_details.append(
+            {
+                "model_prob": float(round(p, 4)),
+                "market_odds": float(round(dec_odds, 3)),
+                "american_odds": decimal_to_american(dec_odds),
+                "implied_prob": float(round(implied, 4)),
+                "edge": float(round(edge, 4)),
+                "is_trap": is_trap,
+                "ev": leg_ev,
+            }
+        )
+
+    market_implied = odds_to_implied_prob(market_dec_odds)
+    fair_dec_odds = float(round(1.0 / model_prob, 3)) if model_prob > 0 else 999.0
+    parlay_edge = float(round(model_prob - market_implied, 4))
+    parlay_ev = float(round((model_prob * market_dec_odds) - 1.0, 4))
+
+    best_single = max(leg_details, key=lambda x: x["ev"])
+    prefer_single_bet = bool(best_single["ev"] > parlay_ev or (best_single["ev"] > 0 and parlay_ev <= 0))
+    single_vs_parlay_delta = float(round(parlay_ev - best_single["ev"], 4))
+
+    if prefer_single_bet:
+        recommendation = f"الرهان المنفرد على الساق الأفضل ({best_single['american_odds']}, EV: {best_single['ev']:+.1%}) يتفوق بوضوح على البارلي (EV: {parlay_ev:+.1%})."
+    elif parlay_ev > 0.0:
+        recommendation = f"تجميعة البارلي تحقق عائداً موجباً أعلى (+EV: {parlay_ev:+.1%}) من الرهانات المنفردة."
+    else:
+        recommendation = "سعر السوق غير مجزٍ سواء للبارلي أو الرهانات المنفردة."
+
+    return {
+        "model_prob": float(round(model_prob, 4)),
+        "market_dec_odds": float(round(market_dec_odds, 3)),
+        "market_american_odds": decimal_to_american(market_dec_odds),
+        "market_implied_prob": float(round(market_implied, 4)),
+        "fair_dec_odds": fair_dec_odds,
+        "fair_american_odds": decimal_to_american(fair_dec_odds),
+        "parlay_edge": parlay_edge,
+        "parlay_ev": parlay_ev,
+        "has_value_trap": has_trap,
+        "is_positive_ev": parlay_ev > 0.0,
+        "prefer_single_bet": prefer_single_bet,
+        "single_vs_parlay_delta": single_vs_parlay_delta,
+        "best_single_ev": best_single["ev"],
+        "recommendation": recommendation,
+        "legs": leg_details,
+    }
+
+
 def value_signal(
     calibrated: Prob3, market_odds: tuple[float, float, float]
 ) -> Optional[Dict]:
@@ -142,13 +284,19 @@ def value_signal(
             continue
         ev = p * odds - 1.0
         kelly = max(0.0, (p * b - (1.0 - p)) / b)
+        implied = odds_to_implied_prob(odds)
+        edge = calculate_edge(p, odds)
         cand = {
             "side": name,
             "odds": float(odds),
+            "american_odds": decimal_to_american(odds),
             "p": float(p),
+            "implied_p": implied,
+            "edge": edge,
             "ev": float(ev),
             "kelly": float(kelly),
             "stake": float(round(0.25 * kelly, 4)),
+            "is_trap": detect_value_trap(p, odds),
         }
         if best is None or cand["kelly"] > best["kelly"]:
             best = cand
@@ -278,6 +426,8 @@ def predict_match(
     lineup_confirmed: bool = False,
     temp_over25: float = 1.0,
     temp_btts: float = 1.0,
+    home_randomness_stats: Optional[TeamRandomnessStats] = None,
+    away_randomness_stats: Optional[TeamRandomnessStats] = None,
 ) -> Dict:
     profile = get_league_profile(league_id)
     w = dict(weights or DEFAULT_WEIGHTS)
@@ -477,6 +627,20 @@ def predict_match(
         elo_home, elo_away, home_adv=elo_ha, draw_base=float(profile.draw_baseline)
     )
 
+    h_rand = home_randomness_stats or compute_team_randomness_profile(home, [])
+    a_rand = away_randomness_stats or compute_team_randomness_profile(away, [])
+    rand_report = evaluate_match_randomness(
+        home_team=home,
+        away_team=away,
+        home_stats=h_rand,
+        away_stats=a_rand,
+        referee_profile=referee_profile,
+        total_expected_goals=float(lam + mu),
+        elo_diff=float(abs(elo_home - elo_away)),
+        top_prob=float(max(elo_p)),
+        draw_baseline=float(profile.draw_baseline),
+    )
+
     pts_gap = form_home.pts - form_away.pts
     form_steep = 1.1 * float(profile.form_weight_mult)
     home_lean = 1 / (1 + math.exp(-form_steep * pts_gap))
@@ -485,6 +649,8 @@ def predict_match(
         form_draw += 0.03
     if is_low_scoring:
         form_draw += 0.04
+    if rand_report["multipliers"]["draw_boost"] > 0:
+        form_draw = min(0.48, form_draw + rand_report["multipliers"]["draw_boost"])
     form_p = _norm(home_lean * (1 - form_draw), form_draw, (1 - home_lean) * (1 - form_draw))
 
     blend_odds, blend_src = pick_market_odds(
@@ -513,12 +679,25 @@ def predict_match(
         parts.append((market_p, w_eff["market"]))
 
     blended = _blend_many(parts)
-    calibrated = apply_temperature(blended, temperature)
+    effective_temp = temperature * rand_report["multipliers"]["temperature_mult"]
+    calibrated = apply_temperature(blended, effective_temp)
+
+    d_boost = rand_report["multipliers"]["draw_boost"]
+    if d_boost > 0:
+        # Direct ensemble calibration boost on draw probability to protect against draw traps (/boost)
+        ch, cd, ca = calibrated
+        target_d = min(0.48, cd + d_boost)
+        if cd < 1.0 and cd < target_d:
+            rem_scale = (1.0 - target_d) / max(0.001, (1.0 - cd))
+            calibrated = _norm(ch * rem_scale, target_d, ca * rem_scale)
 
     mat = align_matrix_to_probs(mat, calibrated)
     mk = markets_from_matrix(mat)
-    p_over25 = apply_binary_temperature(float(mk["p_over25"]), temp_over25)
-    p_btts = apply_binary_temperature(float(mk["p_btts_yes"]), temp_btts)
+
+    # Apply randomness temperature multiplier to goal markets to damp overconfidence on chaotic matches (/goal)
+    goal_temp_mult = rand_report["multipliers"]["temperature_mult"]
+    p_over25 = apply_binary_temperature(float(mk["p_over25"]), temp_over25 * goal_temp_mult)
+    p_btts = apply_binary_temperature(float(mk["p_btts_yes"]), temp_btts * goal_temp_mult)
 
     edge = None
     value = None
@@ -534,6 +713,12 @@ def predict_match(
         (context_p, w_fair["context"]),
     ]
     fair = apply_temperature(_blend_many(fair_parts), temperature)
+    if d_boost > 0:
+        fh, fd, fa = fair
+        target_fd = min(0.48, fd + d_boost)
+        if fd < 1.0 and fd < target_fd:
+            rem_scale = (1.0 - target_fd) / max(0.001, (1.0 - fd))
+            fair = _norm(fh * rem_scale, target_fd, fa * rem_scale)
     value_odds = open_odds if open_odds else (sharp_odds or market_odds)
     if value_odds:
         value_market = odds_to_probs(*value_odds)
@@ -544,6 +729,11 @@ def predict_match(
                 "away": fair[2] - value_market[2],
             }
             value = value_signal(fair, value_odds)
+            if value is not None:
+                value["is_randomness_excluded"] = rand_report["is_strictly_excluded"]
+                value["match_randomness_index"] = rand_report["match_randomness_index"]
+                if rand_report["is_strictly_excluded"]:
+                    value["bet"] = False
 
     model_side = (
         "home"
@@ -563,6 +753,7 @@ def predict_match(
     confidence = float(
         min(0.95, confidence + steam_confidence_bonus(steam_res, model_side))
     )
+    confidence = float(min(0.95, max(0.15, confidence * rand_report["multipliers"]["confidence_mult"])))
 
     p_1x = float(calibrated[0] + calibrated[1])
     p_x2 = float(calibrated[1] + calibrated[2])
@@ -587,7 +778,12 @@ def predict_match(
         "xpts_home": xpts_home,
         "xpts_away": xpts_away,
         "double_chance": double_chance,
+        "randomness": rand_report,
+        "match_randomness_index": rand_report["match_randomness_index"],
+        "stability_score": rand_report["stability_score"],
+        "is_strictly_excluded": rand_report["is_strictly_excluded"],
         "components": {
+            "randomness": rand_report,
             "dixon_coles": {"p": dc_p, "lambda": [lam, mu]},
             "pi_ratings": {"p": pi_p, "lambda": [lam_pi, mu_pi]},
             "elo": {"p": elo_p, "ratings": [elo_home, elo_away], "home_adv": elo_ha},

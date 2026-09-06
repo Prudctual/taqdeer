@@ -6,11 +6,12 @@ import { MatchList } from "@/components/MatchList";
 import { HeroMatchBanner } from "@/components/HeroMatchBanner";
 import { LiveInteractiveScores } from "@/components/LiveInteractiveScores";
 import { BankerPicksWidget, type BankerPick } from "@/components/BankerPicksWidget";
+import { ParlayBuilderWidget } from "@/components/ParlayBuilderWidget";
 import { LeagueTableWidget, type StandingTeam } from "@/components/LeagueTableWidget";
 import { ShadcnDataTable, type MatchTableRow } from "@/components/ShadcnDataTable";
 import { useLiveScores } from "@/lib/hooks/useLiveScores";
 import { resolveMatchPhase } from "@/lib/match-status";
-import type { MatchCard } from "@/lib/queries";
+import type { MatchCard, ParlayCandidateMatch } from "@/lib/queries";
 
 interface LeagueItem {
   id: string;
@@ -36,6 +37,7 @@ interface StudioHomeViewProps {
   nextMatch?: MatchCard | null;
   standingsByLeague?: Record<string, StandingTeam[]>;
   bankerPicks?: BankerPick[];
+  parlayCandidates?: ParlayCandidateMatch[];
 }
 
 export function StudioHomeView({
@@ -46,9 +48,10 @@ export function StudioHomeView({
   nextMatch,
   standingsByLeague = {},
   bankerPicks = [],
+  parlayCandidates = [],
 }: StudioHomeViewProps) {
   const [activeTab, setActiveTab] = useState<
-    "matches" | "value" | "bankers" | "standings"
+    "matches" | "value" | "bankers" | "parlay" | "standings"
   >("matches");
   const [matchesViewMode, setMatchesViewMode] = useState<"cards" | "table">("cards");
 
@@ -153,6 +156,13 @@ export function StudioHomeView({
             className={tabClass(activeTab === "bankers")}
           >
             أأمن التوقعات
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("parlay")}
+            className={tabClass(activeTab === "parlay")}
+          >
+            ⚡ محلل البارلي
           </button>
           <button
             type="button"
@@ -265,10 +275,19 @@ export function StudioHomeView({
         )}
 
         {activeTab === "bankers" && (
-          <BankerPicksWidget
-            picks={bankerPicks}
-            title="أأمن 4 توقعات للجولة الحالية"
-          />
+          <div className="space-y-6">
+            <BankerPicksWidget
+              picks={bankerPicks}
+              title="نموذج الاختيار وأأمن الترشيحات (Selection Model)"
+            />
+            {parlayCandidates.length > 0 && (
+              <ParlayBuilderWidget candidates={parlayCandidates} />
+            )}
+          </div>
+        )}
+
+        {activeTab === "parlay" && (
+          <ParlayBuilderWidget candidates={parlayCandidates} />
         )}
 
         {activeTab === "standings" && (

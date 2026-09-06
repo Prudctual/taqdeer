@@ -6,6 +6,7 @@ import { SiteSidebar } from "@/components/SiteSidebar";
 import { ThemeProvider } from "@/components/ThemeContext";
 import { AdvancedModeProvider } from "@/components/AdvancedModeContext";
 import { CommandMenu } from "@/components/CommandMenu";
+import { MainContentShell } from "@/components/MainContentShell";
 import { SITE_URL } from "@/lib/site";
 import "./globals.css";
 
@@ -71,9 +72,7 @@ export default function RootLayout({
               {/* Content Area — scrollable */}
               <div className="flex flex-1 flex-col min-w-0 overflow-y-auto">
                 <SiteHeader />
-                <main className="mx-auto w-full max-w-[var(--content-max)] flex-1 px-4 py-6 sm:px-6 sm:py-8">
-                  {children}
-                </main>
+                <MainContentShell>{children}</MainContentShell>
                 <SiteFooter />
               </div>
             </div>

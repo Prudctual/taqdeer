@@ -12,6 +12,7 @@ import {
   getLeagues,
   getStandings,
   getBankerPicks,
+  getParlayCandidates,
   type MatchCard,
 } from "@/lib/queries";
 import { resolveMatchPhase } from "@/lib/match-status";
@@ -40,7 +41,8 @@ export default function HomePage() {
   const upcomingByLeague = getUpcomingByLeague(9);
   const lastFit = getMeta("last_fit");
   const leagues = getLeagues();
-  const bankerPicks = getBankerPicks(4);
+  const bankerPicks = getBankerPicks(8);
+  const parlayCandidates = getParlayCandidates("all", 16);
 
   const standingsByLeague: Record<string, StandingTeam[]> = {};
   leagues.forEach((l) => {
@@ -162,6 +164,7 @@ export default function HomePage() {
         nextMatch={nextMatch}
         standingsByLeague={standingsByLeague}
         bankerPicks={bankerPicks}
+        parlayCandidates={parlayCandidates}
       />
       <LatestNewsWidget />
       <LatestArticlesWidget />

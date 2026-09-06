@@ -336,5 +336,194 @@ export function actualOutcome(
   return "D";
 }
 
+/** تحويل الأودز العشرية إلى صيغة أمريكية نصية (+100, -167, +240, -400) */
+export function decimalToAmerican(decOdds: number): string {
+  if (!decOdds || decOdds <= 1.0) return "—";
+  if (decOdds >= 2.0) {
+    const am = Math.round((decOdds - 1.0) * 100);
+    return `+${am}`;
+  }
+  const am = Math.round(100.0 / (decOdds - 1.0));
+  return `-${am}`;
+}
 
+/** تحويل الأودز الأمريكية إلى أودز عشرية (Decimal) */
+export function americanToDecimal(amOdds: number): number {
+  if (amOdds > 0) {
+    return Number((1.0 + amOdds / 100.0).toFixed(4));
+  }
+  if (amOdds < 0) {
+    return Number((1.0 + 100.0 / Math.abs(amOdds)).toFixed(4));
+  }
+  return 1.0;
+}
 
+/** حساب احتمال السوق الضمني (Implied Probability) من الأودز العشرية */
+export function oddsToImpliedProb(decOdds: number): number {
+  if (!decOdds || decOdds <= 1.0) return 1.0;
+  return Number((1.0 / decOdds).toFixed(4));
+}
+
+/**
+ * حساب الفارق الاحتمالي الصافي (Model Edge):
+ * Model Probability - Implied Market Probability
+ * مثال: تيلستار نموذج 65.5% - سوق 62.5% = +3.0%
+ * برشلونة نموذج 54.4% - سوق 80.0% = -25.6% (مصيدة قيمة)
+ */
+export function calculateEdge(modelProb: number, decOdds: number): number {
+  const implied = oddsToImpliedProb(decOdds);
+  return Number((modelProb - implied).toFixed(4));
+}
+
+/**
+ * كشف مصائد القيمة (Value Trap):
+ * عندما يطالب سعر السوق باحتمال أعلى بكثير مما يراه النموذج، مما يخلق عائداً سلبياً فادحاً (-EV).
+ */
+export function detectValueTrap(
+  modelProb: number,
+  decOdds: number,
+  threshold = -0.05
+): boolean {
+  if (!decOdds || decOdds <= 1.0) return false;
+  const edge = calculateEdge(modelProb, decOdds);
+  return edge <= threshold;
+}
+
+/**
+ * حساب مؤشر قوة الترشيح (Selection Score 0–100):
+ * يدمج احتمال الفوز وهامش الفصل الاحتمالي عن النتيجة الثانية (separation gap) وثقة النموذج.
+ */
+export function calculateSelectionScore(
+  topProb: number,
+  secondProb: number,
+  confidence = 0.8
+): number {
+  const p1 = Math.max(0, Math.min(1, topProb));
+  const p2 = Math.max(0, Math.min(1, secondProb));
+  const conf = Math.max(0, Math.min(1, confidence));
+  const separation = Math.max(0, p1 - p2);
+
+  const score =
+    30.0 +
+    55.0 * p1 +
+    25.0 * Math.min(separation / 0.35, 1.0) +
+    15.0 * (conf - 0.5);
+
+  return Math.max(10, Math.min(99, Math.round(score)));
+}
+
+export interface ParlayLeg {
+  id?: string;
+  matchName?: string;
+  pickLabel?: string;
+  prob: number;
+  odds: number;
+}
+
+export interface ParlayAnalysisResult {
+  modelProb: number;
+  marketDecOdds: number;
+  marketAmericanOdds: string;
+  marketImpliedProb: number;
+  fairDecOdds: number;
+  fairAmericanOdds: string;
+  parlayEdge: number;
+  parlayEv: number;
+  hasValueTrap: boolean;
+  isPositiveEv: boolean;
+  preferSingleBet: boolean;
+  singleVsParlayDelta: number;
+  bestSingleEv: number;
+  bestSingleLegName: string;
+  recommendation: string;
+  legs: Array<
+    ParlayLeg & {
+      americanOdds: string;
+      impliedProb: number;
+      edge: number;
+      isTrap: boolean;
+      ev: number;
+    }
+  >;
+}
+
+/**
+ * تحليل رهان البارلي / التجميعي (Parlay / Combinator Calculator):
+ * يحسب احتمال النجاح المشترك بفرض الاستقلالية، السعر العادل، العائد المتوقع،
+ * ويكشف ما إذا كان أي اختيار يحمل مصيدة قيمة تفسد التجميعة بأكملها،
+ * ويقارن جدوى التجميعة بالرهان المنفرد (Single Bet vs Parlay).
+ */
+export function calculateParlay(legs: ParlayLeg[]): ParlayAnalysisResult | null {
+  if (!legs || legs.length === 0) return null;
+
+  let modelProb = 1.0;
+  let marketDecOdds = 1.0;
+  let hasValueTrap = false;
+
+  const enrichedLegs = legs.map((leg) => {
+    const p = Math.max(0.01, Math.min(0.99, Number(leg.prob) || 0.5));
+    const o = Math.max(1.01, Number(leg.odds) || 1.90);
+    modelProb *= p;
+    marketDecOdds *= o;
+    const implied = oddsToImpliedProb(o);
+    const edge = calculateEdge(p, o);
+    const isTrap = detectValueTrap(p, o);
+    const legEv = Number(((p * o) - 1.0).toFixed(4));
+    if (isTrap) hasValueTrap = true;
+
+    return {
+      ...leg,
+      prob: p,
+      odds: o,
+      americanOdds: decimalToAmerican(o),
+      impliedProb: implied,
+      edge,
+      isTrap,
+      ev: legEv,
+    };
+  });
+
+  const marketImplied = oddsToImpliedProb(marketDecOdds);
+  const fairDecOdds = modelProb > 0 ? Number((1.0 / modelProb).toFixed(3)) : 999.0;
+  const parlayEdge = Number((modelProb - marketImplied).toFixed(4));
+  const parlayEv = Number(((modelProb * marketDecOdds) - 1.0).toFixed(4));
+
+  // مقارنة البارلي بأفضل رهان منفرد (Single Bet vs Parlay)
+  let bestLeg = enrichedLegs[0]!;
+  for (const leg of enrichedLegs) {
+    if (leg.ev > bestLeg.ev) {
+      bestLeg = leg;
+    }
+  }
+
+  const preferSingleBet = bestLeg.ev > parlayEv || (bestLeg.ev > 0 && parlayEv <= 0);
+  const singleVsParlayDelta = Number((parlayEv - bestLeg.ev).toFixed(4));
+
+  let recommendation = "";
+  if (preferSingleBet) {
+    recommendation = `الرهان المنفرد على ${bestLeg.matchName || bestLeg.pickLabel || "الخيار الأفضل"} (${bestLeg.americanOdds}، عائد متوقع: +${(bestLeg.ev * 100).toFixed(1)}%) أجدى وأأمن بكثير من البارلي (-EV: ${(parlayEv * 100).toFixed(1)}%). الجمع بينهما يبتلع الربحية.`;
+  } else if (parlayEv > 0.0) {
+    recommendation = `تجميعة البارلي متوافقة إحصائياً وتعزز العائد المتوقع الإجمالي (+EV: +${(parlayEv * 100).toFixed(1)}%).`;
+  } else {
+    recommendation = "سعر السوق المعروض لا يعوض المخاطرة المضافة في البارلي أو الرهانات المنفردة.";
+  }
+
+  return {
+    modelProb: Number(modelProb.toFixed(4)),
+    marketDecOdds: Number(marketDecOdds.toFixed(3)),
+    marketAmericanOdds: decimalToAmerican(marketDecOdds),
+    marketImpliedProb: Number(marketImplied.toFixed(4)),
+    fairDecOdds,
+    fairAmericanOdds: decimalToAmerican(fairDecOdds),
+    parlayEdge,
+    parlayEv,
+    hasValueTrap,
+    isPositiveEv: parlayEv > 0.0,
+    preferSingleBet,
+    singleVsParlayDelta,
+    bestSingleEv: bestLeg.ev,
+    bestSingleLegName: bestLeg.matchName || "الساق الأفضل",
+    recommendation,
+    legs: enrichedLegs,
+  };
+}

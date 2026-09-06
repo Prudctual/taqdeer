@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
+import { getCalibrationBins } from "@/lib/queries";
 import {
   checkRateLimit,
   createRateLimitErrorResponse,
@@ -44,12 +45,14 @@ export async function GET(request: Request) {
     query += " ORDER BY m.created_at DESC";
 
     const rows = db.prepare(query).all(...params);
+    const calSummary = getCalibrationBins(league ?? undefined);
 
     return NextResponse.json(
       {
         success: true,
         count: rows.length,
         timestamp: new Date().toISOString(),
+        calibration: calSummary,
         data: rows,
       },
       {

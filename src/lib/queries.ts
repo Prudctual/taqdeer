@@ -1,6 +1,13 @@
 import { cache } from "react";
 import { getDb } from "./db";
 import { LEAGUES, latestSeasonStartYear } from "./leagues";
+import {
+  calculateSelectionScore,
+  decimalToAmerican,
+  oddsToImpliedProb,
+  calculateEdge,
+  detectValueTrap,
+} from "./format";
 
 export type MatchCard = {
   id: string;
@@ -1292,32 +1299,53 @@ export type BankerPick = {
   awayTeam: string;
   leagueName: string;
   pickLabel: string;
+  pickKey?: "H" | "A" | "D";
   probability: number;
+  secondProbability?: number;
+  separationGap?: number;
+  selectionScore?: number;
   confidence: number;
+  odds?: number | null;
+  americanOdds?: string;
+  impliedProb?: number | null;
+  edge?: number | null;
+  isTrap?: boolean;
+  matchRandomnessIndex?: number;
+  stabilityScore?: number;
+  isStrictlyExcluded?: boolean;
 };
 
-export const getBankerPicks = cache(function getBankerPicks(limit = 4, leagueId?: string): BankerPick[] {
+export const getBankerPicks = cache(function getBankerPicks(
+  limit = 4,
+  leagueId?: string
+): BankerPick[] {
   try {
     const db = getDb();
     const leagueFilter = leagueId ? "AND m.league_id = ?" : "";
-    const params: unknown[] = leagueId ? [leagueId, limit] : [limit];
+    const params: unknown[] = leagueId ? [leagueId] : [];
 
-    const rows = db.prepare(`
+    const rows = db
+      .prepare(
+        `
       SELECT m.id as matchId, l.name_ar as leagueName,
              ht.name_ar as homeTeam, at.name_ar as awayTeam,
-             p.p_home, p.p_draw, p.p_away, p.confidence, m.utc_date
+             p.p_home, p.p_draw, p.p_away, p.confidence, m.utc_date,
+             m.odds_home, m.odds_draw, m.odds_away,
+             p.analytics_json
       FROM matches m
       JOIN leagues l ON l.id = m.league_id
       JOIN teams ht ON ht.id = m.home_team_id
       JOIN teams at ON at.id = m.away_team_id
       JOIN predictions p ON p.match_id = m.id
       WHERE m.status IN ('SCHEDULED', 'TIMED')
-        AND substr(m.utc_date, 1, 19) >= strftime('%Y-%m-%dT%H:%M:%S', 'now')
+        AND substr(m.utc_date, 1, 19) >= strftime('%Y-%m-%dT%H:%M:%S', 'now', '-12 hours')
         AND (p.p_home IS NOT NULL OR p.p_away IS NOT NULL)
       ${leagueFilter}
-      ORDER BY m.utc_date ASC, MAX(COALESCE(p.p_home, 0), COALESCE(p.p_away, 0)) DESC
-      LIMIT ?
-    `).all(...params) as Array<{
+      ORDER BY m.utc_date ASC
+      LIMIT 120
+    `
+      )
+      .all(...params) as Array<{
       matchId: string;
       leagueName: string;
       homeTeam: string;
@@ -1327,30 +1355,515 @@ export const getBankerPicks = cache(function getBankerPicks(limit = 4, leagueId?
       p_away: number | null;
       confidence: number | null;
       utc_date: string;
+      odds_home: number | null;
+      odds_draw: number | null;
+      odds_away: number | null;
+      analytics_json: string | null;
     }>;
 
-    // لا نُرجع مباريات منتهية كـ «ترشيحات بنكر» — الواجهة تفضّل الفراغ على التضليل
-    return rows.map((r) => {
-      const pH = r.p_home ?? 0.5;
-      const pA = r.p_away ?? 0.3;
-      const isHomePick = pH >= pA;
-      const prob = isHomePick ? pH : pA;
-      const pickLabel = isHomePick ? `فوز المضيف (1)` : `فوز الضيف (2)`;
-      // بلا اختلاق: عند غياب ثقة النموذج (لا يحدث عملياً — العمود NOT NULL) نعرض الاحتمال نفسه
-      const conf = r.confidence ?? prob;
+    const candidates: BankerPick[] = [];
 
-      return {
+    for (const r of rows) {
+      // Parse anti-randomness analytics
+      let isStrictlyExcluded = false;
+      let mri = 30;
+      let stability = 70;
+      let isDrawTrap = false;
+
+      if (r.analytics_json) {
+        try {
+          const parsed = JSON.parse(r.analytics_json);
+          const rand = parsed.randomness;
+          if (rand) {
+            isStrictlyExcluded = Boolean(rand.is_strictly_excluded || rand.verdict === "STRICT_EXCLUDE");
+            mri = rand.match_randomness_index ?? 30;
+            stability = rand.stability_score ?? (100 - mri);
+            isDrawTrap = Boolean(rand.pillars?.draw_trap?.active && rand.pillars?.draw_trap?.severity !== "LOW");
+          }
+        } catch {
+          // ignore
+        }
+      }
+
+      // Bankers must be strictly safe: exclude chaotic matches, draw traps, and severe volatility
+      if (isStrictlyExcluded || mri >= 60 || isDrawTrap) {
+        continue;
+      }
+
+      const pH = r.p_home ?? 0.33;
+      const pD = r.p_draw ?? 0.33;
+      const pA = r.p_away ?? 0.33;
+
+      const outcomes = [
+        { key: "H" as const, p: pH, odds: r.odds_home, label: "فوز المضيف (1)" },
+        { key: "D" as const, p: pD, odds: r.odds_draw, label: "تعادل (X)" },
+        { key: "A" as const, p: pA, odds: r.odds_away, label: "فوز الضيف (2)" },
+      ].sort((a, b) => b.p - a.p);
+
+      const top1 = outcomes[0]!;
+      const top2 = outcomes[1]!;
+
+      // استبعاد التعادل كترشيح بنكر صريح
+      if (top1.key === "D") continue;
+
+      const separationGap = Number((top1.p - top2.p).toFixed(4));
+      // فحص تكافؤ اللقاء: حد أدنى للأفضلية 4% واحتمال فوز >= 44%
+      if (separationGap < 0.04 || top1.p < 0.44) continue;
+
+      const conf = r.confidence ?? top1.p;
+      const selectionScore = calculateSelectionScore(top1.p, top2.p, conf);
+
+      const odds = top1.odds && top1.odds > 1.0 ? top1.odds : null;
+      const americanOdds = odds ? decimalToAmerican(odds) : "—";
+      const impliedProb = odds ? oddsToImpliedProb(odds) : null;
+      const edge = odds ? calculateEdge(top1.p, odds) : null;
+      const isTrap = odds ? detectValueTrap(top1.p, odds) : false;
+
+      candidates.push({
         matchId: r.matchId,
         homeTeam: r.homeTeam,
         awayTeam: r.awayTeam,
         leagueName: r.leagueName,
-        pickLabel,
-        probability: Number(prob.toFixed(2)),
+        pickLabel: top1.label,
+        pickKey: top1.key,
+        probability: Number(top1.p.toFixed(3)),
+        secondProbability: Number(top2.p.toFixed(3)),
+        separationGap,
+        selectionScore,
         confidence: Number(conf.toFixed(2)),
-      };
-    });
+        odds,
+        americanOdds,
+        impliedProb,
+        edge,
+        isTrap,
+        matchRandomnessIndex: mri,
+        stabilityScore: stability,
+        isStrictlyExcluded,
+      });
+    }
+
+    // فرز وفق مؤشر قوة الاختيار
+    candidates.sort((a, b) => (b.selectionScore ?? 0) - (a.selectionScore ?? 0));
+    return candidates.slice(0, limit);
   } catch (e) {
     console.error("Error in getBankerPicks:", e);
+    return [];
+  }
+});
+
+export interface SelectionStrategyResult {
+  safety: BankerPick[];
+  value: BankerPick[];
+  balanced: BankerPick[];
+  traps: BankerPick[];
+}
+
+export const getSelectionStrategies = cache(function getSelectionStrategies(
+  leagueId?: string
+): SelectionStrategyResult {
+  const all = getBankerPicks(80, leagueId);
+
+  // 1. الأمان: أعلى احتمال فوز بغض النظر عن السعر
+  const safety = [...all]
+    .sort((a, b) => b.probability - a.probability)
+    .slice(0, 4);
+
+  // 2. القيمة: أعلى Edge إيجابي متاح
+  const value = [...all]
+    .filter((p) => p.odds && (p.edge ?? 0) > 0.01)
+    .sort((a, b) => (b.edge ?? 0) - (a.edge ?? 0))
+    .slice(0, 4);
+
+  // 3. التوازن: احتمال قوي مع Edge موجب وبلا مصائد قيمة
+  const balanced = [...all]
+    .filter((p) => p.probability >= 0.48 && (p.edge ?? 0) >= -0.02 && !p.isTrap)
+    .sort((a, b) => (b.selectionScore ?? 0) - (a.selectionScore ?? 0))
+    .slice(0, 4);
+
+  // 4. مصائد القيمة: احتمال مرتفع لكن سعر السوق مبالغ فيه ويحمل عائداً سالباً (-EV)
+  const traps = [...all]
+    .filter((p) => p.isTrap)
+    .sort((a, b) => (a.edge ?? 0) - (b.edge ?? 0))
+    .slice(0, 4);
+
+  return { safety, value, balanced, traps };
+});
+
+export interface CalibrationBinItem {
+  label: string;
+  low: number;
+  high: number;
+  nMatches: number;
+  nCorrect: number;
+  winRate: number;
+  meanProb: number;
+  calibrationError: number;
+}
+
+export interface CalibrationSummary {
+  bins: CalibrationBinItem[];
+  totalMatches: number;
+  totalCorrect: number;
+  overallWinRate: number;
+  ece: number;
+  lastFitted?: string | null;
+}
+
+export const getCalibrationBins = cache(function getCalibrationBins(
+  leagueId?: string
+): CalibrationSummary {
+  try {
+    const db = getDb();
+
+    // 1. محاولة جلب المعايرة المحفوظة من تدريب النموذج
+    if (!leagueId || leagueId === "all") {
+      const metaRow = db
+        .prepare("SELECT value FROM app_meta WHERE key = 'calibration_bins'")
+        .get() as { value: string } | undefined;
+      if (metaRow?.value) {
+        try {
+          const parsed = JSON.parse(metaRow.value);
+          if (Array.isArray(parsed.bins) && parsed.bins.length > 0) {
+            const bins: CalibrationBinItem[] = parsed.bins.map(
+              (b: {
+                label: string;
+                low: number;
+                high: number;
+                n_matches: number;
+                n_correct: number;
+                win_rate: number;
+                mean_prob: number;
+                calibration_error: number;
+              }) => ({
+                label: b.label,
+                low: b.low,
+                high: b.high,
+                nMatches: b.n_matches,
+                nCorrect: b.n_correct,
+                winRate: b.win_rate,
+                meanProb: b.mean_prob,
+                calibrationError: b.calibration_error,
+              })
+            );
+            const totalMatches = bins.reduce((s, b) => s + b.nMatches, 0);
+            const totalCorrect = bins.reduce((s, b) => s + b.nCorrect, 0);
+            return {
+              bins,
+              totalMatches,
+              totalCorrect,
+              overallWinRate:
+                totalMatches > 0
+                  ? Number((totalCorrect / totalMatches).toFixed(4))
+                  : 0,
+              ece: parsed.ece ?? 0,
+              lastFitted: parsed.updated_at,
+            };
+          }
+        } catch {
+          // fallback to live computation
+        }
+      }
+    }
+
+    // 2. حساب مباشر على المباريات المكتملة في قاعدة البيانات
+    const BIN_RANGES: Array<[number, number, string]> = [
+      [0.30, 0.40, "30–39.9%"],
+      [0.40, 0.50, "40–49.9%"],
+      [0.50, 0.55, "50–54.9%"],
+      [0.55, 0.60, "55–59.9%"],
+      [0.60, 0.70, "60–69.9%"],
+      [0.70, 0.80, "70–79.9%"],
+      [0.80, 1.01, "80%+"],
+    ];
+
+    let sql = `
+      SELECT m.home_goals, m.away_goals,
+             COALESCE(ps.p_home, p.p_home) as p_home,
+             COALESCE(ps.p_draw, p.p_draw) as p_draw,
+             COALESCE(ps.p_away, p.p_away) as p_away
+      FROM matches m
+      JOIN predictions p ON p.match_id = m.id
+      LEFT JOIN prediction_snapshots ps ON ps.match_id = m.id
+      WHERE (m.status = 'FINISHED' OR (m.home_goals IS NOT NULL AND m.away_goals IS NOT NULL))
+        AND (p.p_home IS NOT NULL OR ps.p_home IS NOT NULL)
+    `;
+    const params: string[] = [];
+    if (leagueId && leagueId !== "all") {
+      sql += " AND m.league_id = ?";
+      params.push(leagueId);
+    }
+
+    const rows = db.prepare(sql).all(...params) as Array<{
+      home_goals: number;
+      away_goals: number;
+      p_home: number | null;
+      p_draw: number | null;
+      p_away: number | null;
+    }>;
+
+    const binnedMap = new Map<string, { probs: number[]; hits: boolean[] }>();
+    for (const [, , label] of BIN_RANGES) {
+      binnedMap.set(label, { probs: [], hits: [] });
+    }
+
+    let totalMatches = 0;
+    let totalCorrect = 0;
+
+    for (const r of rows) {
+      const ph = r.p_home ?? 0.33;
+      const pd = r.p_draw ?? 0.33;
+      const pa = r.p_away ?? 0.33;
+
+      let topProb = ph;
+      let topSide: "H" | "D" | "A" = "H";
+      if (pd > ph && pd >= pa) {
+        topSide = "D";
+        topProb = pd;
+      } else if (pa > ph && pa > pd) {
+        topSide = "A";
+        topProb = pa;
+      }
+
+      let actual: "H" | "D" | "A" = "D";
+      if (r.home_goals > r.away_goals) actual = "H";
+      else if (r.away_goals > r.home_goals) actual = "A";
+
+      const isHit = topSide === actual;
+      totalMatches++;
+      if (isHit) totalCorrect++;
+
+      for (const [low, high, label] of BIN_RANGES) {
+        if (topProb >= low && topProb < high) {
+          const entry = binnedMap.get(label)!;
+          entry.probs.push(topProb);
+          entry.hits.push(isHit);
+          break;
+        }
+      }
+    }
+
+    const bins: CalibrationBinItem[] = BIN_RANGES.map(([low, high, label]) => {
+      const entry = binnedMap.get(label)!;
+      const n = entry.probs.length;
+      const hits = entry.hits.filter(Boolean).length;
+      const winRate = n > 0 ? hits / n : 0;
+      const meanProb =
+        n > 0
+          ? entry.probs.reduce((a, b) => a + b, 0) / n
+          : (low + Math.min(high, 1.0)) / 2;
+      const calError = n > 0 ? Math.abs(winRate - meanProb) : 0;
+
+      return {
+        label,
+        low,
+        high: Math.min(high, 1.0),
+        nMatches: n,
+        nCorrect: hits,
+        winRate: Number(winRate.toFixed(4)),
+        meanProb: Number(meanProb.toFixed(4)),
+        calibrationError: Number(calError.toFixed(4)),
+      };
+    });
+
+    const ece =
+      totalMatches > 0
+        ? bins.reduce(
+            (sum, b) => sum + (b.nMatches / totalMatches) * b.calibrationError,
+            0
+          )
+        : 0;
+
+    return {
+      bins,
+      totalMatches,
+      totalCorrect,
+      overallWinRate:
+        totalMatches > 0
+          ? Number((totalCorrect / totalMatches).toFixed(4))
+          : 0,
+      ece: Number(ece.toFixed(4)),
+    };
+  } catch (e) {
+    console.error("Error in getCalibrationBins:", e);
+    return {
+      bins: [],
+      totalMatches: 0,
+      totalCorrect: 0,
+      overallWinRate: 0,
+      ece: 0,
+    };
+  }
+});
+
+export interface ParlayCandidateMatch {
+  matchId: string;
+  leagueId: string;
+  leagueNameAr: string;
+  utcDate: string;
+  homeTeam: string;
+  awayTeam: string;
+  recommendedSide: "H" | "D" | "A";
+  recommendedSideLabel: string;
+  probability: number;
+  secondProbability: number;
+  separationGap: number;
+  selectionScore: number;
+  odds: number;
+  americanOdds: string;
+  impliedProb: number;
+  edge: number;
+  isTrap: boolean;
+  confidence: number;
+  isEstimatedOdds?: boolean;
+  matchRandomnessIndex?: number;
+  stabilityScore?: number;
+  isStrictlyExcluded?: boolean;
+}
+
+export const getParlayCandidates = cache(function getParlayCandidates(
+  leagueId?: string,
+  limit = 16
+): ParlayCandidateMatch[] {
+  try {
+    const db = getDb();
+    const leagueFilter =
+      leagueId && leagueId !== "all" ? "AND m.league_id = ?" : "";
+    const params: unknown[] =
+      leagueId && leagueId !== "all" ? [leagueId] : [];
+
+    const rows = db
+      .prepare(
+        `
+      SELECT m.id as matchId, m.league_id as leagueId, l.name_ar as leagueNameAr,
+             m.utc_date as utcDate, ht.name_ar as homeTeam, at.name_ar as awayTeam,
+             p.p_home, p.p_draw, p.p_away, p.confidence,
+             m.odds_home, m.odds_draw, m.odds_away,
+             p.analytics_json
+      FROM matches m
+      JOIN leagues l ON l.id = m.league_id
+      JOIN teams ht ON ht.id = m.home_team_id
+      JOIN teams at ON at.id = m.away_team_id
+      JOIN predictions p ON p.match_id = m.id
+      WHERE m.status IN ('SCHEDULED', 'TIMED')
+        AND substr(m.utc_date, 1, 19) >= strftime('%Y-%m-%dT%H:%M:%S', 'now', '-12 hours')
+        AND (p.p_home IS NOT NULL OR p.p_away IS NOT NULL)
+      ${leagueFilter}
+      ORDER BY (m.odds_home IS NOT NULL) DESC, m.utc_date ASC
+      LIMIT 100
+    `
+      )
+      .all(...params) as Array<{
+      matchId: string;
+      leagueId: string;
+      leagueNameAr: string;
+      utcDate: string;
+      homeTeam: string;
+      awayTeam: string;
+      p_home: number | null;
+      p_draw: number | null;
+      p_away: number | null;
+      confidence: number | null;
+      odds_home: number | null;
+      odds_draw: number | null;
+      odds_away: number | null;
+      analytics_json: string | null;
+    }>;
+
+    const candidates: ParlayCandidateMatch[] = [];
+
+    for (const r of rows) {
+      // Parse anti-randomness analytics
+      let isStrictlyExcluded = false;
+      let mri = 30;
+      let stability = 70;
+
+      if (r.analytics_json) {
+        try {
+          const parsed = JSON.parse(r.analytics_json);
+          const rand = parsed.randomness;
+          if (rand) {
+            isStrictlyExcluded = Boolean(rand.is_strictly_excluded || rand.verdict === "STRICT_EXCLUDE");
+            mri = rand.match_randomness_index ?? 30;
+            stability = rand.stability_score ?? (100 - mri);
+          }
+        } catch {
+          // ignore
+        }
+      }
+
+      // Parlays multiply risk: strictly exclude matches with high randomness or critical instability
+      if (isStrictlyExcluded || mri >= 62) {
+        continue;
+      }
+
+      const ph = r.p_home ?? 0.33;
+      const pd = r.p_draw ?? 0.33;
+      const pa = r.p_away ?? 0.33;
+
+      const outcomes = [
+        { key: "H" as const, p: ph, odds: r.odds_home, label: `فوز ${r.homeTeam}` },
+        { key: "D" as const, p: pd, odds: r.odds_draw, label: "التعادل" },
+        { key: "A" as const, p: pa, odds: r.odds_away, label: `فوز ${r.awayTeam}` },
+      ].sort((a, b) => b.p - a.p);
+
+      const top1 = outcomes[0]!;
+      const top2 = outcomes[1]!;
+
+      // استبعاد التعادل كترشيح رئيسي للبارلي
+      if (top1.key === "D") continue;
+
+      const hasLiveOdds = Boolean(top1.odds && top1.odds > 1.0);
+      const isEstimatedOdds = !hasLiveOdds;
+      // إذا لم تتوفر أودز معتمدة بعد، نشتق سعراً عادلاً تقديرياً مع هامش دارج 5%
+      const finalOdds = hasLiveOdds
+        ? top1.odds!
+        : top1.p > 0
+        ? Math.max(1.10, Number((1.0 / (top1.p * 1.05)).toFixed(2)))
+        : 2.0;
+
+      const separationGap = Number((top1.p - top2.p).toFixed(4));
+      const conf = r.confidence ?? top1.p;
+      const selectionScore = calculateSelectionScore(top1.p, top2.p, conf);
+      const implied = oddsToImpliedProb(finalOdds);
+      const edge = calculateEdge(top1.p, finalOdds);
+      const isTrap = detectValueTrap(top1.p, finalOdds);
+
+      candidates.push({
+        matchId: r.matchId,
+        leagueId: r.leagueId,
+        leagueNameAr: r.leagueNameAr,
+        utcDate: r.utcDate,
+        homeTeam: r.homeTeam,
+        awayTeam: r.awayTeam,
+        recommendedSide: top1.key,
+        recommendedSideLabel: top1.label,
+        probability: Number(top1.p.toFixed(3)),
+        secondProbability: Number(top2.p.toFixed(3)),
+        separationGap,
+        selectionScore,
+        odds: finalOdds,
+        americanOdds: decimalToAmerican(finalOdds),
+        impliedProb: implied,
+        edge,
+        isTrap,
+        confidence: Number(conf.toFixed(2)),
+        isEstimatedOdds,
+        matchRandomnessIndex: mri,
+        stabilityScore: stability,
+        isStrictlyExcluded,
+      });
+    }
+
+    // ترتيب: أودز حقيقية أولاً ثم وفق مؤشر قوة الاختيار
+    candidates.sort((a, b) => {
+      const aEst = a.isEstimatedOdds ? 1 : 0;
+      const bEst = b.isEstimatedOdds ? 1 : 0;
+      if (aEst !== bEst) return aEst - bEst;
+      return b.selectionScore - a.selectionScore;
+    });
+    return candidates.slice(0, limit);
+  } catch (e) {
+    console.error("Error in getParlayCandidates:", e);
     return [];
   }
 });
@@ -1860,4 +2373,202 @@ export function getMatchAvailability(matchId: string): PlayerAvailabilityRow[] {
     return [];
   }
 }
+
+export interface StrictlyExcludedMatch {
+  matchId: string;
+  leagueId: string;
+  leagueNameAr: string;
+  homeTeam: string;
+  awayTeam: string;
+  utcDate: string;
+  matchRandomnessIndex: number;
+  stabilityScore: number;
+  verdictAr: string;
+  recommendedActionAr: string;
+  primaryExclusionPillar: "draw_trap" | "second_half_fragility" | "disciplinary_risk" | "volatility" | "other";
+  primaryReasonAr: string;
+  pillarSeverity: string;
+}
+
+export const getStrictlyExcludedMatches = cache(function getStrictlyExcludedMatches(
+  limit = 40,
+  leagueId?: string
+): StrictlyExcludedMatch[] {
+  try {
+    const db = getDb();
+    const leagueFilter = leagueId && leagueId !== "all" ? "AND m.league_id = ?" : "";
+    const params: unknown[] = leagueId && leagueId !== "all" ? [leagueId] : [];
+
+    const rows = db
+      .prepare(
+        `
+      SELECT m.id as matchId, m.league_id as leagueId, l.name_ar as leagueNameAr,
+             m.utc_date as utcDate, ht.name_ar as homeTeam, at.name_ar as awayTeam,
+             p.analytics_json
+      FROM matches m
+      JOIN leagues l ON l.id = m.league_id
+      JOIN teams ht ON ht.id = m.home_team_id
+      JOIN teams at ON at.id = m.away_team_id
+      JOIN predictions p ON p.match_id = m.id
+      WHERE m.status IN ('SCHEDULED', 'TIMED')
+        AND substr(m.utc_date, 1, 19) >= strftime('%Y-%m-%dT%H:%M:%S', 'now', '-12 hours')
+        AND p.analytics_json IS NOT NULL
+        ${leagueFilter}
+      ORDER BY m.utc_date ASC
+      LIMIT 160
+    `
+      )
+      .all(...params) as Array<{
+      matchId: string;
+      leagueId: string;
+      leagueNameAr: string;
+      utcDate: string;
+      homeTeam: string;
+      awayTeam: string;
+      analytics_json: string;
+    }>;
+
+    const results: StrictlyExcludedMatch[] = [];
+
+    for (const r of rows) {
+      try {
+        const data = JSON.parse(r.analytics_json);
+        const rand = data.randomness;
+        if (!rand || (!rand.is_strictly_excluded && rand.verdict !== "STRICT_EXCLUDE")) {
+          continue;
+        }
+
+        const mri = rand.match_randomness_index ?? 74;
+        const stability = rand.stability_score ?? (100 - mri);
+        const pillars = rand.pillars || {};
+
+        let primaryPillar: StrictlyExcludedMatch["primaryExclusionPillar"] = "other";
+        let primaryReason = rand.recommended_action_ar || "مباراة عالية العشوائية مستبعدة إحصائياً";
+        let severity = "CRITICAL";
+
+        if (pillars.draw_trap?.severity === "CRITICAL" || pillars.draw_trap?.active) {
+          primaryPillar = "draw_trap";
+          primaryReason = pillars.draw_trap.reason_ar;
+          severity = pillars.draw_trap.severity || "CRITICAL";
+        } else if (pillars.second_half_fragility?.severity === "CRITICAL" || pillars.second_half_fragility?.active) {
+          primaryPillar = "second_half_fragility";
+          primaryReason = pillars.second_half_fragility.reason_ar;
+          severity = pillars.second_half_fragility.severity || "HIGH";
+        } else if (pillars.disciplinary_risk?.severity === "CRITICAL" || pillars.disciplinary_risk?.active) {
+          primaryPillar = "disciplinary_risk";
+          primaryReason = pillars.disciplinary_risk.reason_ar;
+          severity = pillars.disciplinary_risk.severity || "HIGH";
+        } else if (pillars.volatility_risk?.score >= 0.70) {
+          primaryPillar = "volatility";
+          primaryReason = pillars.volatility_risk.reason_ar || "تذبذب حاد وغير مستقر في نتائج الفريقين";
+          severity = "HIGH";
+        }
+
+        results.push({
+          matchId: r.matchId,
+          leagueId: r.leagueId,
+          leagueNameAr: r.leagueNameAr,
+          homeTeam: r.homeTeam,
+          awayTeam: r.awayTeam,
+          utcDate: r.utcDate,
+          matchRandomnessIndex: mri,
+          stabilityScore: stability,
+          verdictAr: rand.verdict_ar || "استبعاد صارم (عالية العشوائية)",
+          recommendedActionAr: rand.recommended_action_ar || "",
+          primaryExclusionPillar: primaryPillar,
+          primaryReasonAr: primaryReason,
+          pillarSeverity: severity,
+        });
+
+        if (results.length >= limit) break;
+      } catch {
+        // ignore parse error
+      }
+    }
+
+    return results;
+  } catch (e) {
+    console.error("Error in getStrictlyExcludedMatches:", e);
+    return [];
+  }
+});
+
+export interface ConfinedPlatformData {
+  summaryStats: {
+    totalEvaluated: number;
+    totalConfined: number;
+    totalExcluded: number;
+    avgStability: number;
+    topSafetyPick: BankerPick | null;
+    topValuePick: BankerPick | null;
+  };
+  confinedMatches: BankerPick[];
+  strategies: SelectionStrategyResult;
+  parlayCandidates: ParlayCandidateMatch[];
+  excludedMatches: StrictlyExcludedMatch[];
+  calibration: CalibrationSummary;
+}
+
+export const getConfinedPlatformData = cache(function getConfinedPlatformData(
+  leagueId?: string
+): ConfinedPlatformData {
+  const allBankers = getBankerPicks(100, leagueId);
+  const excludedMatches = getStrictlyExcludedMatches(50, leagueId);
+  const parlayCandidates = getParlayCandidates(leagueId, 24);
+  const calibration = getCalibrationBins(leagueId);
+
+  // الفرق المحصورة المؤهلة: استبعاد أي مباراة مستبعدة أو منخفضة الأمان
+  const strictlyConfined = allBankers.filter(
+    (p) => !p.isStrictlyExcluded && (p.stabilityScore ?? 50) >= 42
+  );
+
+  // تقسيم الاستراتيجيات الصارم
+  const safety = [...strictlyConfined]
+    .sort((a, b) => b.probability - a.probability)
+    .slice(0, 8);
+
+  const value = [...strictlyConfined]
+    .filter((p) => p.odds && (p.edge ?? 0) > 0.01)
+    .sort((a, b) => (b.edge ?? 0) - (a.edge ?? 0))
+    .slice(0, 8);
+
+  const balanced = [...strictlyConfined]
+    .filter((p) => p.probability >= 0.48 && (p.edge ?? 0) >= -0.02 && !p.isTrap)
+    .sort((a, b) => (b.selectionScore ?? 0) - (a.selectionScore ?? 0))
+    .slice(0, 8);
+
+  const traps = allBankers
+    .filter((p) => p.isTrap)
+    .sort((a, b) => (a.edge ?? 0) - (b.edge ?? 0))
+    .slice(0, 8);
+
+  const avgStability = strictlyConfined.length > 0
+    ? Math.round(
+        strictlyConfined.reduce((acc, c) => acc + (c.stabilityScore ?? 50), 0) /
+          strictlyConfined.length
+      )
+    : 70;
+
+  return {
+    summaryStats: {
+      totalEvaluated: allBankers.length + excludedMatches.length,
+      totalConfined: strictlyConfined.length,
+      totalExcluded: excludedMatches.length,
+      avgStability,
+      topSafetyPick: safety[0] || null,
+      topValuePick: value[0] || null,
+    },
+    confinedMatches: strictlyConfined,
+    strategies: {
+      safety,
+      value,
+      balanced,
+      traps,
+    },
+    parlayCandidates,
+    excludedMatches,
+    calibration,
+  };
+});
+
 

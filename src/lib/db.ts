@@ -254,6 +254,8 @@ function migrate(db: Database.Database) {
     ["yellow_away", "INTEGER"],
     ["red_home", "INTEGER"],
     ["red_away", "INTEGER"],
+    ["ht_home_goals", "INTEGER"],
+    ["ht_away_goals", "INTEGER"],
     ["minute", "INTEGER"],
     ["live_status_ar", "TEXT"],
     ["live_events_json", "TEXT"],

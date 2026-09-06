@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
 import {
+  decimalToAmerican,
+  oddsToImpliedProb,
+  calculateEdge,
+  detectValueTrap,
+} from "@/lib/format";
+import {
   checkRateLimit,
   createRateLimitErrorResponse,
   getSecureApiHeaders,
@@ -21,6 +27,12 @@ export async function GET(request: Request) {
       Math.max(1, parseInt(searchParams.get("limit") || "10", 10)),
       50
     );
+    const safeOnly =
+      searchParams.get("safe_only") === "true" ||
+      searchParams.get("anti_random") === "true";
+    const maxMri = searchParams.get("max_mri")
+      ? parseFloat(searchParams.get("max_mri")!)
+      : null;
 
     const db = getDb();
 
@@ -80,14 +92,29 @@ export async function GET(request: Request) {
     const valueBets = rows
       .map((r) => {
         let valueSignal = null;
+        interface RandomnessReportSnippet {
+          match_randomness_index: number;
+          stability_score: number;
+          verdict: string;
+          is_strictly_excluded?: boolean;
+          pillars?: {
+            draw_trap?: { active: boolean };
+            second_half_fragility?: { active: boolean };
+            disciplinary_risk?: { active: boolean };
+          };
+        }
+        let randSnippet: RandomnessReportSnippet | null = null;
         if (r.analytics_json) {
           try {
             const parsed = JSON.parse(r.analytics_json);
             if (parsed.value) valueSignal = parsed.value;
+            if (parsed.randomness) randSnippet = parsed.randomness;
           } catch {
             // fallback
           }
         }
+
+        const isStrictlyExcluded = randSnippet?.is_strictly_excluded || false;
 
         if (!valueSignal && r.odds_home && r.odds_draw && r.odds_away) {
           const outcomes = [
@@ -102,18 +129,34 @@ export async function GET(request: Request) {
             if (b <= 0) continue;
             const ev = o.p * o.odds - 1.0;
             const kelly = Math.max(0.0, (o.p * b - (1.0 - o.p)) / b);
+            const implied = oddsToImpliedProb(o.odds);
+            const edge = calculateEdge(o.p, o.odds);
             const cand = {
               side: o.side,
               odds: o.odds,
+              american_odds: decimalToAmerican(o.odds),
               p: o.p,
+              implied_prob: implied,
+              edge,
+              is_trap: detectValueTrap(o.p, o.odds),
               ev: parseFloat(ev.toFixed(4)),
               kelly: parseFloat(kelly.toFixed(4)),
               stake: parseFloat((0.25 * kelly).toFixed(4)),
-              bet: ev >= 0.03 && ev <= 0.4 && kelly > 0,
+              bet: !isStrictlyExcluded && ev >= 0.03 && ev <= 0.4 && kelly > 0,
             };
             if (!best || cand.ev > best.ev) best = cand;
           }
           valueSignal = best;
+        }
+
+        if (valueSignal) {
+          const sOdds = valueSignal.odds || 2.0;
+          const sProb = valueSignal.p || 0.5;
+          if (!valueSignal.american_odds) valueSignal.american_odds = decimalToAmerican(sOdds);
+          if (!valueSignal.implied_prob) valueSignal.implied_prob = oddsToImpliedProb(sOdds);
+          if (valueSignal.edge === undefined) valueSignal.edge = calculateEdge(sProb, sOdds);
+          if (valueSignal.is_trap === undefined) valueSignal.is_trap = detectValueTrap(sProb, sOdds);
+          if (isStrictlyExcluded) valueSignal.bet = false;
         }
 
         return {
@@ -127,9 +170,31 @@ export async function GET(request: Request) {
           confidence: r.confidence,
           odds: { home: r.odds_home, draw: r.odds_draw, away: r.odds_away },
           value_signal: valueSignal,
+          randomness: randSnippet
+            ? {
+                match_randomness_index: randSnippet.match_randomness_index,
+                stability_score: randSnippet.stability_score,
+                verdict: randSnippet.verdict,
+                is_strictly_excluded: randSnippet.is_strictly_excluded,
+                draw_trap_active: randSnippet.pillars?.draw_trap?.active,
+                second_half_fragile:
+                  randSnippet.pillars?.second_half_fragility?.active,
+                disciplinary_risk_active:
+                  randSnippet.pillars?.disciplinary_risk?.active,
+              }
+            : null,
         };
       })
-      .filter((b) => b.value_signal && b.value_signal.bet)
+      .filter((b) => {
+        if (!b.value_signal || !b.value_signal.bet) return false;
+        if (safeOnly && (b.randomness?.is_strictly_excluded || (b.randomness?.match_randomness_index ?? 0) >= 65)) {
+          return false;
+        }
+        if (maxMri !== null && (b.randomness?.match_randomness_index ?? 0) > maxMri) {
+          return false;
+        }
+        return true;
+      })
       .slice(0, limit);
 
     return NextResponse.json(

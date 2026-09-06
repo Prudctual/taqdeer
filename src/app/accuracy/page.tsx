@@ -9,8 +9,14 @@ import {
 } from "@/components/ui";
 import { LeagueAccuracyChart } from "@/components/LeagueAccuracyChart";
 import { PredictionArchiveLog } from "@/components/PredictionArchiveLog";
+import { CalibrationBinsWidget } from "@/components/CalibrationBinsWidget";
 import { formatMetaStamp, pct, pctCss } from "@/lib/format";
-import { getModelMetrics, getMeta, getFinishedPredictionsHistory } from "@/lib/queries";
+import {
+  getModelMetrics,
+  getMeta,
+  getFinishedPredictionsHistory,
+  getCalibrationBins,
+} from "@/lib/queries";
 
 export const metadata: Metadata = {
   title: "دقة النماذج والمعايرة",
@@ -58,6 +64,7 @@ export default function AccuracyPage() {
   const allMetrics = getModelMetrics();
   const lastFit = getMeta("last_fit");
   const historyItems = getFinishedPredictionsHistory("all", 150);
+  const calibrationData = getCalibrationBins();
 
   let vb: ValueBacktest | null = null;
   try {
@@ -253,6 +260,9 @@ export default function AccuracyPage() {
               matches: m.n_matches ?? 82,
             }))}
           />
+
+          {/* جدول معايرة فئات الاحتمالات ومنحنى الموثوقية */}
+          <CalibrationBinsWidget data={calibrationData} />
 
           {/* جدول أداء الدوريات المفضل */}
           <SectionCard

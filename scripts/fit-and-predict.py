@@ -33,6 +33,8 @@ from engine.ensemble import (  # noqa: E402
     value_signal,
 )
 from engine.evaluate import (  # noqa: E402
+    calibration_bins,
+    expected_calibration_error,
     fit_binary_temperature,
     summarize,
     summarize_with_closing,
@@ -40,6 +42,10 @@ from engine.evaluate import (  # noqa: E402
 from engine.form import FormMatch, TeamForm, rolling_form  # noqa: E402
 from engine.league_profiles import get_league_profile  # noqa: E402
 from engine.pi_ratings import PiMatch, update_pi  # noqa: E402
+from engine.randomness_engine import (  # noqa: E402
+    compute_team_randomness_profile,
+    evaluate_match_randomness,
+)
 from engine.xg_engine import compute_advanced_metrics  # noqa: E402
 
 
@@ -604,7 +610,8 @@ def repredict_flagged(conn: sqlite3.Connection) -> int:
                    odds_home, odds_draw, odds_away,
                    shots_home, shots_away, sot_home, sot_away,
                    fouls_home, fouls_away, corners_home, corners_away,
-                   ppda_home, ppda_away, season, xg_true_home, xg_true_away
+                   ppda_home, ppda_away, season, xg_true_home, xg_true_away,
+                   ht_home_goals, ht_away_goals, yellow_home, yellow_away, red_home, red_away
             FROM matches
             WHERE league_id = ? AND status = 'FINISHED'
               AND home_goals IS NOT NULL AND away_goals IS NOT NULL
@@ -658,7 +665,7 @@ def repredict_flagged(conn: sqlite3.Connection) -> int:
                 home_goals=int(m["home_goals"]),
                 away_goals=int(m["away_goals"]),
                 date=m["utc_date"],
-                season=m.get("season", ""),
+                season=m["season"] if "season" in m.keys() and m["season"] is not None else "",
             )
             for m in train
         ]
@@ -690,6 +697,14 @@ def repredict_flagged(conn: sqlite3.Connection) -> int:
             for m in train
         ]
         forms = rolling_form(form_matches, window=5)
+        rand_profiles = {}
+        for m in finished:
+            hid = m["home_team_id"]
+            aid = m["away_team_id"]
+            if hid not in rand_profiles:
+                rand_profiles[hid] = compute_team_randomness_profile(hid, finished, window=25)
+            if aid not in rand_profiles:
+                rand_profiles[aid] = compute_team_randomness_profile(aid, finished, window=25)
         ts = now_iso()
         for t in targets:
             odds = None
@@ -744,6 +759,8 @@ def repredict_flagged(conn: sqlite3.Connection) -> int:
                 ppda_home_n=ppda_hn,
                 ppda_away_n=ppda_an,
                 form_matches=form_matches,
+                home_randomness_stats=rand_profiles.get(t["home_team_id"]),
+                away_randomness_stats=rand_profiles.get(t["away_team_id"]),
             )
             conn.execute("DELETE FROM predictions WHERE match_id=?", (t["id"],))
             market = pred["components"]["market"]["p"]
@@ -756,6 +773,10 @@ def repredict_flagged(conn: sqlite3.Connection) -> int:
                 "xpts": [pred["xpts_home"], pred["xpts_away"]],
                 "double_chance": pred.get("double_chance"),
                 "narrow_repredict": True,
+                "randomness": pred.get("randomness"),
+                "match_randomness_index": pred.get("match_randomness_index"),
+                "stability_score": pred.get("stability_score"),
+                "is_strictly_excluded": pred.get("is_strictly_excluded"),
             }
             tops = top_scores(pred["matrix"], 8)
             elo_h = ratings.get(t["home_team_id"], 1500.0)
@@ -851,6 +872,47 @@ def repredict_flagged(conn: sqlite3.Connection) -> int:
     return n_written
 
 
+def refresh_calibration_bins(conn: sqlite3.Connection) -> None:
+    rows = conn.execute(
+        """
+        SELECT m.home_goals, m.away_goals, p.p_home, p.p_draw, p.p_away
+        FROM matches m
+        JOIN predictions p ON p.match_id = m.id
+        WHERE (m.status = 'FINISHED' OR (m.home_goals IS NOT NULL AND m.away_goals IS NOT NULL))
+          AND p.p_home IS NOT NULL
+        """
+    ).fetchall()
+    probs = []
+    outcomes = []
+    for r in rows:
+        probs.append((float(r["p_home"]), float(r["p_draw"]), float(r["p_away"])))
+        hg, ag = int(r["home_goals"]), int(r["away_goals"])
+        outcomes.append("H" if hg > ag else ("A" if ag > hg else "D"))
+    if probs:
+        cal_bins = calibration_bins(probs, outcomes)
+        ece = expected_calibration_error(probs, outcomes)
+        conn.execute(
+            """
+            INSERT INTO app_meta(key, value) VALUES('calibration_bins', ?)
+            ON CONFLICT(key) DO UPDATE SET value=excluded.value
+            """,
+            (
+                json.dumps(
+                    {
+                        "bins": cal_bins,
+                        "ece": ece,
+                        "n_matches": len(probs),
+                        "model_version": MODEL_VERSION,
+                        "updated_at": now_iso(),
+                    },
+                    ensure_ascii=False,
+                ),
+            ),
+        )
+        conn.commit()
+        print(f"Refreshed calibration bins in app_meta: {len(probs)} matches, ECE={ece:.4f}", flush=True)
+
+
 def main() -> None:
     if not DB_PATH.exists():
         print("DB missing. Run: bun run sync")
@@ -861,6 +923,16 @@ def main() -> None:
     conn.execute("PRAGMA journal_mode = WAL")
     conn.execute("PRAGMA busy_timeout = 10000")
     ensure_columns(conn)
+
+    if "--help" in sys.argv or "-h" in sys.argv:
+        print("Usage: fit-and-predict.py [--repredict-flagged] [--calibration-only]")
+        conn.close()
+        return
+
+    if "--calibration-only" in sys.argv:
+        refresh_calibration_bins(conn)
+        conn.close()
+        return
 
     if "--repredict-flagged" in sys.argv:
         repredict_flagged(conn)
@@ -890,7 +962,8 @@ def main() -> None:
                    odds_sharp_home, odds_sharp_draw, odds_sharp_away,
                    shots_home, shots_away, sot_home, sot_away,
                    fouls_home, fouls_away, corners_home, corners_away, season,
-                   xg_true_home, xg_true_away
+                   xg_true_home, xg_true_away,
+                   ht_home_goals, ht_away_goals, yellow_home, yellow_away, red_home, red_away
             FROM matches
             WHERE league_id = ? AND status = 'FINISHED'
               AND home_goals IS NOT NULL AND away_goals IS NOT NULL
@@ -946,7 +1019,7 @@ def main() -> None:
                 home_goals=int(m["home_goals"]),
                 away_goals=int(m["away_goals"]),
                 date=m["utc_date"],
-                season=m.get("season", ""),
+                season=m["season"] if "season" in m.keys() and m["season"] is not None else "",
             )
             for m in elo_source
         ]
@@ -1452,6 +1525,15 @@ def main() -> None:
                     flush=True,
                 )
 
+        rand_profiles = {}
+        for m in finished:
+            hid = m["home_team_id"]
+            aid = m["away_team_id"]
+            if hid not in rand_profiles:
+                rand_profiles[hid] = compute_team_randomness_profile(hid, finished, window=25)
+            if aid not in rand_profiles:
+                rand_profiles[aid] = compute_team_randomness_profile(aid, finished, window=25)
+
         # --- Targets: real scheduled (full model) + last 12 finished (eval-time model) ---
         recent = conn.execute(
             """
@@ -1478,6 +1560,10 @@ def main() -> None:
                 "weights": pred["weights"],
                 "xpts": [pred["xpts_home"], pred["xpts_away"]],
                 "double_chance": pred.get("double_chance"),
+                "randomness": pred.get("randomness"),
+                "match_randomness_index": pred.get("match_randomness_index"),
+                "stability_score": pred.get("stability_score"),
+                "is_strictly_excluded": pred.get("is_strictly_excluded"),
             }
             conn.execute(
                 """
@@ -1621,6 +1707,8 @@ def main() -> None:
                 ppda_home_n=ppda_hn,
                 ppda_away_n=ppda_an,
                 form_matches=form_matches,
+                home_randomness_stats=rand_profiles.get(t["home_team_id"]),
+                away_randomness_stats=rand_profiles.get(t["away_team_id"]),
             )
 
             write_prediction(
@@ -1667,6 +1755,8 @@ def main() -> None:
                 days_into_season=ctx.get("days_into_season"),
                 temp_over25=temp_over25,
                 temp_btts=temp_btts,
+                home_randomness_stats=rand_profiles.get(r["home_team_id"]),
+                away_randomness_stats=rand_profiles.get(r["away_team_id"]),
             )
             write_prediction(r["id"], pred, ctx["elo_home"], ctx["elo_away"])
             retro += 1
@@ -1693,9 +1783,29 @@ def main() -> None:
                 now_iso(),
             ),
         )
+        cal_bins = calibration_bins(all_probs, all_outcomes)
+        ece = expected_calibration_error(all_probs, all_outcomes)
+        conn.execute(
+            """
+            INSERT INTO app_meta(key, value) VALUES('calibration_bins', ?)
+            ON CONFLICT(key) DO UPDATE SET value=excluded.value
+            """,
+            (
+                json.dumps(
+                    {
+                        "bins": cal_bins,
+                        "ece": ece,
+                        "n_matches": len(all_probs),
+                        "model_version": MODEL_VERSION,
+                        "updated_at": now_iso(),
+                    },
+                    ensure_ascii=False,
+                ),
+            ),
+        )
         print(
             f"overall acc={overall['accuracy']:.3f} brier={overall['brier']:.3f} "
-            f"rps={overall['rps']:.4f} n={int(overall['n'])}"
+            f"rps={overall['rps']:.4f} ece={ece:.4f} n={int(overall['n'])}"
         )
 
     # حذف غير مشروط أولاً: تدريب بلا رهانات يجب ألا يترك بطاقة backtest قديمة

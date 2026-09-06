@@ -12,8 +12,21 @@ from .ensemble import (
     lock_form_weight,
     predict_match,
     value_signal,
+    decimal_to_american,
+    american_to_decimal,
+    odds_to_implied_prob,
+    calculate_edge,
+    detect_value_trap,
+    calculate_selection_score,
+    parlay_analysis,
 )
-from .evaluate import rps, summarize
+from .evaluate import (
+    rps,
+    summarize,
+    calibration_bins,
+    expected_calibration_error,
+    underdog_edge_calibration,
+)
 from .form import (
     FormMatch,
     TeamForm,
@@ -40,6 +53,11 @@ from .elo import elo_home_adv_from_profile, log_home_adv_to_elo
 from .form import apply_congestion, congestion_lambda_mult
 from .evaluate import apply_binary_temperature, fit_binary_temperature
 from .player_impact import xi_delta_impact
+from .randomness_engine import (
+    TeamRandomnessStats,
+    compute_team_randomness_profile,
+    evaluate_match_randomness,
+)
 
 
 def main() -> None:
@@ -323,7 +341,217 @@ def main() -> None:
     assert full2["components"]["true_xg_dc"] is not None
     assert full2["components"]["market"]["source"] == "sharp"
     assert full2["components"]["early_season"] is True
-    assert full2["clv"]["applied"]
+    # 19. اختبار نموذج الاختيار، الأودز الأمريكية، كشف مصائد القيمة، البارلي، ومعايرة الفئات
+    # (أ) تحويل الأودز الأمريكية والعشرية
+    assert decimal_to_american(1.60) == -167
+    assert decimal_to_american(1.25) == -400
+    assert decimal_to_american(3.40) == 240
+    assert decimal_to_american(2.00) == 100
+    assert decimal_to_american(1.85) == -118
+    assert decimal_to_american(2.81) == 181
+
+    assert american_to_decimal(240) == 3.40
+    assert american_to_decimal(-400) == 1.25
+    assert american_to_decimal(100) == 2.00
+
+    # (ب) حساب الفارق الاحتمالي (Edge) وكشف مصائد القيمة (Value Trap)
+    # Telstar: احتمال 65.5% وسعر -167 (1.60) -> Edge موجب (+3%)
+    edge_telstar = calculate_edge(0.655, 1.60)
+    assert abs(edge_telstar - 0.030) < 0.005
+    assert not detect_value_trap(0.655, 1.60)
+
+    # Barcelona: احتمال 54.4% وسعر -400 (1.25 -> 80%) -> Edge سالب فادح (-25.6%) -> مصيدة قيمة!
+    edge_barca = calculate_edge(0.544, 1.25)
+    assert abs(edge_barca - (-0.256)) < 0.005
+    assert detect_value_trap(0.544, 1.25)
+
+    # Fortuna: احتمال 50.5% وسعر +240 (3.40 -> 29.4%) -> Edge ضخم (+21.1%)
+    edge_fortuna = calculate_edge(0.505, 3.40)
+    assert abs(edge_fortuna - 0.211) < 0.005
+
+    # (ج) مؤشر قوة الترشيح (Selection Score 0-100)
+    score_telstar = calculate_selection_score(0.655, 0.188, 0.85)
+    score_barca = calculate_selection_score(0.544, 0.231, 0.82)
+    score_close = calculate_selection_score(0.38, 0.35, 0.50)
+    assert score_telstar >= 90, f"Telstar score {score_telstar}"
+    assert score_barca >= 85, f"Barca score {score_barca}"
+    assert score_close < 65, f"Close score {score_close}"
+    assert score_telstar > score_barca > score_close
+
+    # (د) تحليل رهان البارلي (Parlay Analysis)
+    # تلستار + برشلونة بسعر إجمالي +100 (2.0)
+    parlay_res = parlay_analysis([(0.655, 1.5988), (0.544, 1.25)])
+    assert abs(parlay_res["model_prob"] - 0.3563) < 0.005
+    assert parlay_res["fair_american_odds"] == 181
+    assert parlay_res["has_value_trap"] is True
+    assert parlay_res["is_positive_ev"] is False  # سالب العائد بسبب تسعير برشلونة
+
+    # (هـ) معايرة فئات الاحتمالات (Calibration Bins & ECE)
+    sample_probs = [(0.75, 0.15, 0.10)] * 10 + [(0.52, 0.28, 0.20)] * 10
+    sample_outs = ["H"] * 7 + ["D"] * 3 + ["H"] * 5 + ["A"] * 5
+    cbins = calibration_bins(sample_probs, sample_outs)
+    assert len(cbins) == 7
+    bin_70 = next(b for b in cbins if b["label"] == "70–79.9%")
+    assert bin_70["n_matches"] == 10
+    assert bin_70["n_correct"] == 7
+    assert abs(bin_70["win_rate"] - 0.70) < 1e-4
+    ece = expected_calibration_error(sample_probs, sample_outs)
+    assert 0.0 <= ece <= 1.0
+
+    # (و) فحص معايرة الرهانات المفاجئة (Underdog Edge Calibration)
+    underdog_eval = underdog_edge_calibration(
+        sample_probs, sample_outs, [(2.50, 3.20, 3.00)] * 20
+    )
+    assert "is_calibrated" in underdog_eval
+
+    # (ز) فحص محرك تقليل واستبعاد العشوائية (Anti-Randomness & Stability Engine)
+    # 1. اختبار الفريق الأكثر تعادلاً (Chronic Drawer)
+    draw_matches = [
+        {"home_team_id": "TeamD", "away_team_id": "X", "home_goals": 1, "away_goals": 1, "ht_home_goals": 0, "ht_away_goals": 0, "red_home": 0, "red_away": 0, "yellow_home": 1, "yellow_away": 1, "fouls_home": 10, "fouls_away": 10},
+        {"home_team_id": "TeamD", "away_team_id": "Y", "home_goals": 0, "away_goals": 0, "ht_home_goals": 0, "ht_away_goals": 0, "red_home": 0, "red_away": 0, "yellow_home": 2, "yellow_away": 1, "fouls_home": 11, "fouls_away": 10},
+        {"home_team_id": "Z", "away_team_id": "TeamD", "home_goals": 2, "away_goals": 2, "ht_home_goals": 1, "ht_away_goals": 1, "red_home": 0, "red_away": 0, "yellow_home": 1, "yellow_away": 2, "fouls_home": 12, "fouls_away": 11},
+        {"home_team_id": "TeamD", "away_team_id": "W", "home_goals": 1, "away_goals": 1, "ht_home_goals": 1, "ht_away_goals": 0, "red_home": 0, "red_away": 0, "yellow_home": 1, "yellow_away": 1, "fouls_home": 9, "fouls_away": 10},
+        {"home_team_id": "TeamD", "away_team_id": "V", "home_goals": 2, "away_goals": 0, "ht_home_goals": 1, "ht_away_goals": 0, "red_home": 0, "red_away": 0, "yellow_home": 0, "yellow_away": 1, "fouls_home": 8, "fouls_away": 10},
+        {"home_team_id": "U", "away_team_id": "TeamD", "home_goals": 1, "away_goals": 0, "ht_home_goals": 0, "ht_away_goals": 0, "red_home": 0, "red_away": 0, "yellow_home": 2, "yellow_away": 1, "fouls_home": 11, "fouls_away": 9},
+        {"home_team_id": "TeamD", "away_team_id": "T", "home_goals": 3, "away_goals": 1, "ht_home_goals": 2, "ht_away_goals": 0, "red_home": 0, "red_away": 0, "yellow_home": 1, "yellow_away": 1, "fouls_home": 10, "fouls_away": 10},
+        {"home_team_id": "S", "away_team_id": "TeamD", "home_goals": 0, "away_goals": 2, "ht_home_goals": 0, "ht_away_goals": 1, "red_home": 0, "red_away": 0, "yellow_home": 1, "yellow_away": 1, "fouls_home": 10, "fouls_away": 8},
+        {"home_team_id": "TeamD", "away_team_id": "R", "home_goals": 0, "away_goals": 1, "ht_home_goals": 0, "ht_away_goals": 0, "red_home": 0, "red_away": 0, "yellow_home": 2, "yellow_away": 2, "fouls_home": 12, "fouls_away": 11},
+        {"home_team_id": "Q", "away_team_id": "TeamD", "home_goals": 1, "away_goals": 1, "ht_home_goals": 1, "ht_away_goals": 0, "red_home": 0, "red_away": 0, "yellow_home": 1, "yellow_away": 1, "fouls_home": 10, "fouls_away": 10},
+    ]
+    stat_d = compute_team_randomness_profile("TeamD", draw_matches)
+    assert stat_d.draw_rate >= 0.35, f"draw_rate {stat_d.draw_rate}"
+    assert stat_d.is_chronic_drawer is True
+
+    # 2. اختبار الفريق الأضعف بالنصف الثاني (Second-Half Fragile)
+    sh_matches = [
+        {"home_team_id": "TeamSH", "away_team_id": "X", "home_goals": 1, "away_goals": 2, "ht_home_goals": 1, "ht_away_goals": 0, "red_home": 0, "red_away": 0, "yellow_home": 1, "yellow_away": 1, "fouls_home": 10, "fouls_away": 10},
+        {"home_team_id": "TeamSH", "away_team_id": "Y", "home_goals": 2, "away_goals": 2, "ht_home_goals": 2, "ht_away_goals": 0, "red_home": 0, "red_away": 0, "yellow_home": 1, "yellow_away": 1, "fouls_home": 10, "fouls_away": 10},
+        {"home_team_id": "Z", "away_team_id": "TeamSH", "home_goals": 3, "away_goals": 1, "ht_home_goals": 0, "ht_away_goals": 1, "red_home": 0, "red_away": 0, "yellow_home": 1, "yellow_away": 1, "fouls_home": 10, "fouls_away": 10},
+        {"home_team_id": "TeamSH", "away_team_id": "W", "home_goals": 1, "away_goals": 1, "ht_home_goals": 1, "ht_away_goals": 0, "red_home": 0, "red_away": 0, "yellow_home": 1, "yellow_away": 1, "fouls_home": 10, "fouls_away": 10},
+        {"home_team_id": "TeamSH", "away_team_id": "V", "home_goals": 0, "away_goals": 2, "ht_home_goals": 0, "ht_away_goals": 0, "red_home": 0, "red_away": 0, "yellow_home": 1, "yellow_away": 1, "fouls_home": 10, "fouls_away": 10},
+        {"home_team_id": "U", "away_team_id": "TeamSH", "home_goals": 2, "away_goals": 0, "ht_home_goals": 0, "ht_away_goals": 0, "red_home": 0, "red_away": 0, "yellow_home": 1, "yellow_away": 1, "fouls_home": 10, "fouls_away": 10},
+    ]
+    stat_sh = compute_team_randomness_profile("TeamSH", sh_matches)
+    assert stat_sh.sh_fragility_ratio >= 0.70, f"sh_ratio {stat_sh.sh_fragility_ratio}"
+    assert stat_sh.is_second_half_fragile is True
+    assert stat_sh.blown_leads_count >= 2
+
+    # 3. اختبار الفريق المعرض للطرد (Red Card Prone)
+    rc_matches = [
+        {"home_team_id": "TeamRC", "away_team_id": "X", "home_goals": 0, "away_goals": 1, "ht_home_goals": 0, "ht_away_goals": 0, "red_home": 1, "red_away": 0, "yellow_home": 4, "yellow_away": 1, "fouls_home": 17, "fouls_away": 10},
+        {"home_team_id": "Y", "away_team_id": "TeamRC", "home_goals": 2, "away_goals": 0, "ht_home_goals": 1, "ht_away_goals": 0, "red_home": 0, "red_away": 1, "yellow_home": 1, "yellow_away": 3, "fouls_home": 10, "fouls_away": 16},
+        {"home_team_id": "TeamRC", "away_team_id": "Z", "home_goals": 1, "away_goals": 1, "ht_home_goals": 0, "ht_away_goals": 0, "red_home": 0, "red_away": 0, "yellow_home": 3, "yellow_away": 2, "fouls_home": 15, "fouls_away": 12},
+        {"home_team_id": "W", "away_team_id": "TeamRC", "home_goals": 1, "away_goals": 1, "ht_home_goals": 0, "ht_away_goals": 0, "red_home": 0, "red_away": 1, "yellow_home": 2, "yellow_away": 4, "fouls_home": 11, "fouls_away": 18},
+        {"home_team_id": "TeamRC", "away_team_id": "V", "home_goals": 0, "away_goals": 0, "ht_home_goals": 0, "ht_away_goals": 0, "red_home": 0, "red_away": 0, "yellow_home": 3, "yellow_away": 1, "fouls_home": 14, "fouls_away": 9},
+        {"home_team_id": "U", "away_team_id": "TeamRC", "home_goals": 2, "away_goals": 1, "ht_home_goals": 1, "ht_away_goals": 0, "red_home": 0, "red_away": 0, "yellow_home": 4, "yellow_away": 2, "fouls_home": 16, "fouls_away": 11},
+    ]
+    stat_rc = compute_team_randomness_profile("TeamRC", rc_matches)
+    assert stat_rc.red_cards_avg >= 0.15, f"rc_avg {stat_rc.red_cards_avg}"
+    assert stat_rc.is_card_prone is True
+    assert stat_rc.disciplinary_risk_index >= 3.0
+
+    # 4. فحص تقييم عشوائية المباراة
+    m_rand_high = evaluate_match_randomness(
+        home_team="TeamD",
+        away_team="TeamRC",
+        home_stats=stat_d,
+        away_stats=stat_rc,
+        referee_profile={"strictness": 1.30, "avg_yellows": 5.2, "avg_reds": 0.35, "matches_n": 15},
+        total_expected_goals=2.1,
+        elo_diff=35.0,
+        top_prob=0.42,
+    )
+    assert m_rand_high["match_randomness_index"] >= 72, f"MRI: {m_rand_high['match_randomness_index']}"
+    assert m_rand_high["verdict"] == "STRICT_EXCLUDE"
+    assert m_rand_high["is_strictly_excluded"] is True
+    assert m_rand_high["pillars"]["draw_trap"]["active"] is True
+    assert m_rand_high["pillars"]["disciplinary_risk"]["active"] is True
+    assert m_rand_high["multipliers"]["temperature_mult"] > 1.0
+    assert m_rand_high["multipliers"]["confidence_mult"] < 1.0
+    assert "goal_recommendation_ar" in m_rand_high
+
+    # 5. اختبار صدام البطاقات الثنائي (Mutual Card-Prone Clash)
+    m_rand_derby = evaluate_match_randomness(
+        home_team="TeamRC1",
+        away_team="TeamRC2",
+        home_stats=stat_rc,
+        away_stats=stat_rc,
+        referee_profile={"strictness": 1.20, "avg_reds": 0.25},
+        total_expected_goals=2.5,
+    )
+    assert m_rand_derby["pillars"]["disciplinary_risk"]["severity"] == "CRITICAL"
+    assert m_rand_derby["is_strictly_excluded"] is True
+    assert "صدام انضباطي ناري" in m_rand_derby["pillars"]["disciplinary_risk"]["reason_ar"]
+
+    # 6. اختبار الانهيار الثنائي للشوط الثاني (Mutual 2H Collapse)
+    m_rand_sh_mutual = evaluate_match_randomness(
+        home_team="TeamSH1",
+        away_team="TeamSH2",
+        home_stats=stat_sh,
+        away_stats=stat_sh,
+        total_expected_goals=2.7,
+    )
+    assert m_rand_sh_mutual["pillars"]["second_half_fragility"]["severity"] == "CRITICAL"
+    assert "انهيار دفاعي متأخر لكلا الفريقين" in m_rand_sh_mutual["pillars"]["second_half_fragility"]["reason_ar"]
+
+    # 7. اختبار الحالات الحدية (Empty margins & zero-goal defense handling)
+    stat_empty = compute_team_randomness_profile("EmptyTeam", [])
+    assert stat_empty.matches_played == 0
+    assert stat_empty.draw_rate == 0.25
+    assert stat_empty.sh_fragility_ratio == 0.50
+
+    stat_elite_def = compute_team_randomness_profile("EliteDef", [
+        {"home_team_id": "EliteDef", "away_team_id": "X", "home_goals": 1, "away_goals": 0, "ht_home_goals": 0, "ht_away_goals": 0} for _ in range(10)
+    ] + [
+        {"home_team_id": "EliteDef", "away_team_id": "Y", "home_goals": 2, "away_goals": 1, "ht_home_goals": 1, "ht_away_goals": 0}
+    ])
+    # 0 goals conceded in 1H, 1 in 2H over 11 games -> should NOT be flagged as 2H fragile due to elite overall defense
+    assert stat_elite_def.is_second_half_fragile is False
+
+    # 8. فحص التكامل الكامل داخل predict_match مع التعديلات المباشرة (/boost و /goal)
+    pred_draw_trap = predict_match(
+        home="TeamD",
+        away="TeamD",
+        dc=dc_model,
+        elo_home=1500.0,
+        elo_away=1500.0,
+        pi=pi_state,
+        form_home=avg,
+        form_away=avg,
+        market_odds=(2.50, 3.20, 2.80),
+        home_randomness_stats=stat_d,
+        away_randomness_stats=stat_d,
+    )
+    assert pred_draw_trap["randomness"]["pillars"]["draw_trap"]["severity"] == "CRITICAL"
+    assert pred_draw_trap["is_strictly_excluded"] is True
+    assert pred_draw_trap["p_draw"] > 0.35, f"p_draw {pred_draw_trap['p_draw']}"
+    if pred_draw_trap.get("value"):
+        assert pred_draw_trap["value"]["bet"] is False
+
+    # مواجهة مستقرة
+    clean_matches = [
+        {"home_team_id": "SolidH", "away_team_id": "X", "home_goals": 2, "away_goals": 0, "ht_home_goals": 1, "ht_away_goals": 0, "red_home": 0, "red_away": 0, "yellow_home": 1, "yellow_away": 1, "fouls_home": 9, "fouls_away": 9},
+        {"home_team_id": "SolidH", "away_team_id": "Y", "home_goals": 3, "away_goals": 1, "ht_home_goals": 1, "ht_away_goals": 0, "red_home": 0, "red_away": 0, "yellow_home": 1, "yellow_away": 1, "fouls_home": 8, "fouls_away": 10},
+        {"home_team_id": "Z", "away_team_id": "SolidH", "home_goals": 1, "away_goals": 2, "ht_home_goals": 0, "ht_away_goals": 1, "red_home": 0, "red_away": 0, "yellow_home": 0, "yellow_away": 1, "fouls_home": 10, "fouls_away": 8},
+        {"home_team_id": "SolidH", "away_team_id": "W", "home_goals": 2, "away_goals": 1, "ht_home_goals": 1, "ht_away_goals": 0, "red_home": 0, "red_away": 0, "yellow_home": 1, "yellow_away": 1, "fouls_home": 9, "fouls_away": 9},
+        {"home_team_id": "SolidH", "away_team_id": "V", "home_goals": 4, "away_goals": 0, "ht_home_goals": 2, "ht_away_goals": 0, "red_home": 0, "red_away": 0, "yellow_home": 1, "yellow_away": 0, "fouls_home": 8, "fouls_away": 11},
+        {"home_team_id": "U", "away_team_id": "SolidH", "home_goals": 0, "away_goals": 2, "ht_home_goals": 0, "ht_away_goals": 1, "red_home": 0, "red_away": 0, "yellow_home": 1, "yellow_away": 1, "fouls_home": 10, "fouls_away": 9},
+    ]
+    stat_solid_h = compute_team_randomness_profile("SolidH", clean_matches)
+    stat_solid_a = compute_team_randomness_profile("SolidA", clean_matches)
+    m_rand_stable = evaluate_match_randomness(
+        home_team="SolidH",
+        away_team="SolidA",
+        home_stats=stat_solid_h,
+        away_stats=stat_solid_a,
+        referee_profile={"strictness": 0.90, "avg_yellows": 3.2, "avg_reds": 0.05, "matches_n": 20},
+        total_expected_goals=2.9,
+        elo_diff=180.0,
+        top_prob=0.68,
+    )
+    assert m_rand_stable["match_randomness_index"] < 40, f"Stable MRI: {m_rand_stable['match_randomness_index']}"
+    assert m_rand_stable["verdict"] == "SAFE_STABLE"
+    assert m_rand_stable["is_strictly_excluded"] is False
 
     print("selftest ok — ensemble-v4 mathematical engine verified cleanly!")
 

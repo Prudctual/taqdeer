@@ -545,7 +545,7 @@ async function syncTeamCrests(db: ReturnType<typeof getDb>) {
   console.log(`  مجموع الشعارات المحدّثة: ${updated}`);
 }
 
-function ingestCsv(
+export function ingestCsv(
   db: ReturnType<typeof getDb>,
   leagueId: string,
   season: string,
@@ -573,7 +573,8 @@ function ingestCsv(
       odds_close_home, odds_close_draw, odds_close_away,
       shots_home, shots_away, sot_home, sot_away,
       fouls_home, fouls_away, corners_home, corners_away,
-      referee_name, yellow_home, yellow_away, red_home, red_away
+      referee_name, yellow_home, yellow_away, red_home, red_away,
+      ht_home_goals, ht_away_goals
     ) VALUES (
       @id, @league_id, @season, @matchday, @utc_date, @status,
       @home_team_id, @away_team_id, @home_goals, @away_goals, @source, @external_id,
@@ -583,7 +584,8 @@ function ingestCsv(
       @odds_close_home, @odds_close_draw, @odds_close_away,
       @shots_home, @shots_away, @sot_home, @sot_away,
       @fouls_home, @fouls_away, @corners_home, @corners_away,
-      @referee_name, @yellow_home, @yellow_away, @red_home, @red_away
+      @referee_name, @yellow_home, @yellow_away, @red_home, @red_away,
+      @ht_home_goals, @ht_away_goals
     )
     ON CONFLICT(id) DO UPDATE SET
       home_goals=excluded.home_goals,
@@ -613,7 +615,9 @@ function ingestCsv(
       yellow_home=excluded.yellow_home,
       yellow_away=excluded.yellow_away,
       red_home=excluded.red_home,
-      red_away=excluded.red_away
+      red_away=excluded.red_away,
+      ht_home_goals=excluded.ht_home_goals,
+      ht_away_goals=excluded.ht_away_goals
   `);
 
   const num = (v: string | undefined) => {
@@ -680,6 +684,8 @@ function ingestCsv(
         yellow_away: num(r.AY),
         red_home: num(r.HR),
         red_away: num(r.AR),
+        ht_home_goals: num(r.HTHG),
+        ht_away_goals: num(r.HTAG),
       });
       n++;
     }

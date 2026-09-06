@@ -26,6 +26,7 @@ import { LiveEventsTimeline } from "@/components/LiveEventsTimeline";
 import { MatchRiskPanel } from "@/components/MatchRiskPanel";
 import { DoubleChancePanel } from "@/components/DoubleChancePanel";
 import { LiveInPlaySimulator } from "@/components/LiveInPlaySimulator";
+import { AntiRandomnessCard, type RandomnessReport } from "@/components/AntiRandomnessCard";
 import { getMatchDetailedInfo } from "@/lib/match-details";
 
 
@@ -79,6 +80,10 @@ type Analytics = {
   weights?: Record<string, number>;
   home_sw?: { strengths: string[]; weaknesses: string[] };
   away_sw?: { strengths: string[]; weaknesses: string[] };
+  randomness?: RandomnessReport | null;
+  match_randomness_index?: number;
+  stability_score?: number;
+  is_strictly_excluded?: boolean;
   version?: string;
 };
 
@@ -611,6 +616,14 @@ export default async function MatchPage({
           lambdaHome={match.lambda_home}
           lambdaAway={match.lambda_away}
           liveEventsJson={match.liveEventsJson}
+        />
+      ) : null}
+
+      {analytics?.randomness ? (
+        <AntiRandomnessCard
+          homeName={match.home_name_ar}
+          awayName={match.away_name_ar}
+          report={analytics.randomness}
         />
       ) : null}
 

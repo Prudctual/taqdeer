@@ -2,7 +2,16 @@
 
 import { useState, useMemo } from "react";
 import Link from "next/link";
-import { formatKickoffAbsolute } from "@/lib/format";
+import {
+  formatKickoffAbsolute,
+  decimalToAmerican,
+  oddsToImpliedProb,
+  calculateEdge,
+  detectValueTrap,
+  pct,
+} from "@/lib/format";
+import { ParlayBuilderWidget } from "@/components/ParlayBuilderWidget";
+import type { ParlayCandidateMatch } from "@/lib/queries";
 
 export interface ValueMatchItem {
   id: string;
@@ -36,6 +45,68 @@ const LEAGUES_CONFIG = [
 export function ValueMatchesView({ matches }: { matches: ValueMatchItem[] }) {
   const [selectedLeague, setSelectedLeague] = useState<string>("ALL");
   const [searchQuery, setSearchQuery] = useState<string>("");
+  const [viewTab, setViewTab] = useState<"singles" | "parlay">("singles");
+  const [oddsFormat, setOddsFormat] = useState<"decimal" | "american">("decimal");
+  const [filterStrictRandomness, setFilterStrictRandomness] = useState<boolean>(false);
+
+  // Format matches as parlay candidates — strictly filter out high randomness / chaotic matches
+  const parlayCandidates: ParlayCandidateMatch[] = useMemo(() => {
+    return matches
+      .map((m) => {
+        let analytics: {
+          value?: { side?: string; odds?: number; ev?: number; stake?: number };
+          randomness?: { is_strictly_excluded?: boolean; match_randomness_index?: number; stability_score?: number };
+        } | null = null;
+        if (m.analytics_json) {
+          try {
+            analytics = JSON.parse(m.analytics_json);
+          } catch {
+            analytics = null;
+          }
+        }
+        const val = analytics?.value;
+        const rand = analytics?.randomness;
+        const isExcluded = Boolean(rand?.is_strictly_excluded || (rand?.match_randomness_index ?? 0) >= 62);
+        const mri = rand?.match_randomness_index ?? 30;
+        const stability = rand?.stability_score ?? (100 - mri);
+
+        const side = (val?.side === "away" ? "A" : val?.side === "draw" ? "D" : "H") as "H" | "D" | "A";
+        const prob = side === "H" ? m.p_home : side === "A" ? m.p_away : m.p_draw;
+        const secondProb =
+          side === "H"
+            ? Math.max(m.p_draw, m.p_away)
+            : side === "A"
+            ? Math.max(m.p_home, m.p_draw)
+            : Math.max(m.p_home, m.p_away);
+        const odds = val?.odds || (side === "H" ? m.odds_home : side === "A" ? m.odds_away : m.odds_draw) || 2.0;
+        const label = side === "H" ? `فوز ${m.home_name_ar}` : side === "A" ? `فوز ${m.away_name_ar}` : "التعادل";
+
+        return {
+          matchId: m.id,
+          leagueId: m.league_id,
+          leagueNameAr: m.league_name_ar,
+          utcDate: m.utc_date,
+          homeTeam: m.home_name_ar,
+          awayTeam: m.away_name_ar,
+          recommendedSide: side,
+          recommendedSideLabel: label,
+          probability: prob,
+          secondProbability: secondProb,
+          separationGap: prob - secondProb,
+          selectionScore: Math.round(prob * 100),
+          odds,
+          americanOdds: decimalToAmerican(odds),
+          impliedProb: oddsToImpliedProb(odds),
+          edge: calculateEdge(prob, odds),
+          isTrap: detectValueTrap(prob, odds),
+          confidence: 0.8,
+          matchRandomnessIndex: mri,
+          stabilityScore: stability,
+          isStrictlyExcluded: isExcluded,
+        };
+      })
+      .filter((c) => !c.isStrictlyExcluded && c.recommendedSide !== "D");
+  }, [matches]);
 
   // Compute metric summaries
   const evValues = useMemo(() => {
@@ -72,32 +143,100 @@ export function ValueMatchesView({ matches }: { matches: ValueMatchItem[] }) {
         m.away_name_ar.toLowerCase().includes(query) ||
         m.league_name_ar.toLowerCase().includes(query);
 
-      return matchLeague && matchSearch;
+      let passRandomness = true;
+      if (filterStrictRandomness && m.analytics_json) {
+        try {
+          const a = JSON.parse(m.analytics_json);
+          const rand = a?.randomness;
+          if (rand && (rand.is_strictly_excluded || rand.match_randomness_index >= 65 || rand.verdict === "STRICT_EXCLUDE")) {
+            passRandomness = false;
+          }
+        } catch {
+          // ignore
+        }
+      }
+
+      return matchLeague && matchSearch && passRandomness;
     });
-  }, [matches, selectedLeague, searchQuery]);
+  }, [matches, selectedLeague, searchQuery, filterStrictRandomness]);
 
   return (
     <div className="space-y-4">
-      {matches.length === 0 ? (
-        <div className="rounded-2xl border border-line bg-surface p-8 text-center space-y-2">
-          <h2 className="text-sm font-semibold text-ink">لا توجد فرص قيمة حالياً</h2>
-          <p className="text-xs text-muted max-w-lg mx-auto leading-relaxed">
-            عند ظهور انحراف إيجابي بين احتمال النموذج وأسعار السوق ستظهر الفرص هنا تلقائياً.
-          </p>
-        </div>
-      ) : null}
+      {/* View Mode & Odds Format Bar */}
+      <div className="flex flex-wrap items-center justify-between gap-2 bg-panel p-2 rounded-xl border border-line">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => setViewTab("singles")}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+              viewTab === "singles"
+                ? "bg-accent text-on-fill shadow-xs"
+                : "text-muted hover:text-ink hover:bg-surface/60"
+            }`}
+          >
+            🎯 فرص القيمة المنفردة ({filteredMatches.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewTab("parlay")}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+              viewTab === "parlay"
+                ? "bg-accent text-on-fill shadow-xs"
+                : "text-muted hover:text-ink hover:bg-surface/60"
+            }`}
+          >
+            ⚡ محلل البارلي والمُركّبات (Parlay Analyzer)
+          </button>
 
-      {/* 1. Hero Header & Overview Metrics */}
-      <div className="rounded-2xl border border-success/30 bg-panel p-4 sm:p-5 space-y-4 shadow-2xs">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-success-dim border border-success/25 text-success font-semibold text-[11px]">
-            تحليل فرص القيمة والسيولة (+EV)
-          </span>
-
-          <span className="text-[11px] font-bold text-muted bg-surface px-3 py-0.5 rounded-full border border-line">
-            حاسبة كيلي الربع (Quarter Kelly 25%)
-          </span>
+          <button
+            type="button"
+            onClick={() => setFilterStrictRandomness(!filterStrictRandomness)}
+            className={`press-scale px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition-all cursor-pointer shadow-2xs ${
+              filterStrictRandomness
+                ? "bg-rose-500/15 border-rose-500/40 text-rose-600 dark:text-rose-400"
+                : "bg-surface border-line text-muted hover:text-ink"
+            }`}
+            title="استبعاد المباريات عالية العشوائية وفخاخ التعادل والطرد"
+          >
+            {filterStrictRandomness ? "🛡️ فلتر العشوائية: مفعّل (صارم)" : "🛡️ استبعاد عالي العشوائية"}
+          </button>
         </div>
+
+        {viewTab === "singles" && (
+          <button
+            type="button"
+            onClick={() => setOddsFormat(oddsFormat === "decimal" ? "american" : "decimal")}
+            className="press-scale px-2.5 py-1 rounded-lg bg-surface border border-line text-muted hover:text-ink font-mono font-semibold text-xs transition-all cursor-pointer shadow-2xs"
+          >
+            {oddsFormat === "decimal" ? "🇪🇺 أودز عشرية (Decimal)" : "🇺🇸 أودز أمريكية (American)"}
+          </button>
+        )}
+      </div>
+
+      {viewTab === "parlay" ? (
+        <ParlayBuilderWidget candidates={parlayCandidates} />
+      ) : (
+        <>
+          {matches.length === 0 ? (
+            <div className="rounded-2xl border border-line bg-surface p-8 text-center space-y-2">
+              <h2 className="text-sm font-semibold text-ink">لا توجد فرص قيمة حالياً</h2>
+              <p className="text-xs text-muted max-w-lg mx-auto leading-relaxed">
+                عند ظهور انحراف إيجابي بين احتمال النموذج وأسعار السوق ستظهر الفرص هنا تلقائياً.
+              </p>
+            </div>
+          ) : null}
+
+          {/* 1. Hero Header & Overview Metrics */}
+          <div className="rounded-2xl border border-success/30 bg-panel p-4 sm:p-5 space-y-4 shadow-2xs">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-success-dim border border-success/25 text-success font-semibold text-[11px]">
+                تحليل فرص القيمة والسيولة (+EV)
+              </span>
+
+              <span className="text-[11px] font-bold text-muted bg-surface px-3 py-0.5 rounded-full border border-line">
+                حاسبة كيلي الربع (Quarter Kelly 25%)
+              </span>
+            </div>
 
         <div className="space-y-1">
           <h1 className="text-xl sm:text-3xl font-semibold text-ink tracking-tight leading-tight">
@@ -221,7 +360,20 @@ export function ValueMatchesView({ matches }: { matches: ValueMatchItem[] }) {
       ) : (
         <div className="grid grid-cols-1 gap-3">
           {filteredMatches.map((m) => {
-            let analytics: { value?: { side?: string; odds?: number; ev?: number; stake?: number } } | null = null;
+            let analytics: {
+              value?: { side?: string; odds?: number; ev?: number; stake?: number };
+              randomness?: {
+                match_randomness_index?: number;
+                stability_score?: number;
+                verdict?: string;
+                is_strictly_excluded?: boolean;
+                pillars?: {
+                  draw_trap?: { active?: boolean };
+                  second_half_fragility?: { active?: boolean };
+                  disciplinary_risk?: { active?: boolean };
+                };
+              };
+            } | null = null;
             if (m.analytics_json) {
               try {
                 analytics = JSON.parse(m.analytics_json);
@@ -230,6 +382,7 @@ export function ValueMatchesView({ matches }: { matches: ValueMatchItem[] }) {
               }
             }
             const val = analytics?.value;
+            const rand = analytics?.randomness;
             const sideLabel =
               val?.side === "home"
                 ? `فوز ${m.home_name_ar}`
@@ -251,13 +404,34 @@ export function ValueMatchesView({ matches }: { matches: ValueMatchItem[] }) {
               >
                 {/* Card Top Pill & Date */}
                 <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line pb-2.5">
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <span className="px-2.5 py-0.5 rounded-md bg-success-dim text-success font-semibold text-[11px]">
                       {m.league_name_ar}
                     </span>
                     <span className="text-[11px] font-bold text-muted">
                       {formatKickoffAbsolute(m.utc_date)}
                     </span>
+                    {rand ? (
+                      <span
+                        className={`px-2 py-0.5 rounded-md text-[10px] font-bold border ${
+                          rand.verdict === "SAFE_STABLE"
+                            ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/25"
+                            : rand.verdict === "STRICT_EXCLUDE" || rand.is_strictly_excluded
+                            ? "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/25"
+                            : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/25"
+                        }`}
+                      >
+                        {rand.verdict === "SAFE_STABLE"
+                          ? `🛡️ أمان إحصائي (${rand.match_randomness_index}%)`
+                          : rand.pillars?.draw_trap?.active
+                          ? "🤝 فخ تعادل"
+                          : rand.pillars?.second_half_fragility?.active
+                          ? "⏱️ هشاشة شوط 2"
+                          : rand.pillars?.disciplinary_risk?.active
+                          ? "🟥 خطر طرد"
+                          : `عشوائية ${rand.match_randomness_index}%`}
+                      </span>
+                    ) : null}
                   </div>
 
                   <Link
@@ -287,34 +461,77 @@ export function ValueMatchesView({ matches }: { matches: ValueMatchItem[] }) {
                   </div>
 
                   {/* Value Key Metrics Grid */}
-                  {val && (
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs shrink-0">
-                      <div className="rounded-lg border border-line bg-panel p-2 text-center space-y-0.5 shadow-2xs min-w-[5rem]">
-                        <span className="text-[9px] font-bold text-muted block">الجانب المرشح</span>
-                        <div className={`font-semibold truncate text-xs ${sideTextColor}`}>{sideLabel}</div>
-                      </div>
+                  {val && (() => {
+                    const valOdds = val.odds ?? 2.0;
+                    const candProb =
+                      val.side === "home"
+                        ? m.p_home
+                        : val.side === "away"
+                        ? m.p_away
+                        : m.p_draw;
+                    const implied = oddsToImpliedProb(valOdds);
+                    const edge = calculateEdge(candProb, valOdds);
+                    const amOdds = decimalToAmerican(valOdds);
 
-                      <div className="rounded-lg border border-line bg-panel p-2 text-center space-y-0.5 shadow-2xs min-w-[4.5rem]">
-                        <span className="text-[9px] font-bold text-muted block">السعر المتاح</span>
-                        <div className="font-mono font-semibold text-ink text-xs tabular">{val.odds}</div>
-                      </div>
+                    return (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 text-xs shrink-0">
+                        <div className="rounded-lg border border-line bg-panel p-2 text-center space-y-0.5 shadow-2xs min-w-[5rem]">
+                          <span className="text-[9px] font-bold text-muted block">الجانب المرشح</span>
+                          <div className={`font-semibold truncate text-xs ${sideTextColor}`}>{sideLabel}</div>
+                        </div>
 
-                      <div className="rounded-lg border border-success/30 bg-success-dim p-2 text-center space-y-0.5 shadow-2xs min-w-[5rem]">
-                        <span className="text-[9px] font-bold text-success block">الفائدة (+EV)</span>
-                        <div className="font-mono font-semibold text-success text-xs tabular">+{((val.ev ?? 0) * 100).toFixed(1)}%</div>
-                      </div>
+                        <div className="rounded-lg border border-line bg-panel p-2 text-center space-y-0.5 shadow-2xs min-w-[4.5rem]">
+                          <span className="text-[9px] font-bold text-muted block">السعر المتاح</span>
+                          <div className="font-mono font-semibold text-ink text-xs tabular">
+                            {oddsFormat === "american" ? amOdds : valOdds.toFixed(2)}
+                          </div>
+                          <span className="text-[9px] font-mono text-muted block">
+                            {oddsFormat === "american" ? valOdds.toFixed(2) : amOdds}
+                          </span>
+                        </div>
 
-                      <div className="rounded-lg border border-line bg-panel p-2 text-center space-y-0.5 shadow-2xs min-w-[4.5rem]">
-                        <span className="text-[9px] font-bold text-muted block">رهان كيلي الربع</span>
-                        <div className="font-mono font-semibold text-ink text-xs tabular">{((val.stake ?? 0) * 100).toFixed(1)}%</div>
+                        <div className="rounded-lg border border-line bg-panel p-2 text-center space-y-0.5 shadow-2xs min-w-[4.5rem]">
+                          <span className="text-[9px] font-bold text-muted block">احتمال السوق</span>
+                          <div className="font-mono font-semibold text-muted text-xs tabular">
+                            {pct(implied, 1)}
+                          </div>
+                        </div>
+
+                        <div className="rounded-lg border border-line bg-panel p-2 text-center space-y-0.5 shadow-2xs min-w-[4.5rem]">
+                          <span className="text-[9px] font-bold text-muted block">فارق السعر (Edge)</span>
+                          <div
+                            className={`font-mono font-bold text-xs tabular ${
+                              edge >= 0 ? "text-success" : "text-amber-600 dark:text-amber-400"
+                            }`}
+                          >
+                            {edge >= 0 ? "+" : ""}
+                            {(edge * 100).toFixed(1)}%
+                          </div>
+                        </div>
+
+                        <div className="rounded-lg border border-success/30 bg-success-dim p-2 text-center space-y-0.5 shadow-2xs min-w-[5rem]">
+                          <span className="text-[9px] font-bold text-success block">الفائدة (+EV)</span>
+                          <div className="font-mono font-semibold text-success text-xs tabular">
+                            +{((val.ev ?? 0) * 100).toFixed(1)}%
+                          </div>
+                        </div>
+
+                        <div className="rounded-lg border border-line bg-panel p-2 text-center space-y-0.5 shadow-2xs min-w-[4.5rem]">
+                          <span className="text-[9px] font-bold text-muted block">رهان كيلي الربع</span>
+                          <div className="font-mono font-semibold text-ink text-xs tabular">
+                            {((val.stake ?? 0) * 100).toFixed(1)}%
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    );
+                  })()}
                 </div>
               </div>
             );
           })}
         </div>
+      )}
+        </>
       )}
     </div>
   );
