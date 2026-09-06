@@ -1612,9 +1612,10 @@ export const getFinishedPredictionsHistory = cache(
           AND m.source NOT IN ('preview-holdout','synthetic','demo')
       `;
       const params: (string | number)[] = [];
-      if (opts?.fromDate) {
+      const effectiveFromDate = opts?.fromDate ?? PREDICTION_ARCHIVE_FROM;
+      if (effectiveFromDate) {
         sql += ` AND date(m.utc_date, '+3 hours') >= date(?)`;
-        params.push(opts.fromDate);
+        params.push(effectiveFromDate);
       }
       if (leagueId && leagueId !== "all") {
         sql += ` AND m.league_id = ?`;
