@@ -30,6 +30,14 @@ import {
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
+function formatPoints(pts: number): string {
+  if (pts === 0) return "0 نقطة";
+  if (pts === 1) return "نقطة واحدة";
+  if (pts === 2) return "نقطتان";
+  if (pts >= 3 && pts <= 10) return `${pts} نقاط`;
+  return `${pts} نقطة`;
+}
+
 function NumTh({ children, full }: { children: ReactNode; full?: string }) {
   return (
     <th scope="col" className="px-3 py-3 text-center text-xs font-semibold text-ink uppercase">
@@ -306,7 +314,7 @@ export default async function LeaguePage({
                   : "تصنيفات القوة الأولية والمباريات المجدولة"
                 : leader
                   ? anyPlayed
-                    ? `الصدارة: ${leader.name_ar} برصيد ${leader.points} نقطة · ${n} فريقاً`
+                    ? `الصدارة: ${leader.name_ar} برصيد ${formatPoints(leader.points)} · ${n} فريقاً`
                     : `جدول الموسم الجاري · ${n} فريقاً · بانتظار أول النتائج`
                   : `المواسم الرسمية وتقييم Elo النماذج`}
             </p>
@@ -377,6 +385,8 @@ export default async function LeaguePage({
                     <NumTh full="فوز">ف</NumTh>
                     <NumTh full="تعادل">ت</NumTh>
                     <NumTh full="خسارة">خ</NumTh>
+                    <NumTh full="أهداف له">له</NumTh>
+                    <NumTh full="أهداف عليه">عليه</NumTh>
                     <NumTh full="فارق الأهداف">+/-</NumTh>
                     <NumTh full="النقاط">نقاط</NumTh>
                     <NumTh full="تقييم Elo">Elo</NumTh>
@@ -405,7 +415,7 @@ export default async function LeaguePage({
                           }`}
                           style={
                             zone
-                              ? { borderInlineStart: `5px solid ${zone.color}` }
+                              ? { borderInlineStart: `4px solid ${zone.color}` }
                               : undefined
                           }
                         >
@@ -414,17 +424,12 @@ export default async function LeaguePage({
                         <td className="px-4 py-3 font-semibold">
                           <Link
                             href={`/team/${r.team_id}`}
-                            className={`flex items-center gap-2.5 no-underline transition-colors ${
-                              zone
-                                ? zone.textColor
-                                : "text-ink hover:text-accent"
-                            }`}
+                            className="flex items-center gap-2.5 no-underline transition-colors text-ink hover:text-accent"
                           >
                             <Crest
                               src={r.crest_url}
                               alt={r.name_ar}
                               size="xs"
-                              fallback={String(r.position)}
                             />
                             <span className="truncate">{r.name_ar}</span>
 
@@ -444,6 +449,8 @@ export default async function LeaguePage({
                         <td className="px-3 py-3 text-center font-mono font-bold text-ink">{r.won}</td>
                         <td className="px-3 py-3 text-center font-mono font-bold text-muted">{r.drawn}</td>
                         <td className="px-3 py-3 text-center font-mono font-bold text-muted">{r.lost}</td>
+                        <td className="px-3 py-3 text-center font-mono font-bold text-ink">{r.goals_for}</td>
+                        <td className="px-3 py-3 text-center font-mono font-bold text-muted">{r.goals_against}</td>
                         <td className="px-3 py-3 text-center font-mono font-bold text-muted">
                           {r.goal_difference > 0 ? `+${r.goal_difference}` : r.goal_difference}
                         </td>

@@ -54,6 +54,8 @@ export default function HomePage() {
         won: s.won,
         drawn: s.drawn,
         lost: s.lost,
+        goals_for: s.goals_for,
+        goals_against: s.goals_against,
         goal_difference: s.goal_difference,
         points: s.points,
         position: s.position,

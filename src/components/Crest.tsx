@@ -101,7 +101,7 @@ export function Crest({
 
   return (
     <span
-      className={`font-semibold tabular ${plate} ${fallbackText[size]} ${glyphTone} ${className}`}
+      className={`select-none font-semibold tabular ${plate} ${fallbackText[size]} ${glyphTone} ${className}`}
       aria-hidden
       title={alt}
     >

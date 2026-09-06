@@ -1264,7 +1264,9 @@ export function recomputeStandings(db: ReturnType<typeof getDb>, leagueId: strin
     const gdx = x[1].gf - x[1].ga;
     const gdy = y[1].gf - y[1].ga;
     if (gdy !== gdx) return gdy - gdx;
-    return y[1].gf - x[1].gf;
+    if (y[1].gf !== x[1].gf) return y[1].gf - x[1].gf;
+    if (x[1].ga !== y[1].ga) return x[1].ga - y[1].ga;
+    return x[0].localeCompare(y[0]);
   });
 
   // Wipe standings for this specific league and season

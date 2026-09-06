@@ -14,6 +14,8 @@ export interface StandingTeam {
   won: number;
   drawn: number;
   lost: number;
+  goals_for?: number;
+  goals_against?: number;
   goal_difference: number;
   points: number;
   position?: number;
@@ -111,6 +113,8 @@ export function LeagueTableWidget({
                 <th scope="col" className="p-3 text-center tabular">فاز</th>
                 <th scope="col" className="p-3 text-center tabular">تعادل</th>
                 <th scope="col" className="p-3 text-center tabular">خسر</th>
+                <th scope="col" className="p-3 text-center tabular hidden sm:table-cell">له</th>
+                <th scope="col" className="p-3 text-center tabular hidden sm:table-cell">عليه</th>
                 <th scope="col" className="p-3 text-center tabular hidden sm:table-cell">فارق الأهداف</th>
                 <th scope="col" className="p-3 text-center tabular font-semibold text-accent">النقاط</th>
                 <th scope="col" className="p-3 text-center tabular hidden md:table-cell">Elo</th>
@@ -163,6 +167,12 @@ export function LeagueTableWidget({
                     </td>
                     <td className="p-3 text-center tabular font-semibold text-muted">
                       {team.lost}
+                    </td>
+                    <td className="p-3 text-center tabular font-semibold text-ink hidden sm:table-cell">
+                      {team.goals_for ?? "—"}
+                    </td>
+                    <td className="p-3 text-center tabular font-semibold text-muted hidden sm:table-cell">
+                      {team.goals_against ?? "—"}
                     </td>
                     <td className="p-3 text-center tabular font-semibold text-muted hidden sm:table-cell">
                       {team.goal_difference > 0
