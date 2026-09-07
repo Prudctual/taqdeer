@@ -9,7 +9,7 @@ const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 if (!BOT_TOKEN) throw new Error("TELEGRAM_BOT_TOKEN environment variable is required");
 const API_URL = `https://api.telegram.org/bot${BOT_TOKEN}`;
 
-const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || process.env.SITE_URL || "http://13.53.56.196").replace(/\/$/, "");
+const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || process.env.SITE_URL || "http://192.3.12.130").replace(/\/$/, "");
 
 const possiblePaths = [
   path.resolve(process.cwd(), "data/taqdeer.db"),
@@ -22,8 +22,12 @@ if (!fs.existsSync(path.dirname(dbPath))) {
 }
 
 const db = new Database(dbPath);
-db.query("PRAGMA journal_mode = WAL;").run();
-db.query("PRAGMA busy_timeout = 10000;").run();
+try {
+  db.query("PRAGMA busy_timeout = 10000;").run();
+  db.query("PRAGMA journal_mode = WAL;").run();
+} catch {
+  // WAL or busy handled gracefully
+}
 
 console.log(`🤖 Starting Taqdeer Telegram Bot (@Taqdeerbot)...`);
 console.log(`📁 Connected to Database: ${dbPath}`);
