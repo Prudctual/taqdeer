@@ -26,6 +26,15 @@ from .sharp_market import closing_line_value, detect_steam, pick_market_odds, st
 from .strengths_weaknesses import analyze_team_strengths_weaknesses
 from .tactical_matchup import evaluate_tactical_matchup
 from .weather_engine import apply_weather_to_lambdas
+from .goalkeeper_engine import (
+    GoalkeeperProfile,
+    compute_team_goalkeeper_profile,
+    evaluate_goalkeeper_matchup,
+)
+from .manager_engine import (
+    ManagerProfile,
+    compute_manager_profile,
+)
 from .randomness_engine import (
     TeamRandomnessStats,
     compute_team_randomness_profile,
@@ -428,6 +437,10 @@ def predict_match(
     temp_btts: float = 1.0,
     home_randomness_stats: Optional[TeamRandomnessStats] = None,
     away_randomness_stats: Optional[TeamRandomnessStats] = None,
+    home_gk_stats: Optional[GoalkeeperProfile] = None,
+    away_gk_stats: Optional[GoalkeeperProfile] = None,
+    home_manager_profile: Optional[ManagerProfile] = None,
+    away_manager_profile: Optional[ManagerProfile] = None,
 ) -> Dict:
     profile = get_league_profile(league_id)
     w = dict(weights or DEFAULT_WEIGHTS)
@@ -510,6 +523,30 @@ def predict_match(
     if any(t in clean_home for t in profile.turf_teams):
         lam *= 1.05
 
+    is_h_gk_missing = any(
+        str(p.get("position") or "").upper() in ("G", "GK") or "GOALKEEPER" in str(p.get("position") or "").upper()
+        for p in (home_missing or [])
+    )
+    is_a_gk_missing = any(
+        str(p.get("position") or "").upper() in ("G", "GK") or "GOALKEEPER" in str(p.get("position") or "").upper()
+        for p in (away_missing or [])
+    )
+
+    home_gk = home_gk_stats or compute_team_goalkeeper_profile(
+        home, form_matches or [], ratings_map={home: elo_home, away: elo_away}, is_backup=is_h_gk_missing
+    )
+    away_gk = away_gk_stats or compute_team_goalkeeper_profile(
+        away, form_matches or [], ratings_map={home: elo_home, away: elo_away}, is_backup=is_a_gk_missing
+    )
+    gk_res = evaluate_goalkeeper_matchup(home_gk, away_gk, home, away)
+
+    home_mgr = home_manager_profile or compute_manager_profile(
+        home, form_matches or [], elo_rating=elo_home
+    )
+    away_mgr = away_manager_profile or compute_manager_profile(
+        away, form_matches or [], elo_rating=elo_away
+    )
+
     tactics = evaluate_tactical_matchup(
         home,
         away,
@@ -517,9 +554,19 @@ def predict_match(
         ppda_away=float(ppda_away if ppda_away is not None else 11.0),
         ppda_home_n=int(ppda_home_n),
         ppda_away_n=int(ppda_away_n),
+        home_low_block_aptitude=home_mgr.low_block_aptitude,
+        away_low_block_aptitude=away_mgr.low_block_aptitude,
     )
     lam *= float(tactics["home_lambda_mult"])
     mu *= float(tactics["away_lambda_mult"])
+
+    # Manager attack impact
+    lam *= float(home_mgr.lambda_attack_mult)
+    mu *= float(away_mgr.lambda_attack_mult)
+
+    # Goalkeeper shot-stopping impact on opponent goal expectation
+    mu *= float(home_gk.opponent_lambda_mult)
+    lam *= float(away_gk.opponent_lambda_mult)
 
     weather_res = apply_weather_to_lambdas(
         lam,
@@ -639,6 +686,11 @@ def predict_match(
         elo_diff=float(abs(elo_home - elo_away)),
         top_prob=float(max(elo_p)),
         draw_baseline=float(profile.draw_baseline),
+        home_gk=home_gk,
+        away_gk=away_gk,
+        tactics=tactics,
+        home_mgr=home_mgr,
+        away_mgr=away_mgr,
     )
 
     pts_gap = form_home.pts - form_away.pts
@@ -804,6 +856,8 @@ def predict_match(
             "true_xg_dc": {"lambda": [lam_tx, mu_tx]} if lam_tx is not None else None,
             "h2h": h2h_res,
             "tactics": tactics,
+            "goalkeeper": gk_res,
+            "manager": {"home": home_mgr.to_dict(), "away": away_mgr.to_dict()},
             "logistics": logistics,
             "weather": weather_res,
             "player_impact": player_res,

@@ -1117,6 +1117,84 @@ export function HasrTerminalView({ initialData }: HasrTerminalViewProps) {
               </div>
             </div>
 
+            {/* Goalkeeper Metrics (Factors 11 & 12) */}
+            {inspectingMatch.goalkeeperStats && (
+              <div className="p-3 rounded bg-panel/30 border border-line text-xs space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-ink">حراسة المرمى والأهداف المنقذة:</span>
+                  <span className="text-[11px] font-semibold text-accent">
+                    {inspectingMatch.goalkeeperStats.advantageText || "متكافئ إحصائياً"}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-center text-[11px]">
+                  <div className="p-2 rounded bg-surface border border-line">
+                    <span className="text-muted block text-[10px]">{inspectingMatch.homeTeam}</span>
+                    <span className="font-bold text-ink block tabular">
+                      تصديات: {inspectingMatch.goalkeeperStats.homeSavePct ? `${Math.round(inspectingMatch.goalkeeperStats.homeSavePct * 100)}%` : "—"}
+                    </span>
+                    <span className="text-[10px] text-muted block tabular">
+                      منقذ xG: {inspectingMatch.goalkeeperStats.homeGoalsPrevented !== undefined ? `${inspectingMatch.goalkeeperStats.homeGoalsPrevented > 0 ? "+" : ""}${inspectingMatch.goalkeeperStats.homeGoalsPrevented.toFixed(1)}` : "—"}
+                    </span>
+                  </div>
+                  <div className="p-2 rounded bg-surface border border-line">
+                    <span className="text-muted block text-[10px]">{inspectingMatch.awayTeam}</span>
+                    <span className="font-bold text-ink block tabular">
+                      تصديات: {inspectingMatch.goalkeeperStats.awaySavePct ? `${Math.round(inspectingMatch.goalkeeperStats.awaySavePct * 100)}%` : "—"}
+                    </span>
+                    <span className="text-[10px] text-muted block tabular">
+                      منقذ xG: {inspectingMatch.goalkeeperStats.awayGoalsPrevented !== undefined ? `${inspectingMatch.goalkeeperStats.awayGoalsPrevented > 0 ? "+" : ""}${inspectingMatch.goalkeeperStats.awayGoalsPrevented.toFixed(1)}` : "—"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Tactical Matchup & Low Block (Factors 22, 24, 25) */}
+            {inspectingMatch.tacticalMatchup && (
+              <div className="p-3 rounded bg-panel/30 border border-line text-xs space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-ink">التوافق التكتيكي ومواجهة التكتل:</span>
+                  {inspectingMatch.tacticalMatchup.isLowBlock && (
+                    <span className="px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 text-[10px] font-bold">
+                      مواجهة تكتل دفاعي
+                    </span>
+                  )}
+                </div>
+                <div className="space-y-1 text-[11px] text-muted leading-relaxed">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-ink font-semibold">{inspectingMatch.homeTeam}:</span>
+                    <span>{inspectingMatch.tacticalMatchup.homeStyle || "أسلوب متوازن"} ({inspectingMatch.tacticalMatchup.homeFormation || "4-3-3"})</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-ink font-semibold">{inspectingMatch.awayTeam}:</span>
+                    <span>{inspectingMatch.tacticalMatchup.awayStyle || "أسلوب متوازن"} ({inspectingMatch.tacticalMatchup.awayFormation || "4-3-3"})</span>
+                  </div>
+                  {inspectingMatch.tacticalMatchup.commentaryAr && (
+                    <p className="text-ink pt-1 border-t border-line/60 font-medium">
+                      {inspectingMatch.tacticalMatchup.commentaryAr}
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Manager Impact & New Manager Bounce (Factor 21) */}
+            {inspectingMatch.managerImpact && (inspectingMatch.managerImpact.homeManager || inspectingMatch.managerImpact.summaryAr) && (
+              <div className="p-3 rounded bg-panel/30 border border-line text-xs space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-ink">الجهاز الفني والقيادة:</span>
+                  {(inspectingMatch.managerImpact.homeBounce || inspectingMatch.managerImpact.awayBounce) && (
+                    <span className="px-1.5 py-0.5 rounded bg-accent/10 border border-accent/30 text-accent text-[10px] font-bold">
+                      انتعاشة مدرب جديد
+                    </span>
+                  )}
+                </div>
+                <p className="text-muted text-[11px] leading-relaxed">
+                  {inspectingMatch.managerImpact.summaryAr || `مدرب المضيف: ${inspectingMatch.managerImpact.homeManager || "مستقر"} · مدرب الضيف: ${inspectingMatch.managerImpact.awayManager || "مستقر"}`}
+                </p>
+              </div>
+            )}
+
             {/* Anti-Randomness Assessment */}
             <div className="p-3 rounded bg-panel/30 border border-line text-xs space-y-1.5">
               <div className="flex items-center justify-between">

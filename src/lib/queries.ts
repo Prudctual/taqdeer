@@ -1319,6 +1319,31 @@ export type BankerPick = {
   matchRandomnessIndex?: number;
   stabilityScore?: number;
   isStrictlyExcluded?: boolean;
+  goalkeeperStats?: {
+    homeSavePct?: number;
+    awaySavePct?: number;
+    homeGoalsPrevented?: number;
+    awayGoalsPrevented?: number;
+    homeGrade?: string;
+    awayGrade?: string;
+    advantageText?: string;
+  };
+  tacticalMatchup?: {
+    homeStyle?: string;
+    awayStyle?: string;
+    homeFormation?: string;
+    awayFormation?: string;
+    isLowBlock?: boolean;
+    lowBlockWarning?: boolean;
+    commentaryAr?: string;
+  };
+  managerImpact?: {
+    homeManager?: string;
+    awayManager?: string;
+    homeBounce?: boolean;
+    awayBounce?: boolean;
+    summaryAr?: string;
+  };
 };
 
 export const getBankerPicks = cache(function getBankerPicks(
@@ -1383,6 +1408,9 @@ export const getBankerPicks = cache(function getBankerPicks(
       let mri = 30;
       let stability = 70;
       let isDrawTrap = false;
+      let gkStats: BankerPick["goalkeeperStats"] = undefined;
+      let tacMatchup: BankerPick["tacticalMatchup"] = undefined;
+      let mgrImpact: BankerPick["managerImpact"] = undefined;
 
       if (r.analytics_json) {
         try {
@@ -1393,6 +1421,41 @@ export const getBankerPicks = cache(function getBankerPicks(
             mri = rand.match_randomness_index ?? 30;
             stability = rand.stability_score ?? (100 - mri);
             isDrawTrap = Boolean(rand.pillars?.draw_trap?.active && rand.pillars?.draw_trap?.severity !== "LOW");
+          }
+          const comps = parsed.components || {};
+          if (comps.goalkeeper) {
+            const gk = comps.goalkeeper;
+            gkStats = {
+              homeSavePct: gk.home?.save_pct,
+              awaySavePct: gk.away?.save_pct,
+              homeGoalsPrevented: gk.home?.goals_prevented_total,
+              awayGoalsPrevented: gk.away?.goals_prevented_total,
+              homeGrade: gk.home?.shot_stopping_grade,
+              awayGrade: gk.away?.shot_stopping_grade,
+              advantageText: gk.advantage_text,
+            };
+          }
+          if (comps.tactics) {
+            const tac = comps.tactics;
+            tacMatchup = {
+              homeStyle: tac.home_style,
+              awayStyle: tac.away_style,
+              homeFormation: tac.home_formation,
+              awayFormation: tac.away_formation,
+              isLowBlock: tac.is_low_block_matchup,
+              lowBlockWarning: tac.low_block_trap_warning,
+              commentaryAr: tac.matchup_commentary,
+            };
+          }
+          if (comps.manager) {
+            const mgr = comps.manager;
+            mgrImpact = {
+              homeManager: mgr.home?.manager_name,
+              awayManager: mgr.away?.manager_name,
+              homeBounce: mgr.home?.is_new_manager_bounce,
+              awayBounce: mgr.away?.is_new_manager_bounce,
+              summaryAr: mgr.home?.summary_ar,
+            };
           }
         } catch {
           // ignore
@@ -1459,6 +1522,9 @@ export const getBankerPicks = cache(function getBankerPicks(
         matchRandomnessIndex: mri,
         stabilityScore: stability,
         isStrictlyExcluded,
+        goalkeeperStats: gkStats,
+        tacticalMatchup: tacMatchup,
+        managerImpact: mgrImpact,
       });
     }
 

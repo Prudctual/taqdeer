@@ -259,6 +259,11 @@ def evaluate_match_randomness(
     elo_diff: float = 100.0,
     top_prob: float = 0.50,
     draw_baseline: float = 0.25,
+    home_gk: Optional[Any] = None,
+    away_gk: Optional[Any] = None,
+    tactics: Optional[Dict[str, Any]] = None,
+    home_mgr: Optional[Any] = None,
+    away_mgr: Optional[Any] = None,
 ) -> Dict[str, Any]:
     """
     Evaluates total match randomness across all dimensions and generates:
@@ -320,6 +325,13 @@ def evaluate_match_randomness(
         draw_score = max(draw_score, 0.75)
     elif draw_trap_severity == "MODERATE":
         draw_score = max(draw_score, 0.45)
+
+    if tactics and tactics.get("low_block_trap_warning"):
+        draw_trap_active = True
+        if draw_trap_severity in ("LOW", "MODERATE"):
+            draw_trap_severity = "HIGH"
+            draw_trap_reason = str(tactics.get("matchup_commentary") or "فخ تكتل دفاعي مغلق يرفع احتمالية التعادل العشوائي")
+            draw_score = max(draw_score, 0.75)
 
     # 2. Second-Half Fragility & Collapse (Weight 0.28)
     # -------------------------------------------------------------
@@ -419,6 +431,29 @@ def evaluate_match_randomness(
     vol_reason = "استقرار جيد في نتائج الفريقين السابقة"
     if home_stats.is_volatile_form or away_stats.is_volatile_form:
         vol_reason = "تذبذب حاد في هوامش الفوز والخسارة وتفاوت غير مستقر في مستوى الفريقين"
+
+    gk_risk_active = False
+    gk_risk_reason = "مستوى حراسة مستقر ولا توجد مؤشرات قلق"
+    if home_gk or away_gk:
+        h_grade = str(getattr(home_gk, "shot_stopping_grade", "") or "")
+        a_grade = str(getattr(away_gk, "shot_stopping_grade", "") or "")
+        h_backup = bool(getattr(home_gk, "is_backup", False))
+        a_backup = bool(getattr(away_gk, "is_backup", False))
+        if "ALARMING" in h_grade or "ALARMING" in a_grade or (h_backup and is_tight_match) or (a_backup and is_tight_match):
+            gk_risk_active = True
+            gk_risk_reason = "مخاطر حراسة حادة: حارس بديل أو تصديات منخفضة تزيد احتمالية استقبال أهداف سهلة ومفاجئة"
+            volatility_score = min(1.0, volatility_score + 0.25)
+        elif "VULNERABLE" in h_grade or "VULNERABLE" in a_grade or h_backup or a_backup:
+            gk_risk_active = True
+            gk_risk_reason = "تحذير حراسة: أحد الحارسين يعاني من اهتزاز في التصديات تحت الضغط"
+            volatility_score = min(1.0, volatility_score + 0.12)
+
+    mgr_bounce_active = False
+    mgr_reason = "استقرار فني وإداري في كلا الفريقين"
+    if (home_mgr and getattr(home_mgr, "is_new_manager_bounce", False)) or (away_mgr and getattr(away_mgr, "is_new_manager_bounce", False)):
+        mgr_bounce_active = True
+        mgr_reason = "تأثير تغيير المدرب الجديد: دافعية وحماس تكتيكي مع تذبذب محتمل في المنظومة"
+        volatility_score = min(1.0, volatility_score + 0.10)
 
     # 5. Low-Goal / Stalemate Entropy (Weight 0.10)
     # -------------------------------------------------------------
@@ -567,6 +602,27 @@ def evaluate_match_randomness(
                 "score": float(round(low_goal_score, 2)),
                 "total_expected_goals": float(round(total_expected_goals, 2)),
                 "is_tight_match": is_tight_match,
+            },
+            "goalkeeper_risk": {
+                "active": gk_risk_active,
+                "reason_ar": gk_risk_reason,
+                "home_grade": str(getattr(home_gk, "shot_stopping_grade", "SOLID") if home_gk else "SOLID"),
+                "away_grade": str(getattr(away_gk, "shot_stopping_grade", "SOLID") if away_gk else "SOLID"),
+                "home_is_backup": bool(getattr(home_gk, "is_backup", False) if home_gk else False),
+                "away_is_backup": bool(getattr(away_gk, "is_backup", False) if away_gk else False),
+            },
+            "tactical_clash": {
+                "active": bool(tactics.get("low_block_trap_warning", False) if tactics else False),
+                "clash_type": str(tactics.get("tactical_clash_type", "BALANCED") if tactics else "BALANCED"),
+                "is_low_block": bool(tactics.get("is_low_block_matchup", False) if tactics else False),
+                "advantage": str(tactics.get("style_advantage", "NEUTRAL") if tactics else "NEUTRAL"),
+                "commentary_ar": str(tactics.get("matchup_commentary", "") if tactics else ""),
+            },
+            "manager_transition": {
+                "active": mgr_bounce_active,
+                "reason_ar": mgr_reason,
+                "home_bounce": bool(getattr(home_mgr, "is_new_manager_bounce", False) if home_mgr else False),
+                "away_bounce": bool(getattr(away_mgr, "is_new_manager_bounce", False) if away_mgr else False),
             },
         },
     }

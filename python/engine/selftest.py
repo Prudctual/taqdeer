@@ -53,6 +53,15 @@ from .elo import elo_home_adv_from_profile, log_home_adv_to_elo
 from .form import apply_congestion, congestion_lambda_mult
 from .evaluate import apply_binary_temperature, fit_binary_temperature
 from .player_impact import xi_delta_impact
+from .goalkeeper_engine import (
+    GoalkeeperProfile,
+    compute_team_goalkeeper_profile,
+    evaluate_goalkeeper_matchup,
+)
+from .manager_engine import (
+    ManagerProfile,
+    compute_manager_profile,
+)
 from .randomness_engine import (
     TeamRandomnessStats,
     compute_team_randomness_profile,
@@ -552,6 +561,83 @@ def main() -> None:
     assert m_rand_stable["match_randomness_index"] < 40, f"Stable MRI: {m_rand_stable['match_randomness_index']}"
     assert m_rand_stable["verdict"] == "SAFE_STABLE"
     assert m_rand_stable["is_strictly_excluded"] is False
+
+    # 17. فحص محرك حراسة المرمى (Goalkeeper Engine - Factors 11 & 12)
+    gk_matches_elite = [
+        {"home_team_id": "TeamGK", "away_team_id": "TopOpp", "home_goals": 0, "away_goals": 0, "sot_away": 7, "xg_away": 2.1},
+        {"home_team_id": "TeamGK", "away_team_id": "TopOpp2", "home_goals": 1, "away_goals": 1, "sot_away": 8, "xg_away": 2.4},
+        {"home_team_id": "Opp3", "away_team_id": "TeamGK", "home_goals": 0, "away_goals": 2, "sot_home": 6, "xg_home": 1.8},
+        {"home_team_id": "TeamGK", "away_team_id": "Opp4", "home_goals": 2, "away_goals": 0, "sot_away": 5, "xg_away": 1.5},
+    ]
+    gk_elite = compute_team_goalkeeper_profile("TeamGK", gk_matches_elite, ratings_map={"TopOpp": 1700.0, "TopOpp2": 1680.0})
+    assert gk_elite.save_pct >= 0.75, f"Elite GK save_pct: {gk_elite.save_pct}"
+    assert gk_elite.goals_prevented_total > 0.0, f"Goals prevented: {gk_elite.goals_prevented_total}"
+    assert gk_elite.shot_stopping_grade in ("ELITE", "ABOVE_AVERAGE")
+    assert gk_elite.opponent_lambda_mult < 1.0, f"Defensive mult: {gk_elite.opponent_lambda_mult}"
+    assert "🧤" in gk_elite.summary_ar
+
+    # فحص الحارس الضعيف / البديل
+    gk_matches_weak = [
+        {"home_team_id": "WeakGK", "away_team_id": "Opp", "home_goals": 0, "away_goals": 4, "sot_away": 5, "xg_away": 1.5},
+        {"home_team_id": "WeakGK", "away_team_id": "Opp2", "home_goals": 1, "away_goals": 3, "sot_away": 4, "xg_away": 1.2},
+    ]
+    gk_weak = compute_team_goalkeeper_profile("WeakGK", gk_matches_weak, is_backup=True)
+    assert gk_weak.opponent_lambda_mult > 1.0, f"Weak GK mult: {gk_weak.opponent_lambda_mult}"
+    assert gk_weak.is_backup is True
+    assert "BACKUP" in gk_weak.shot_stopping_grade
+
+    gk_matchup_res = evaluate_goalkeeper_matchup(gk_elite, gk_weak, "TeamGK", "WeakGK")
+    assert gk_matchup_res["advantage"] == "HOME"
+    assert gk_matchup_res["has_vulnerable_gk"] is True
+
+    # 18. فحص محرك المدرب وانتعاشة التغيير (Manager Engine - Factor 21)
+    mgr_bounce = compute_manager_profile("TeamBounce", [], elo_rating=1550.0, tenure_override=2, manager_name_override="مدرب جديد")
+    assert mgr_bounce.is_new_manager_bounce is True
+    assert mgr_bounce.bounce_intensity_mult > 1.0
+    assert "انتعاشة مدرب جديد" in mgr_bounce.summary_ar
+
+    mgr_vet = compute_manager_profile("mancity", [], elo_rating=1780.0)
+    assert mgr_vet.is_new_manager_bounce is False
+    assert mgr_vet.experience_level == "ELITE_TACTICIAN"
+    assert mgr_vet.low_block_aptitude >= 0.90
+
+    # 19. فحص التوافق التكتيكي والتكتل الدفاعي (Tactical Matchup - Factors 22, 24, 25)
+    # استحواذ ضد تكتل دفاعي مع ضعف في فك التكتلات
+    tac_low_block = evaluate_tactical_matchup(
+        home_team="mancity",
+        away_team="getafe",
+        home_low_block_aptitude=0.72,
+        away_low_block_aptitude=0.85,
+    )
+    assert tac_low_block["is_low_block_matchup"] is True
+    assert tac_low_block["low_block_trap_warning"] is True
+    assert "تحذير تكتل دفاعي" in tac_low_block["matchup_commentary"]
+
+    # 20. فحص الربط الشامل في predict_match (Goalkeeper, Manager, Pillars)
+    p_full_v4 = predict_match(
+        home="teamA",
+        away="teamB",
+        dc=dc_model,
+        elo_home=1600.0,
+        elo_away=1480.0,
+        pi=pi_state,
+        form_home=avg,
+        form_away=avg,
+        market_odds=(1.80, 3.50, 4.50),
+        home_gk_stats=gk_elite,
+        away_gk_stats=gk_weak,
+        home_manager_profile=mgr_vet,
+        away_manager_profile=mgr_bounce,
+    )
+    assert "goalkeeper" in p_full_v4["components"], "goalkeeper component missing"
+    assert "manager" in p_full_v4["components"], "manager component missing"
+    assert "tactics" in p_full_v4["components"], "tactics component missing"
+    rand_pil = p_full_v4["randomness"]["pillars"]
+    assert "goalkeeper_risk" in rand_pil, "goalkeeper_risk pillar missing"
+    assert "tactical_clash" in rand_pil, "tactical_clash pillar missing"
+    assert "manager_transition" in rand_pil, "manager_transition pillar missing"
+    assert rand_pil["goalkeeper_risk"]["active"] is True, "expected active GK risk due to weak away keeper"
+    assert rand_pil["manager_transition"]["active"] is True, "expected active manager bounce"
 
     print("selftest ok — ensemble-v4 mathematical engine verified cleanly!")
 

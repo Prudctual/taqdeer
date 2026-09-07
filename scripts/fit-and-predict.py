@@ -42,6 +42,14 @@ from engine.evaluate import (  # noqa: E402
 from engine.form import FormMatch, TeamForm, rolling_form  # noqa: E402
 from engine.league_profiles import get_league_profile  # noqa: E402
 from engine.pi_ratings import PiMatch, update_pi  # noqa: E402
+from engine.goalkeeper_engine import (  # noqa: E402
+    compute_team_goalkeeper_profile,
+    GoalkeeperProfile,
+)
+from engine.manager_engine import (  # noqa: E402
+    compute_manager_profile,
+    ManagerProfile,
+)
 from engine.randomness_engine import (  # noqa: E402
     compute_team_randomness_profile,
     evaluate_match_randomness,
@@ -698,6 +706,8 @@ def repredict_flagged(conn: sqlite3.Connection) -> int:
         ]
         forms = rolling_form(form_matches, window=5)
         rand_profiles = {}
+        gk_profiles = {}
+        mgr_profiles = {}
         for m in finished:
             hid = m["home_team_id"]
             aid = m["away_team_id"]
@@ -705,6 +715,14 @@ def repredict_flagged(conn: sqlite3.Connection) -> int:
                 rand_profiles[hid] = compute_team_randomness_profile(hid, finished, window=25)
             if aid not in rand_profiles:
                 rand_profiles[aid] = compute_team_randomness_profile(aid, finished, window=25)
+            if hid not in gk_profiles:
+                gk_profiles[hid] = compute_team_goalkeeper_profile(hid, finished, ratings_map=ratings, window=25)
+            if aid not in gk_profiles:
+                gk_profiles[aid] = compute_team_goalkeeper_profile(aid, finished, ratings_map=ratings, window=25)
+            if hid not in mgr_profiles:
+                mgr_profiles[hid] = compute_manager_profile(hid, finished, elo_rating=ratings.get(hid, 1500.0))
+            if aid not in mgr_profiles:
+                mgr_profiles[aid] = compute_manager_profile(aid, finished, elo_rating=ratings.get(aid, 1500.0))
         ts = now_iso()
         for t in targets:
             odds = None
@@ -761,6 +779,10 @@ def repredict_flagged(conn: sqlite3.Connection) -> int:
                 form_matches=form_matches,
                 home_randomness_stats=rand_profiles.get(t["home_team_id"]),
                 away_randomness_stats=rand_profiles.get(t["away_team_id"]),
+                home_gk_stats=gk_profiles.get(t["home_team_id"]),
+                away_gk_stats=gk_profiles.get(t["away_team_id"]),
+                home_manager_profile=mgr_profiles.get(t["home_team_id"]),
+                away_manager_profile=mgr_profiles.get(t["away_team_id"]),
             )
             conn.execute("DELETE FROM predictions WHERE match_id=?", (t["id"],))
             market = pred["components"]["market"]["p"]
@@ -1526,6 +1548,8 @@ def main() -> None:
                 )
 
         rand_profiles = {}
+        gk_profiles = {}
+        mgr_profiles = {}
         for m in finished:
             hid = m["home_team_id"]
             aid = m["away_team_id"]
@@ -1533,6 +1557,14 @@ def main() -> None:
                 rand_profiles[hid] = compute_team_randomness_profile(hid, finished, window=25)
             if aid not in rand_profiles:
                 rand_profiles[aid] = compute_team_randomness_profile(aid, finished, window=25)
+            if hid not in gk_profiles:
+                gk_profiles[hid] = compute_team_goalkeeper_profile(hid, finished, ratings_map=ratings, window=25)
+            if aid not in gk_profiles:
+                gk_profiles[aid] = compute_team_goalkeeper_profile(aid, finished, ratings_map=ratings, window=25)
+            if hid not in mgr_profiles:
+                mgr_profiles[hid] = compute_manager_profile(hid, finished, elo_rating=ratings.get(hid, 1500.0))
+            if aid not in mgr_profiles:
+                mgr_profiles[aid] = compute_manager_profile(aid, finished, elo_rating=ratings.get(aid, 1500.0))
 
         # --- Targets: real scheduled (full model) + last 12 finished (eval-time model) ---
         recent = conn.execute(
@@ -1709,6 +1741,10 @@ def main() -> None:
                 form_matches=form_matches,
                 home_randomness_stats=rand_profiles.get(t["home_team_id"]),
                 away_randomness_stats=rand_profiles.get(t["away_team_id"]),
+                home_gk_stats=gk_profiles.get(t["home_team_id"]),
+                away_gk_stats=gk_profiles.get(t["away_team_id"]),
+                home_manager_profile=mgr_profiles.get(t["home_team_id"]),
+                away_manager_profile=mgr_profiles.get(t["away_team_id"]),
             )
 
             write_prediction(
