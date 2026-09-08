@@ -1,7 +1,7 @@
 /** فحوص سريعة للمنطق غير البديهي — `bun run check` */
 import assert from "node:assert";
 import { parseUkDate } from "./sync-data";
-import { historicalSeasons, latestSeasonStartYear } from "../src/lib/leagues";
+import { historicalSeasons, latestSeasonStartYear, LEAGUES } from "../src/lib/leagues";
 import {
   calendarDayOffset,
   crestInitials,
@@ -75,4 +75,13 @@ const liveAwayRed = calculateInPlayProbs(1.4, 1.1, 60, 1, 0, {
 assert.ok(liveAwayRed.pHome + liveAwayRed.pDraw + liveAwayRed.pAway > 0.99);
 assert.ok(liveAwayRed.pAway < liveBase.pAway);
 
+// التحقق من الدوريات السبعة المعتمدة واستبعاد tur1 و no1 تماماً
+assert.equal(LEAGUES.length, 7);
+assert.deepEqual(
+  LEAGUES.map((l) => l.id),
+  ["pl", "pd", "bl1", "sa", "fl1", "ppd", "ded"],
+);
+assert.ok(!LEAGUES.some((l) => l.id === "tur1" || l.id === "no1"));
+
 console.log("selfcheck ok");
+

@@ -638,8 +638,16 @@ def main() -> None:
     assert "manager_transition" in rand_pil, "manager_transition pillar missing"
     assert rand_pil["goalkeeper_risk"]["active"] is True, "expected active GK risk due to weak away keeper"
     assert rand_pil["manager_transition"]["active"] is True, "expected active manager bounce"
+    # 13. التحقق الصارم من الدوريات السبعة وغياب الدوري التركي والنرويجي
+    from .league_profiles import LEAGUE_PROFILES, get_league_profile
+    assert len(LEAGUE_PROFILES) == 7, f"Expected 7 leagues, got {len(LEAGUE_PROFILES)}"
+    assert set(LEAGUE_PROFILES.keys()) == {"pl", "pd", "bl1", "sa", "fl1", "ppd", "ded"}
+    assert "tur1" not in LEAGUE_PROFILES and "no1" not in LEAGUE_PROFILES
+    assert get_league_profile("tur1").league_id == "default"
+    assert get_league_profile("no1").league_id == "default"
 
     print("selftest ok — ensemble-v4 mathematical engine verified cleanly!")
+
 
 
 if __name__ == "__main__":

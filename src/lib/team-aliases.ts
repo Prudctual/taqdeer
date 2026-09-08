@@ -191,10 +191,6 @@ const ALIASES: Record<string, string> = {
   "Académico Viseu": "Academico",
   "Académico de Viseu": "Academico",
   "Academico de Viseu": "Academico",
-  "Istanbul Basaksehir": "Buyuksehyr",
-  "Başakşehir": "Buyuksehyr",
-  "Goztepe": "Goztep",
-  "Gaziantep FK": "Gaziantep",
 };
 
 function normalizeKey(name: string): string {
