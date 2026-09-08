@@ -38,8 +38,6 @@ const LEAGUES_CONFIG = [
   { id: "fl1", name: "الدوري الفرنسي", icon: "🇫🇷" },
   { id: "ppd", name: "الدوري البرتغالي", icon: "🇵🇹" },
   { id: "ded", name: "الدوري الهولندي", icon: "🇳🇱" },
-  { id: "tur1", name: "الدوري التركي", icon: "🇹🇷" },
-  { id: "no1", name: "الدوري النرويجي", icon: "🇳🇴" },
 ];
 
 export function ValueMatchesView({ matches }: { matches: ValueMatchItem[] }) {

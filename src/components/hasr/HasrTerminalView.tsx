@@ -61,7 +61,6 @@ export function HasrTerminalView({ initialData }: HasrTerminalViewProps) {
         FL1: "الدوري الفرنسي",
         PPD: "الدوري البرتغالي",
         DED: "الدوري الهولندي",
-        TUR1: "الدوري التركي",
       };
       const expectedName = leagueNameMap[selectedLeague];
       if (expectedName) {

@@ -74,23 +74,6 @@ export const LEAGUES: LeagueDef[] = [
     fdOrgCode: "DED",
     fdUkCode: "N1",
   },
-  {
-    id: "tur1",
-    code: "TR1",
-    nameAr: "الدوري التركي",
-    nameEn: "Süper Lig",
-    countryAr: "تركيا",
-    fdOrgCode: "TR1",
-    fdUkCode: "T1",
-  },
-  {
-    id: "no1",
-    code: "NO1",
-    nameAr: "الدوري النرويجي",
-    nameEn: "Eliteserien",
-    countryAr: "النرويج",
-    fdOrgCode: "NO1",
-  },
 ];
 
 export function leagueByCode(code: string) {
@@ -117,9 +100,6 @@ const LEAGUE_EMBLEM_MAP: Record<string, string> = {
   FL1: "https://crests.football-data.org/FL1.png",
   PPD: "https://crests.football-data.org/PPL.png",
   DED: "https://crests.football-data.org/ED.png",
-  TR1: "https://flagcdn.com/w40/tr.png",
-  TUR1: "https://flagcdn.com/w40/tr.png",
-  NO1: "https://flagcdn.com/w40/no.png",
   UEL: "https://crests.football-data.org/EL.png",
   UCL: "https://crests.football-data.org/CL.png",
 };
@@ -200,57 +180,6 @@ export function getLeagueZone(
   leagueId?: string,
 ): LeagueZone | null {
   const lid = leagueId?.toLowerCase();
-
-  // Norway (Eliteserien)
-  if (lid === "no1") {
-    if (position === 1) {
-      return {
-        color: "var(--home)",
-        bgColor: "bg-blue-500/10 hover:bg-blue-500/20",
-        textColor: "text-blue-500 font-semibold",
-        positionBgColor: "bg-blue-500/20",
-        positionTextColor: "text-blue-500",
-        borderColor: "border-blue-500/30",
-        label: "تصفيات دوري أبطال أوروبا",
-        tournamentType: "ucl",
-      };
-    }
-    if (position === 2 || position === 3) {
-      return {
-        color: "var(--warn)",
-        bgColor: "bg-emerald-500/10 hover:bg-emerald-500/20",
-        textColor: "text-emerald-500 font-semibold",
-        positionBgColor: "bg-emerald-500/20",
-        positionTextColor: "text-emerald-500",
-        borderColor: "border-emerald-500/30",
-        label: "تصفيات دوري المؤتمر الأوروبي",
-        tournamentType: "uel",
-      };
-    }
-    if (position === total - 2) {
-      return {
-        color: "var(--warn)",
-        bgColor: "bg-amber-500/10 hover:bg-amber-500/20",
-        textColor: "text-amber-500 font-semibold",
-        positionBgColor: "bg-amber-500/20",
-        positionTextColor: "text-amber-500",
-        borderColor: "border-amber-500/30",
-        label: "ملحق تفادي الهبوط",
-      };
-    }
-    if (position >= total - 1) {
-      return {
-        color: "var(--danger)",
-        bgColor: "bg-danger-dim hover:bg-danger-dim",
-        textColor: "text-danger font-semibold",
-        positionBgColor: "bg-danger-dim",
-        positionTextColor: "text-danger",
-        borderColor: "border-danger/30",
-        label: "منطقة الهبوط المباشر",
-      };
-    }
-    return null;
-  }
 
   // Portugal (Primeira Liga)
   if (lid === "ppd") {
@@ -377,58 +306,6 @@ export function getLeagueZone(
       };
     }
     if (position >= total - 1) {
-      return {
-        color: "var(--danger)",
-        bgColor: "bg-danger-dim hover:bg-danger-dim",
-        textColor: "text-danger font-semibold",
-        positionBgColor: "bg-danger-dim",
-        positionTextColor: "text-danger",
-        borderColor: "border-danger/30",
-        label: "منطقة الهبوط المباشر",
-      };
-    }
-    return null;
-  }
-
-  // Turkey (Süper Lig)
-  if (lid === "tur1") {
-    if (position <= 2) {
-      return {
-        color: "var(--home)",
-        bgColor: "bg-blue-500/10 hover:bg-blue-500/20",
-        textColor: "text-blue-500 font-semibold",
-        positionBgColor: "bg-blue-500/20",
-        positionTextColor: "text-blue-500",
-        borderColor: "border-blue-500/30",
-        label: "تصفيات دوري أبطال أوروبا",
-        tournamentType: "ucl",
-      };
-    }
-    if (position === 3) {
-      return {
-        color: "var(--warn)",
-        bgColor: "bg-orange-500/10 hover:bg-orange-500/20",
-        textColor: "text-orange-500 font-semibold",
-        positionBgColor: "bg-orange-500/20",
-        positionTextColor: "text-orange-500",
-        borderColor: "border-orange-500/30",
-        label: "الدوري الأوروبي",
-        tournamentType: "uel",
-      };
-    }
-    if (position === 4) {
-      return {
-        color: "var(--warn)",
-        bgColor: "bg-emerald-500/10 hover:bg-emerald-500/20",
-        textColor: "text-emerald-500 font-semibold",
-        positionBgColor: "bg-emerald-500/20",
-        positionTextColor: "text-emerald-500",
-        borderColor: "border-emerald-500/30",
-        label: "دوري المؤتمر الأوروبي",
-        tournamentType: "uel",
-      };
-    }
-    if (position >= total - 3) {
       return {
         color: "var(--danger)",
         bgColor: "bg-danger-dim hover:bg-danger-dim",

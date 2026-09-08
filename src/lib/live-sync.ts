@@ -32,8 +32,6 @@ const FOTMOB_LEAGUES: Record<number, string> = {
   53: "fl1",
   61: "ppd",
   57: "ded",
-  71: "tur1",
-  59: "no1", // Eliteserien
 };
 
 const APIF_LEAGUES: Record<number, string> = {
@@ -44,8 +42,6 @@ const APIF_LEAGUES: Record<number, string> = {
   61: "fl1",
   94: "ppd",
   88: "ded",
-  203: "tur1",
-  103: "no1",
 };
 
 type LiveEvent = {

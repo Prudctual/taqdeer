@@ -28,14 +28,6 @@ async function main() {
     n++;
   }
 
-  // النرويج عبر مساره الخاص أيضاً
-  try {
-    const { syncNorwayEliteserien } = await import("./sync-eliteserien");
-    await syncNorwayEliteserien();
-  } catch (e) {
-    console.warn("  sync eliteserien:", e);
-  }
-
   console.log(`done — recomputed ${n} league-seasons`);
 }
 

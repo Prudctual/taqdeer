@@ -13,7 +13,7 @@ _DEFAULT_CACHE = Path(__file__).resolve().parents[2] / "data" / "enrich-cache"
 CACHE_DIR = Path(os.environ.get("TAQDEER_ENRICH_CACHE", str(_DEFAULT_CACHE)))
 MIN_INTERVAL = float(os.environ.get("FOTMOB_MIN_INTERVAL", "1.2"))
 
-# primaryId لدورياتنا الثمانية
+# primaryId لدورياتنا السبعة
 LEAGUE_PRIMARY: Dict[str, int] = {
     "pl": 47,
     "pd": 87,
@@ -22,8 +22,6 @@ LEAGUE_PRIMARY: Dict[str, int] = {
     "fl1": 53,
     "ppd": 61,
     "ded": 57,
-    "tur1": 71,
-    "no1": 59,  # Eliteserien
 }
 PRIMARY_TO_LEAGUE = {v: k for k, v in LEAGUE_PRIMARY.items()}
 

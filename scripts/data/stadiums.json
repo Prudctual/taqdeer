@@ -529,26 +529,6 @@
     "lon": 6.8375,
     "name": "De Grolsch Veste"
   },
-  "tur1-galatasaray": {
-    "lat": 41.1034,
-    "lon": 28.9902,
-    "name": "RAMS Park"
-  },
-  "tur1-fenerbahce": {
-    "lat": 40.9878,
-    "lon": 29.0369,
-    "name": "Ülker Stadium"
-  },
-  "tur1-besiktas": {
-    "lat": 41.0393,
-    "lon": 28.9944,
-    "name": "Tüpraş Stadium"
-  },
-  "tur1-trabzonspor": {
-    "lat": 41.0037,
-    "lon": 39.7055,
-    "name": "Şenol Güneş Stadium"
-  },
   "ded-psv-eindhoven": {
     "lat": 51.4418,
     "lon": 5.4676,
@@ -724,86 +704,6 @@
     "lon": -8.476,
     "name": "Clube Desportivo"
   },
-  "tur1-kasimpasa": {
-    "lat": 41.042,
-    "lon": 28.973,
-    "name": "Recep Tayyip Erdoğan"
-  },
-  "tur1-basaksehir": {
-    "lat": 41.087,
-    "lon": 28.785,
-    "name": "Başakşehir Fatih Terim"
-  },
-  "tur1-buyuksehyr": {
-    "lat": 41.087,
-    "lon": 28.785,
-    "name": "Başakşehir Fatih Terim"
-  },
-  "tur1-samsunspor": {
-    "lat": 41.316,
-    "lon": 36.31,
-    "name": "Samsun 19 Mayıs"
-  },
-  "tur1-goztepe": {
-    "lat": 38.427,
-    "lon": 27.128,
-    "name": "Gürsel Aksel"
-  },
-  "tur1-alanyaspor": {
-    "lat": 36.552,
-    "lon": 32.018,
-    "name": "Alanya Oba"
-  },
-  "tur1-antalyaspor": {
-    "lat": 36.888,
-    "lon": 30.67,
-    "name": "Corendon Antalya"
-  },
-  "tur1-konyaspor": {
-    "lat": 37.869,
-    "lon": 32.468,
-    "name": "Konya Büyükşehir"
-  },
-  "tur1-sivasspor": {
-    "lat": 39.742,
-    "lon": 37.003,
-    "name": "Yeni 4 Eylül"
-  },
-  "tur1-eyupspor": {
-    "lat": 41.048,
-    "lon": 28.933,
-    "name": "Eyüp Stadı"
-  },
-  "tur1-rizespor": {
-    "lat": 41.042,
-    "lon": 40.528,
-    "name": "Çaykur Didi"
-  },
-  "tur1-kayserispor": {
-    "lat": 38.737,
-    "lon": 35.37,
-    "name": "Kadir Has"
-  },
-  "tur1-hatayspor": {
-    "lat": 36.242,
-    "lon": 36.165,
-    "name": "Mersin"
-  },
-  "tur1-adana-demirspor": {
-    "lat": 36.999,
-    "lon": 35.325,
-    "name": "Yeni Adana"
-  },
-  "tur1-bodrumspor": {
-    "lat": 37.035,
-    "lon": 27.43,
-    "name": "Bodrum İlçe"
-  },
-  "tur1-gaziantep": {
-    "lat": 37.066,
-    "lon": 37.378,
-    "name": "Kalyon"
-  },
   "bl1-ein-frankfurt": {
     "lat": 50.0686,
     "lon": 8.6455,
@@ -863,11 +763,6 @@
     "lat": 41.5625,
     "lon": -8.4298,
     "name": "Estádio Municipal de Braga"
-  },
-  "tur1-goztep": {
-    "lat": 38.427,
-    "lon": 27.128,
-    "name": "Gürsel Aksel"
   },
   "bl1-elversberg": {
     "lat": 49.316,
@@ -973,31 +868,6 @@
     "lat": 44.714,
     "lon": 10.65,
     "name": "Mapei Stadium"
-  },
-  "tur1-amedspor": {
-    "lat": 37.913,
-    "lon": 40.217,
-    "name": "Diyarbakır Stadyumu"
-  },
-  "tur1-corum": {
-    "lat": 40.55,
-    "lon": 34.955,
-    "name": "Çorum Şehir"
-  },
-  "tur1-erzurumspor": {
-    "lat": 39.906,
-    "lon": 41.262,
-    "name": "Kazım Karabekir"
-  },
-  "tur1-genclerbirligi": {
-    "lat": 39.939,
-    "lon": 32.846,
-    "name": "Eryaman"
-  },
-  "tur1-kocaelispor": {
-    "lat": 40.766,
-    "lon": 29.941,
-    "name": "Kocaeli Stadyumu"
   },
   "bl1-fc-koln": {
     "lat": 50.9335,

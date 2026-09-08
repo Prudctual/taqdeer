@@ -58,7 +58,7 @@ def pi_home_boost_from_profile(log_ha: float | None, fallback: float = 0.22) -> 
     """يربط أفضلية الأرض في بروفايل الدوري بمضاعف λ للمضيف في Pi."""
     if log_ha is None:
         return fallback
-    # log_ha≈0.22 → boost≈0.22؛ تركيا أعلى قليلاً
+    # log_ha≈0.22 → boost≈0.22
     return float(min(max(float(log_ha), 0.14), 0.34))
 
 

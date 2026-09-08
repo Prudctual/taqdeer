@@ -703,8 +703,6 @@ const API_FOOTBALL_LEAGUE_IDS: Record<number, string> = {
   61: "fl1",
   94: "ppd",
   88: "ded",
-  203: "tur1",
-  103: "no1",
 };
 
 function extractBookmakerOdds(

@@ -157,8 +157,7 @@ export default async function LeaguePage({
   const isCurrentSeason = activeSeason === currentSeasonYear;
   const anyPlayed = standings.some((r) => r.played > 0);
   const seasonPrep = n === 0 && isCurrentSeason;
-  const seasonLabel =
-    id === "no1" ? activeSeason : `${activeSeason}/${Number(activeSeason) + 1}`;
+  const seasonLabel = `${activeSeason}/${Number(activeSeason) + 1}`;
 
   const totalFinishedMatchesInSeason =
     standings.reduce((acc, r) => acc + r.played, 0) / 2;

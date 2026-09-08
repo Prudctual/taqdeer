@@ -275,7 +275,6 @@ DIV_TO_LEAGUE = {
     "F1": "fl1",
     "P1": "ppd",
     "N1": "ded",
-    "T1": "tur1",
 }
 
 

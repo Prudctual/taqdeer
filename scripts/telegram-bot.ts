@@ -319,7 +319,6 @@ const LEAGUES_KEYBOARD = {
     ],
     [
       { text: "🇳🇱 الدوري الهولندي", callback_data: "cmd_league_ded" },
-      { text: "🇹🇷 الدوري التركي", callback_data: "cmd_league_tur1" },
     ],
     [
       { text: "🔙 القائمة الرئيسية", callback_data: "cmd_main_menu" },

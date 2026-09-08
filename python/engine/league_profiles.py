@@ -104,30 +104,6 @@ LEAGUE_PROFILES: Dict[str, LeagueProfile] = {
         elo_weight_mult=1.10,
         form_weight_mult=1.10,
     ),
-    # 🇹🇷 Süper Lig (Turkey)
-    "tur1": LeagueProfile(
-        league_id="tur1",
-        name_ar="الدوري التركي",
-        home_advantage=0.29,
-        draw_baseline=0.24,
-        avg_match_goals=2.80,
-        turf_teams=[],
-        noise_factor=1.10,
-        elo_weight_mult=1.05,
-        form_weight_mult=1.15,
-    ),
-    # 🇳🇴 Eliteserien (Norway) — موسم تقويمي، أهداف أعلى نسبياً
-    "no1": LeagueProfile(
-        league_id="no1",
-        name_ar="الدوري النرويجي",
-        home_advantage=0.23,
-        draw_baseline=0.22,
-        avg_match_goals=3.05,
-        turf_teams=[],
-        noise_factor=1.08,
-        elo_weight_mult=1.05,
-        form_weight_mult=1.12,
-    ),
 }
 
 DEFAULT_PROFILE = LeagueProfile(

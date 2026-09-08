@@ -34,7 +34,6 @@ export function HasrHeader({
     { id: "FL1", label: "الدوري الفرنسي" },
     { id: "PPD", label: "الدوري البرتغالي" },
     { id: "DED", label: "الدوري الهولندي" },
-    { id: "TUR1", label: "الدوري التركي" },
   ];
 
   return (

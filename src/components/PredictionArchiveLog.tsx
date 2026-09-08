@@ -32,8 +32,6 @@ function countryAr(leagueId?: string): string {
   if (id === "bl1") return "ألمانيا";
   if (id === "fl1") return "فرنسا";
   if (id === "ded") return "هولندا";
-  if (id === "tur1" || id === "tr1") return "تركيا";
-  if (id === "no1") return "النرويج";
   if (id === "cl" || id === "ucl") return "أوروبا";
   if (id === "uel" || id === "el") return "أوروبا";
   return "";

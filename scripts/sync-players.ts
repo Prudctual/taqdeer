@@ -16,7 +16,6 @@ const LEAGUE_HINTS: Record<string, string[]> = {
   fl1: ["Ligue 1", "French Ligue 1"],
   ppd: ["Primeira Liga", "Portuguese"],
   ded: ["Eredivisie", "Dutch"],
-  tur1: ["Super Lig", "Turkish"],
 };
 
 /** أسماء بحث بديلة عندما يفشل الاسم الإنجليزي في القاعدة */

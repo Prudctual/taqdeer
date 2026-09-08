@@ -207,30 +207,3 @@ sa-parma|sa|Parma|بارما
 sa-como|sa|Como|كومو
 sa-pisa|sa|Pisa|بيزا
 sa-hellas-verona|sa|Hellas Verona|Hellas Verona
-tur1-istanbulspor|tur1|Istanbulspor|Istanbulspor
-tur1-trabzonspor|tur1|Trabzonspor|طرابزون سبور
-tur1-sivasspor|tur1|Sivasspor|سيفاسبور
-tur1-gaziantep|tur1|Gaziantep|غازي عنتاب
-tur1-besiktas|tur1|Besiktas|بيشكتاش
-tur1-kayserispor|tur1|Kayserispor|قايسري سبور
-tur1-giresunspor|tur1|Giresunspor|Giresunspor
-tur1-ad-demirspor|tur1|Ad. Demirspor|Ad. Demirspor
-tur1-karagumruk|tur1|Karagumruk|Karagumruk
-tur1-alanyaspor|tur1|Alanyaspor|ألانيا سبور
-tur1-antalyaspor|tur1|Antalyaspor|أنطاليا سبور
-tur1-galatasaray|tur1|Galatasaray|غالاتاسراي
-tur1-buyuksehyr|tur1|Buyuksehyr|Buyuksehyr
-tur1-kasimpasa|tur1|Kasimpasa|قاسم باشا
-tur1-ankaragucu|tur1|Ankaragucu|Ankaragucu
-tur1-konyaspor|tur1|Konyaspor|قونية سبور
-tur1-fenerbahce|tur1|Fenerbahce|فنربخشة
-tur1-umraniyespor|tur1|Umraniyespor|Umraniyespor
-tur1-hatayspor|tur1|Hatayspor|هاتاي سبور
-tur1-pendikspor|tur1|Pendikspor|Pendikspor
-tur1-samsunspor|tur1|Samsunspor|سامسون سبور
-tur1-rizespor|tur1|Rizespor|ريزي سبور
-tur1-goztep|tur1|Goztep|Goztep
-tur1-eyupspor|tur1|Eyupspor|أيوب سبور
-tur1-bodrumspor|tur1|Bodrumspor|Bodrumspor
-tur1-genclerbirligi|tur1|Genclerbirligi|Genclerbirligi
-tur1-kocaelispor|tur1|Kocaelispor|Kocaelispor

@@ -63,11 +63,6 @@ KNOWN_MANAGERS: Dict[str, Dict[str, Any]] = {
     "psv": {"name": "بيتر بوش", "experience": "VETERAN", "discipline": 0.89, "low_block": 0.92, "tenure": 65},
     "ajax": {"name": "فرانشيسكو فاريولي", "experience": "ESTABLISHED", "discipline": 0.86, "low_block": 0.85, "tenure": 30},
     "feyenoord": {"name": "برايان بريسكه", "experience": "ESTABLISHED", "discipline": 0.82, "low_block": 0.84, "tenure": 28},
-
-    # Turkish Süper Lig
-    "galatasaray": {"name": "أوكان بوروك", "experience": "VETERAN", "discipline": 0.88, "low_block": 0.89, "tenure": 95},
-    "fenerbahce": {"name": "جوزيه مورينيو", "experience": "ELITE_TACTICIAN", "discipline": 0.94, "low_block": 0.86, "tenure": 32},
-    "besiktas": {"name": "جيوفاني فان برونكهورست", "experience": "VETERAN", "discipline": 0.83, "low_block": 0.80, "tenure": 24},
 }
 
 

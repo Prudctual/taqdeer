@@ -12,7 +12,7 @@ BASE = "https://api.sofascore.com/api/v1"
 CACHE_DIR = Path(os.environ.get("TAQDEER_ENRICH_CACHE", "/tmp/taqdeer-enrich-cache"))
 MIN_INTERVAL = float(os.environ.get("SOFA_MIN_INTERVAL", "1.6"))
 
-# Sofascore uniqueTournament ids للدوريات الثمانية
+# Sofascore uniqueTournament ids للدوريات السبعة
 LEAGUE_TOURNAMENTS: Dict[str, int] = {
     "pl": 17,
     "pd": 8,
@@ -21,8 +21,6 @@ LEAGUE_TOURNAMENTS: Dict[str, int] = {
     "fl1": 34,
     "ppd": 238,
     "ded": 37,
-    "tur1": 52,
-    "no1": 20,  # Eliteserien
 }
 
 _last_req = 0.0

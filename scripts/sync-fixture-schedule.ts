@@ -23,7 +23,6 @@ const FEEDS = [
   { id: "fl1", slug: `ligue-1-${SEASON}` },
   { id: "ppd", slug: `primeira-liga-${SEASON}` },
   { id: "ded", slug: `eredivisie-${SEASON}` },
-  { id: "tur1", slug: `super-lig-${SEASON}` },
 ];
 
 /**
@@ -55,9 +54,6 @@ const FEED_ALIASES: Record<string, string> = {
   PSV: "PSV Eindhoven",
   "Fortuna Sittard": "For Sittard",
   "ADO Den Haag": "Den Haag",
-  // tur1
-  "Istanbul Basaksehir": "Buyuksehyr",
-  "Çorum": "Corum",
 };
 
 type FeedMatch = {

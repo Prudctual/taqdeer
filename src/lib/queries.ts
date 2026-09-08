@@ -409,7 +409,7 @@ export function getRecentFinishedByLeague(perLeague = 4, _season?: string): {
     .filter((g) => g.matches.length > 0);
 }
 
-/** معرّفات النرويج كانت تتغيّر sch→r16→fin عند المزامنة — نحلّ البدائل */
+/** معرّفات قديمة كانت تتغيّر sch→r16→fin عند المزامنة — نحلّ البدائل */
 const LEGACY_MATCH_ID_RE =
   /^([a-z0-9]+)-(\d+)-(sch|fin|r\d+)-([a-z0-9]+)-([a-z0-9]+)$/i;
 
@@ -867,7 +867,7 @@ export const getLeagues = cache(function getLeagues() {
     country_ar: string;
     crest_url: string | null;
   }>;
-  // حافظ على ترتيب LEAGUES المعرّف (إنجلترا→…→النرويج) بدل ترتيب أبجدي عشوائي
+  // حافظ على ترتيب LEAGUES المعرّف (إنجلترا→…→هولندا) بدل ترتيب أبجدي عشوائي
   const order = new Map(validIds.map((id, i) => [id, i]));
   return rows.sort((a, b) => (order.get(a.id) ?? 99) - (order.get(b.id) ?? 99));
 });

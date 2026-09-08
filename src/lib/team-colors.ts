@@ -237,14 +237,6 @@ const KNOWN_COLORS: Record<string, string> = {
   "ألكمار": "#DC0018",
   twente: "#E30613",
   "تفينتي": "#E30613",
-  galatasaray: "#A90432",
-  "غلطة سراي": "#A90432",
-  fenerbahce: "#C8A800",
-  "فنربخشة": "#C8A800",
-  besiktas: "#222222",
-  "بشكتاش": "#222222",
-  trabzonspor: "#800020",
-  "طرابزون سبور": "#800020",
 };
 
 const PALETTE = [
