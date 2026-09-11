@@ -182,22 +182,23 @@ def compute_team_goalkeeper_profile(
         top_save_pct = save_pct * 0.95
         top_goals_prevented = goals_prevented_tot * 0.3
 
-    # Grade determination
-    if save_pct >= 0.75 and goals_prevented_per90 >= 0.18:
+    # Grade determination with empirical Bayes shrinkage for small match sample sizes
+    gp90_shrunk = goals_prevented_per90 * min(1.0, n / 8.0)
+    if n >= 6 and save_pct >= 0.75 and gp90_shrunk >= 0.18:
         grade = "ELITE"
         lam_mult = 0.95
-    elif save_pct >= 0.72 and goals_prevented_per90 >= 0.04:
+    elif n >= 4 and save_pct >= 0.72 and gp90_shrunk >= 0.04:
         grade = "ABOVE_AVERAGE"
         lam_mult = 0.975
-    elif save_pct >= 0.67 and goals_prevented_per90 >= -0.08:
+    elif save_pct >= 0.67 and gp90_shrunk >= -0.08:
         grade = "SOLID"
         lam_mult = 1.00
-    elif save_pct >= 0.62 or goals_prevented_per90 >= -0.20:
+    elif save_pct >= 0.62 or gp90_shrunk >= -0.20:
         grade = "VULNERABLE"
         lam_mult = 1.035
     else:
-        grade = "ALARMING"
-        lam_mult = 1.07
+        grade = "ALARMING" if n >= 4 else "VULNERABLE"
+        lam_mult = 1.07 if n >= 4 else 1.035
 
     if is_backup:
         lam_mult *= backup_penalty_mult

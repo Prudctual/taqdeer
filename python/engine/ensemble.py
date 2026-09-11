@@ -343,6 +343,21 @@ def _blend_lambdas(
 ) -> Tuple[float, float]:
     import math
 
+    lam_f = max(0.25, lam_f)
+    mu_f = max(0.25, mu_f)
+    lam_pi = max(0.25, lam_pi)
+    mu_pi = max(0.25, mu_pi)
+    lam_dc = max(0.25, lam_dc)
+    mu_dc = max(0.25, mu_dc)
+    if lam_sh is not None:
+        lam_sh = max(0.25, lam_sh)
+    if mu_sh is not None:
+        mu_sh = max(0.25, mu_sh)
+    if lam_xg is not None:
+        lam_xg = max(0.25, lam_xg)
+    if mu_xg is not None:
+        mu_xg = max(0.25, mu_xg)
+
     if lam_xg is not None and mu_xg is not None and lam_sh is not None and mu_sh is not None:
         lam = math.exp(
             0.40 * math.log(lam_f)
@@ -391,7 +406,7 @@ def _blend_lambdas(
         mu = math.exp(
             0.62 * math.log(mu_f) + 0.25 * math.log(mu_pi) + 0.13 * math.log(mu_dc)
         )
-    return float(lam), float(mu)
+    return float(min(max(lam, 0.25), 5.5)), float(min(max(mu, 0.25), 5.5))
 
 
 def predict_match(
@@ -448,7 +463,18 @@ def predict_match(
     if early:
         w["dc"] = float(w.get("dc", DEFAULT_WEIGHTS["dc"])) * 0.88
         w["elo"] = float(w.get("elo", DEFAULT_WEIGHTS["elo"])) * 1.08
-    w["elo"] = float(w.get("elo", DEFAULT_WEIGHTS["elo"])) * float(profile.elo_weight_mult)
+    dc_counts = getattr(dc, "match_counts", None)
+    if dc_counts:
+        n_h = dc_counts.get(home, 0)
+        n_a = dc_counts.get(away, 0)
+    else:
+        n_h = 100
+        n_a = 100
+    min_n = min(n_h, n_a)
+    if min_n < 10:
+        dc_factor = 0.70 + 0.03 * min_n
+        w["dc"] = float(w.get("dc", DEFAULT_WEIGHTS["dc"])) * dc_factor
+        w["elo"] = float(w.get("elo", DEFAULT_WEIGHTS["elo"])) * (2.0 - dc_factor)
     w.setdefault("context", DEFAULT_WEIGHTS["context"])
     w = lock_form_weight(w, FORM_BLEND_WEIGHT)
     temperature = float(temperature) * float(profile.noise_factor)
@@ -693,7 +719,9 @@ def predict_match(
         away_mgr=away_mgr,
     )
 
-    pts_gap = form_home.pts - form_away.pts
+    pts_h = form_home.pts if form_home.n >= 5 else (form_home.pts * (form_home.n / 5.0) + 1.35 * (1.0 - form_home.n / 5.0))
+    pts_a = form_away.pts if form_away.n >= 5 else (form_away.pts * (form_away.n / 5.0) + 1.35 * (1.0 - form_away.n / 5.0))
+    pts_gap = pts_h - pts_a
     form_steep = 1.1 * float(profile.form_weight_mult)
     home_lean = 1 / (1 + math.exp(-form_steep * pts_gap))
     form_draw = profile.draw_baseline + 0.05 * (1 - abs(pts_gap) / 3)

@@ -156,14 +156,25 @@ def compute_team_randomness_profile(
             sh_gf_list.append(gf * 0.55)
             sh_ga_list.append(ga * 0.55)
 
-        # Cards & Fouls
+        # Cards & Fouls with defensive sanitization to reject corrupted/fixture ID data
+        def _clean_stat(val: Any, max_limit: float, fallback: float) -> float:
+            if val is None:
+                return fallback
+            try:
+                f = float(val)
+                if not math.isfinite(f) or f < 0 or f > max_limit:
+                    return fallback
+                return f
+            except (ValueError, TypeError):
+                return fallback
+
         rc = _extract_field(m, "red_home" if is_home else "red_away")
         yc = _extract_field(m, "yellow_home" if is_home else "yellow_away")
         fl = _extract_field(m, "fouls_home" if is_home else "fouls_away")
 
-        red_cards_list.append(float(rc) if rc is not None else 0.0)
-        yellow_cards_list.append(float(yc) if yc is not None else 1.8)
-        fouls_list.append(float(fl) if fl is not None else 11.5)
+        red_cards_list.append(_clean_stat(rc, 4.0, 0.0))
+        yellow_cards_list.append(_clean_stat(yc, 12.0, 1.8))
+        fouls_list.append(_clean_stat(fl, 35.0, 11.5))
 
     valid_n = len(margins)
     if valid_n == 0:
@@ -211,12 +222,14 @@ def compute_team_randomness_profile(
         or (sh_gd <= -0.45 and sh_ga_avg >= 0.70)
     )
 
-    rc_avg = sum(red_cards_list) / valid_n
-    yc_avg = sum(yellow_cards_list) / valid_n
-    fl_avg = sum(fouls_list) / valid_n
+    # Defensive clamping on card averages to prevent corrupted or outlier values from distorting metrics
+    rc_avg = min(max(sum(red_cards_list) / valid_n, 0.0), 1.5)
+    yc_avg = min(max(sum(yellow_cards_list) / valid_n, 0.0), 8.0)
+    fl_avg = min(max(sum(fouls_list) / valid_n, 0.0), 25.0)
 
-    # Disciplinary Risk Index (DRI): baseline is ~2.0
+    # Disciplinary Risk Index (DRI): baseline is ~2.0, clamp to sensible [0.5, 10.0]
     dri = (rc_avg * 6.0) + (yc_avg * 1.0) + (fl_avg * 0.08)
+    dri = min(max(dri, 0.5), 10.0)
     is_card_prone = bool(rc_avg >= 0.12 or dri >= 3.0 or (yc_avg >= 2.7 and fl_avg >= 13.0))
 
     # Margin Variance
@@ -278,11 +291,19 @@ def evaluate_match_randomness(
     if referee_profile:
         try:
             if referee_profile.get("strictness") is not None:
-                ref_strictness = float(referee_profile["strictness"])
+                ref_strictness = min(max(float(referee_profile["strictness"]), 0.5), 2.5)
             if referee_profile.get("avg_reds") is not None:
-                ref_avg_reds = float(referee_profile["avg_reds"])
+                ref_avg_reds = min(max(float(referee_profile["avg_reds"]), 0.0), 1.5)
+            n_ref = referee_profile.get("matches_n")
+            if n_ref is not None:
+                n_ref_f = float(n_ref)
+                if 0 <= n_ref_f < 5.0:
+                    s_ref = n_ref_f / 5.0
+                    ref_strictness = ref_strictness * s_ref + 1.0 * (1.0 - s_ref)
+                    ref_avg_reds = ref_avg_reds * s_ref + 0.08 * (1.0 - s_ref)
         except Exception:
             ref_strictness = 1.0
+            ref_avg_reds = 0.08
 
     # 1. Chronic Draw & Draw Trap Component (Weight 0.28)
     # -------------------------------------------------------------

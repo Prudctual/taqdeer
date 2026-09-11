@@ -626,6 +626,15 @@ export function ingestCsv(
     return Number.isFinite(n) ? n : null;
   };
 
+  const cardCount = (v: string | undefined, maxAllowed: number): number | null => {
+    if (v === undefined || v === "") return null;
+    const n = Number(v);
+    if (!Number.isFinite(n)) return null;
+    const rounded = Math.round(n);
+    if (rounded < 0 || rounded > maxAllowed) return null;
+    return rounded;
+  };
+
   let n = 0;
   const tx = db.transaction(() => {
     for (const r of rows) {
@@ -680,10 +689,10 @@ export function ingestCsv(
         corners_home: num(r.HC),
         corners_away: num(r.AC),
         referee_name: r.Referee ? String(r.Referee).trim() : null,
-        yellow_home: num(r.HY),
-        yellow_away: num(r.AY),
-        red_home: num(r.HR),
-        red_away: num(r.AR),
+        yellow_home: cardCount(r.HY, 15),
+        yellow_away: cardCount(r.AY, 15),
+        red_home: cardCount(r.HR, 5),
+        red_away: cardCount(r.AR, 5),
         ht_home_goals: num(r.HTHG),
         ht_away_goals: num(r.HTAG),
       });

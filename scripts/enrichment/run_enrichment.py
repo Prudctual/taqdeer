@@ -768,9 +768,21 @@ def tier_e_referees(conn: sqlite3.Connection) -> None:
     ).fetchall()
     ts = now_iso()
     for r in rows:
-        avg_y = float(r["avg_y"] or 0)
-        avg_r = float(r["avg_r"] or 0)
-        strict = (avg_y / 4.0) if avg_y > 0 else 1.0
+        n_matches = int(r["n"])
+        raw_y = float(r["avg_y"] or 0)
+        raw_r = float(r["avg_r"] or 0)
+        # Empirical Bayes shrinkage for referees with small sample sizes (N < 5)
+        if n_matches < 5:
+            s = float(n_matches) / 5.0
+            avg_y = raw_y * s + 3.8 * (1.0 - s)
+            avg_r = raw_r * s + 0.12 * (1.0 - s)
+        else:
+            avg_y = raw_y
+            avg_r = raw_r
+        # Defensive clamping against outliers / malformed records
+        avg_y = min(max(avg_y, 0.0), 8.0)
+        avg_r = min(max(avg_r, 0.0), 1.0)
+        strict = min(max((avg_y / 4.0) if avg_y > 0 else 1.0, 0.5), 2.5)
         conn.execute(
             """
             INSERT INTO referee_profiles(name, matches_n, avg_yellows, avg_reds, strictness, updated_at)
@@ -782,7 +794,7 @@ def tier_e_referees(conn: sqlite3.Connection) -> None:
               strictness=excluded.strictness,
               updated_at=excluded.updated_at
             """,
-            (r["name"], int(r["n"]), avg_y, avg_r, strict, ts),
+            (r["name"], n_matches, avg_y, avg_r, strict, ts),
         )
     conn.commit()
     print(f"  [E] referee profiles: {len(rows)}", flush=True)

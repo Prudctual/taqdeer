@@ -31,6 +31,15 @@ function num(v: string | undefined): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+function cardCount(v: string | undefined, maxAllowed: number): number | null {
+  if (v === undefined || v === "") return null;
+  const n = Number(v);
+  if (!Number.isFinite(n)) return null;
+  const rounded = Math.round(n);
+  if (rounded < 0 || rounded > maxAllowed) return null;
+  return rounded;
+}
+
 function parseUkDate(dateRaw: string): string | null {
   // DD/MM/YYYY or DD/MM/YY
   const m = dateRaw.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
@@ -79,10 +88,10 @@ async function main() {
           const away = resolveTeamName(r.AwayTeam || r.Away || "");
           const day = r.Date ? parseUkDate(r.Date) : null;
           if (!home || !away || !day) continue;
-          const hy = num(r.HY);
-          const ay = num(r.AY);
-          const hr = num(r.HR);
-          const ar = num(r.AR);
+          const hy = cardCount(r.HY, 15);
+          const ay = cardCount(r.AY, 15);
+          const hr = cardCount(r.HR, 5);
+          const ar = cardCount(r.AR, 5);
           if (hy == null && ay == null && hr == null && ar == null) continue;
           const id = `${league.id}-${season}-${slugify(home)}-${slugify(away)}-${day}`;
           const ref = r.Referee ? String(r.Referee).trim() : null;

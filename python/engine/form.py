@@ -250,11 +250,21 @@ def form_lambda_adjust(
     fh = _blend_window_forms(multi_home) or form_home
     fa = _blend_window_forms(multi_away) or form_away
 
+    # Empirical Bayes shrinkage for small sample sizes (n < 5)
+    fh_gf = fh.gf if fh.n >= 5 else (fh.gf * (fh.n / 5.0) + 1.35 * (1.0 - fh.n / 5.0))
+    fa_gf = fa.gf if fa.n >= 5 else (fa.gf * (fa.n / 5.0) + 1.35 * (1.0 - fa.n / 5.0))
+    fh_ga = fh.ga if fh.n >= 5 else (fh.ga * (fh.n / 5.0) + 1.35 * (1.0 - fh.n / 5.0))
+    fa_ga = fa.ga if fa.n >= 5 else (fa.ga * (fa.n / 5.0) + 1.35 * (1.0 - fa.n / 5.0))
+    fh_sot_for = fh.sot_for if fh.n >= 5 else (fh.sot_for * (fh.n / 5.0) + 4.2 * (1.0 - fh.n / 5.0))
+    fa_sot_for = fa.sot_for if fa.n >= 5 else (fa.sot_for * (fa.n / 5.0) + 4.2 * (1.0 - fa.n / 5.0))
+    fh_sot_against = fh.sot_against if fh.n >= 5 else (fh.sot_against * (fh.n / 5.0) + 4.2 * (1.0 - fh.n / 5.0))
+    fa_sot_against = fa.sot_against if fa.n >= 5 else (fa.sot_against * (fa.n / 5.0) + 4.2 * (1.0 - fa.n / 5.0))
+
     # Higher weight on SoT stability (0.50 gf / 0.50 sot)
-    home_att = 0.50 * fh.gf + 0.50 * (fh.sot_for / 3.5)
-    away_att = 0.50 * fa.gf + 0.50 * (fa.sot_for / 3.5)
-    home_def = 0.50 * fh.ga + 0.50 * (fh.sot_against / 3.5)
-    away_def = 0.50 * fa.ga + 0.50 * (fa.sot_against / 3.5)
+    home_att = 0.50 * fh_gf + 0.50 * (fh_sot_for / 3.5)
+    away_att = 0.50 * fa_gf + 0.50 * (fa_sot_for / 3.5)
+    home_def = 0.50 * fh_ga + 0.50 * (fh_sot_against / 3.5)
+    away_def = 0.50 * fa_ga + 0.50 * (fa_sot_against / 3.5)
 
     lam_mult = 1.0 + 0.08 * (home_att - 1.3) + 0.06 * (away_def - 1.3)
     mu_mult = 1.0 + 0.08 * (away_att - 1.3) + 0.06 * (home_def - 1.3)

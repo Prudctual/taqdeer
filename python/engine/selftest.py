@@ -1,7 +1,11 @@
-"""فحص ذاتي كامل لمنطق v4 ومكونات المحرك الرياضي — يفشل بصوت عالٍ إن انكسر المنطق."""
+import sys
+from pathlib import Path
+if __name__ == "__main__" and not __package__:
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+    __package__ = "engine"
 
 import numpy as np
-from .dixon_coles import DixonColesResult, MatchObs, fit_dixon_coles, score_matrix, tau_vec
+from .dixon_coles import DixonColesResult, MatchObs, fit_dixon_coles, score_matrix, tau_vec, expected_goals
 from .elo import EloMatch, update_elo
 from .ensemble import (
     DEFAULT_WEIGHTS,
@@ -638,7 +642,78 @@ def main() -> None:
     assert "manager_transition" in rand_pil, "manager_transition pillar missing"
     assert rand_pil["goalkeeper_risk"]["active"] is True, "expected active GK risk due to weak away keeper"
     assert rand_pil["manager_transition"]["active"] is True, "expected active manager bounce"
-    # 13. التحقق الصارم من الدوريات السبعة وغياب الدوري التركي والنرويجي
+    # 21. فحص الانكماش البايزي للفرق الصاعدة أو ذات العينات الصغيرة (مثل هال سيتي: 3 مباريات و0 أهداف مستقبلة)
+    obs_shrinkage = [
+        # دوري مصغر مع فريق خاض 3 مباريات فقط دون استقبال أي هدف
+        MatchObs("HeavyFav", "TeamMid", 2, 1, 10.0),
+        MatchObs("TeamMid", "HeavyFav", 1, 3, 20.0),
+        MatchObs("TeamMid", "TeamOther", 1, 0, 15.0),
+        MatchObs("TeamOther", "TeamMid", 1, 1, 25.0),
+        MatchObs("SmallClean", "TeamMid", 2, 0, 5.0),
+        MatchObs("TeamOther", "SmallClean", 0, 1, 12.0),
+        MatchObs("SmallClean", "TeamOther", 0, 0, 18.0),
+    ]
+    dc_shrink_model = fit_dixon_coles(obs_shrinkage, half_life_days=140.0)
+    # بفضل الانكماش البايزي والـ Empirical Bayes prior، لا تنفجر معلمات دفاع SmallClean إلى +3.8
+    assert "SmallClean" in dc_shrink_model.defense
+    assert dc_shrink_model.defense["SmallClean"] <= 0.65, (
+        f"Expected defense parameter <= 0.65, got {dc_shrink_model.defense['SmallClean']}"
+    )
+    # لا تنهار أهداف الخصم المتوقعة إلى الصفر أو أرضية 0.2 (كانت سابقاً تنهار إلى 0.023)
+    lam_opp, mu_clean = expected_goals(dc_shrink_model, "HeavyFav", "SmallClean")
+    assert lam_opp >= 0.60, f"Expected opponent goals >= 0.60, got {lam_opp}"
+    # التحقق من التعامل مع فريق جديد تماماً ذو 0 مباريات (Unseen / 0-match newcomer)
+    lam_unseen, mu_unseen = expected_goals(dc_shrink_model, "UnseenTeam", "SmallClean")
+    assert 0.25 <= lam_unseen <= 5.5, f"Unseen team lambda out of bounds: {lam_unseen}"
+    pred_newcomer = predict_match(
+        home="UnseenTeam",
+        away="HeavyFav",
+        dc=dc_shrink_model,
+        elo_home=1400.0,
+        elo_away=1600.0,
+        pi=pi_state,
+        form_home=TeamForm(pts=3.0, gd=2.0, gf=2.0, ga=0.0, sot_for=5.0, sot_against=2.0, n=1),
+        form_away=avg,
+        weights={"dc": 0.30, "elo": 0.12, "pi": 0.18, "context": 0.07, "form": 0.20},
+    )
+    # الفريق الجديد (0 مباريات) يجب أن يُخفّض وزن DC لصالحه إلى 70% ويعزز Elo إلى 130%
+    w_unseen = pred_newcomer["weights"]
+    assert w_unseen["dc"] < 0.30, f"Expected dc weight discount for 0-match team, got {w_unseen['dc']}"
+    assert w_unseen["elo"] > 0.12, f"Expected elo weight boost for 0-match team, got {w_unseen['elo']}"
+
+    # 22. فحص الحواجز الدفاعية للبطاقات وضبط القيم الفاسدة (Defensive Card Guardrails)
+    corrupted_matches = [
+        {"home_team_id": "DirtyTeam", "away_team_id": "X", "home_goals": 1, "away_goals": 1,
+         "red_home": 4917, "red_away": 0, "yellow_home": 99999, "yellow_away": 2, "fouls_home": 12, "fouls_away": 10},
+        {"home_team_id": "DirtyTeam", "away_team_id": "Y", "home_goals": 0, "away_goals": 0,
+         "red_home": -5, "red_away": 1, "yellow_home": -2, "yellow_away": 1, "fouls_home": 11, "fouls_away": 10},
+        {"home_team_id": "Z", "away_team_id": "DirtyTeam", "home_goals": 2, "away_goals": 1,
+         "red_home": 0, "red_away": 5887558, "yellow_home": 1, "yellow_away": 45000, "fouls_home": 10, "fouls_away": 500},
+    ]
+    dirty_stats = compute_team_randomness_profile("DirtyTeam", corrupted_matches)
+    assert dirty_stats.red_cards_avg <= 1.0, f"Red card avg must be guarded <= 1.0, got {dirty_stats.red_cards_avg}"
+    assert dirty_stats.yellow_cards_avg <= 6.0, f"Yellow card avg must be guarded <= 6.0, got {dirty_stats.yellow_cards_avg}"
+    assert dirty_stats.disciplinary_risk_index <= 10.0, f"DRI must be guarded <= 10.0, got {dirty_stats.disciplinary_risk_index}"
+
+    dirty_match_res = evaluate_match_randomness(
+        home_team="DirtyTeam",
+        away_team="SafeTeam",
+        home_stats=dirty_stats,
+        away_stats=stat_empty,
+        referee_profile={"strictness": 9999.0, "avg_reds": 4917.0, "matches_n": 1},
+    )
+    # فحص انكماش الحكم قليل العينة (مباراة واحدة ببطاقتين حمراوين تنكمش نحو المتوسط)
+    ref_eval = evaluate_match_randomness(
+        home_team="SafeTeam",
+        away_team="SafeTeam2",
+        home_stats=stat_empty,
+        away_stats=stat_empty,
+        referee_profile={"strictness": 1.5, "avg_reds": 2.0, "matches_n": 1},
+    )
+    assert ref_eval["pillars"]["disciplinary_risk"]["referee_avg_reds"] < 1.0, (
+        f"Referee avg_reds must be shrunk for small sample, got {ref_eval['pillars']['disciplinary_risk']['referee_avg_reds']}"
+    )
+    # 23. التحقق الصارم من الدوريات السبعة وغياب الدوري التركي والنرويجي
     from .league_profiles import LEAGUE_PROFILES, get_league_profile
     assert len(LEAGUE_PROFILES) == 7, f"Expected 7 leagues, got {len(LEAGUE_PROFILES)}"
     assert set(LEAGUE_PROFILES.keys()) == {"pl", "pd", "bl1", "sa", "fl1", "ppd", "ded"}
