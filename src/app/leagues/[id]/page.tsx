@@ -27,8 +27,7 @@ import {
   getLeagueZone as zoneOf,
 } from "@/lib/leagues";
 
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
+export const revalidate = 20;
 
 function formatPoints(pts: number): string {
   if (pts === 0) return "0 نقطة";

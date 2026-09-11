@@ -37,9 +37,24 @@ from .form import (
     form_lambda_adjust,
     multi_window_form,
     rolling_form,
+    second_half_impact,
+    similar_opponent_form,
+    venue_form,
 )
 from .h2h_engine import evaluate_h2h_advantage
-from .logistics_engine import evaluate_logistics_and_external_factors
+from .logistics_engine import (
+    classify_match_importance,
+    evaluate_logistics_and_external_factors,
+    haversine_km,
+    travel_distance_km,
+)
+from .model2 import (
+    candidate_reason,
+    is_direct_win_candidate,
+    resolve_pick,
+    score_match,
+    score_slate,
+)
 from .pi_ratings import PiMatch, update_pi
 from .player_impact import apply_absence_penalties, apply_rapm_to_xg
 from .referee_engine import evaluate_referee_impact
@@ -720,6 +735,109 @@ def main() -> None:
     assert "tur1" not in LEAGUE_PROFILES and "no1" not in LEAGUE_PROFILES
     assert get_league_profile("tur1").league_id == "default"
     assert get_league_profile("no1").league_id == "default"
+
+    # 24. نموذج 2: ثلاثون عاملاً بلا تغيير 1X2
+    p1x2 = {"p_home": 0.56, "p_draw": 0.24, "p_away": 0.20, "confidence": 0.7, "lambda_home": 1.7, "lambda_away": 1.1}
+    pick = resolve_pick(0.56, 0.24, 0.20)
+    assert pick["pick"] == "H" and pick["is_direct_top"]
+    assert is_direct_win_candidate({**p1x2, "match_randomness_index": 30})
+    assert candidate_reason({**p1x2, "p_home": 0.38, "p_draw": 0.32, "p_away": 0.30}) is not None
+    m2 = score_match({
+        **p1x2,
+        "components": {
+            "elo": {"ratings": [1680, 1500]},
+            "form": {"home_gd": 0.8, "away_gd": -0.2, "home_pts": 2.1, "away_pts": 1.0},
+            "dixon_coles": {"lambda": [1.7, 1.1]},
+            "h2h": {"h2h_matches_count": 6, "recency_home": 3.2, "recency_away": 1.1, "recency_weight": 4.3, "h2h_summary": "أفضلية"},
+            "logistics": {
+                "rest_days_home": 6.0,
+                "rest_days_away": 3.0,
+                "home_matches_7d": 1,
+                "away_matches_7d": 2,
+                "home_matches_14d": 2,
+                "away_matches_14d": 3,
+                "travel_distance_km": 420.0,
+                "match_importance": {"available": True, "label": "صراع على اللقب", "stakes": "title", "intensity": 0.8},
+            },
+        },
+        "randomness": {"stability_score": 72, "match_randomness_index": 28, "pillars": {}},
+    })
+    assert len([f for g in m2["groups"] for f in g["factors"]]) == 30
+    assert m2["reliability"] is not None and 10 <= m2["reliability"] <= 99
+    assert m2["p_pick"] == 0.56
+    thin = score_match({"p_home": 0.50, "p_draw": 0.26, "p_away": 0.24, "components": {}})
+    assert thin["coverage"] < 20 and thin["coverage_warning"]
+    assert thin.get("p_home") is None  # الكتلة لا تعيد 1X2
+
+    slate = score_slate([
+        {"pred": {**p1x2, "components": {}, "match_randomness_index": 20}},
+        {"pred": {"p_home": 0.48, "p_draw": 0.27, "p_away": 0.25, "components": {}, "match_randomness_index": 22}},
+        {"pred": {"p_home": 0.33, "p_draw": 0.34, "p_away": 0.33, "components": {}, "match_randomness_index": 25}},
+    ])
+    assert slate[0]["model2"]["candidate"] is True
+    assert slate[2]["model2"]["candidate"] is False
+    assert slate[0]["model2"]["slate_n"] == 3
+    assert slate[0]["model2"]["slate_rank"] == 1
+    assert slate[0]["pred"]["p_home"] == 0.56
+
+    # 25. بيانات مشتقة: سفر، أهمية، ملعب، شوط ثانٍ
+    d = haversine_km((51.5549, -0.1084), (53.4308, -2.9608))
+    assert 250 < d < 350, d
+    km = travel_distance_km("pl-arsenal", "pl-liverpool")
+    assert km is None or km > 200
+    imp = classify_match_importance(
+        {"position": 1, "points": 20}, {"position": 2, "points": 18}, 20
+    )
+    assert imp["available"] and imp["stakes"] == "title"
+    rows = [
+        {"home_team_id": "A", "away_team_id": "B", "home_goals": 2, "away_goals": 0, "ht_home_goals": 1, "ht_away_goals": 0},
+        {"home_team_id": "C", "away_team_id": "A", "home_goals": 1, "away_goals": 1, "ht_home_goals": 1, "ht_away_goals": 0},
+        {"home_team_id": "A", "away_team_id": "D", "home_goals": 3, "away_goals": 1, "ht_home_goals": 1, "ht_away_goals": 1},
+        {"home_team_id": "A", "away_team_id": "E", "home_goals": 1, "away_goals": 0, "ht_home_goals": 0, "ht_away_goals": 0},
+    ]
+    vf = venue_form(rows, "A", "home")
+    assert vf["available"] == 1.0 and vf["played"] == 3 and vf["win_rate"] > 0.5
+    sh = second_half_impact(rows, "A")
+    assert sh["available"] == 1.0 and sh["sh_gd"] > 0
+    sim = similar_opponent_form(rows, "A", "Z", {"A": 1600, "B": 1580, "C": 1590, "D": 1610, "E": 1570, "Z": 1600})
+    assert sim["available"] == 1.0
+
+    # 26. استخراج FotMob: لا استطلاع كأودز، حكم من infoBox
+    _enr = str(Path(__file__).resolve().parents[2] / "scripts" / "enrichment")
+    if _enr not in sys.path:
+        sys.path.insert(0, _enr)
+    from fotmob_client import extract_odds_1x2, extract_referee_info
+    assert extract_odds_1x2({"content": {"matchFacts": {"poll": {"oddspoll": {"Facts": [{"OddsType": "1x2"}]}}}}}) is None
+    got_odds = extract_odds_1x2({"odds": {"home": 1.85, "draw": 3.40, "away": 4.20}})
+    assert got_odds == {"home": 1.85, "draw": 3.40, "away": 4.20}
+    ref_info = extract_referee_info({
+        "content": {
+            "matchFacts": {
+                "infoBox": {
+                    "Referee": {
+                        "text": "Mateo Busquets Ferrer",
+                        "stats": [
+                            {"type": "matches", "value": 38, "valueType": "total"},
+                            {"type": "yellowCards", "value": 5.71, "valueType": "perMatch"},
+                            {"type": "redCards", "value": 9, "valueType": "total"},
+                        ],
+                    }
+                }
+            }
+        }
+    })
+    assert ref_info and ref_info["name"].startswith("Mateo") and ref_info["matches_n"] == 38
+    assert 5.0 < float(ref_info["avg_yellows"]) < 6.5
+    live = score_match({
+        **p1x2,
+        "components": {
+            "sharp": {"applied": True, "side": "home", "magnitude": 0.08, "summary": "ضغط"},
+            "referee": {"matches_n": 20, "strictness": 1.1, "summary": "ملف"},
+        },
+    })
+    assert live.get("p_home") is None and live["p_pick"] == 0.56
+    assert any(f["id"] == 20 and f["available"] for g in live["groups"] for f in g["factors"])
+    assert any(f["id"] == 30 and f["available"] for g in live["groups"] for f in g["factors"])
 
     print("selftest ok — ensemble-v4 mathematical engine verified cleanly!")
 

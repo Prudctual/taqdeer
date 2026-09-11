@@ -5,8 +5,7 @@ import { getArticleBySlug, getArticles } from "@/lib/queries";
 import { BookOpen, Clock, Sparkles, ArrowRight, Calendar } from "lucide-react";
 import { ReactNode } from "react";
 
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
+export const revalidate = 20;
 
 interface ArticlePageProps {
   params: Promise<{ slug: string }>;

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getConfinedPlatformData } from "@/lib/queries";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 20;
 
 export async function GET(request: NextRequest) {
   try {

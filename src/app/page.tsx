@@ -17,9 +17,7 @@ import {
 } from "@/lib/queries";
 import { resolveMatchPhase } from "@/lib/match-status";
 
-// Always read live SQLite — ISR can bake the empty "run pipeline" state at build time
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
+export const revalidate = 20;
 
 function toTableStatus(m: MatchCard): MatchTableRow["status"] {
   const phase = resolveMatchPhase({

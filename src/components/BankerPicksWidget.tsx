@@ -27,7 +27,7 @@ export function BankerPicksWidget({
       return item.probability >= 0.50;
     }
     return true;
-  }).slice(0, 4);
+  }).slice(0, 8);
 
   if (rawList.length === 0) {
     return null;
@@ -36,7 +36,7 @@ export function BankerPicksWidget({
   return (
     <SectionCard
       title={title}
-      subtitle="ترتيب الترشيحات وفق مؤشر قوة الاختيار (Selection Score) الذي يدمج احتمال الفوز وهامش الفصل الاحتمالي والـEdge"
+      subtitle="ترتيب الترشيحات وفق موثوقية النموذج 2 (ثلاثون عاملاً) فوق احتمالات النموذج 1"
     >
       {/* Sub-navigation Controls */}
       <div className="px-4 sm:px-5 pt-3 pb-1 flex flex-wrap items-center justify-between gap-2 border-b border-line">
@@ -83,7 +83,9 @@ export function BankerPicksWidget({
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 text-xs p-4 sm:p-5">
         {filteredList.map((item) => {
-          const score = item.selectionScore ?? Math.round(item.probability * 100);
+          const score = item.model2?.reliability != null
+            ? Math.round(item.model2.reliability)
+            : item.selectionScore ?? Math.round(item.probability * 100);
           const sep = item.separationGap != null ? item.separationGap : null;
           const edge = item.edge != null ? item.edge : null;
 
@@ -110,7 +112,7 @@ export function BankerPicksWidget({
                     </span>
                   )}
                   <span className="bg-accent-dim text-accent border border-accent/20 font-mono font-bold text-[10px] px-2 py-0.5 rounded-md tabular">
-                    مؤشر {score}/100
+                    موثوقية {score}
                   </span>
                 </div>
               </div>

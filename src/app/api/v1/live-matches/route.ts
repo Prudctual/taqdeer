@@ -116,7 +116,12 @@ export async function GET(request: Request) {
         upcomingGroups,
         timestamp: new Date().toISOString(),
       },
-      { headers: getSecureApiHeaders(rl) },
+      {
+        headers: {
+          ...getSecureApiHeaders(rl),
+          "Cache-Control": "public, s-maxage=5, stale-while-revalidate=15",
+        },
+      },
     );
   } catch (err: unknown) {
     const errorMsg = err instanceof Error ? err.message : String(err);

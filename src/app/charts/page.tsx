@@ -9,8 +9,7 @@ export const metadata: Metadata = {
   description: "مركز المخططات والرسوم البيانية التفاعلية المربوطة مباشرة ببيانات وحالة كل مباراة في قاعدة البيانات.",
 };
 
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
+export const revalidate = 20;
 
 function valueRowToMatchCard(v: ReturnType<typeof getValueMatches>[number]): MatchCard {
   return {

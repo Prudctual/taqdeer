@@ -2,8 +2,7 @@ import type { Metadata } from "next";
 import { getConfinedPlatformData } from "@/lib/queries";
 import { HasrTerminalView } from "@/components/hasr/HasrTerminalView";
 
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
+export const revalidate = 20;
 
 export const metadata: Metadata = {
   title: "الفرق المحصورة · منصة حصر النخب الإحصائية والبارلي المزدوج",

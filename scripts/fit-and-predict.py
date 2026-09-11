@@ -39,8 +39,24 @@ from engine.evaluate import (  # noqa: E402
     summarize,
     summarize_with_closing,
 )
-from engine.form import FormMatch, TeamForm, rolling_form  # noqa: E402
+from engine.form import (  # noqa: E402
+    FormMatch,
+    TeamForm,
+    rolling_form,
+    second_half_impact,
+    similar_opponent_form,
+    venue_form,
+)
 from engine.league_profiles import get_league_profile  # noqa: E402
+from engine.logistics_engine import (  # noqa: E402
+    classify_match_importance,
+    count_midweek_in_window,
+    travel_distance_km,
+)
+from engine.model2 import score_match, score_slate  # noqa: E402
+from engine.referee_engine import evaluate_referee_impact  # noqa: E402
+from engine.sharp_market import detect_steam  # noqa: E402
+from engine.tactical_matchup import style_family  # noqa: E402
 from engine.pi_ratings import PiMatch, update_pi  # noqa: E402
 from engine.goalkeeper_engine import (  # noqa: E402
     compute_team_goalkeeper_profile,
@@ -83,6 +99,10 @@ def load_live_enrichment(conn: sqlite3.Connection, match_id: str, referee_name: 
         "away_strength": None,
         "home_matches_7d": None,
         "away_matches_7d": None,
+        "home_matches_14d": None,
+        "away_matches_14d": None,
+        "home_matches_30d": None,
+        "away_matches_30d": None,
         "days_into_season": None,
     }
     mrow = conn.execute(
@@ -91,6 +111,8 @@ def load_live_enrichment(conn: sqlite3.Connection, match_id: str, referee_name: 
                odds_sharp_home, odds_sharp_draw, odds_sharp_away,
                odds_close_home, odds_close_draw, odds_close_away,
                matches_7d_home, matches_7d_away,
+               matches_14d_home, matches_14d_away,
+               matches_30d_home, matches_30d_away,
                home_team_id, away_team_id, utc_date, season
         FROM matches WHERE id=?
         """,
@@ -115,10 +137,19 @@ def load_live_enrichment(conn: sqlite3.Connection, match_id: str, referee_name: 
             float(mrow["odds_close_away"]),
         )
     if mrow:
-        if mrow["matches_7d_home"] is not None:
-            out["home_matches_7d"] = float(mrow["matches_7d_home"])
-        if mrow["matches_7d_away"] is not None:
-            out["away_matches_7d"] = float(mrow["matches_7d_away"])
+        for key, col in (
+            ("home_matches_7d", "matches_7d_home"),
+            ("away_matches_7d", "matches_7d_away"),
+            ("home_matches_14d", "matches_14d_home"),
+            ("away_matches_14d", "matches_14d_away"),
+            ("home_matches_30d", "matches_30d_home"),
+            ("away_matches_30d", "matches_30d_away"),
+        ):
+            try:
+                if mrow[col] is not None:
+                    out[key] = float(mrow[col])
+            except (IndexError, KeyError):
+                pass
         out["days_into_season"] = days_into_season(mrow["utc_date"], mrow["season"])
 
     try:
@@ -284,6 +315,250 @@ def count_matches_in_window(
     return float(n)
 
 
+def persist_congestion(
+    conn: sqlite3.Connection,
+    match_id: str,
+    home_id: str,
+    away_id: str,
+    utc_date: str,
+    rows: list,
+) -> dict[str, float]:
+    vals = {
+        "home_matches_7d": count_matches_in_window(rows, home_id, utc_date, days=7),
+        "away_matches_7d": count_matches_in_window(rows, away_id, utc_date, days=7),
+        "home_matches_14d": count_matches_in_window(rows, home_id, utc_date, days=14),
+        "away_matches_14d": count_matches_in_window(rows, away_id, utc_date, days=14),
+        "home_matches_30d": count_matches_in_window(rows, home_id, utc_date, days=30),
+        "away_matches_30d": count_matches_in_window(rows, away_id, utc_date, days=30),
+        "home_midweek_7d": count_midweek_in_window(rows, home_id, utc_date, days=7),
+        "away_midweek_7d": count_midweek_in_window(rows, away_id, utc_date, days=7),
+    }
+    conn.execute(
+        """
+        UPDATE matches SET
+          matches_7d_home=?, matches_7d_away=?,
+          matches_14d_home=?, matches_14d_away=?,
+          matches_30d_home=?, matches_30d_away=?
+        WHERE id=?
+        """,
+        (
+            vals["home_matches_7d"],
+            vals["away_matches_7d"],
+            vals["home_matches_14d"],
+            vals["away_matches_14d"],
+            vals["home_matches_30d"],
+            vals["away_matches_30d"],
+            match_id,
+        ),
+    )
+    return vals
+
+
+def load_standings_map(conn: sqlite3.Connection, league_id: str, season: str) -> tuple[dict, int]:
+    try:
+        rows = conn.execute(
+            """
+            SELECT team_id, position, points, played
+            FROM standings WHERE league_id=? AND season=?
+            """,
+            (league_id, season),
+        ).fetchall()
+    except sqlite3.OperationalError:
+        return {}, 0
+    by = {str(r["team_id"]): dict(r) for r in rows}
+    return by, len(by)
+
+
+def build_match_context(
+    *,
+    home_id: str,
+    away_id: str,
+    utc_date: str,
+    finished: list,
+    ratings: dict[str, float],
+    standings: dict,
+    n_teams: int,
+    congestion: dict[str, float],
+) -> dict:
+    elo_map = dict(ratings)
+    return {
+        "home_matches_7d": congestion.get("home_matches_7d"),
+        "away_matches_7d": congestion.get("away_matches_7d"),
+        "home_matches_14d": congestion.get("home_matches_14d"),
+        "away_matches_14d": congestion.get("away_matches_14d"),
+        "home_matches_30d": congestion.get("home_matches_30d"),
+        "away_matches_30d": congestion.get("away_matches_30d"),
+        "home_midweek_7d": congestion.get("home_midweek_7d"),
+        "away_midweek_7d": congestion.get("away_midweek_7d"),
+        "travel_distance_km": travel_distance_km(home_id, away_id),
+        "match_importance": classify_match_importance(
+            standings.get(home_id), standings.get(away_id), n_teams
+        ),
+        "venue_split": {
+            "home": venue_form(finished, home_id, "home"),
+            "away": venue_form(finished, away_id, "away"),
+        },
+        "similar_opponents": {
+            "home": similar_opponent_form(
+                finished, home_id, away_id, elo_map, style_family_fn=style_family
+            ),
+            "away": similar_opponent_form(
+                finished, away_id, home_id, elo_map, style_family_fn=style_family
+            ),
+        },
+        "second_half": {
+            "home": second_half_impact(finished, home_id),
+            "away": second_half_impact(finished, away_id),
+        },
+    }
+
+
+def apply_model2_to_predictions(conn: sqlite3.Connection) -> None:
+    """تمرير اللائحة: رتبة العامل 5 ثم موثوقية النموذج 2 على نافذة 14 يوماً."""
+    window = conn.execute(
+        """
+        SELECT p.match_id, p.p_home, p.p_draw, p.p_away, p.lambda_home, p.lambda_away,
+               p.p_over25, p.elo_home, p.elo_away, p.confidence, p.analytics_json,
+               m.utc_date
+        FROM predictions p
+        JOIN matches m ON m.id = p.match_id
+        WHERE m.status IN ('SCHEDULED','TIMED','IN_PLAY','PAUSED')
+          AND substr(m.utc_date, 1, 19) >= strftime('%Y-%m-%dT%H:%M:%S', 'now', '-12 hours')
+          AND substr(m.utc_date, 1, 19) <= strftime('%Y-%m-%dT%H:%M:%S', 'now', '+14 days')
+        ORDER BY m.utc_date ASC
+        """
+    ).fetchall()
+
+    def pred_from_row(r) -> dict:
+        analytics = {}
+        if r["analytics_json"]:
+            try:
+                analytics = json.loads(r["analytics_json"])
+            except Exception:
+                analytics = {}
+        pred = {
+            "p_home": r["p_home"],
+            "p_draw": r["p_draw"],
+            "p_away": r["p_away"],
+            "lambda_home": r["lambda_home"],
+            "lambda_away": r["lambda_away"],
+            "p_over25": r["p_over25"],
+            "elo_home": r["elo_home"],
+            "elo_away": r["elo_away"],
+            "confidence": r["confidence"],
+            "components": analytics.get("components") or {},
+            "randomness": analytics.get("randomness"),
+            "match_randomness_index": analytics.get("match_randomness_index"),
+            "is_strictly_excluded": analytics.get("is_strictly_excluded"),
+        }
+        return pred, analytics
+
+    entries = []
+    window_ids = set()
+    for r in window:
+        pred, analytics = pred_from_row(r)
+        entries.append({"match_id": r["match_id"], "pred": pred, "analytics": analytics})
+        window_ids.add(r["match_id"])
+
+    if entries:
+        score_slate(entries)
+        for item in entries:
+            analytics = item["analytics"]
+            analytics["model2"] = item["model2"]
+            conn.execute(
+                "UPDATE predictions SET analytics_json=? WHERE match_id=?",
+                (json.dumps(analytics, ensure_ascii=False), item["match_id"]),
+            )
+
+    rest = conn.execute(
+        """
+        SELECT p.match_id, p.p_home, p.p_draw, p.p_away, p.lambda_home, p.lambda_away,
+               p.p_over25, p.elo_home, p.elo_away, p.confidence, p.analytics_json
+        FROM predictions p
+        """
+    ).fetchall()
+    for r in rest:
+        if r["match_id"] in window_ids:
+            continue
+        pred, analytics = pred_from_row(r)
+        analytics["model2"] = score_match(pred)
+        conn.execute(
+            "UPDATE predictions SET analytics_json=? WHERE match_id=?",
+            (json.dumps(analytics, ensure_ascii=False), r["match_id"]),
+        )
+    print(
+        f"model2: slate {len(entries)} · candidates "
+        f"{sum(1 for e in entries if e.get('model2', {}).get('candidate'))}",
+        flush=True,
+    )
+    conn.commit()
+
+
+def _odds3(row: sqlite3.Row, prefix: str) -> tuple[float, float, float] | None:
+    h, d, a = row[f"{prefix}_home"], row[f"{prefix}_draw"], row[f"{prefix}_away"]
+    if h and d and a and float(h) > 1.01 and float(d) > 1.01 and float(a) > 1.01:
+        return (float(h), float(d), float(a))
+    return None
+
+
+def refresh_live_components(conn: sqlite3.Connection) -> None:
+    """يحدّث sharp/حكم في analytics دون تغيير 1X2 ثم يعيد تسجيل النموذج 2."""
+    rows = conn.execute(
+        """
+        SELECT p.match_id, p.p_home, p.p_draw, p.p_away, p.analytics_json,
+               m.odds_home, m.odds_draw, m.odds_away,
+               m.odds_open_home, m.odds_open_draw, m.odds_open_away,
+               m.referee_name
+        FROM predictions p
+        JOIN matches m ON m.id = p.match_id
+        WHERE m.status IN ('SCHEDULED','TIMED','IN_PLAY','PAUSED')
+          AND substr(m.utc_date, 1, 19) >= strftime('%Y-%m-%dT%H:%M:%S', 'now', '-12 hours')
+          AND substr(m.utc_date, 1, 19) <= strftime('%Y-%m-%dT%H:%M:%S', 'now', '+14 days')
+        """
+    ).fetchall()
+    n = 0
+    for r in rows:
+        analytics: dict = {}
+        if r["analytics_json"]:
+            try:
+                analytics = json.loads(r["analytics_json"])
+            except Exception:
+                analytics = {}
+        comps = analytics.get("components")
+        if not isinstance(comps, dict):
+            comps = {}
+        steam = detect_steam(_odds3(r, "odds_open"), _odds3(r, "odds"))
+        prev_sharp = comps.get("sharp") if isinstance(comps.get("sharp"), dict) else {}
+        comps["sharp"] = {**prev_sharp, **steam}
+
+        profile = None
+        name = (r["referee_name"] or "").strip()
+        if name:
+            try:
+                pref = conn.execute(
+                    """
+                    SELECT name, matches_n, avg_yellows, avg_reds, strictness
+                    FROM referee_profiles WHERE name=?
+                    """,
+                    (name,),
+                ).fetchone()
+            except sqlite3.OperationalError:
+                pref = None
+            if pref:
+                profile = dict(pref)
+        comps["referee"] = evaluate_referee_impact(profile)
+
+        analytics["components"] = comps
+        conn.execute(
+            "UPDATE predictions SET analytics_json=? WHERE match_id=?",
+            (json.dumps(analytics, ensure_ascii=False), r["match_id"]),
+        )
+        n += 1
+    conn.commit()
+    apply_model2_to_predictions(conn)
+    print(f"live refresh: {n} matches · 1X2 unchanged", flush=True)
+
+
 def ensure_columns(conn: sqlite3.Connection) -> None:
     cols = {r[1] for r in conn.execute("PRAGMA table_info(matches)")}
     for name, typ in [
@@ -318,6 +593,10 @@ def ensure_columns(conn: sqlite3.Connection) -> None:
         ("referee_name", "TEXT"),
         ("matches_7d_home", "REAL"),
         ("matches_7d_away", "REAL"),
+        ("matches_14d_home", "REAL"),
+        ("matches_14d_away", "REAL"),
+        ("matches_30d_home", "REAL"),
+        ("matches_30d_away", "REAL"),
     ]:
         if name not in cols:
             conn.execute(f"ALTER TABLE matches ADD COLUMN {name} {typ}")
@@ -724,6 +1003,8 @@ def repredict_flagged(conn: sqlite3.Connection) -> int:
             if aid not in mgr_profiles:
                 mgr_profiles[aid] = compute_manager_profile(aid, finished, elo_rating=ratings.get(aid, 1500.0))
         ts = now_iso()
+        season = targets[0]["season"] if targets else (finished[-1]["season"] if finished else "")
+        standings_map, n_teams = load_standings_map(conn, lid, season)
         for t in targets:
             odds = None
             if t["odds_home"] and t["odds_draw"] and t["odds_away"]:
@@ -731,6 +1012,19 @@ def repredict_flagged(conn: sqlite3.Connection) -> int:
             enrich = load_live_enrichment(conn, t["id"], t["referee_name"])
             ppda_h, ppda_hn = rolling_team_ppda(finished, t["home_team_id"])
             ppda_a, ppda_an = rolling_team_ppda(finished, t["away_team_id"])
+            cong = persist_congestion(
+                conn, t["id"], t["home_team_id"], t["away_team_id"], t["utc_date"], finished
+            )
+            m2_ctx = build_match_context(
+                home_id=t["home_team_id"],
+                away_id=t["away_team_id"],
+                utc_date=t["utc_date"],
+                finished=finished,
+                ratings=ratings,
+                standings=standings_map,
+                n_teams=n_teams,
+                congestion=cong,
+            )
             pred = predict_match(
                 home=t["home_team_id"],
                 away=t["away_team_id"],
@@ -756,12 +1050,6 @@ def repredict_flagged(conn: sqlite3.Connection) -> int:
                 open_odds=enrich["open_odds"],
                 sharp_odds=enrich.get("sharp_odds"),
                 close_odds=enrich.get("close_odds"),
-                home_matches_7d=enrich.get("home_matches_7d")
-                    if enrich.get("home_matches_7d") is not None
-                    else count_matches_in_window(finished, t["home_team_id"], t["utc_date"]),
-                away_matches_7d=enrich.get("away_matches_7d")
-                    if enrich.get("away_matches_7d") is not None
-                    else count_matches_in_window(finished, t["away_team_id"], t["utc_date"]),
                 days_into_season=enrich.get("days_into_season"),
                 home_strength=enrich.get("home_strength"),
                 away_strength=enrich.get("away_strength"),
@@ -783,6 +1071,7 @@ def repredict_flagged(conn: sqlite3.Connection) -> int:
                 away_gk_stats=gk_profiles.get(t["away_team_id"]),
                 home_manager_profile=mgr_profiles.get(t["home_team_id"]),
                 away_manager_profile=mgr_profiles.get(t["away_team_id"]),
+                **m2_ctx,
             )
             conn.execute("DELETE FROM predictions WHERE match_id=?", (t["id"],))
             market = pred["components"]["market"]["p"]
@@ -890,6 +1179,7 @@ def repredict_flagged(conn: sqlite3.Connection) -> int:
             n_written += 1
     conn.execute("DELETE FROM app_meta WHERE key='enrich_repredict_matches'")
     conn.commit()
+    apply_model2_to_predictions(conn)
     print(f"narrow repredict wrote {n_written}", flush=True)
     return n_written
 
@@ -947,12 +1237,17 @@ def main() -> None:
     ensure_columns(conn)
 
     if "--help" in sys.argv or "-h" in sys.argv:
-        print("Usage: fit-and-predict.py [--repredict-flagged] [--calibration-only]")
+        print("Usage: fit-and-predict.py [--repredict-flagged] [--refresh-live] [--calibration-only]")
         conn.close()
         return
 
     if "--calibration-only" in sys.argv:
         refresh_calibration_bins(conn)
+        conn.close()
+        return
+
+    if "--refresh-live" in sys.argv:
+        refresh_live_components(conn)
         conn.close()
         return
 
@@ -1216,6 +1511,7 @@ def main() -> None:
             (lid,),
         ).fetchone()
         season = season_row["season"]
+        standings_map, n_teams = load_standings_map(conn, lid, season)
 
         for tid, elo in ratings.items():
             conn.execute(
@@ -1695,6 +1991,19 @@ def main() -> None:
             enrich = load_live_enrichment(conn, t["id"], t["referee_name"])
             ppda_h, ppda_hn = rolling_team_ppda(finished, t["home_team_id"])
             ppda_a, ppda_an = rolling_team_ppda(finished, t["away_team_id"])
+            cong = persist_congestion(
+                conn, t["id"], t["home_team_id"], t["away_team_id"], t["utc_date"], finished
+            )
+            m2_ctx = build_match_context(
+                home_id=t["home_team_id"],
+                away_id=t["away_team_id"],
+                utc_date=t["utc_date"],
+                finished=finished,
+                ratings=ratings,
+                standings=standings_map,
+                n_teams=n_teams,
+                congestion=cong,
+            )
             pred = predict_match(
                 home=t["home_team_id"],
                 away=t["away_team_id"],
@@ -1718,12 +2027,6 @@ def main() -> None:
                 open_odds=enrich["open_odds"],
                 sharp_odds=enrich.get("sharp_odds"),
                 close_odds=enrich.get("close_odds"),
-                home_matches_7d=enrich.get("home_matches_7d")
-                    if enrich.get("home_matches_7d") is not None
-                    else count_matches_in_window(finished, t["home_team_id"], t["utc_date"]),
-                away_matches_7d=enrich.get("away_matches_7d")
-                    if enrich.get("away_matches_7d") is not None
-                    else count_matches_in_window(finished, t["away_team_id"], t["utc_date"]),
                 days_into_season=enrich.get("days_into_season"),
                 home_strength=enrich.get("home_strength"),
                 away_strength=enrich.get("away_strength"),
@@ -1745,6 +2048,7 @@ def main() -> None:
                 away_gk_stats=gk_profiles.get(t["away_team_id"]),
                 home_manager_profile=mgr_profiles.get(t["home_team_id"]),
                 away_manager_profile=mgr_profiles.get(t["away_team_id"]),
+                **m2_ctx,
             )
 
             write_prediction(
@@ -1887,6 +2191,7 @@ def main() -> None:
         """,
         (MODEL_VERSION,),
     )
+    apply_model2_to_predictions(conn)
     conn.commit()
     conn.close()
     print("fit complete —", MODEL_VERSION)

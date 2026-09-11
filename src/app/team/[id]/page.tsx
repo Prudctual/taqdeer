@@ -24,8 +24,7 @@ import {
 } from "@/lib/queries";
 import { toSquadStars } from "@/lib/players";
 
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
+export const revalidate = 20;
 
 const loadTeam = cache((id: string) => getTeam(id));
 

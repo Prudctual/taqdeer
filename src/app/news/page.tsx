@@ -3,8 +3,7 @@ import { getLatestNews } from "@/lib/queries";
 import { RefreshCw } from "lucide-react";
 import NewsFeedClient from "./NewsFeedClient";
 
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
+export const revalidate = 20;
 
 export const metadata: Metadata = {
   title: "الأخبار الرياضية اللحظية — منصة تقدير",

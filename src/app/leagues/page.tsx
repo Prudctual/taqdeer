@@ -10,8 +10,7 @@ import { leagueEmblemUrl } from "@/lib/leagues";
 import { dbReady, getLeaguesOverview } from "@/lib/queries";
 import Link from "next/link";
 
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
+export const revalidate = 20;
 
 export default function LeaguesPage() {
   if (!dbReady()) {

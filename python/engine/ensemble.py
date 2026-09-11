@@ -456,6 +456,17 @@ def predict_match(
     away_gk_stats: Optional[GoalkeeperProfile] = None,
     home_manager_profile: Optional[ManagerProfile] = None,
     away_manager_profile: Optional[ManagerProfile] = None,
+    home_matches_14d: Optional[float] = None,
+    away_matches_14d: Optional[float] = None,
+    home_matches_30d: Optional[float] = None,
+    away_matches_30d: Optional[float] = None,
+    travel_distance_km: Optional[float] = None,
+    home_midweek_7d: Optional[float] = None,
+    away_midweek_7d: Optional[float] = None,
+    match_importance: Optional[Mapping[str, Any]] = None,
+    venue_split: Optional[Mapping[str, Any]] = None,
+    similar_opponents: Optional[Mapping[str, Any]] = None,
+    second_half: Optional[Mapping[str, Any]] = None,
 ) -> Dict:
     profile = get_league_profile(league_id)
     w = dict(weights or DEFAULT_WEIGHTS)
@@ -635,19 +646,17 @@ def predict_match(
         away_team=away,
         rest_days_home=form_home.rest_days,
         rest_days_away=form_away.rest_days,
+        home_matches_7d=home_matches_7d,
+        away_matches_7d=away_matches_7d,
+        home_matches_14d=home_matches_14d,
+        away_matches_14d=away_matches_14d,
+        home_matches_30d=home_matches_30d,
+        away_matches_30d=away_matches_30d,
+        travel_distance_km=travel_distance_km,
+        home_midweek_7d=home_midweek_7d,
+        away_midweek_7d=away_midweek_7d,
+        match_importance=match_importance,
     )
-    if home_matches_7d is not None and home_matches_7d >= 3:
-        logistics = dict(logistics)
-        logistics["logistics_summary"] = (
-            (logistics.get("logistics_summary") or "")
-            + f" · ازدحام مضيف {home_matches_7d:.0f} مباريات/7ي"
-        ).strip(" ·")
-    if away_matches_7d is not None and away_matches_7d >= 3:
-        logistics = dict(logistics)
-        logistics["logistics_summary"] = (
-            (logistics.get("logistics_summary") or "")
-            + f" · ازدحام ضيف {away_matches_7d:.0f} مباريات/7ي"
-        ).strip(" ·")
 
     sw_home = analyze_team_strengths_weaknesses(
         team_name=home,
@@ -887,6 +896,12 @@ def predict_match(
             "goalkeeper": gk_res,
             "manager": {"home": home_mgr.to_dict(), "away": away_mgr.to_dict()},
             "logistics": logistics,
+            "venue_split": venue_split,
+            "similar_opponents": similar_opponents,
+            "second_half": second_half,
+            "tiered_form": {"home": tier_h, "away": tier_a} if (tier_h or tier_a) else None,
+            "randomness_home": h_rand.to_dict() if hasattr(h_rand, "to_dict") else None,
+            "randomness_away": a_rand.to_dict() if hasattr(a_rand, "to_dict") else None,
             "weather": weather_res,
             "player_impact": player_res,
             "referee": referee_res,

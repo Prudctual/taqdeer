@@ -22,7 +22,7 @@ function loadEnvIfNeeded() {
 }
 
 let lastSyncTimestamp = 0;
-const SYNC_THROTTLE_MS = 3_000;
+const SYNC_THROTTLE_MS = 8_000;
 
 const FOTMOB_LEAGUES: Record<number, string> = {
   47: "pl",

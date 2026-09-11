@@ -11,6 +11,7 @@ import type {
   BankerPick,
 } from "@/lib/queries";
 import { HasrHeader } from "./HasrHeader";
+import { Model2Breakdown } from "@/components/Model2Breakdown";
 
 interface HasrTerminalViewProps {
   initialData: ConfinedPlatformData;
@@ -22,7 +23,7 @@ export function HasrTerminalView({ initialData }: HasrTerminalViewProps) {
   const [strategyFilter, setStrategyFilter] = useState<"all" | "safety" | "value" | "balanced" | "traps">("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [viewMode, setViewMode] = useState<"cards" | "table">("cards");
-  const [sortBy, setSortBy] = useState<"date_asc" | "score_desc" | "prob_desc" | "edge_desc">("date_asc");
+  const [sortBy, setSortBy] = useState<"date_asc" | "score_desc" | "prob_desc" | "edge_desc">("score_desc");
 
   // Selected match for detailed inspection modal
   const [inspectingMatch, setInspectingMatch] = useState<BankerPick | null>(null);
@@ -87,7 +88,9 @@ export function HasrTerminalView({ initialData }: HasrTerminalViewProps) {
         return (b.selectionScore ?? 0) - (a.selectionScore ?? 0);
       }
       if (sortBy === "score_desc") {
-        return (b.selectionScore ?? 0) - (a.selectionScore ?? 0);
+        const br = b.model2?.reliability ?? b.selectionScore ?? 0;
+        const ar = a.model2?.reliability ?? a.selectionScore ?? 0;
+        return br - ar;
       }
       if (sortBy === "prob_desc") {
         return b.probability - a.probability;
@@ -235,6 +238,10 @@ export function HasrTerminalView({ initialData }: HasrTerminalViewProps) {
         {/* TAB 1: SCREENER (المباريات المحصورة) */}
         {activeTab === "screener" && (
           <div className="space-y-4">
+            <div className="rounded border border-line bg-panel px-4 py-3 text-xs text-muted">
+              <span className="font-semibold text-ink">مسار النموذج 2: </span>
+              لائحة {initialData.pipeline.slateN} → مرشحون {initialData.pipeline.candidates} → أقوى {initialData.pipeline.topN}
+            </div>
             {/* Control Bar: Filters, Search, Sort & View Switch */}
             <div className="flex flex-col gap-3 border-b border-line pb-4">
               {/* Category Filter Buttons */}
@@ -352,7 +359,7 @@ export function HasrTerminalView({ initialData }: HasrTerminalViewProps) {
                     className="text-xs bg-panel border border-line rounded px-2.5 py-1 text-ink focus:outline-hidden focus:border-accent"
                   >
                     <option value="date_asc">الأقرب موعداً (تصاعدياً من الأقرب للابعد)</option>
-                    <option value="score_desc">الأعلى درجة حصر (Selection Score)</option>
+                    <option value="score_desc">الأعلى موثوقية (النموذج 2)</option>
                     <option value="prob_desc">أعلى نسبة احتمال فوز</option>
                     <option value="edge_desc">أعلى قيمة مضافة (+EV Edge)</option>
                   </select>
@@ -369,7 +376,7 @@ export function HasrTerminalView({ initialData }: HasrTerminalViewProps) {
             ) : viewMode === "cards" ? (
               /* Enhanced Cards View with Distinct Team Colors & Dates */
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {filteredConfined.map((item) => {
+                {filteredConfined.map((item, idx) => {
                   const homeCol = getTeamColors(item.homeTeam, item.homeTeamId);
                   const awayCol = getTeamColors(item.awayTeam, item.awayTeamId);
                   const kickoff = formatKickoff(item.utcDate);
@@ -380,13 +387,20 @@ export function HasrTerminalView({ initialData }: HasrTerminalViewProps) {
                       className={`group rounded border transition-all relative overflow-hidden flex flex-col justify-between ${
                         item.isTrap
                           ? "bg-rose-500/5 border-rose-500/30"
-                          : "bg-surface border-line hover:border-accent"
+                          : idx < 8
+                            ? "bg-surface border-accent/40 hover:border-accent"
+                            : "bg-surface border-line hover:border-accent"
                       }`}
                     >
                       {/* Top Bar: League, Matchday, Kickoff */}
                       <div className="p-3.5 border-b border-line bg-panel/40 flex items-center justify-between text-xs">
                         <div className="flex items-center gap-2">
                           <span className="font-semibold text-ink">{item.leagueName}</span>
+                          {idx < 8 && sortBy === "score_desc" && strategyFilter === "all" ? (
+                            <span className="text-[10px] text-accent px-1.5 py-0.5 rounded bg-surface border border-accent/30 tabular">
+                              أقوى {idx + 1}
+                            </span>
+                          ) : null}
                           {item.matchday ? (
                             <span className="text-[10px] text-muted px-1.5 py-0.5 rounded bg-surface border border-line tabular">
                               الجولة {item.matchday}
@@ -509,9 +523,11 @@ export function HasrTerminalView({ initialData }: HasrTerminalViewProps) {
                             </span>
                           </div>
                           <div className="p-2 rounded bg-panel/40 border border-line/60">
-                            <span className="text-[10px] text-muted block">مؤشر الأمان</span>
+                            <span className="text-[10px] text-muted block">موثوقية 2</span>
                             <span className="font-bold tabular text-ink">
-                              {item.stabilityScore ?? 70}%
+                              {item.model2?.reliability != null
+                                ? item.model2.reliability.toFixed(0)
+                                : item.selectionScore ?? "—"}
                             </span>
                           </div>
                         </div>
@@ -1029,7 +1045,7 @@ export function HasrTerminalView({ initialData }: HasrTerminalViewProps) {
       {/* QUICK MATCH INSPECTION MODAL (عند النقر على البطاقة أو الصف تظهر بياناتها بدقة) */}
       {inspectingMatch && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink/50 backdrop-blur-xs">
-          <div className="bg-surface border border-line rounded max-w-xl w-full p-6 space-y-5 shadow-none animate-fade-in-up">
+          <div className="bg-surface border border-line rounded max-w-xl w-full p-6 space-y-5 shadow-none animate-fade-in-up max-h-[90vh] overflow-y-auto">
             {/* Modal Header */}
             <div className="flex items-center justify-between border-b border-line pb-3">
               <div>
@@ -1116,83 +1132,9 @@ export function HasrTerminalView({ initialData }: HasrTerminalViewProps) {
               </div>
             </div>
 
-            {/* Goalkeeper Metrics (Factors 11 & 12) */}
-            {inspectingMatch.goalkeeperStats && (
-              <div className="p-3 rounded bg-panel/30 border border-line text-xs space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-ink">حراسة المرمى والأهداف المنقذة:</span>
-                  <span className="text-[11px] font-semibold text-accent">
-                    {inspectingMatch.goalkeeperStats.advantageText || "متكافئ إحصائياً"}
-                  </span>
-                </div>
-                <div className="grid grid-cols-2 gap-2 text-center text-[11px]">
-                  <div className="p-2 rounded bg-surface border border-line">
-                    <span className="text-muted block text-[10px]">{inspectingMatch.homeTeam}</span>
-                    <span className="font-bold text-ink block tabular">
-                      تصديات: {inspectingMatch.goalkeeperStats.homeSavePct ? `${Math.round(inspectingMatch.goalkeeperStats.homeSavePct * 100)}%` : "—"}
-                    </span>
-                    <span className="text-[10px] text-muted block tabular">
-                      منقذ xG: {inspectingMatch.goalkeeperStats.homeGoalsPrevented !== undefined ? `${inspectingMatch.goalkeeperStats.homeGoalsPrevented > 0 ? "+" : ""}${inspectingMatch.goalkeeperStats.homeGoalsPrevented.toFixed(1)}` : "—"}
-                    </span>
-                  </div>
-                  <div className="p-2 rounded bg-surface border border-line">
-                    <span className="text-muted block text-[10px]">{inspectingMatch.awayTeam}</span>
-                    <span className="font-bold text-ink block tabular">
-                      تصديات: {inspectingMatch.goalkeeperStats.awaySavePct ? `${Math.round(inspectingMatch.goalkeeperStats.awaySavePct * 100)}%` : "—"}
-                    </span>
-                    <span className="text-[10px] text-muted block tabular">
-                      منقذ xG: {inspectingMatch.goalkeeperStats.awayGoalsPrevented !== undefined ? `${inspectingMatch.goalkeeperStats.awayGoalsPrevented > 0 ? "+" : ""}${inspectingMatch.goalkeeperStats.awayGoalsPrevented.toFixed(1)}` : "—"}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Tactical Matchup & Low Block (Factors 22, 24, 25) */}
-            {inspectingMatch.tacticalMatchup && (
-              <div className="p-3 rounded bg-panel/30 border border-line text-xs space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-ink">التوافق التكتيكي ومواجهة التكتل:</span>
-                  {inspectingMatch.tacticalMatchup.isLowBlock && (
-                    <span className="px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 text-[10px] font-bold">
-                      مواجهة تكتل دفاعي
-                    </span>
-                  )}
-                </div>
-                <div className="space-y-1 text-[11px] text-muted leading-relaxed">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-ink font-semibold">{inspectingMatch.homeTeam}:</span>
-                    <span>{inspectingMatch.tacticalMatchup.homeStyle || "أسلوب متوازن"} ({inspectingMatch.tacticalMatchup.homeFormation || "4-3-3"})</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-ink font-semibold">{inspectingMatch.awayTeam}:</span>
-                    <span>{inspectingMatch.tacticalMatchup.awayStyle || "أسلوب متوازن"} ({inspectingMatch.tacticalMatchup.awayFormation || "4-3-3"})</span>
-                  </div>
-                  {inspectingMatch.tacticalMatchup.commentaryAr && (
-                    <p className="text-ink pt-1 border-t border-line/60 font-medium">
-                      {inspectingMatch.tacticalMatchup.commentaryAr}
-                    </p>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Manager Impact & New Manager Bounce (Factor 21) */}
-            {inspectingMatch.managerImpact && (inspectingMatch.managerImpact.homeManager || inspectingMatch.managerImpact.summaryAr) && (
-              <div className="p-3 rounded bg-panel/30 border border-line text-xs space-y-1">
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-ink">الجهاز الفني والقيادة:</span>
-                  {(inspectingMatch.managerImpact.homeBounce || inspectingMatch.managerImpact.awayBounce) && (
-                    <span className="px-1.5 py-0.5 rounded bg-accent/10 border border-accent/30 text-accent text-[10px] font-bold">
-                      انتعاشة مدرب جديد
-                    </span>
-                  )}
-                </div>
-                <p className="text-muted text-[11px] leading-relaxed">
-                  {inspectingMatch.managerImpact.summaryAr || `مدرب المضيف: ${inspectingMatch.managerImpact.homeManager || "مستقر"} · مدرب الضيف: ${inspectingMatch.managerImpact.awayManager || "مستقر"}`}
-                </p>
-              </div>
-            )}
+            <div className="rounded border border-line bg-panel/30 p-3">
+              <Model2Breakdown model2={inspectingMatch.model2} compact />
+            </div>
 
             {/* Anti-Randomness Assessment */}
             <div className="p-3 rounded bg-panel/30 border border-line text-xs space-y-1.5">

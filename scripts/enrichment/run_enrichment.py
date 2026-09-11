@@ -154,6 +154,10 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
         ("xg_true_away", "REAL"),
         ("matches_7d_home", "REAL"),
         ("matches_7d_away", "REAL"),
+        ("matches_14d_home", "REAL"),
+        ("matches_14d_away", "REAL"),
+        ("matches_30d_home", "REAL"),
+        ("matches_30d_away", "REAL"),
         ("referee_name", "TEXT"),
     ):
         if name not in cols:
@@ -462,7 +466,7 @@ def tier_b_weather(conn: sqlite3.Connection) -> None:
         """
         SELECT id, home_team_id, utc_date FROM matches
         WHERE status IN ('SCHEDULED','TIMED')
-          AND datetime(utc_date) BETWEEN datetime('now') AND datetime('now', '+8 days')
+          AND datetime(utc_date) BETWEEN datetime('now') AND datetime('now', '+14 days')
         ORDER BY utc_date
         """
     ).fetchall()
@@ -564,7 +568,7 @@ def apply_fotmob_to_match(
     match: sqlite3.Row,
     fotmob_id: int,
     details: dict,
-) -> bool:
+) -> dict:
     parsed = extract_enrichment(details)
     home_side = parsed["home"]
     away_side = parsed["away"]
@@ -649,22 +653,92 @@ def apply_fotmob_to_match(
                 ),
             )
 
+    odds = parsed.get("odds") or {}
+    if (
+        isinstance(odds, dict)
+        and odds.get("home")
+        and odds.get("draw")
+        and odds.get("away")
+    ):
+        persist_live_odds(
+            conn,
+            match["id"],
+            float(odds["home"]),
+            float(odds["draw"]),
+            float(odds["away"]),
+        )
+
+    prev_ref = conn.execute(
+        "SELECT referee_name FROM matches WHERE id=?",
+        (match["id"],),
+    ).fetchone()
+    had_ref = bool(prev_ref and (prev_ref["referee_name"] or "").strip())
+    new_referee = False
     ref = parsed.get("referee")
     if isinstance(ref, str) and ref.strip():
-        conn.execute(
-            "UPDATE matches SET referee_name=COALESCE(referee_name, ?) WHERE id=?",
-            (ref.strip(), match["id"]),
-        )
-    elif isinstance(ref, dict) and ref.get("name"):
+        ref = {"name": ref.strip()}
+    if isinstance(ref, dict) and ref.get("name"):
         conn.execute(
             "UPDATE matches SET referee_name=COALESCE(referee_name, ?) WHERE id=?",
             (ref["name"], match["id"]),
         )
-    return confirmed
+        persist_referee_profile(conn, ref)
+        new_referee = not had_ref
+    return {"confirmed": confirmed, "new_referee": new_referee}
 
 
-def iter_fotmob_matches(days: int = 8):
-    """اليوم + (days-1) أيام قادمة — يغطي نافذة SQL لـ 7 أيام كاملة."""
+def persist_live_odds(
+    conn: sqlite3.Connection,
+    match_id: str,
+    home: float,
+    draw: float,
+    away: float,
+) -> None:
+    conn.execute(
+        """
+        UPDATE matches SET
+          odds_home=?, odds_draw=?, odds_away=?,
+          odds_open_home = COALESCE(odds_open_home, ?),
+          odds_open_draw = COALESCE(odds_open_draw, ?),
+          odds_open_away = COALESCE(odds_open_away, ?),
+          odds_sharp_home = COALESCE(odds_sharp_home, ?),
+          odds_sharp_draw = COALESCE(odds_sharp_draw, ?),
+          odds_sharp_away = COALESCE(odds_sharp_away, ?)
+        WHERE id=?
+        """,
+        (home, draw, away, home, draw, away, home, draw, away, match_id),
+    )
+
+
+def persist_referee_profile(conn: sqlite3.Connection, info: dict) -> None:
+    name = (info.get("name") or "").strip()
+    n = int(info.get("matches_n") or 0)
+    if not name or n <= 0 or info.get("avg_yellows") is None:
+        return
+    avg_y = float(info["avg_yellows"])
+    avg_r = float(info["avg_reds"]) if info.get("avg_reds") is not None else 0.12
+    strict = float(info["strictness"]) if info.get("strictness") is not None else min(max(avg_y / 4.0, 0.5), 2.5)
+    conn.execute(
+        """
+        INSERT INTO referee_profiles(name, matches_n, avg_yellows, avg_reds, strictness, updated_at)
+        VALUES(?,?,?,?,?,?)
+        ON CONFLICT(name) DO UPDATE SET
+          matches_n=CASE WHEN excluded.matches_n >= referee_profiles.matches_n
+                         THEN excluded.matches_n ELSE referee_profiles.matches_n END,
+          avg_yellows=CASE WHEN excluded.matches_n >= referee_profiles.matches_n
+                           THEN excluded.avg_yellows ELSE referee_profiles.avg_yellows END,
+          avg_reds=CASE WHEN excluded.matches_n >= referee_profiles.matches_n
+                        THEN excluded.avg_reds ELSE referee_profiles.avg_reds END,
+          strictness=CASE WHEN excluded.matches_n >= referee_profiles.matches_n
+                          THEN excluded.strictness ELSE referee_profiles.strictness END,
+          updated_at=excluded.updated_at
+        """,
+        (name, n, avg_y, avg_r, strict, now_iso()),
+    )
+
+
+def iter_fotmob_matches(days: int = 14):
+    """اليوم + (days-1) أيام قادمة — يغطي نافذة النموذج 2 (14 يوماً)."""
     today = now_utc().date()
     for i in range(days):
         d = (today + timedelta(days=i)).strftime("%Y%m%d")
@@ -672,12 +746,62 @@ def iter_fotmob_matches(days: int = 8):
             yield fm
 
 
+def _merge_repredict_flags(conn: sqlite3.Connection, match_ids: list[str]) -> None:
+    if not match_ids:
+        return
+    existing = conn.execute(
+        "SELECT value FROM app_meta WHERE key='enrich_repredict_matches'"
+    ).fetchone()
+    prev = []
+    if existing and existing["value"]:
+        prev = [x for x in str(existing["value"]).split(",") if x]
+    merged = list(dict.fromkeys([*prev, *match_ids]))
+    conn.execute(
+        """
+        INSERT INTO app_meta(key, value) VALUES ('enrich_repredict_matches', ?)
+        ON CONFLICT(key) DO UPDATE SET value=excluded.value
+        """,
+        (",".join(merged),),
+    )
+    conn.commit()
+
+
+def _spawn_fit(flag: str) -> None:
+    try:
+        import subprocess
+
+        subprocess.run(
+            [
+                str(ROOT / ".venv" / "bin" / "python"),
+                str(ROOT / "scripts" / "fit-and-predict.py"),
+                flag,
+            ],
+            cwd=str(ROOT),
+            timeout=600,
+            check=False,
+        )
+    except Exception as e:
+        print(f"  fit spawn {flag} failed: {e}", flush=True)
+
+
+def after_enrichment_cycle(conn: sqlite3.Connection) -> None:
+    flagged = conn.execute(
+        "SELECT value FROM app_meta WHERE key='enrich_repredict_matches'"
+    ).fetchone()
+    ids = [x for x in str(flagged["value"]).split(",") if x] if flagged and flagged["value"] else []
+    if ids:
+        print(f"  repredict flagged: {len(ids)}", flush=True)
+        _spawn_fit("--repredict-flagged")
+    _spawn_fit("--refresh-live")
+
+
 def tier_c_injuries(conn: sqlite3.Connection) -> None:
-    print("[C] FotMob injuries/missing (8d window)…", flush=True)
+    print("[C] FotMob injuries/missing/refs (14d window)…", flush=True)
     n = 0
     errors = 0
+    new_refs = []
     seen = set()
-    for fm in iter_fotmob_matches(8):
+    for fm in iter_fotmob_matches(14):
         fid = fm.get("fotmob_id")
         if not fid or fid in seen:
             continue
@@ -689,10 +813,16 @@ def tier_c_injuries(conn: sqlite3.Connection) -> None:
         if not details:
             errors += 1
             continue
-        apply_fotmob_to_match(conn, local, int(fid), details)
+        result = apply_fotmob_to_match(conn, local, int(fid), details)
+        if result.get("new_referee"):
+            new_refs.append(local["id"])
         n += 1
     conn.commit()
-    print(f"  [C] fotmob applied: {n} (detail_misses={errors}) leagues={len(LEAGUE_PRIMARY)}", flush=True)
+    _merge_repredict_flags(conn, new_refs)
+    print(
+        f"  [C] fotmob applied: {n} (detail_misses={errors} new_refs={len(new_refs)}) leagues={len(LEAGUE_PRIMARY)}",
+        flush=True,
+    )
     meta_set(conn, "tier_c", time.time())
 
 
@@ -725,30 +855,14 @@ def tier_d_lineups_imminent(conn: sqlite3.Connection) -> None:
         if not details:
             continue
         was = int(m["lineup_confirmed"] or 0)
-        confirmed = apply_fotmob_to_match(conn, m, int(fid), details)
-        if confirmed and not was:
+        result = apply_fotmob_to_match(conn, m, int(fid), details)
+        if result.get("confirmed") and not was:
+            newly_confirmed.append(m["id"])
+        if result.get("new_referee"):
             newly_confirmed.append(m["id"])
     conn.commit()
     print(f"  [D] imminent checked={len(rows)} newly_confirmed={len(newly_confirmed)}", flush=True)
-    if newly_confirmed:
-        meta_set(conn, "enrich_repredict_matches", ",".join(newly_confirmed))
-        print(f"  [D] flag repredict: {newly_confirmed[:5]}", flush=True)
-        # إعادة توقع فورية خفيفة (لا walk-forward)
-        try:
-            import subprocess
-
-            subprocess.run(
-                [
-                    str(ROOT / ".venv" / "bin" / "python"),
-                    str(ROOT / "scripts" / "fit-and-predict.py"),
-                    "--repredict-flagged",
-                ],
-                cwd=str(ROOT),
-                timeout=600,
-                check=False,
-            )
-        except Exception as e:
-            print(f"  [D] narrow repredict spawn failed: {e}", flush=True)
+    _merge_repredict_flags(conn, newly_confirmed)
     meta_set(conn, "tier_d", time.time())
 
 
@@ -788,10 +902,14 @@ def tier_e_referees(conn: sqlite3.Connection) -> None:
             INSERT INTO referee_profiles(name, matches_n, avg_yellows, avg_reds, strictness, updated_at)
             VALUES (?,?,?,?,?,?)
             ON CONFLICT(name) DO UPDATE SET
-              matches_n=excluded.matches_n,
-              avg_yellows=excluded.avg_yellows,
-              avg_reds=excluded.avg_reds,
-              strictness=excluded.strictness,
+              matches_n=CASE WHEN excluded.matches_n >= referee_profiles.matches_n
+                             THEN excluded.matches_n ELSE referee_profiles.matches_n END,
+              avg_yellows=CASE WHEN excluded.matches_n >= referee_profiles.matches_n
+                               THEN excluded.avg_yellows ELSE referee_profiles.avg_yellows END,
+              avg_reds=CASE WHEN excluded.matches_n >= referee_profiles.matches_n
+                            THEN excluded.avg_reds ELSE referee_profiles.avg_reds END,
+              strictness=CASE WHEN excluded.matches_n >= referee_profiles.matches_n
+                              THEN excluded.strictness ELSE referee_profiles.strictness END,
               updated_at=excluded.updated_at
             """,
             (r["name"], n_matches, avg_y, avg_r, strict, ts),
@@ -860,19 +978,23 @@ def tier_f_understat_xg(conn: sqlite3.Connection) -> None:
         """
     ).fetchall()
     for u in upcoming:
-        for side, col in (("home_team_id", "matches_7d_home"), ("away_team_id", "matches_7d_away")):
+        for side, cols in (
+            ("home_team_id", (("matches_7d_home", 7), ("matches_14d_home", 14), ("matches_30d_home", 30))),
+            ("away_team_id", (("matches_7d_away", 7), ("matches_14d_away", 14), ("matches_30d_away", 30))),
+        ):
             tid = u[side]
-            n = conn.execute(
-                """
-                SELECT COUNT(*) AS n FROM matches
-                WHERE (home_team_id=? OR away_team_id=?)
-                  AND status IN ('FINISHED','SCHEDULED','TIMED','IN_PLAY','PAUSED','LIVE')
-                  AND id != ?
-                  AND datetime(utc_date) BETWEEN datetime(?, '-7 days') AND datetime(?)
-                """,
-                (tid, tid, u["id"], u["utc_date"], u["utc_date"]),
-            ).fetchone()["n"]
-            conn.execute(f"UPDATE matches SET {col}=? WHERE id=?", (float(n), u["id"]))
+            for col, days in cols:
+                n = conn.execute(
+                    f"""
+                    SELECT COUNT(*) AS n FROM matches
+                    WHERE (home_team_id=? OR away_team_id=?)
+                      AND status IN ('FINISHED','SCHEDULED','TIMED','IN_PLAY','PAUSED','LIVE')
+                      AND id != ?
+                      AND datetime(utc_date) BETWEEN datetime(?, '-{days} days') AND datetime(?)
+                    """,
+                    (tid, tid, u["id"], u["utc_date"], u["utc_date"]),
+                ).fetchone()["n"]
+                conn.execute(f"UPDATE matches SET {col}=? WHERE id=?", (float(n), u["id"]))
     conn.commit()
     print(f"  [F] xg_true rows updated: {updated}", flush=True)
     meta_set(conn, "tier_f", time.time())
@@ -930,6 +1052,7 @@ def run_cycle(force_all: bool = False) -> None:
             tier_e_referees(conn)
         if force_all or due(conn, "tier_f", INTERVAL_F):
             tier_f_understat_xg(conn)
+        after_enrichment_cycle(conn)
     finally:
         conn.close()
 

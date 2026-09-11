@@ -2,10 +2,37 @@ import type { NextConfig } from "next";
 import path from "path";
 
 const nextConfig: NextConfig = {
+  poweredByHeader: false,
+  compress: true,
   serverExternalPackages: ["better-sqlite3"],
   outputFileTracingRoot: path.join(__dirname),
   outputFileTracingExcludes: {
     "*": ["./node_modules/@swc/core*"],
+  },
+  experimental: {
+    optimizePackageImports: ["lucide-react", "recharts"],
+  },
+  async headers() {
+    return [
+      {
+        source: "/_next/static/:path*",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=31536000, immutable",
+          },
+        ],
+      },
+      {
+        source: "/:path*.(svg|ico|png|jpg|jpeg|webp|woff2)",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=86400, stale-while-revalidate=604800",
+          },
+        ],
+      },
+    ];
   },
   images: {
     unoptimized: true,

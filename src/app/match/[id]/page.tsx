@@ -27,6 +27,8 @@ import { MatchRiskPanel } from "@/components/MatchRiskPanel";
 import { DoubleChancePanel } from "@/components/DoubleChancePanel";
 import { LiveInPlaySimulator } from "@/components/LiveInPlaySimulator";
 import { AntiRandomnessCard, type RandomnessReport } from "@/components/AntiRandomnessCard";
+import { Model2Breakdown } from "@/components/Model2Breakdown";
+import { parseModel2 } from "@/lib/queries";
 import { getMatchDetailedInfo } from "@/lib/match-details";
 
 
@@ -58,8 +60,7 @@ import {
 } from "@/lib/queries";
 import { toSquadStars } from "@/lib/players";
 
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
+export const revalidate = 20;
 
 /** مشترك بين generateMetadata والصفحة داخل الطلب نفسه */
 const loadMatch = cache((id: string) => getMatchById(id));
@@ -84,6 +85,7 @@ type Analytics = {
   match_randomness_index?: number;
   stability_score?: number;
   is_strictly_excluded?: boolean;
+  model2?: Record<string, unknown> | null;
   version?: string;
 };
 
@@ -625,6 +627,17 @@ export default async function MatchPage({
           awayName={match.away_name_ar}
           report={analytics.randomness}
         />
+      ) : null}
+
+      {hasPred ? (
+        <SectionCard
+          title="موثوقية الفوز المباشر"
+          subtitle="النموذج 2 يرتّب أمان الترشيح ولا يغيّر احتمالات النموذج 1"
+        >
+          <div className="p-4 sm:p-5">
+            <Model2Breakdown model2={parseModel2(analytics?.model2)} />
+          </div>
+        </SectionCard>
       ) : null}
 
       <UpsetAlertBadge

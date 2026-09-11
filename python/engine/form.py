@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections import defaultdict, deque
 from dataclasses import dataclass
-from typing import Deque, Dict, List, Optional, Tuple
+from typing import Any, Deque, Dict, List, Optional, Tuple
 
 
 from datetime import datetime
@@ -279,6 +279,159 @@ def form_lambda_adjust(
         mu_mult *= 0.95
 
     return float(min(max(lam_mult, 0.70), 1.35)), float(min(max(mu_mult, 0.70), 1.35))
+
+
+def _row_get(obj: Any, *keys: str, default: Any = None) -> Any:
+    if obj is None:
+        return default
+    for key in keys:
+        if isinstance(obj, dict):
+            val = obj.get(key)
+        else:
+            try:
+                val = obj[key]
+            except Exception:
+                val = getattr(obj, key, None)
+        if val is not None:
+            return val
+    return default
+
+
+def venue_form(
+    matches: List[Any],
+    team_id: str,
+    venue: str,
+    window: int = 12,
+) -> Dict[str, float]:
+    """سجل الفريق على أرضه أو خارجها من آخر مباريات ذلك الملعب."""
+    played = won = drawn = gf = ga = 0.0
+    for m in reversed(matches):
+        hid = _row_get(m, "home_team_id", "home")
+        aid = _row_get(m, "away_team_id", "away")
+        hg = _row_get(m, "home_goals")
+        ag = _row_get(m, "away_goals")
+        if hg is None or ag is None:
+            continue
+        if venue == "home" and hid != team_id:
+            continue
+        if venue == "away" and aid != team_id:
+            continue
+        if hid != team_id and aid != team_id:
+            continue
+        gf_m = float(hg if hid == team_id else ag)
+        ga_m = float(ag if hid == team_id else hg)
+        played += 1
+        gf += gf_m
+        ga += ga_m
+        if gf_m > ga_m:
+            won += 1
+        elif gf_m == ga_m:
+            drawn += 1
+        if played >= window:
+            break
+    if played <= 0:
+        return {"available": 0.0, "played": 0, "win_rate": 0.0, "gf": 0.0, "ga": 0.0, "pts_avg": 0.0}
+    pts = 3.0 * won + drawn
+    return {
+        "available": 1.0,
+        "played": played,
+        "win_rate": round(won / played, 3),
+        "gf": round(gf / played, 3),
+        "ga": round(ga / played, 3),
+        "pts_avg": round(pts / played, 3),
+    }
+
+
+def similar_opponent_form(
+    matches: List[Any],
+    team_id: str,
+    opponent_id: str,
+    elo_map: Dict[str, float],
+    style_family_fn=None,
+    window: int = 16,
+    elo_band: float = 75.0,
+) -> Dict[str, float]:
+    """أداء الفريق أمام خصوم قريبين في Elo أو نفس عائلة الأسلوب."""
+    target_elo = float(elo_map.get(opponent_id, 1500.0))
+    target_fam = style_family_fn(opponent_id) if style_family_fn else None
+    played = won = drawn = gf = ga = 0.0
+    for m in reversed(matches):
+        hid = _row_get(m, "home_team_id", "home")
+        aid = _row_get(m, "away_team_id", "away")
+        hg = _row_get(m, "home_goals")
+        ag = _row_get(m, "away_goals")
+        if hg is None or ag is None:
+            continue
+        if hid == team_id:
+            opp = aid
+        elif aid == team_id:
+            opp = hid
+        else:
+            continue
+        if opp == opponent_id:
+            continue
+        opp_elo = float(elo_map.get(str(opp), 1500.0))
+        elo_ok = abs(opp_elo - target_elo) <= elo_band
+        style_ok = bool(target_fam and style_family_fn and style_family_fn(str(opp)) == target_fam)
+        if not (elo_ok or style_ok):
+            continue
+        gf_m = float(hg if hid == team_id else ag)
+        ga_m = float(ag if hid == team_id else hg)
+        played += 1
+        gf += gf_m
+        ga += ga_m
+        if gf_m > ga_m:
+            won += 1
+        elif gf_m == ga_m:
+            drawn += 1
+        if played >= window:
+            break
+    if played < 3:
+        return {"available": 0.0, "played": played, "win_rate": 0.0, "gf": 0.0, "ga": 0.0, "pts_avg": 0.0}
+    pts = 3.0 * won + drawn
+    return {
+        "available": 1.0,
+        "played": played,
+        "win_rate": round(won / played, 3),
+        "gf": round(gf / played, 3),
+        "ga": round(ga / played, 3),
+        "pts_avg": round(pts / played, 3),
+    }
+
+
+def second_half_impact(matches: List[Any], team_id: str, window: int = 15) -> Dict[str, float]:
+    """وكيل تأثير التبديلات: أهداف الشوط الثاني من ht_* — ليس أحداث تبديل Opta."""
+    n = 0
+    sh_gf = sh_ga = 0.0
+    for m in reversed(matches):
+        hid = _row_get(m, "home_team_id", "home")
+        aid = _row_get(m, "away_team_id", "away")
+        hg = _row_get(m, "home_goals")
+        ag = _row_get(m, "away_goals")
+        hth = _row_get(m, "ht_home_goals")
+        hta = _row_get(m, "ht_away_goals")
+        if hid != team_id and aid != team_id:
+            continue
+        if None in (hg, ag, hth, hta):
+            continue
+        if hid == team_id:
+            sh_gf += float(hg) - float(hth)
+            sh_ga += float(ag) - float(hta)
+        else:
+            sh_gf += float(ag) - float(hta)
+            sh_ga += float(hg) - float(hth)
+        n += 1
+        if n >= window:
+            break
+    if n < 4:
+        return {"available": 0.0, "played": float(n), "sh_gf": 0.0, "sh_ga": 0.0, "sh_gd": 0.0}
+    return {
+        "available": 1.0,
+        "played": float(n),
+        "sh_gf": round(sh_gf / n, 3),
+        "sh_ga": round(sh_ga / n, 3),
+        "sh_gd": round((sh_gf - sh_ga) / n, 3),
+    }
 
 
 def congestion_lambda_mult(matches_in_7d: Optional[float]) -> float:

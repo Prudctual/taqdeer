@@ -27,6 +27,9 @@ def evaluate_h2h_advantage(
             "home_lambda_mult": 1.0,
             "away_lambda_mult": 1.0,
             "h2h_summary": "لا توجد مواجهات مباشرة سابقة قريبة لتعديل النسب",
+            "recency_home": 0.0,
+            "recency_away": 0.0,
+            "recency_weight": 0.0,
         }
 
     h_wins = 0
@@ -72,6 +75,28 @@ def evaluate_h2h_advantage(
             home_mult *= 0.97
             h2h_summary = f"أفضلية تاريخية لصالح {away_team} بواقع {a_wins} انتصارات"
 
+    recency_home = 0.0
+    recency_away = 0.0
+    recency_w = 0.0
+    recent = list(recent_h2h_matches[-10:])
+    for i, m in enumerate(recent):
+        w = 0.55 + 0.45 * ((i + 1) / max(1, len(recent)))
+        h_score = int(m.get("home_goals", 0))
+        a_score = int(m.get("away_goals", 0))
+        h_name = str(m.get("home_team", ""))
+        if h_name == home_team:
+            home_gf, away_gf = h_score, a_score
+        else:
+            home_gf, away_gf = a_score, h_score
+        if home_gf > away_gf:
+            recency_home += w
+        elif away_gf > home_gf:
+            recency_away += w
+        else:
+            recency_home += 0.35 * w
+            recency_away += 0.35 * w
+        recency_w += w
+
     return {
         "h2h_matches_count": total,
         "home_h2h_wins": h_wins,
@@ -80,4 +105,7 @@ def evaluate_h2h_advantage(
         "home_lambda_mult": round(home_mult, 3),
         "away_lambda_mult": round(away_mult, 3),
         "h2h_summary": h2h_summary,
+        "recency_home": round(recency_home, 3),
+        "recency_away": round(recency_away, 3),
+        "recency_weight": round(recency_w, 3),
     }

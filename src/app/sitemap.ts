@@ -1,8 +1,7 @@
 import { getLeagues } from "@/lib/queries";
 import { SITE_URL } from "@/lib/site";
 
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
+export const revalidate = 20;
 
 export default async function sitemap() {
   const leagues = getLeagues();

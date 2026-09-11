@@ -9,8 +9,7 @@ export const metadata: Metadata = {
     "كل التوقعات القادمة مع أفضل فرصة مزدوجة (1X / X2 / 12) بشكل واضح ومستقل عن التوقع الأرجح.",
 };
 
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
+export const revalidate = 20;
 
 export default function DoubleChancePage() {
   const matches = getDoubleChanceMatches(14);

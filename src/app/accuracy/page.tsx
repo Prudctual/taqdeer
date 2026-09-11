@@ -24,8 +24,7 @@ export const metadata: Metadata = {
     "مقاييس الدقة وBrier وRPS لنماذج تقدير على شريحة walk-forward — مقارنة شفافة مع خط السوق.",
 };
 
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
+export const revalidate = 20;
 
 /** شرح المقاييس بلغة عادية — لا رياضيات إلا عند الحاجة */
 const GLOSSARY: { term: string; body: string }[] = [

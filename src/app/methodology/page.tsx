@@ -10,8 +10,7 @@ export const metadata: Metadata = {
     "كيف تُحسب احتمالات تقدير: Dixon–Coles، Elo، Pi-ratings، الفورم، ودمج الإشارة مع خط السوق.",
 };
 
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
+export const revalidate = 20;
 
 const steps = [
   {
@@ -132,6 +131,9 @@ export default function MethodologyPage() {
           </p>
           <p>
             تُبنى هذه الاحتمالات عبر 6 إشارات مستقلة تُحسب من بيانات رسمية مجانية (نتائج سابقة، تسديدات، وأسعار سوق)، ثم تُدمج وتُعاير بدقة قبل عرضها للمستخدم.
+          </p>
+          <p>
+            بعد ذلك يعمل <strong className="text-ink">النموذج 2</strong> كطبقة تصفية منفصلة: لا يغيّر أرقام 1X2، بل يقيّم موثوقية ترشيح الفوز المباشر عبر ثلاثين عاملاً (قوة، دفاع، انضباط، تكتيك، ظروف، وحركة السوق) ويُخرج مرتبة المرشحين.
           </p>
         </div>
       </SectionCard>

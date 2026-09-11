@@ -1,6 +1,7 @@
 import { cache } from "react";
 import { getDb } from "./db";
 import { LEAGUES, latestSeasonStartYear } from "./leagues";
+import { HEAVY_TTL_MS, QUERY_TTL_MS, withTtl } from "./ttl-cache";
 import {
   calculateSelectionScore,
   decimalToAmerican,
@@ -242,6 +243,7 @@ export function getUpcomingByLeague(perLeague = 9): {
   leagueNameAr: string;
   matches: MatchCard[];
 }[] {
+  return withTtl(`upcoming:${perLeague}`, QUERY_TTL_MS, () => {
   const db = getDb();
 
   // المباريات القادمة والمباشرة فقط — المباريات المنتهية تستبعد تماماً وتتحول لسجل التوقعات
@@ -299,6 +301,7 @@ export function getUpcomingByLeague(perLeague = 9): {
       const bDate = b.matches[0]?.utcDate ?? "";
       return aDate.localeCompare(bDate);
     });
+  });
 }
 
 /**
@@ -531,6 +534,7 @@ export function getAvailableSeasons(leagueId: string): string[] {
 }
 
 export function getStandings(leagueId: string, seasonParam?: string) {
+  return withTtl(`standings:${leagueId}:${seasonParam || ""}`, HEAVY_TTL_MS, () => {
   const db = getDb();
   const season = seasonParam || latestStandingsSeason(leagueId);
   if (!season) return [];
@@ -576,6 +580,7 @@ export function getStandings(leagueId: string, seasonParam?: string) {
     crest_url: string | null;
     team_id: string;
   }>;
+  });
 }
 
 export function getStandingsSeason(leagueId: string): string | null {
@@ -1293,6 +1298,82 @@ export const getValueMatches = cache(function getValueMatches(): Array<{
   }
 });
 
+export type Model2Factor = {
+  id: number;
+  group: number;
+  title: string;
+  score: number | null;
+  value?: unknown;
+  label?: string | null;
+  available: boolean;
+};
+
+export type Model2Group = {
+  id: number;
+  key: string;
+  title: string;
+  score: number | null;
+  available: number;
+  factors: Model2Factor[];
+};
+
+export type Model2Report = {
+  reliability: number | null;
+  coverage: number;
+  coverageWarning: boolean;
+  groups: Model2Group[];
+  rank: number | null;
+  slateRank: number | null;
+  slateN: number | null;
+  candidate: boolean;
+  excludeReason: string | null;
+  pick?: string;
+  pPick?: number;
+  gap?: number;
+};
+
+export function parseModel2(raw: unknown): Model2Report | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const m = raw as Record<string, unknown>;
+  const groupsIn = Array.isArray(m.groups) ? m.groups : [];
+  return {
+    reliability: typeof m.reliability === "number" ? m.reliability : null,
+    coverage: typeof m.coverage === "number" ? m.coverage : 0,
+    coverageWarning: Boolean(m.coverage_warning),
+    rank: typeof m.rank === "number" ? m.rank : null,
+    slateRank: typeof m.slate_rank === "number" ? m.slate_rank : null,
+    slateN: typeof m.slate_n === "number" ? m.slate_n : null,
+    candidate: Boolean(m.candidate),
+    excludeReason: typeof m.exclude_reason === "string" ? m.exclude_reason : null,
+    pick: typeof m.pick === "string" ? m.pick : undefined,
+    pPick: typeof m.p_pick === "number" ? m.p_pick : undefined,
+    gap: typeof m.gap === "number" ? m.gap : undefined,
+    groups: groupsIn.map((g) => {
+      const gg = g as Record<string, unknown>;
+      const factors = Array.isArray(gg.factors) ? gg.factors : [];
+      return {
+        id: Number(gg.id) || 0,
+        key: String(gg.key || ""),
+        title: String(gg.title || ""),
+        score: typeof gg.score === "number" ? gg.score : null,
+        available: Number(gg.available) || 0,
+        factors: factors.map((f) => {
+          const ff = f as Record<string, unknown>;
+          return {
+            id: Number(ff.id) || 0,
+            group: Number(ff.group) || 0,
+            title: String(ff.title || ""),
+            score: typeof ff.score === "number" ? ff.score : null,
+            value: ff.value,
+            label: typeof ff.label === "string" ? ff.label : null,
+            available: Boolean(ff.available),
+          };
+        }),
+      };
+    }),
+  };
+}
+
 export type BankerPick = {
   matchId: string;
   homeTeam: string;
@@ -1310,6 +1391,7 @@ export type BankerPick = {
   secondProbability?: number;
   separationGap?: number;
   selectionScore?: number;
+  model2?: Model2Report;
   confidence: number;
   odds?: number | null;
   americanOdds?: string;
@@ -1350,6 +1432,7 @@ export const getBankerPicks = cache(function getBankerPicks(
   limit = 4,
   leagueId?: string
 ): BankerPick[] {
+  return withTtl(`bankers:${limit}:${leagueId || "all"}`, HEAVY_TTL_MS, () => {
   try {
     const db = getDb();
     const leagueFilter = leagueId ? "AND m.league_id = ?" : "";
@@ -1373,10 +1456,11 @@ export const getBankerPicks = cache(function getBankerPicks(
       JOIN predictions p ON p.match_id = m.id
       WHERE m.status IN ('SCHEDULED', 'TIMED')
         AND substr(m.utc_date, 1, 19) >= strftime('%Y-%m-%dT%H:%M:%S', 'now', '-12 hours')
+        AND substr(m.utc_date, 1, 19) <= strftime('%Y-%m-%dT%H:%M:%S', 'now', '+14 days')
         AND (p.p_home IS NOT NULL OR p.p_away IS NOT NULL)
       ${leagueFilter}
       ORDER BY m.utc_date ASC
-      LIMIT 120
+      LIMIT 160
     `
       )
       .all(...params) as Array<{
@@ -1411,10 +1495,12 @@ export const getBankerPicks = cache(function getBankerPicks(
       let gkStats: BankerPick["goalkeeperStats"] = undefined;
       let tacMatchup: BankerPick["tacticalMatchup"] = undefined;
       let mgrImpact: BankerPick["managerImpact"] = undefined;
+      let model2: Model2Report | undefined;
 
       if (r.analytics_json) {
         try {
           const parsed = JSON.parse(r.analytics_json);
+          model2 = parseModel2(parsed.model2);
           const rand = parsed.randomness;
           if (rand) {
             isStrictlyExcluded = Boolean(rand.is_strictly_excluded || rand.verdict === "STRICT_EXCLUDE");
@@ -1488,7 +1574,9 @@ export const getBankerPicks = cache(function getBankerPicks(
       if (separationGap < 0.04 || top1.p < 0.44) continue;
 
       const conf = r.confidence ?? top1.p;
-      const selectionScore = calculateSelectionScore(top1.p, top2.p, conf);
+      const fallbackScore = calculateSelectionScore(top1.p, top2.p, conf);
+      const selectionScore =
+        model2?.reliability != null ? Math.round(model2.reliability) : fallbackScore;
 
       const odds = top1.odds && top1.odds > 1.0 ? top1.odds : null;
       const americanOdds = odds ? decimalToAmerican(odds) : "—";
@@ -1525,16 +1613,25 @@ export const getBankerPicks = cache(function getBankerPicks(
         goalkeeperStats: gkStats,
         tacticalMatchup: tacMatchup,
         managerImpact: mgrImpact,
+        model2,
       });
     }
 
-    // فرز وفق مؤشر قوة الاختيار
-    candidates.sort((a, b) => (b.selectionScore ?? 0) - (a.selectionScore ?? 0));
+    // فرز وفق موثوقية النموذج 2 ثم درجة الاختيار الاحتياطية
+    candidates.sort((a, b) => {
+      const ar = a.model2?.reliability ?? a.selectionScore ?? 0;
+      const br = b.model2?.reliability ?? b.selectionScore ?? 0;
+      if (br !== ar) return br - ar;
+      const aRank = a.model2?.rank ?? 999;
+      const bRank = b.model2?.rank ?? 999;
+      return aRank - bRank;
+    });
     return candidates.slice(0, limit);
   } catch (e) {
     console.error("Error in getBankerPicks:", e);
     return [];
   }
+  });
 });
 
 export interface SelectionStrategyResult {
@@ -1810,6 +1907,7 @@ export const getParlayCandidates = cache(function getParlayCandidates(
   leagueId?: string,
   limit = 16
 ): ParlayCandidateMatch[] {
+  return withTtl(`parlay:${leagueId || "all"}:${limit}`, HEAVY_TTL_MS, () => {
   try {
     const db = getDb();
     const leagueFilter =
@@ -1832,10 +1930,11 @@ export const getParlayCandidates = cache(function getParlayCandidates(
       JOIN predictions p ON p.match_id = m.id
       WHERE m.status IN ('SCHEDULED', 'TIMED')
         AND substr(m.utc_date, 1, 19) >= strftime('%Y-%m-%dT%H:%M:%S', 'now', '-12 hours')
+        AND substr(m.utc_date, 1, 19) <= strftime('%Y-%m-%dT%H:%M:%S', 'now', '+14 days')
         AND (p.p_home IS NOT NULL OR p.p_away IS NOT NULL)
       ${leagueFilter}
       ORDER BY (m.odds_home IS NOT NULL) DESC, m.utc_date ASC
-      LIMIT 100
+      LIMIT 160
     `
       )
       .all(...params) as Array<{
@@ -1862,6 +1961,7 @@ export const getParlayCandidates = cache(function getParlayCandidates(
       let isStrictlyExcluded = false;
       let mri = 30;
       let stability = 70;
+      let model2Rel: number | null = null;
 
       if (r.analytics_json) {
         try {
@@ -1872,6 +1972,8 @@ export const getParlayCandidates = cache(function getParlayCandidates(
             mri = rand.match_randomness_index ?? 30;
             stability = rand.stability_score ?? (100 - mri);
           }
+          const m2 = parseModel2(parsed.model2);
+          if (m2?.reliability != null) model2Rel = m2.reliability;
         } catch {
           // ignore
         }
@@ -1909,7 +2011,8 @@ export const getParlayCandidates = cache(function getParlayCandidates(
 
       const separationGap = Number((top1.p - top2.p).toFixed(4));
       const conf = r.confidence ?? top1.p;
-      const selectionScore = calculateSelectionScore(top1.p, top2.p, conf);
+      const selectionScore =
+        model2Rel != null ? Math.round(model2Rel) : calculateSelectionScore(top1.p, top2.p, conf);
       const implied = oddsToImpliedProb(finalOdds);
       const edge = calculateEdge(top1.p, finalOdds);
       const isTrap = detectValueTrap(top1.p, finalOdds);
@@ -1952,6 +2055,7 @@ export const getParlayCandidates = cache(function getParlayCandidates(
     console.error("Error in getParlayCandidates:", e);
     return [];
   }
+  });
 });
 
 export type Article = {
@@ -2498,6 +2602,7 @@ export const getStrictlyExcludedMatches = cache(function getStrictlyExcludedMatc
       JOIN predictions p ON p.match_id = m.id
       WHERE m.status IN ('SCHEDULED', 'TIMED')
         AND substr(m.utc_date, 1, 19) >= strftime('%Y-%m-%dT%H:%M:%S', 'now', '-12 hours')
+        AND substr(m.utc_date, 1, 19) <= strftime('%Y-%m-%dT%H:%M:%S', 'now', '+14 days')
         AND p.analytics_json IS NOT NULL
         ${leagueFilter}
       ORDER BY m.utc_date ASC
@@ -2588,6 +2693,11 @@ export interface ConfinedPlatformData {
     topSafetyPick: BankerPick | null;
     topValuePick: BankerPick | null;
   };
+  pipeline: {
+    slateN: number;
+    candidates: number;
+    topN: number;
+  };
   confinedMatches: BankerPick[];
   strategies: SelectionStrategyResult;
   parlayCandidates: ParlayCandidateMatch[];
@@ -2598,6 +2708,7 @@ export interface ConfinedPlatformData {
 export const getConfinedPlatformData = cache(function getConfinedPlatformData(
   leagueId?: string
 ): ConfinedPlatformData {
+  return withTtl(`hasr:${leagueId || "all"}`, HEAVY_TTL_MS, () => {
   const allBankers = getBankerPicks(100, leagueId);
   const excludedMatches = getStrictlyExcludedMatches(50, leagueId);
   const parlayCandidates = getParlayCandidates(leagueId, 24);
@@ -2605,8 +2716,7 @@ export const getConfinedPlatformData = cache(function getConfinedPlatformData(
 
   // الفرق المحصورة المؤهلة: استبعاد أي مباراة مستبعدة أو منخفضة الأمان، وترتيبها تصاعدياً حسب موعد اللقاء
   const strictlyConfined = allBankers
-    .filter((p) => !p.isStrictlyExcluded && (p.stabilityScore ?? 50) >= 42)
-    .sort((a, b) => new Date(a.utcDate).getTime() - new Date(b.utcDate).getTime());
+    .filter((p) => !p.isStrictlyExcluded && (p.stabilityScore ?? 50) >= 42);
 
   // تقسيم الاستراتيجيات الصارم
   const safety = [...strictlyConfined]
@@ -2635,6 +2745,12 @@ export const getConfinedPlatformData = cache(function getConfinedPlatformData(
       )
     : 70;
 
+  const slateN = Math.max(
+    ...strictlyConfined.map((p) => p.model2?.slateN ?? 0),
+    allBankers.length + excludedMatches.length,
+    0,
+  );
+
   return {
     summaryStats: {
       totalEvaluated: allBankers.length + excludedMatches.length,
@@ -2643,6 +2759,11 @@ export const getConfinedPlatformData = cache(function getConfinedPlatformData(
       avgStability,
       topSafetyPick: safety[0] || null,
       topValuePick: value[0] || null,
+    },
+    pipeline: {
+      slateN,
+      candidates: strictlyConfined.length,
+      topN: Math.min(8, strictlyConfined.length),
     },
     confinedMatches: strictlyConfined,
     strategies: {
@@ -2655,6 +2776,7 @@ export const getConfinedPlatformData = cache(function getConfinedPlatformData(
     excludedMatches,
     calibration,
   };
+  });
 });
 
 

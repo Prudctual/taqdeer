@@ -18,7 +18,11 @@ module.exports = {
         NODE_ENV: "production",
         PORT: "3000",
         PATH: PATH_ENV,
+        NEXT_TELEMETRY_DISABLED: "1",
+        NODE_OPTIONS: "--max-old-space-size=512",
       },
+      max_memory_restart: "700M",
+      kill_timeout: 8000,
     },
     {
       name: "taqdeer-auto-sync",

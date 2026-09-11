@@ -12,8 +12,7 @@ import {
   getSecureApiHeaders,
 } from "@/lib/rate-limit";
 
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
+export const revalidate = 20;
 
 export async function GET(request: Request) {
   const rl = checkRateLimit(request);

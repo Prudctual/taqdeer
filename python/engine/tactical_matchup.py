@@ -181,6 +181,20 @@ def _clean_team_key(team_key: str) -> str:
     return team_key.lower().replace(" ", "").replace("-", "").replace("_", "")
 
 
+def style_family(team_key: str) -> str:
+    """عائلة أسلوب مختصرة لخصوم مشابهين: possession / press / low_block / counter / balanced."""
+    style = get_team_tactics(team_key).get("style") or ""
+    if any(w in style for w in ("تكتل", "دفاع منخفض", "تراجع")):
+        return "low_block"
+    if "مرتدات" in style or "تحول" in style:
+        return "counter"
+    if "ضغط" in style:
+        return "press"
+    if any(w in style for w in ("استحواذ", "سيطرة", "بناء")):
+        return "possession"
+    return "balanced"
+
+
 def get_team_tactics(
     team_key: str,
     ppda: Optional[float] = None,

@@ -12,8 +12,7 @@ export const metadata: Metadata = {
     "توقعات محفوظة للمباريات القادمة، وتنتقل تلقائياً إلى النتائج المكتملة بعد انتهاء المباراة.",
 };
 
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
+export const revalidate = 20;
 
 export default function HistoryPage() {
   const upcomingSnapshots = getUpcomingSnapshotMatches(20);

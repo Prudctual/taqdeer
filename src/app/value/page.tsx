@@ -9,8 +9,7 @@ export const metadata: Metadata = {
 };
 
 // Live SQLite — avoid baking empty value list at build time
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
+export const revalidate = 20;
 
 export default function ValueMatchesPage() {
   const matches = getValueMatches();

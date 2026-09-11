@@ -4,8 +4,7 @@ import { getArticles, getFeaturedArticle } from "@/lib/queries";
 import { BookOpen, Clock, TrendingUp } from "lucide-react";
 import ArticlesFilterClient from "./ArticlesFilterClient";
 
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
+export const revalidate = 20;
 
 export const metadata: Metadata = {
   title: "المقالات والتقارير — منصة تقدير",
