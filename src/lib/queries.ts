@@ -3,6 +3,10 @@ import { getDb } from "./db";
 import { LEAGUES, latestSeasonStartYear } from "./leagues";
 import { HEAVY_TTL_MS, QUERY_TTL_MS, withTtl } from "./ttl-cache";
 import {
+  isSettledArchiveMatch,
+  SQL_SETTLED_MATCH,
+} from "./match-status";
+import {
   calculateSelectionScore,
   decimalToAmerican,
   oddsToImpliedProb,
@@ -1767,7 +1771,7 @@ export const getCalibrationBins = cache(function getCalibrationBins(
       FROM matches m
       JOIN predictions p ON p.match_id = m.id
       LEFT JOIN prediction_snapshots ps ON ps.match_id = m.id
-      WHERE (m.status = 'FINISHED' OR (m.home_goals IS NOT NULL AND m.away_goals IS NOT NULL))
+      WHERE ${SQL_SETTLED_MATCH}
         AND (p.p_home IS NOT NULL OR ps.p_home IS NOT NULL)
     `;
     const params: string[] = [];
@@ -2310,7 +2314,7 @@ export const getFinishedPredictionsHistory = cache(
           ON p.match_id = m.id AND COALESCE(p.model_version, '') != 'live-v1'
         LEFT JOIN prediction_snapshots ps
           ON ps.match_id = m.id AND COALESCE(ps.model_version, '') != 'live-v1'
-        WHERE (m.status = 'FINISHED' OR (m.home_goals IS NOT NULL AND m.away_goals IS NOT NULL))
+        WHERE ${SQL_SETTLED_MATCH}
           AND (p.p_home IS NOT NULL OR ps.p_home IS NOT NULL)
           AND m.source NOT IN ('preview-holdout','synthetic','demo')
       `;
@@ -2327,7 +2331,16 @@ export const getFinishedPredictionsHistory = cache(
       sql += ` ORDER BY m.utc_date DESC LIMIT ?`;
       params.push(limit);
 
-      const rows = db.prepare(sql).all(...params) as (MatchCard & { isSnapshotLocked: number })[];
+      const rows = (
+        db.prepare(sql).all(...params) as (MatchCard & { isSnapshotLocked: number })[]
+      ).filter((m) =>
+        isSettledArchiveMatch({
+          status: m.status,
+          utcDate: m.utcDate,
+          homeGoals: m.homeGoals,
+          awayGoals: m.awayGoals,
+        }),
+      );
 
       return rows.map((m) => {
         const pHome = m.pHome ?? 0;

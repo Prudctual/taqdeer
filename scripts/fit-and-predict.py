@@ -1190,7 +1190,9 @@ def refresh_calibration_bins(conn: sqlite3.Connection) -> None:
         SELECT m.home_goals, m.away_goals, p.p_home, p.p_draw, p.p_away
         FROM matches m
         JOIN predictions p ON p.match_id = m.id
-        WHERE (m.status = 'FINISHED' OR (m.home_goals IS NOT NULL AND m.away_goals IS NOT NULL))
+        WHERE m.status IN ('FINISHED','FT','AET','PEN','COMPLETED','AWARDED')
+          AND m.home_goals IS NOT NULL
+          AND m.away_goals IS NOT NULL
           AND p.p_home IS NOT NULL
         """
     ).fetchall()

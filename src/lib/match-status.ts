@@ -38,6 +38,16 @@ const FINISHED_STATUSES = new Set([
   "AWARDED",
 ]);
 
+/**
+ * شرط SQL لنتيجة مكتملة بعد الصافرة.
+ * المباراة الجارية بنتيجة 0–0 ليست أرشيفاً ولا تدخل دقة النموذج.
+ */
+export const SQL_SETTLED_MATCH = `
+  m.status IN ('FINISHED','FT','AET','PEN','COMPLETED','AWARDED')
+  AND m.home_goals IS NOT NULL
+  AND m.away_goals IS NOT NULL
+`;
+
 const POSTPONED_STATUSES = new Set(["POSTPONED", "SUSPENDED"]);
 const CANCELLED_STATUSES = new Set(["CANCELLED", "CANCELED", "ABANDONED"]);
 
@@ -82,6 +92,14 @@ export function hasRecordedScore(
   awayGoals: number | null | undefined,
 ): boolean {
   return homeGoals != null && awayGoals != null;
+}
+
+/** هل تُوثَّق في سجل التوقعات؟ الجارية ولو 0–0 تُستبعد. */
+export function isSettledArchiveMatch(input: MatchStatusInput): boolean {
+  return (
+    resolveMatchPhase(input) === "finished" &&
+    hasRecordedScore(input.homeGoals, input.awayGoals)
+  );
 }
 
 /** دليل من المصدر على أن المباراة انطلقت فعلاً */
