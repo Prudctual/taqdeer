@@ -6,6 +6,7 @@ import {
   isSettledArchiveMatch,
   SQL_SETTLED_MATCH,
 } from "./match-status";
+import { keepCurrentRound } from "./current-round";
 import {
   calculateSelectionScore,
   decimalToAmerican,
@@ -1442,15 +1443,15 @@ export const getBankerPicks = cache(function getBankerPicks(
     const leagueFilter = leagueId ? "AND m.league_id = ?" : "";
     const params: unknown[] = leagueId ? [leagueId] : [];
 
-    const rows = db
+    const fetched = db
       .prepare(
         `
-      SELECT m.id as matchId, l.name_ar as leagueName,
+      SELECT m.id as matchId, m.league_id as leagueId, l.name_ar as leagueName,
              ht.name_ar as homeTeam, at.name_ar as awayTeam,
              ht.id as homeTeamId, at.id as awayTeamId,
              ht.crest_url as homeCrestUrl, at.crest_url as awayCrestUrl,
              m.matchday,
-             p.p_home, p.p_draw, p.p_away, p.confidence, m.utc_date,
+             p.p_home, p.p_draw, p.p_away, p.confidence, m.utc_date, m.utc_date as utcDate,
              m.odds_home, m.odds_draw, m.odds_away,
              p.analytics_json
       FROM matches m
@@ -1469,6 +1470,7 @@ export const getBankerPicks = cache(function getBankerPicks(
       )
       .all(...params) as Array<{
       matchId: string;
+      leagueId: string;
       leagueName: string;
       homeTeam: string;
       awayTeam: string;
@@ -1482,11 +1484,15 @@ export const getBankerPicks = cache(function getBankerPicks(
       p_away: number | null;
       confidence: number | null;
       utc_date: string;
+      utcDate: string;
       odds_home: number | null;
       odds_draw: number | null;
       odds_away: number | null;
       analytics_json: string | null;
     }>;
+
+    // الجولة الحالية فقط لكل دوري — لا تطفر اللائحة إلى الجولة القادمة قبل اكتمالها
+    const rows = keepCurrentRound(fetched, db, leagueId);
 
     const candidates: BankerPick[] = [];
 
@@ -1919,11 +1925,11 @@ export const getParlayCandidates = cache(function getParlayCandidates(
     const params: unknown[] =
       leagueId && leagueId !== "all" ? [leagueId] : [];
 
-    const rows = db
+    const fetched = db
       .prepare(
         `
       SELECT m.id as matchId, m.league_id as leagueId, l.name_ar as leagueNameAr,
-             m.utc_date as utcDate, ht.name_ar as homeTeam, at.name_ar as awayTeam,
+             m.utc_date as utcDate, m.matchday, ht.name_ar as homeTeam, at.name_ar as awayTeam,
              p.p_home, p.p_draw, p.p_away, p.confidence,
              m.odds_home, m.odds_draw, m.odds_away,
              p.analytics_json
@@ -1946,6 +1952,7 @@ export const getParlayCandidates = cache(function getParlayCandidates(
       leagueId: string;
       leagueNameAr: string;
       utcDate: string;
+      matchday: number | null;
       homeTeam: string;
       awayTeam: string;
       p_home: number | null;
@@ -1957,6 +1964,9 @@ export const getParlayCandidates = cache(function getParlayCandidates(
       odds_away: number | null;
       analytics_json: string | null;
     }>;
+
+    // البارلي من مباريات الجولة الحالية فقط
+    const rows = keepCurrentRound(fetched, db, leagueId);
 
     const candidates: ParlayCandidateMatch[] = [];
 
@@ -2602,11 +2612,11 @@ export const getStrictlyExcludedMatches = cache(function getStrictlyExcludedMatc
     const leagueFilter = leagueId && leagueId !== "all" ? "AND m.league_id = ?" : "";
     const params: unknown[] = leagueId && leagueId !== "all" ? [leagueId] : [];
 
-    const rows = db
+    const fetched = db
       .prepare(
         `
       SELECT m.id as matchId, m.league_id as leagueId, l.name_ar as leagueNameAr,
-             m.utc_date as utcDate, ht.name_ar as homeTeam, at.name_ar as awayTeam,
+             m.utc_date as utcDate, m.matchday, ht.name_ar as homeTeam, at.name_ar as awayTeam,
              p.analytics_json
       FROM matches m
       JOIN leagues l ON l.id = m.league_id
@@ -2627,10 +2637,14 @@ export const getStrictlyExcludedMatches = cache(function getStrictlyExcludedMatc
       leagueId: string;
       leagueNameAr: string;
       utcDate: string;
+      matchday: number | null;
       homeTeam: string;
       awayTeam: string;
       analytics_json: string;
     }>;
+
+    // المستبعدة من الجولة الحالية نفسها — كي تتطابق مع لائحة المحصورة
+    const rows = keepCurrentRound(fetched, db, leagueId);
 
     const results: StrictlyExcludedMatch[] = [];
 
