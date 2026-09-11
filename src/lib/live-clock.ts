@@ -52,15 +52,68 @@ export function estimateMinuteFromKickoff(
   return { minute: 90, liveStatusAr: "انتهت", period: "FT" };
 }
 
-/** يستخرج دقيقة رقمية من نص FotMob مثل "7’" أو "45+2" */
+const HALF_TOKEN =
+  /^(?:1h|2h|ht|ft|et|1st|2nd|first|second|half(?:\s*time)?)$/i;
+
+/** يستخرج دقيقة رقمية من نص FotMob مثل "12’" أو "1H 12'" — يرفض "1H" وحده. */
 export function parseLiveMinute(raw: unknown): number | null {
   if (raw == null) return null;
-  if (typeof raw === "number" && Number.isFinite(raw)) return Math.max(0, Math.round(raw));
-  const s = String(raw).replace(/[\u200e\u200f\u202a-\u202e]/g, "").trim();
+  if (typeof raw === "number" && Number.isFinite(raw)) {
+    const n = Math.round(raw);
+    return n >= 0 && n <= 130 ? n : null;
+  }
+  let s = String(raw).replace(/[\u200e\u200f\u202a-\u202e]/g, "").trim();
+  if (!s || HALF_TOKEN.test(s)) return null;
+
   const plus = s.match(/(\d+)\s*\+\s*(\d+)/);
-  if (plus) return parseInt(plus[1]!, 10) + parseInt(plus[2]!, 10);
-  const m = s.match(/(\d+)/);
-  return m ? parseInt(m[1]!, 10) : null;
+  if (plus) {
+    const base = parseInt(plus[1]!, 10);
+    const extra = parseInt(plus[2]!, 10);
+    if (base >= 40 && base <= 120) return base + extra;
+  }
+
+  // أزل رموز الشوط حتى لا تُقرأ "1H 12'" كدقيقة 1
+  s = s
+    .replace(/\b(?:1st|2nd|first|second)\s*(?:half)?\b/gi, " ")
+    .replace(/\b[12]H\b/gi, " ")
+    .replace(/\b(?:HT|FT|ET|half(?:\s*time)?)\b/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!s || HALF_TOKEN.test(s)) return null;
+
+  const marked = s.match(/(\d+)\s*['′`]/);
+  if (marked) return clampMatchMinute(parseInt(marked[1]!, 10));
+
+  const minsWord = s.match(/(\d+)\s*(?:mins?|min|دق)/i);
+  if (minsWord) return clampMatchMinute(parseInt(minsWord[1]!, 10));
+
+  // "12:33" = دقيقة المباراة : ثانية — خذ الجزء قبل النقطتين إن بدا دقيقة لا ساعة
+  const clock = s.match(/^(\d{1,3}):(\d{2})$/);
+  if (clock) return clampMatchMinute(parseInt(clock[1]!, 10));
+
+  const nums = s.match(/\d+/g);
+  if (!nums || nums.length === 0) return null;
+  // آخر رقم بعد حذف رموز الشوط هو الدقيقة (12 من "half 12")
+  return clampMatchMinute(parseInt(nums[nums.length - 1]!, 10));
+}
+
+function clampMatchMinute(n: number): number | null {
+  if (!Number.isFinite(n) || n < 0 || n > 130) return null;
+  return n;
+}
+
+/** إن علق المصدر على 1 بينما الانطلاق يقول 12 — نصدّق ساعة الملعب. */
+export function reconcileLiveMinute(
+  synced: number | null | undefined,
+  utcDate: string,
+  nowMs = Date.now(),
+): number | null {
+  const est = estimateMinuteFromKickoff(utcDate, nowMs);
+  if (est == null) return synced ?? null;
+  if (est.period === "HT" || est.period === "FT") return est.minute;
+  if (synced == null) return est.minute;
+  if (est.minute >= synced + 3) return est.minute;
+  return synced;
 }
 
 export function liveStatusFromFotmob(status: {
@@ -77,7 +130,9 @@ export function liveStatusFromFotmob(status: {
     return { minute: null, liveStatusAr: "", statusStr: "SCHEDULED" };
   }
 
-  const minute = parseLiveMinute(status.liveTime?.short ?? status.liveTime?.long);
+  const minute =
+    parseLiveMinute(status.liveTime?.short) ??
+    parseLiveMinute(status.liveTime?.long);
   const halfs = status.halfs || {};
   const firstEnded = !!halfs.firstHalfEnded;
   const secondStarted = !!halfs.secondHalfStarted;
@@ -87,14 +142,16 @@ export function liveStatusFromFotmob(status: {
   }
   if (secondStarted || (minute != null && minute > 45)) {
     return {
-      minute: minute ?? 46,
-      liveStatusAr: `الشوط الثاني · د ${minute ?? 46}'`,
+      minute,
+      liveStatusAr:
+        minute != null ? `الشوط الثاني · د ${minute}'` : "الشوط الثاني",
       statusStr: "IN_PLAY",
     };
   }
   return {
-    minute: minute ?? 1,
-    liveStatusAr: `الشوط الأول · د ${minute ?? 1}'`,
+    minute,
+    liveStatusAr:
+      minute != null ? `الشوط الأول · د ${minute}'` : "الشوط الأول",
     statusStr: "IN_PLAY",
   };
 }
@@ -105,14 +162,11 @@ function detectPeriod(
   kickoffPeriod: LivePeriod | null,
 ): LivePeriod {
   const s = liveStatusAr || "";
-  if (s.includes("انتهت") || s.includes("نهاية")) return "FT";
-  if (s.includes("استراحة")) return "HT";
-  if (s.includes("الثاني") || s.includes("إضافي")) return "2H";
+  if (s.includes("انتهت") || s.includes("نهاية") || kickoffPeriod === "FT") return "FT";
+  if (s.includes("استراحة") || kickoffPeriod === "HT") return "HT";
+  if (s.includes("الثاني") || s.includes("إضافي") || kickoffPeriod === "2H") return "2H";
+  if (syncedMinute != null && syncedMinute > 45) return "2H";
   if (s.includes("الأول")) return "1H";
-  if (syncedMinute != null) {
-    if (syncedMinute > 45) return "2H";
-    if (syncedMinute === 45 && s.includes("استراحة")) return "HT";
-  }
   return kickoffPeriod && kickoffPeriod !== "NS" ? kickoffPeriod : "1H";
 }
 
@@ -121,8 +175,6 @@ function formatClockParts(
   baseMinute: number,
   second: number,
 ): Pick<LiveClockState, "minute" | "second" | "stoppage" | "display" | "labelAr" | "shortAr" | "ticking"> {
-  const pad = (n: number) => String(n).padStart(2, "0");
-
   if (period === "HT") {
     return {
       minute: 45,
@@ -157,17 +209,14 @@ function formatClockParts(
   }
 
   const display =
-    stoppage > 0
-      ? `${halfCap}+${stoppage}:${pad(second)}`
-      : `${minute}:${pad(second)}`;
+    stoppage > 0 ? `${halfCap}+${stoppage}'` : `${minute}'`;
 
   const periodAr = period === "2H" ? "الشوط الثاني" : "الشوط الأول";
-  const shortAr =
-    stoppage > 0 ? `${halfCap}+${stoppage}'` : `${minute}:${pad(second)}`;
+  const shortAr = display;
   const labelAr =
     stoppage > 0
       ? `${periodAr} · ${halfCap}+${stoppage}'`
-      : `${periodAr} · ${minute}:${pad(second)}`;
+      : `${periodAr} · د ${minute}'`;
 
   return {
     minute: stoppage > 0 ? halfCap : minute,
@@ -207,17 +256,24 @@ export function resolveLiveClock(opts: {
 
   const kickoff = Date.parse(opts.utcDate);
   let totalSeconds: number;
+  const trustedMinute = reconcileLiveMinute(
+    opts.syncedMinute,
+    opts.utcDate,
+    opts.nowMs,
+  );
 
   if (
-    opts.syncedMinute != null &&
+    trustedMinute != null &&
     opts.syncedAtMs != null &&
-    Number.isFinite(opts.syncedAtMs)
+    Number.isFinite(opts.syncedAtMs) &&
+    opts.syncedMinute != null &&
+    trustedMinute === opts.syncedMinute
   ) {
     const advanceSec = Math.max(
       0,
       Math.floor((opts.nowMs - opts.syncedAtMs) / 1000),
     );
-    totalSeconds = opts.syncedMinute * 60 + advanceSec;
+    totalSeconds = trustedMinute * 60 + advanceSec;
   } else if (Number.isFinite(kickoff) && opts.nowMs >= kickoff) {
     // من الانطلاق مع خصم استراحة 15 دقيقة بعد الدقيقة 45
     let elapsedSec = Math.floor((opts.nowMs - kickoff) / 1000);
@@ -234,9 +290,9 @@ export function resolveLiveClock(opts: {
     totalSeconds = m * 60;
   }
 
-  // لا ترجع للخلف عن آخر مزامنة
-  if (opts.syncedMinute != null) {
-    totalSeconds = Math.max(totalSeconds, opts.syncedMinute * 60);
+  // لا ترجع للخلف عن آخر دقيقة موثوقة
+  if (trustedMinute != null) {
+    totalSeconds = Math.max(totalSeconds, trustedMinute * 60);
   }
 
   let minute = Math.floor(totalSeconds / 60);

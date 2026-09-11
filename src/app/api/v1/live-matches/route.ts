@@ -8,6 +8,7 @@ import {
   parseLiveEvents,
 } from "@/lib/in-play-probs";
 import { isLiveStatus, resolveMatchPhase } from "@/lib/match-status";
+import { reconcileLiveMinute } from "@/lib/live-clock";
 import {
   checkRateLimit,
   createRateLimitErrorResponse,
@@ -42,7 +43,7 @@ export async function GET(request: Request) {
     );
 
     const liveMatches = rawLiveMatches.map((m) => {
-      let minute = m.minute;
+      let minute = reconcileLiveMinute(m.minute, m.utcDate, now.getTime());
       let liveStatusAr = m.liveStatusAr;
 
       if (minute == null && isLiveStatus(m.status)) {

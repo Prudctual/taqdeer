@@ -5,6 +5,7 @@ import {
   estimateMinuteFromKickoff,
   liveStatusFromFotmob,
   parseLiveMinute,
+  reconcileLiveMinute,
 } from "./live-clock";
 import { resolveTeamName } from "./team-aliases";
 import { nameAr, slugify } from "./team-names";
@@ -161,8 +162,8 @@ function applyLiveUpdate(
        status = ?,
        home_goals = CASE WHEN ? IS NOT NULL THEN ? ELSE home_goals END,
        away_goals = CASE WHEN ? IS NOT NULL THEN ? ELSE away_goals END,
-       minute = ?,
-       live_status_ar = ?,
+       minute = CASE WHEN ? IS NOT NULL THEN ? ELSE minute END,
+       live_status_ar = COALESCE(?, live_status_ar),
        live_events_json = COALESCE(?, live_events_json),
        live_stats_json = COALESCE(?, live_stats_json),
        external_id = COALESCE(external_id, ?),
@@ -174,6 +175,7 @@ function applyLiveUpdate(
     fields.homeGoals,
     fields.awayGoals,
     fields.awayGoals,
+    fields.minute,
     fields.minute,
     fields.liveStatusAr,
     fields.eventsJson,
@@ -370,7 +372,7 @@ async function syncFromFotmob(db: ReturnType<typeof getDb>): Promise<number> {
           status: mapped.statusStr,
           homeGoals: m.home?.score ?? (mapped.statusStr === "FINISHED" ? 0 : null),
           awayGoals: m.away?.score ?? (mapped.statusStr === "FINISHED" ? 0 : null),
-          minute: mapped.minute,
+          minute: reconcileLiveMinute(mapped.minute, st.utcTime || utcDate),
           liveStatusAr: mapped.liveStatusAr || (mapped.statusStr === "FINISHED" ? "انتهت" : "مباشر الآن"),
           eventsJson,
           statsJson,
