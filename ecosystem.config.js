@@ -19,9 +19,9 @@ module.exports = {
         PORT: "3000",
         PATH: PATH_ENV,
         NEXT_TELEMETRY_DISABLED: "1",
-        NODE_OPTIONS: "--max-old-space-size=512",
+        NODE_OPTIONS: "--max-old-space-size=1024",
       },
-      max_memory_restart: "700M",
+      max_memory_restart: "1200M",
       kill_timeout: 8000,
     },
     {
