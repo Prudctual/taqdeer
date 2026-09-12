@@ -1,29 +1,238 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef, type ReactNode } from "react";
 import Link from "next/link";
-import { pct, formatShortDate, formatRelativeDay, formatMatchTime, crestInitials } from "@/lib/format";
+import {
+  pct,
+  crestInitials,
+  groupByDayAndRound,
+  formatMatchTime,
+  formatKickoffAbsolute,
+  hasKnownKickoffTime,
+  DATA_TZ,
+  DATA_TZ_LABEL,
+  DISPLAY_TZ_LABEL,
+  type DayRoundGroup,
+  type RoundedFixture,
+} from "@/lib/format";
 import { getTeamColors } from "@/lib/team-colors";
 import { Crest } from "@/components/Crest";
 import type {
   ConfinedPlatformData,
   ParlayCandidateMatch,
   BankerPick,
+  StrictlyExcludedMatch,
 } from "@/lib/queries";
 import { HasrHeader } from "./HasrHeader";
-import { Model2Breakdown } from "@/components/Model2Breakdown";
+import { ChevronIcon } from "@/components/ChevronIcon";
+import { Model2BreakdownLazy } from "@/components/Model2BreakdownLazy";
 
 interface HasrTerminalViewProps {
   initialData: ConfinedPlatformData;
 }
 
+function matchCountAr(count: number): string {
+  if (count === 1) return "مباراة واحدة";
+  if (count === 2) return "مباراتان";
+  if (count >= 3 && count <= 10) return `${count} مباريات`;
+  return `${count} مباراة`;
+}
+
+function exclusionPillarLabel(pillar: StrictlyExcludedMatch["primaryExclusionPillar"]): string {
+  switch (pillar) {
+    case "draw_trap":
+      return "فخ تعادل متكرر";
+    case "second_half_fragility":
+      return "تراجع الشوط الثاني";
+    case "disciplinary_risk":
+      return "مخاطر طرد وبطاقات";
+    case "volatility":
+      return "تذبذب نتائج حاد";
+    case "other":
+      return "عشوائية حرجة";
+    default: {
+      const never: never = pillar;
+      return never;
+    }
+  }
+}
+
+function roundCountAr(count: number): string {
+  if (count === 1) return "جولة واحدة";
+  if (count === 2) return "جولتان";
+  if (count >= 3 && count <= 10) return `${count} جولات`;
+  return `${count} جولة`;
+}
+
+/** ساعة الانطلاق بمنطقتي العرض والبيانات — نفس عرف بقية الموقع */
+function kickoffClock(iso: string) {
+  return {
+    known: hasKnownKickoffTime(iso),
+    userTime: formatMatchTime(iso),
+    dataTime: formatMatchTime(iso, DATA_TZ),
+  };
+}
+
+function KickoffStamp({ iso }: { iso: string }) {
+  const clock = kickoffClock(iso);
+  if (!clock.known) {
+    return <span className="text-[11px] text-muted">التوقيت غير مؤكد بعد</span>;
+  }
+  return (
+    <time dateTime={iso} className="flex flex-wrap items-baseline gap-x-1.5">
+      <span className="text-[12px] font-bold text-ink tabular">{clock.userTime}</span>
+      <span className="text-[10px] text-muted">{DISPLAY_TZ_LABEL}</span>
+      <span className="text-[11px] text-faint tabular">
+        {clock.dataTime} {DATA_TZ_LABEL}
+      </span>
+    </time>
+  );
+}
+
+/**
+ * يوم الجولة كبطاقة قابلة للطي: الرأس يحمل اسم اليوم والجولة،
+ * والضغط يفتح المباريات أو يطويها بارتفاع شبكي قابل للمقاطعة.
+ */
+function DayPanel<T extends RoundedFixture>({
+  day,
+  unit,
+  open,
+  onToggle,
+  label,
+  children,
+}: {
+  day: DayRoundGroup<T>;
+  unit: string;
+  open: boolean;
+  onToggle: () => void;
+  label: string;
+  children: () => ReactNode;
+}) {
+  // محتوى اليوم يُبنى عند أول فتح ثم يبقى: الجدول كامل الموسم يزيد على ٥٠٠ مباراة،
+  // وبناؤها كلها مقدماً يُثقل الصفحة بلا أن يراها أحد
+  const everOpen = useRef(open);
+  if (open) everOpen.current = true;
+
+  const firstRound = day.rounds[0]!;
+  const uniformRound =
+    firstRound.matchday != null &&
+    day.rounds.every((r) => r.matchday === firstRound.matchday)
+      ? firstRound.matchday
+      : null;
+
+  const times = day.items.map((m) => m.utcDate).sort((a, b) => a.localeCompare(b));
+  const first = kickoffClock(times[0]!);
+  const last = kickoffClock(times[times.length - 1]!);
+  const span =
+    first.known && last.known && first.userTime !== last.userTime
+      ? `${first.userTime} — ${last.userTime}`
+      : first.known
+        ? first.userTime
+        : null;
+
+  return (
+    <section
+      aria-label={label}
+      className={`rounded border overflow-hidden transition-[border-color,box-shadow] duration-200 ${
+        open
+          ? "border-line-strong bg-surface shadow-xs"
+          : "border-line bg-panel hover:border-line-strong"
+      }`}
+    >
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={open}
+        className={`w-full px-4 py-3 text-start select-none cursor-pointer transition-colors ${
+          open ? "bg-panel" : "hover:bg-panel/80"
+        }`}
+      >
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+          <div className="flex flex-wrap items-center gap-2.5 min-w-0">
+            <span
+              className={`flex h-7 w-7 items-center justify-center rounded-lg border bg-surface transition-[transform,color,border-color] duration-200 ${
+                open
+                  ? "rotate-90 border-accent/30 text-accent"
+                  : "-rotate-90 border-line text-muted"
+              }`}
+              aria-hidden
+            >
+              <ChevronIcon size={14} />
+            </span>
+            <h3 className="text-sm font-bold text-ink text-pretty">{day.weekday}</h3>
+            {uniformRound != null ? (
+              <span className="px-2 py-0.5 rounded bg-accent-dim text-accent border border-accent/20 text-[11px] font-bold tabular">
+                الجولة {uniformRound}
+              </span>
+            ) : (
+              <span className="px-2 py-0.5 rounded bg-surface text-muted border border-line text-[11px] font-semibold">
+                {roundCountAr(day.rounds.length)}
+              </span>
+            )}
+            <span className="text-xs text-muted">{day.dateLabel}</span>
+            {day.relative ? (
+              <span suppressHydrationWarning className="text-[11px] font-semibold text-accent">
+                {day.relative}
+              </span>
+            ) : null}
+          </div>
+
+          <div className="flex items-center gap-2.5 text-[11px]">
+            {span ? (
+              <span className="text-muted tabular hidden sm:inline">
+                {span} {DISPLAY_TZ_LABEL}
+              </span>
+            ) : null}
+            <span className="px-2.5 py-1 rounded-full bg-surface border border-line font-semibold text-muted tabular">
+              {matchCountAr(day.items.length)} {unit}
+            </span>
+            <span className="font-semibold text-muted min-w-9">
+              {open ? "إخفاء" : "عرض"}
+            </span>
+          </div>
+        </div>
+
+        {uniformRound == null ? (
+          <ul className="flex flex-wrap items-center gap-1.5 border-t border-line/60 mt-2.5 pt-2.5">
+            {day.rounds.map((round) => (
+              <li
+                key={round.key}
+                className="px-2 py-0.5 rounded bg-surface border border-line text-[11px]"
+              >
+                <span className="text-muted">{round.leagueName}</span>
+                <span className="mx-1 text-faint" aria-hidden>
+                  ·
+                </span>
+                <span className="font-bold text-accent tabular">{round.roundLabel}</span>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+      </button>
+
+      <div className={`accordion-wrapper ${open ? "is-open" : ""}`}>
+        <div className="accordion-content">
+          {everOpen.current ? (
+            <div className="border-t border-line bg-surface p-3 sm:p-4">{children()}</div>
+          ) : null}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export function HasrTerminalView({ initialData }: HasrTerminalViewProps) {
+  // اللائحة تُحدَّث من نفس مصدر الصفحة كل نصف دقيقة، فلا تتجمّد الأرقام بين الجولات
+  const [data, setData] = useState<ConfinedPlatformData>(initialData);
   const [activeTab, setActiveTab] = useState<"screener" | "parlay" | "radar" | "calibration">("screener");
   const [selectedLeague, setSelectedLeague] = useState<string>("all");
   const [strategyFilter, setStrategyFilter] = useState<"all" | "safety" | "value" | "balanced" | "traps">("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [viewMode, setViewMode] = useState<"cards" | "table">("cards");
-  const [sortBy, setSortBy] = useState<"date_asc" | "score_desc" | "prob_desc" | "edge_desc">("score_desc");
+  // الافتراضي تصاعدي بساعة الانطلاق — الجدول يُقرأ كجدول جولة لا كلائحة ترتيب
+  const [sortBy, setSortBy] = useState<"date_asc" | "score_desc" | "prob_desc" | "edge_desc">("date_asc");
+  /** أيام مفتوحة صراحة — اليوم الأول من كل لائحة مفتوح ما لم يُطوَ */
+  const [openDays, setOpenDays] = useState<Record<string, boolean>>({});
 
   // Selected match for detailed inspection modal
   const [inspectingMatch, setInspectingMatch] = useState<BankerPick | null>(null);
@@ -33,40 +242,54 @@ export function HasrTerminalView({ initialData }: HasrTerminalViewProps) {
 
   // Parlay Lab selection state
   const [selectedMatch1, setSelectedMatch1] = useState<ParlayCandidateMatch | null>(
-    initialData.parlayCandidates[0] || null
+    data.parlayCandidates[0] || null
   );
   const [selectedMatch2, setSelectedMatch2] = useState<ParlayCandidateMatch | null>(
-    initialData.parlayCandidates[1] || null
+    data.parlayCandidates[1] || null
   );
+
+  useEffect(() => {
+    let mounted = true;
+    const controller = new AbortController();
+
+    async function refresh() {
+      try {
+        const res = await fetch("/api/v1/hasr", {
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        if (!res.ok) return;
+        const fresh = (await res.json()) as ConfinedPlatformData & { status?: string };
+        if (!mounted || fresh.status === "error" || !fresh.confinedMatches) return;
+        setData(fresh);
+      } catch {
+        // انقطاع مؤقت — نبقي اللائحة الحالية حتى الدورة التالية
+      }
+    }
+
+    const id = window.setInterval(refresh, 30_000);
+    return () => {
+      mounted = false;
+      controller.abort();
+      window.clearInterval(id);
+    };
+  }, []);
 
   // Filter and sort confined matches
   const filteredConfined = useMemo(() => {
-    let list = [...initialData.confinedMatches];
-
-    if (strategyFilter === "safety") {
-      list = [...initialData.strategies.safety];
-    } else if (strategyFilter === "value") {
-      list = [...initialData.strategies.value];
-    } else if (strategyFilter === "balanced") {
-      list = [...initialData.strategies.balanced];
-    } else if (strategyFilter === "traps") {
-      list = [...initialData.strategies.traps];
-    }
+    let list =
+      strategyFilter === "safety"
+        ? data.strategies.safety
+        : strategyFilter === "value"
+          ? data.strategies.value
+          : strategyFilter === "balanced"
+            ? data.strategies.balanced
+            : strategyFilter === "traps"
+              ? data.strategies.traps
+              : data.confinedMatches;
 
     if (selectedLeague !== "all") {
-      const leagueNameMap: Record<string, string> = {
-        PL: "الدوري الإنجليزي",
-        PD: "الدوري الإسباني",
-        SA: "الدوري الإيطالي",
-        BL1: "الدوري الألماني",
-        FL1: "الدوري الفرنسي",
-        PPD: "الدوري البرتغالي",
-        DED: "الدوري الهولندي",
-      };
-      const expectedName = leagueNameMap[selectedLeague];
-      if (expectedName) {
-        list = list.filter((m) => m.leagueName.includes(expectedName) || m.leagueName === expectedName);
-      }
+      list = list.filter((m) => m.leagueId === selectedLeague);
     }
 
     if (searchQuery.trim()) {
@@ -79,34 +302,46 @@ export function HasrTerminalView({ initialData }: HasrTerminalViewProps) {
       );
     }
 
-    // Sort order
-    list.sort((a, b) => {
-      if (sortBy === "date_asc") {
-        const timeA = a.utcDate ? new Date(a.utcDate).getTime() : 0;
-        const timeB = b.utcDate ? new Date(b.utcDate).getTime() : 0;
-        if (timeA !== timeB) return timeA - timeB;
-        return (b.selectionScore ?? 0) - (a.selectionScore ?? 0);
-      }
-      if (sortBy === "score_desc") {
-        const br = b.model2?.reliability ?? b.selectionScore ?? 0;
-        const ar = a.model2?.reliability ?? a.selectionScore ?? 0;
-        return br - ar;
-      }
-      if (sortBy === "prob_desc") {
-        return b.probability - a.probability;
-      }
-      if (sortBy === "edge_desc") {
-        return (b.edge ?? 0) - (a.edge ?? 0);
-      }
-      return 0;
-    });
-
     return list;
-  }, [initialData, selectedLeague, strategyFilter, searchQuery, sortBy]);
+  }, [data, selectedLeague, strategyFilter, searchQuery]);
 
-  // Filtered and sorted excluded matches
-  const filteredExcluded = useMemo(() => {
-    let list = [...initialData.excludedMatches];
+  /** ترتيب المباريات داخل اليوم — ترتيب الأيام نفسها يبقى زمنياً تصاعدياً */
+  const sortWithinDay = useMemo(() => {
+    return (a: BankerPick, b: BankerPick) => {
+      if (sortBy === "score_desc") {
+        const ar = a.model2?.reliability ?? a.selectionScore ?? 0;
+        const br = b.model2?.reliability ?? b.selectionScore ?? 0;
+        if (br !== ar) return br - ar;
+      } else if (sortBy === "prob_desc") {
+        if (b.probability !== a.probability) return b.probability - a.probability;
+      } else if (sortBy === "edge_desc") {
+        const ae = a.edge ?? 0;
+        const be = b.edge ?? 0;
+        if (be !== ae) return be - ae;
+      }
+      return a.utcDate.localeCompare(b.utcDate);
+    };
+  }, [sortBy]);
+
+  /** أيام الجولة الحالية تصاعدياً، ومباريات كل يوم بداخله */
+  const confinedDays = useMemo(
+    () => groupByDayAndRound(filteredConfined, new Date(), sortWithinDay),
+    [filteredConfined, sortWithinDay]
+  );
+
+  /** ترتيب الموثوقية عبر اللائحة كاملة — يبقى صحيحاً بعد التجميع بالأيام */
+  const reliabilityRank = useMemo(() => {
+    const ranked = [...filteredConfined].sort(
+      (a, b) =>
+        (b.model2?.reliability ?? b.selectionScore ?? 0) -
+        (a.model2?.reliability ?? a.selectionScore ?? 0)
+    );
+    return new Map(ranked.map((m, i) => [m.matchId, i + 1]));
+  }, [filteredConfined]);
+
+  // Filtered excluded matches, grouped by day then round
+  const excludedDays = useMemo(() => {
+    let list = data.excludedMatches;
     if (selectedLeague !== "all") {
       list = list.filter((m) => m.leagueId === selectedLeague);
     }
@@ -119,10 +354,58 @@ export function HasrTerminalView({ initialData }: HasrTerminalViewProps) {
           m.leagueNameAr.toLowerCase().includes(q)
       );
     }
-    // Sort excluded matches chronologically ascending
-    list.sort((a, b) => new Date(a.utcDate).getTime() - new Date(b.utcDate).getTime());
-    return list;
-  }, [initialData.excludedMatches, selectedLeague, searchQuery]);
+    return groupByDayAndRound(
+      list.map((m) => ({ ...m, leagueName: m.leagueNameAr })),
+      new Date()
+    );
+  }, [data.excludedMatches, selectedLeague, searchQuery]);
+
+  const excludedCount = useMemo(
+    () => excludedDays.reduce((acc, d) => acc + d.items.length, 0),
+    [excludedDays]
+  );
+
+  /** بانتظار النموذج — تتبع تصفية الدوري كي لا تخالف اللائحة المعروضة */
+  const awaitingModel = useMemo(
+    () =>
+      selectedLeague === "all"
+        ? data.awaitingModel
+        : data.awaitingModel.filter((m) => m.leagueId === selectedLeague),
+    [data.awaitingModel, selectedLeague]
+  );
+
+  const isDayOpen = (scope: string, key: string, index: number) =>
+    openDays[`${scope}:${key}`] ?? index === 0;
+
+  const toggleDay = (scope: string, key: string, index: number) => {
+    const id = `${scope}:${key}`;
+    setOpenDays((prev) => ({
+      ...prev,
+      [id]: !(prev[id] ?? index === 0),
+    }));
+  };
+
+  /** أعداد أزرار الاستراتيجيات تتبع نفس تصفية الدوري والبحث كي لا تخالف اللائحة المعروضة */
+  const strategyCounts = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    const visible = (list: BankerPick[]) =>
+      list.filter(
+        (m) =>
+          (selectedLeague === "all" || m.leagueId === selectedLeague) &&
+          (!q ||
+            m.homeTeam.toLowerCase().includes(q) ||
+            m.awayTeam.toLowerCase().includes(q) ||
+            m.leagueName.toLowerCase().includes(q))
+      ).length;
+
+    return {
+      all: visible(data.confinedMatches),
+      safety: visible(data.strategies.safety),
+      value: visible(data.strategies.value),
+      balanced: visible(data.strategies.balanced),
+      traps: visible(data.strategies.traps),
+    };
+  }, [data, selectedLeague, searchQuery]);
 
   // Dual Parlay calculations
   const parlayStats = useMemo(() => {
@@ -176,10 +459,10 @@ export function HasrTerminalView({ initialData }: HasrTerminalViewProps) {
   }, [selectedMatch1, selectedMatch2]);
 
   const addMatchToParlay = (item: BankerPick) => {
-    const existing = initialData.parlayCandidates.find((c) => c.matchId === item.matchId);
+    const existing = data.parlayCandidates.find((c) => c.matchId === item.matchId);
     const chosen: ParlayCandidateMatch = existing || {
       matchId: item.matchId,
-      leagueId: "",
+      leagueId: item.leagueId,
       leagueNameAr: item.leagueName,
       utcDate: item.utcDate,
       homeTeam: item.homeTeam,
@@ -209,24 +492,11 @@ export function HasrTerminalView({ initialData }: HasrTerminalViewProps) {
     setActiveTab("parlay");
   };
 
-  const formatKickoff = (iso: string) => {
-    if (!iso) return { label: "موعد غير محدد", time: "—", relative: "—" };
-    const rel = formatRelativeDay(iso);
-    const time = formatMatchTime(iso, "Asia/Baghdad");
-    const date = formatShortDate(iso, "Asia/Baghdad");
-    return {
-      label: rel ? `${rel} · ${time}` : `${date} · ${time}`,
-      time,
-      date,
-      relative: rel || date,
-    };
-  };
-
   return (
     <div className="min-h-screen bg-bg text-ink flex flex-col">
       {/* Header */}
       <HasrHeader
-        summaryStats={initialData.summaryStats}
+        summaryStats={data.summaryStats}
         activeTab={activeTab}
         onTabChange={setActiveTab}
         selectedLeague={selectedLeague}
@@ -238,10 +508,6 @@ export function HasrTerminalView({ initialData }: HasrTerminalViewProps) {
         {/* TAB 1: SCREENER (المباريات المحصورة) */}
         {activeTab === "screener" && (
           <div className="space-y-4">
-            <div className="rounded border border-line bg-panel px-4 py-3 text-xs text-muted">
-              <span className="font-semibold text-ink">مسار النموذج 2: </span>
-              لائحة {initialData.pipeline.slateN} → مرشحون {initialData.pipeline.candidates} → أقوى {initialData.pipeline.topN}
-            </div>
             {/* Control Bar: Filters, Search, Sort & View Switch */}
             <div className="flex flex-col gap-3 border-b border-line pb-4">
               {/* Category Filter Buttons */}
@@ -255,7 +521,7 @@ export function HasrTerminalView({ initialData }: HasrTerminalViewProps) {
                         : "bg-panel text-muted hover:text-ink border-line"
                     }`}
                   >
-                    كافة المحصورة ({initialData.confinedMatches.length})
+                    كافة المحصورة ({strategyCounts.all})
                   </button>
                   <button
                     onClick={() => setStrategyFilter("safety")}
@@ -265,7 +531,7 @@ export function HasrTerminalView({ initialData }: HasrTerminalViewProps) {
                         : "bg-panel text-muted hover:text-ink border-line"
                     }`}
                   >
-                    الأعلى أماناً ({initialData.strategies.safety.length})
+                    الأعلى أماناً ({strategyCounts.safety})
                   </button>
                   <button
                     onClick={() => setStrategyFilter("value")}
@@ -275,7 +541,7 @@ export function HasrTerminalView({ initialData }: HasrTerminalViewProps) {
                         : "bg-panel text-muted hover:text-ink border-line"
                     }`}
                   >
-                    أعلى قيمة ({initialData.strategies.value.length})
+                    أعلى قيمة ({strategyCounts.value})
                   </button>
                   <button
                     onClick={() => setStrategyFilter("balanced")}
@@ -285,7 +551,7 @@ export function HasrTerminalView({ initialData }: HasrTerminalViewProps) {
                         : "bg-panel text-muted hover:text-ink border-line"
                     }`}
                   >
-                    المتوازنة ({initialData.strategies.balanced.length})
+                    المتوازنة ({strategyCounts.balanced})
                   </button>
                   <button
                     onClick={() => setStrategyFilter("traps")}
@@ -295,7 +561,7 @@ export function HasrTerminalView({ initialData }: HasrTerminalViewProps) {
                         : "bg-panel text-muted hover:text-ink border-line"
                     }`}
                   >
-                    مصائد السوق ({initialData.strategies.traps.length})
+                    مصائد السوق ({strategyCounts.traps})
                   </button>
                 </div>
 
@@ -346,7 +612,7 @@ export function HasrTerminalView({ initialData }: HasrTerminalViewProps) {
 
                 <div className="flex items-center gap-2 text-xs">
                   <label htmlFor="sort-select" className="text-muted font-medium">
-                    الترتيب:
+                    الترتيب داخل اليوم:
                   </label>
                   <select
                     id="sort-select"
@@ -358,342 +624,121 @@ export function HasrTerminalView({ initialData }: HasrTerminalViewProps) {
                     }
                     className="text-xs bg-panel border border-line rounded px-2.5 py-1 text-ink focus:outline-hidden focus:border-accent"
                   >
-                    <option value="date_asc">الأقرب موعداً (تصاعدياً من الأقرب للابعد)</option>
+                    <option value="date_asc">ساعة الانطلاق تصاعدياً</option>
                     <option value="score_desc">الأعلى موثوقية (النموذج 2)</option>
                     <option value="prob_desc">أعلى نسبة احتمال فوز</option>
                     <option value="edge_desc">أعلى قيمة مضافة (+EV Edge)</option>
                   </select>
                 </div>
+                <p className="basis-full text-[11px] text-faint">
+                  الأيام مرتبة زمنياً تصاعدياً دائماً — الجمعة ثم السبت ثم الأحد ثم الاثنين — مع
+                  اسم الجولة أمام كل يوم، والترتيب أعلاه يطبّق داخل اليوم فقط. الساعات بتوقيت{" "}
+                  {DISPLAY_TZ_LABEL} ويقابلها توقيت {DATA_TZ_LABEL}.
+                </p>
               </div>
             </div>
 
-            {/* Content: Empty State or Match Listing */}
-            {filteredConfined.length === 0 ? (
-              <div className="p-12 text-center rounded border border-line bg-panel space-y-2">
-                <p className="text-sm font-semibold text-ink">لا توجد مباريات مطابقة للبحث أو التصفية</p>
-                <p className="text-xs text-muted">جرب تعديل كلمة البحث أو اختيار دوري واستراتيجية مختلفة</p>
-              </div>
-            ) : viewMode === "cards" ? (
-              /* Enhanced Cards View with Distinct Team Colors & Dates */
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {filteredConfined.map((item, idx) => {
-                  const homeCol = getTeamColors(item.homeTeam, item.homeTeamId);
-                  const awayCol = getTeamColors(item.awayTeam, item.awayTeamId);
-                  const kickoff = formatKickoff(item.utcDate);
-
-                  return (
-                    <div
-                      key={item.matchId}
-                      className={`group rounded border transition-all relative overflow-hidden flex flex-col justify-between ${
-                        item.isTrap
-                          ? "bg-rose-500/5 border-rose-500/30"
-                          : idx < 8
-                            ? "bg-surface border-accent/40 hover:border-accent"
-                            : "bg-surface border-line hover:border-accent"
-                      }`}
+            {/* مباريات مجدولة لم يمر عليها النموذج: تُذكر صراحة كي لا تغيب بلا أثر */}
+            {awaitingModel.length > 0 ? (
+              <div className="rounded border border-amber-500/25 bg-amber-500/5 px-4 py-3 space-y-2">
+                <p className="text-xs font-bold text-ink">
+                  {matchCountAr(awaitingModel.length)} بانتظار تشغيل النموذج — خارج المحصورة
+                  والمستبعدة
+                </p>
+                <p className="text-[11px] text-muted leading-relaxed">
+                  مجدولة بلا مؤشر عشوائية أو تحليلات النموذج، فلا تُمنح درجة أمان مفترضة. تدخل
+                  اللائحة تلقائياً بعد أقرب تشغيلة تقييم.
+                </p>
+                <ul className="flex flex-wrap gap-1.5">
+                  {awaitingModel.slice(0, 10).map((m) => (
+                    <li
+                      key={m.matchId}
+                      className="px-2 py-0.5 rounded bg-surface border border-line text-[11px] text-muted"
                     >
-                      {/* Top Bar: League, Matchday, Kickoff */}
-                      <div className="p-3.5 border-b border-line bg-panel/40 flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-2">
-                          <span className="font-semibold text-ink">{item.leagueName}</span>
-                          {idx < 8 && sortBy === "score_desc" && strategyFilter === "all" ? (
-                            <span className="text-[10px] text-accent px-1.5 py-0.5 rounded bg-surface border border-accent/30 tabular">
-                              أقوى {idx + 1}
-                            </span>
-                          ) : null}
-                          {item.matchday ? (
-                            <span className="text-[10px] text-muted px-1.5 py-0.5 rounded bg-surface border border-line tabular">
-                              الجولة {item.matchday}
-                            </span>
-                          ) : null}
-                        </div>
+                      {m.homeTeam} × {m.awayTeam}
+                      {m.matchday != null ? (
+                        <span className="mx-1 text-faint tabular">· الجولة {m.matchday}</span>
+                      ) : null}
+                    </li>
+                  ))}
+                  {awaitingModel.length > 10 ? (
+                    <li className="px-2 py-0.5 text-[11px] text-faint tabular">
+                      و{awaitingModel.length - 10} أخرى
+                    </li>
+                  ) : null}
+                </ul>
+              </div>
+            ) : null}
 
-                        {/* Kickoff Timing (Ascending Nearest) */}
-                        <div className="flex items-center gap-1.5">
-                          <span className="inline-block w-1.5 h-1.5 rounded-full bg-accent" />
-                          <span className="text-[11px] font-semibold text-ink tabular">
-                            {kickoff.label}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Card Body: Interactive Click to inspect */}
-                      <div
-                        onClick={() => setInspectingMatch(item)}
-                        className="p-4 space-y-4 cursor-pointer"
-                        title="انقر لعرض تفاصيل المباراة الكاملة"
-                      >
-                        {/* Matchup with Team Colors */}
-                        <div className="space-y-2.5">
-                          {/* Home Team */}
-                          <div className="flex items-center justify-between gap-3">
-                            <div className="flex items-center gap-2.5 min-w-0">
-                              {/* Team Color Pill & Crest */}
-                              <span
-                                className="w-1.5 h-5 rounded-xs shrink-0"
-                                style={{ backgroundColor: homeCol.hex }}
-                                title={`لون ${item.homeTeam}`}
-                              />
-                              <Crest
-                                src={item.homeCrestUrl}
-                                alt={item.homeTeam}
-                                size="sm"
-                                fallback={crestInitials(item.homeTeam)}
-                              />
-                              <span className="text-sm font-bold text-ink truncate group-hover:text-accent transition-colors">
-                                {item.homeTeam}
-                              </span>
-                            </div>
-                            <span className="text-xs font-bold text-muted tabular">
-                              {item.pickKey === "H" ? (
-                                <span className="text-accent font-black">
-                                  {pct(item.probability)}
-                                </span>
-                              ) : (
-                                "مضيف"
-                              )}
-                            </span>
-                          </div>
-
-                          {/* Away Team */}
-                          <div className="flex items-center justify-between gap-3">
-                            <div className="flex items-center gap-2.5 min-w-0">
-                              {/* Team Color Pill & Crest */}
-                              <span
-                                className="w-1.5 h-5 rounded-xs shrink-0"
-                                style={{ backgroundColor: awayCol.hex }}
-                                title={`لون ${item.awayTeam}`}
-                              />
-                              <Crest
-                                src={item.awayCrestUrl}
-                                alt={item.awayTeam}
-                                size="sm"
-                                fallback={crestInitials(item.awayTeam)}
-                              />
-                              <span className="text-sm font-bold text-ink truncate group-hover:text-accent transition-colors">
-                                {item.awayTeam}
-                              </span>
-                            </div>
-                            <span className="text-xs font-bold text-muted tabular">
-                              {item.pickKey === "A" ? (
-                                <span className="text-accent font-black">
-                                  {pct(item.probability)}
-                                </span>
-                              ) : (
-                                "ضيف"
-                              )}
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Pick & Score Bar */}
-                        <div className="p-2.5 rounded bg-panel/70 border border-line flex items-center justify-between text-xs">
-                          <div className="space-y-0.5">
-                            <span className="text-[10px] text-muted block">ترشيح الحصر</span>
-                            <span className="font-bold text-ink">{item.pickLabel}</span>
-                          </div>
-                          <div className="text-end space-y-0.5">
-                            <span className="text-[10px] text-muted block">احتمال النموذج</span>
-                            <span className="text-sm font-black text-ink tabular">
-                              {pct(item.probability)}
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* 3 Metrics Row */}
-                        <div className="grid grid-cols-3 gap-2 text-center text-xs">
-                          <div className="p-2 rounded bg-panel/40 border border-line/60">
-                            <span className="text-[10px] text-muted block">سعر السوق</span>
-                            <span className="font-bold tabular text-ink">
-                              {item.odds ? item.odds.toFixed(2) : "—"}
-                            </span>
-                          </div>
-                          <div className="p-2 rounded bg-panel/40 border border-line/60">
-                            <span className="text-[10px] text-muted block">القيمة (Edge)</span>
-                            <span
-                              className={`font-bold tabular ${
-                                (item.edge ?? 0) > 0
-                                  ? "text-emerald-700 dark:text-emerald-400"
-                                  : "text-muted"
-                              }`}
-                            >
-                              {item.edge !== null && item.edge !== undefined
-                                ? `${item.edge > 0 ? "+" : ""}${Math.round(item.edge * 100)}%`
-                                : "—"}
-                            </span>
-                          </div>
-                          <div className="p-2 rounded bg-panel/40 border border-line/60">
-                            <span className="text-[10px] text-muted block">موثوقية 2</span>
-                            <span className="font-bold tabular text-ink">
-                              {item.model2?.reliability != null
-                                ? item.model2.reliability.toFixed(0)
-                                : item.selectionScore ?? "—"}
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Trap Warning if applicable */}
-                        {item.isTrap && (
-                          <div className="p-2 rounded text-[11px] bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-500/20 font-medium">
-                            تنبيه مصيدة سعرية: السعر المعروض يتطلب احتمالية فوز أعلى من تقدير النموذج
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Card Footer Actions */}
-                      <div className="p-3 border-t border-line bg-panel/20 flex items-center justify-between text-xs gap-2">
-                        <button
-                          onClick={() => setInspectingMatch(item)}
-                          className="text-muted hover:text-ink font-semibold transition-colors text-[11px]"
-                        >
-                          معاينة الفحص ↗
-                        </button>
-
-                        <div className="flex items-center gap-2">
-                          <Link
-                            href={`/match/${item.matchId}`}
-                            className="text-xs text-muted hover:text-accent font-medium underline-offset-4 hover:underline"
-                          >
-                            صفحة اللقاء الكاملة
-                          </Link>
-
-                          <button
-                            onClick={() => addMatchToParlay(item)}
-                            className="px-2.5 py-1 rounded bg-panel hover:bg-ink hover:text-surface text-ink text-[11px] font-semibold border border-line transition-colors"
-                          >
-                            + بارلي
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
+            {/* Content: Empty State or Day → Round Listing */}
+            {confinedDays.length === 0 ? (
+              <div className="p-12 text-center rounded border border-line bg-panel space-y-2">
+                <p className="text-sm font-semibold text-ink">
+                  لا توجد مباريات مطابقة للبحث أو التصفية
+                </p>
+                <p className="text-xs text-muted">
+                  جرب تعديل كلمة البحث أو اختيار دوري واستراتيجية مختلفة
+                </p>
               </div>
             ) : (
-              /* Dense Table View */
-              <div className="overflow-x-auto rounded border border-line bg-surface">
-                <table className="w-full text-xs text-right border-collapse">
-                  <thead>
-                    <tr className="border-b border-line bg-panel/50 text-muted font-semibold">
-                      <th className="p-3">الموعد والجولة</th>
-                      <th className="p-3">المباراة والفرق</th>
-                      <th className="p-3">الدوري</th>
-                      <th className="p-3 text-center">الترشيح</th>
-                      <th className="p-3 text-center">احتمال النموذج</th>
-                      <th className="p-3 text-center">سعر السوق</th>
-                      <th className="p-3 text-center">القيمة (Edge)</th>
-                      <th className="p-3 text-center">مؤشر الأمان</th>
-                      <th className="p-3 text-center">درجة الحصر</th>
-                      <th className="p-3 text-center">إجراء</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-line">
-                    {filteredConfined.map((item) => {
-                      const homeCol = getTeamColors(item.homeTeam, item.homeTeamId);
-                      const awayCol = getTeamColors(item.awayTeam, item.awayTeamId);
-                      const kickoff = formatKickoff(item.utcDate);
-
-                      return (
-                        <tr
-                          key={item.matchId}
-                          className={`hover:bg-panel/40 transition-colors cursor-pointer ${
-                            item.isTrap ? "bg-rose-500/5" : ""
-                          }`}
-                          onClick={() => setInspectingMatch(item)}
-                        >
-                          {/* Kickoff & Round */}
-                          <td className="p-3 text-muted tabular whitespace-nowrap">
-                            <span className="font-semibold text-ink block">{kickoff.label}</span>
-                            {item.matchday ? (
-                              <span className="text-[10px] text-faint">الجولة {item.matchday}</span>
-                            ) : null}
-                          </td>
-
-                          {/* Match with Colors */}
-                          <td className="p-3 font-semibold text-ink">
-                            <div className="flex items-center gap-2">
-                              <span
-                                className="w-1 h-3.5 rounded-xs"
-                                style={{ backgroundColor: homeCol.hex }}
+              <div className="space-y-3">
+                {confinedDays.map((day, index) => (
+                  <DayPanel
+                    key={day.key}
+                    day={day}
+                    unit="محصورة"
+                    open={isDayOpen("confined", day.key, index)}
+                    onToggle={() => toggleDay("confined", day.key, index)}
+                    label={`المباريات المحصورة ${day.weekday} ${day.dateLabel}`}
+                  >
+                    {() => viewMode === "cards" ? (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                        {day.items.map((item) => (
+                          <ConfinedMatchCard
+                            key={item.matchId}
+                            item={item}
+                            rank={reliabilityRank.get(item.matchId) ?? null}
+                            showRank={strategyFilter === "all"}
+                            onInspect={setInspectingMatch}
+                            onAddParlay={addMatchToParlay}
+                          />
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="overflow-x-auto rounded border border-line bg-surface">
+                        <table className="w-full text-xs text-right border-collapse">
+                          <caption className="sr-only">
+                            المباريات المحصورة — {day.weekday} {day.dateLabel}
+                          </caption>
+                          <thead>
+                            <tr className="border-b border-line bg-panel/50 text-muted font-semibold">
+                              <th className="p-3">ساعة الانطلاق</th>
+                              <th className="p-3">المباراة والفرق</th>
+                              <th className="p-3">الدوري والجولة</th>
+                              <th className="p-3 text-center">الترشيح</th>
+                              <th className="p-3 text-center">احتمال النموذج</th>
+                              <th className="p-3 text-center">سعر السوق</th>
+                              <th className="p-3 text-center">القيمة (Edge)</th>
+                              <th className="p-3 text-center">مؤشر الأمان</th>
+                              <th className="p-3 text-center">درجة الحصر</th>
+                              <th className="p-3 text-center">إجراء</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-line">
+                            {day.items.map((item) => (
+                              <ConfinedMatchRow
+                                key={item.matchId}
+                                item={item}
+                                onInspect={setInspectingMatch}
+                                onAddParlay={addMatchToParlay}
                               />
-                              <span>{item.homeTeam}</span>
-                              <span className="text-muted font-normal text-[11px]">×</span>
-                              <span
-                                className="w-1 h-3.5 rounded-xs"
-                                style={{ backgroundColor: awayCol.hex }}
-                              />
-                              <span>{item.awayTeam}</span>
-                            </div>
-                            {item.isTrap && (
-                              <span className="mt-1 inline-block px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-500/20">
-                                مصيدة قيمة
-                              </span>
-                            )}
-                          </td>
-
-                          <td className="p-3 text-muted">{item.leagueName}</td>
-
-                          <td className="p-3 text-center">
-                            <span className="font-bold text-ink">
-                              {item.pickLabel}
-                            </span>
-                          </td>
-
-                          <td className="p-3 text-center tabular font-bold text-ink">
-                            {pct(item.probability)}
-                          </td>
-
-                          <td className="p-3 text-center tabular text-ink">
-                            {item.odds ? item.odds.toFixed(2) : "—"}
-                          </td>
-
-                          <td className="p-3 text-center tabular font-semibold">
-                            <span
-                              className={
-                                (item.edge ?? 0) > 0
-                                  ? "text-emerald-700 dark:text-emerald-400"
-                                  : "text-muted"
-                              }
-                            >
-                              {item.edge !== null && item.edge !== undefined
-                                ? `${item.edge > 0 ? "+" : ""}${Math.round(item.edge * 100)}%`
-                                : "—"}
-                            </span>
-                          </td>
-
-                          <td className="p-3 text-center tabular text-muted">
-                            {item.stabilityScore ?? 70}%
-                          </td>
-
-                          <td className="p-3 text-center tabular font-bold text-ink">
-                            {item.selectionScore}
-                          </td>
-
-                          <td
-                            className="p-3 text-center"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <div className="flex items-center justify-center gap-1.5">
-                              <button
-                                onClick={() => addMatchToParlay(item)}
-                                className="px-2 py-1 rounded bg-panel hover:bg-ink hover:text-surface text-ink text-[11px] font-semibold border border-line transition-colors"
-                              >
-                                + بارلي
-                              </button>
-                              <Link
-                                href={`/match/${item.matchId}`}
-                                className="p-1 text-muted hover:text-accent text-[11px]"
-                                title="فتح صفحة المباراة في تقدير العام"
-                              >
-                                ↗
-                              </Link>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </DayPanel>
+                ))}
               </div>
             )}
           </div>
@@ -720,12 +765,12 @@ export function HasrTerminalView({ initialData }: HasrTerminalViewProps) {
                   <select
                     value={selectedMatch1?.matchId || ""}
                     onChange={(e) => {
-                      const found = initialData.parlayCandidates.find((c) => c.matchId === e.target.value);
+                      const found = data.parlayCandidates.find((c) => c.matchId === e.target.value);
                       setSelectedMatch1(found || null);
                     }}
                     className="text-xs bg-panel border border-line rounded px-2.5 py-1 text-ink focus:outline-hidden focus:border-accent"
                   >
-                    {initialData.parlayCandidates.map((c) => (
+                    {data.parlayCandidates.map((c) => (
                       <option key={c.matchId} value={c.matchId}>
                         {c.homeTeam} × {c.awayTeam} ({pct(c.probability)})
                       </option>
@@ -762,12 +807,12 @@ export function HasrTerminalView({ initialData }: HasrTerminalViewProps) {
                   <select
                     value={selectedMatch2?.matchId || ""}
                     onChange={(e) => {
-                      const found = initialData.parlayCandidates.find((c) => c.matchId === e.target.value);
+                      const found = data.parlayCandidates.find((c) => c.matchId === e.target.value);
                       setSelectedMatch2(found || null);
                     }}
                     className="text-xs bg-panel border border-line rounded px-2.5 py-1 text-ink focus:outline-hidden focus:border-accent"
                   >
-                    {initialData.parlayCandidates.map((c) => (
+                    {data.parlayCandidates.map((c) => (
                       <option key={c.matchId} value={c.matchId}>
                         {c.homeTeam} × {c.awayTeam} ({pct(c.probability)})
                       </option>
@@ -887,80 +932,116 @@ export function HasrTerminalView({ initialData }: HasrTerminalViewProps) {
                 رادار الاستبعاد الصارم
               </h2>
               <p className="text-xs text-muted">
-                المباريات والفرق التي تم إسقاطها من الحصر والبارلي مرتبة تصاعدياً حسب موعد اللقاء لتوضيح أسباب الحظر
+                المباريات والفرق التي تم إسقاطها من الحصر والبارلي، موزعة على أيام الجولة نفسها
+                تصاعدياً لتوضيح أسباب الحظر
               </p>
             </div>
 
-            {/* Excluded Table */}
-            <div className="overflow-x-auto rounded border border-line bg-surface">
-              <table className="w-full text-xs text-right border-collapse">
-                <thead>
-                  <tr className="border-b border-line bg-panel/50 text-muted font-semibold">
-                    <th className="p-3">الموعد</th>
-                    <th className="p-3">المباراة والفرق</th>
-                    <th className="p-3 text-center">الدوري</th>
-                    <th className="p-3 text-center">مؤشر العشوائية (MRI)</th>
-                    <th className="p-3 text-center">مؤشر الأمان</th>
-                    <th className="p-3 text-center">السبب المباشر</th>
-                    <th className="p-3">التفصيل الإحصائي</th>
-                    <th className="p-3 text-center">تفاصيل</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-line">
-                  {filteredExcluded.map((match) => {
-                    const homeCol = getTeamColors(match.homeTeam);
-                    const awayCol = getTeamColors(match.awayTeam);
-                    const kickoff = formatKickoff(match.utcDate);
+            {excludedCount === 0 ? (
+              <div className="p-12 text-center rounded border border-line bg-panel space-y-2">
+                <p className="text-sm font-semibold text-ink">
+                  لا توجد مباريات مستبعدة مطابقة للبحث أو التصفية
+                </p>
+                <p className="text-xs text-muted">جرب تعديل كلمة البحث أو اختيار دوري آخر</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {excludedDays.map((day, index) => (
+                  <DayPanel
+                    key={day.key}
+                    day={day}
+                    unit="مستبعدة"
+                    open={isDayOpen("excluded", day.key, index)}
+                    onToggle={() => toggleDay("excluded", day.key, index)}
+                    label={`المباريات المستبعدة ${day.weekday} ${day.dateLabel}`}
+                  >
+                    {() => (
+                    <div className="overflow-x-auto rounded border border-line bg-surface">
+                      <table className="w-full text-xs text-right border-collapse">
+                        <caption className="sr-only">
+                          المباريات المستبعدة — {day.weekday} {day.dateLabel}
+                        </caption>
+                        <thead>
+                          <tr className="border-b border-line bg-panel/50 text-muted font-semibold">
+                            <th className="p-3">ساعة الانطلاق</th>
+                            <th className="p-3">المباراة والفرق</th>
+                            <th className="p-3">الدوري والجولة</th>
+                            <th className="p-3 text-center">مؤشر العشوائية (MRI)</th>
+                            <th className="p-3 text-center">مؤشر الأمان</th>
+                            <th className="p-3 text-center">السبب المباشر</th>
+                            <th className="p-3">التفصيل الإحصائي</th>
+                            <th className="p-3 text-center">تفاصيل</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-line">
+                          {day.items.map((match) => {
+                            const homeCol = getTeamColors(match.homeTeam);
+                            const awayCol = getTeamColors(match.awayTeam);
 
-                    return (
-                      <tr key={match.matchId} className="hover:bg-panel/30 transition-colors">
-                        <td className="p-3 text-muted tabular whitespace-nowrap">
-                          {kickoff.label}
-                        </td>
-                        <td className="p-3 font-semibold text-ink">
-                          <div className="flex items-center gap-1.5">
-                            <span className="w-1 h-3.5 rounded-xs" style={{ backgroundColor: homeCol.hex }} />
-                            <span>{match.homeTeam}</span>
-                            <span className="text-muted font-normal text-[11px]">×</span>
-                            <span className="w-1 h-3.5 rounded-xs" style={{ backgroundColor: awayCol.hex }} />
-                            <span>{match.awayTeam}</span>
-                          </div>
-                        </td>
-                        <td className="p-3 text-center text-muted">
-                          {match.leagueNameAr}
-                        </td>
-                        <td className="p-3 text-center tabular font-bold text-rose-700 dark:text-rose-400">
-                          {match.matchRandomnessIndex} / 100
-                        </td>
-                        <td className="p-3 text-center tabular text-muted font-medium">
-                          {match.stabilityScore}%
-                        </td>
-                        <td className="p-3 text-center">
-                          <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-500/20">
-                            {match.primaryExclusionPillar === "draw_trap" && "فخ تعادل متكرر"}
-                            {match.primaryExclusionPillar === "second_half_fragility" && "تراجع الشوط الثاني"}
-                            {match.primaryExclusionPillar === "disciplinary_risk" && "مخاطر طرد وبطاقات"}
-                            {match.primaryExclusionPillar === "volatility" && "تذبذب نتائج حاد"}
-                            {match.primaryExclusionPillar === "other" && "عشوائية حرجة"}
-                          </span>
-                        </td>
-                        <td className="p-3 text-muted text-[11px] leading-relaxed max-w-sm">
-                          {match.primaryReasonAr}
-                        </td>
-                        <td className="p-3 text-center">
-                          <Link
-                            href={`/match/${match.matchId}`}
-                            className="text-xs text-muted hover:text-accent underline-offset-4 hover:underline"
-                          >
-                            عرض ↗
-                          </Link>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                            return (
+                              <tr
+                                key={match.matchId}
+                                className="hover:bg-panel/30 transition-colors"
+                              >
+                                <td className="p-3 whitespace-nowrap">
+                                  <KickoffStamp iso={match.utcDate} />
+                                </td>
+                                <td className="p-3 font-semibold text-ink">
+                                  <div className="flex items-center gap-1.5">
+                                    <span
+                                      className="w-1 h-3.5 rounded-xs"
+                                      style={{ backgroundColor: homeCol.hex }}
+                                    />
+                                    <span>{match.homeTeam}</span>
+                                    <span className="text-muted font-normal text-[11px]">×</span>
+                                    <span
+                                      className="w-1 h-3.5 rounded-xs"
+                                      style={{ backgroundColor: awayCol.hex }}
+                                    />
+                                    <span>{match.awayTeam}</span>
+                                  </div>
+                                </td>
+                                <td className="p-3 whitespace-nowrap">
+                                  <span className="text-muted">{match.leagueNameAr}</span>
+                                  {match.matchday != null ? (
+                                    <span className="block text-[11px] font-semibold text-accent tabular">
+                                      الجولة {match.matchday}
+                                    </span>
+                                  ) : null}
+                                </td>
+                                <td className="p-3 text-center tabular font-bold text-rose-700 dark:text-rose-400">
+                                  {match.matchRandomnessIndex} / 100
+                                </td>
+                                <td className="p-3 text-center tabular text-muted font-medium">
+                                  {match.stabilityScore}%
+                                </td>
+                                <td className="p-3 text-center">
+                                  <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-500/20">
+                                    {exclusionPillarLabel(match.primaryExclusionPillar)}
+                                  </span>
+                                </td>
+                                <td className="p-3 text-muted text-[11px] leading-relaxed max-w-sm">
+                                  {match.primaryReasonAr}
+                                </td>
+                                <td className="p-3 text-center">
+                                  <Link
+                                    href={`/match/${match.matchId}`}
+                                    className="text-xs text-muted hover:text-accent underline-offset-4 hover:underline"
+                                  >
+                                    عرض ↗
+                                  </Link>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                    )}
+                  </DayPanel>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -990,7 +1071,7 @@ export function HasrTerminalView({ initialData }: HasrTerminalViewProps) {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-line">
-                  {initialData.calibration.bins.map((bin) => {
+                  {data.calibration.bins.map((bin) => {
                     const isAccurate = Math.abs(bin.calibrationError) <= 0.05;
                     return (
                       <tr key={bin.label} className="hover:bg-panel/30 transition-colors">
@@ -1052,9 +1133,12 @@ export function HasrTerminalView({ initialData }: HasrTerminalViewProps) {
                 <span className="text-xs font-semibold text-muted block">
                   {inspectingMatch.leagueName} {inspectingMatch.matchday ? `· الجولة ${inspectingMatch.matchday}` : ""}
                 </span>
-                <span className="text-xs text-accent font-medium tabular">
-                  {formatKickoff(inspectingMatch.utcDate).label}
-                </span>
+                <time
+                  dateTime={inspectingMatch.utcDate}
+                  className="text-xs text-accent font-medium tabular"
+                >
+                  {formatKickoffAbsolute(inspectingMatch.utcDate)}
+                </time>
               </div>
               <button
                 onClick={() => setInspectingMatch(null)}
@@ -1133,7 +1217,11 @@ export function HasrTerminalView({ initialData }: HasrTerminalViewProps) {
             </div>
 
             <div className="rounded border border-line bg-panel/30 p-3">
-              <Model2Breakdown model2={inspectingMatch.model2} compact />
+              <Model2BreakdownLazy
+                matchId={inspectingMatch.matchId}
+                model2={inspectingMatch.model2}
+                compact
+              />
             </div>
 
             {/* Anti-Randomness Assessment */}
@@ -1260,5 +1348,285 @@ export function HasrTerminalView({ initialData }: HasrTerminalViewProps) {
         </div>
       )}
     </div>
+  );
+}
+
+interface ConfinedMatchProps {
+  item: BankerPick;
+  onInspect: (item: BankerPick) => void;
+  onAddParlay: (item: BankerPick) => void;
+}
+
+/** بطاقة مباراة محصورة — الدوري والجولة يحملهما رأس الجولة فلا يتكرران هنا */
+function ConfinedMatchCard({
+  item,
+  rank,
+  showRank,
+  onInspect,
+  onAddParlay,
+}: ConfinedMatchProps & { rank: number | null; showRank: boolean }) {
+  const homeCol = getTeamColors(item.homeTeam, item.homeTeamId);
+  const awayCol = getTeamColors(item.awayTeam, item.awayTeamId);
+  const isTop = showRank && rank != null && rank <= 8;
+
+  return (
+    <div
+      className={`group rounded border transition-all relative overflow-hidden flex flex-col justify-between ${
+        item.isTrap
+          ? "bg-rose-500/5 border-rose-500/30"
+          : isTop
+            ? "bg-surface border-accent/40 hover:border-accent"
+            : "bg-surface border-line hover:border-accent"
+      }`}
+    >
+      {/* Top Bar: League + round, kickoff in both zones, reliability rank */}
+      <div className="px-3.5 py-3 border-b border-line bg-panel/40 space-y-1.5 text-xs">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <span className="font-semibold text-ink truncate">{item.leagueName}</span>
+            {item.matchday != null ? (
+              <span className="shrink-0 text-[10px] font-bold text-accent px-1.5 py-0.5 rounded bg-surface border border-accent/20 tabular">
+                الجولة {item.matchday}
+              </span>
+            ) : null}
+          </div>
+          {isTop ? (
+            <span className="shrink-0 text-[10px] text-accent px-1.5 py-0.5 rounded bg-surface border border-accent/30 tabular">
+              أقوى {rank}
+            </span>
+          ) : null}
+        </div>
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className="inline-block w-1.5 h-1.5 rounded-full bg-accent shrink-0" />
+          <KickoffStamp iso={item.utcDate} />
+        </div>
+      </div>
+
+      {/* Card Body: Interactive Click to inspect */}
+      <div
+        onClick={() => onInspect(item)}
+        className="p-4 space-y-4 cursor-pointer"
+        title="انقر لعرض تفاصيل المباراة الكاملة"
+      >
+        {/* Matchup with Team Colors */}
+        <div className="space-y-2.5">
+          {/* Home Team */}
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <span
+                className="w-1.5 h-5 rounded-xs shrink-0"
+                style={{ backgroundColor: homeCol.hex }}
+                title={`لون ${item.homeTeam}`}
+              />
+              <Crest
+                src={item.homeCrestUrl}
+                alt={item.homeTeam}
+                size="sm"
+                fallback={crestInitials(item.homeTeam)}
+              />
+              <span className="text-sm font-bold text-ink truncate group-hover:text-accent transition-colors">
+                {item.homeTeam}
+              </span>
+            </div>
+            <span className="text-xs font-bold text-muted tabular">
+              {item.pickKey === "H" ? (
+                <span className="text-accent font-black">{pct(item.probability)}</span>
+              ) : (
+                "مضيف"
+              )}
+            </span>
+          </div>
+
+          {/* Away Team */}
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <span
+                className="w-1.5 h-5 rounded-xs shrink-0"
+                style={{ backgroundColor: awayCol.hex }}
+                title={`لون ${item.awayTeam}`}
+              />
+              <Crest
+                src={item.awayCrestUrl}
+                alt={item.awayTeam}
+                size="sm"
+                fallback={crestInitials(item.awayTeam)}
+              />
+              <span className="text-sm font-bold text-ink truncate group-hover:text-accent transition-colors">
+                {item.awayTeam}
+              </span>
+            </div>
+            <span className="text-xs font-bold text-muted tabular">
+              {item.pickKey === "A" ? (
+                <span className="text-accent font-black">{pct(item.probability)}</span>
+              ) : (
+                "ضيف"
+              )}
+            </span>
+          </div>
+        </div>
+
+        {/* Pick & Score Bar */}
+        <div className="p-2.5 rounded bg-panel/70 border border-line flex items-center justify-between text-xs">
+          <div className="space-y-0.5">
+            <span className="text-[10px] text-muted block">ترشيح الحصر</span>
+            <span className="font-bold text-ink">{item.pickLabel}</span>
+          </div>
+          <div className="text-end space-y-0.5">
+            <span className="text-[10px] text-muted block">احتمال النموذج</span>
+            <span className="text-sm font-black text-ink tabular">{pct(item.probability)}</span>
+          </div>
+        </div>
+
+        {/* 3 Metrics Row */}
+        <div className="grid grid-cols-3 gap-2 text-center text-xs">
+          <div className="p-2 rounded bg-panel/40 border border-line/60">
+            <span className="text-[10px] text-muted block">سعر السوق</span>
+            <span className="font-bold tabular text-ink">
+              {item.odds ? item.odds.toFixed(2) : "—"}
+            </span>
+          </div>
+          <div className="p-2 rounded bg-panel/40 border border-line/60">
+            <span className="text-[10px] text-muted block">القيمة (Edge)</span>
+            <span
+              className={`font-bold tabular ${
+                (item.edge ?? 0) > 0 ? "text-emerald-700 dark:text-emerald-400" : "text-muted"
+              }`}
+            >
+              {item.edge !== null && item.edge !== undefined
+                ? `${item.edge > 0 ? "+" : ""}${Math.round(item.edge * 100)}%`
+                : "—"}
+            </span>
+          </div>
+          <div className="p-2 rounded bg-panel/40 border border-line/60">
+            <span className="text-[10px] text-muted block">موثوقية 2</span>
+            <span className="font-bold tabular text-ink">
+              {item.model2?.reliability != null
+                ? item.model2.reliability.toFixed(0)
+                : item.selectionScore ?? "—"}
+            </span>
+          </div>
+        </div>
+
+        {/* Trap Warning if applicable */}
+        {item.isTrap && (
+          <div className="p-2 rounded text-[11px] bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-500/20 font-medium">
+            تنبيه مصيدة سعرية: السعر المعروض يتطلب احتمالية فوز أعلى من تقدير النموذج
+          </div>
+        )}
+      </div>
+
+      {/* Card Footer Actions */}
+      <div className="p-3 border-t border-line bg-panel/20 flex items-center justify-between text-xs gap-2">
+        <button
+          onClick={() => onInspect(item)}
+          className="text-muted hover:text-ink font-semibold transition-colors text-[11px]"
+        >
+          معاينة الفحص ↗
+        </button>
+
+        <div className="flex items-center gap-2">
+          <Link
+            href={`/match/${item.matchId}`}
+            className="text-xs text-muted hover:text-accent font-medium underline-offset-4 hover:underline"
+          >
+            صفحة اللقاء الكاملة
+          </Link>
+
+          <button
+            onClick={() => onAddParlay(item)}
+            className="px-2.5 py-1 rounded bg-panel hover:bg-ink hover:text-surface text-ink text-[11px] font-semibold border border-line transition-colors"
+          >
+            + بارلي
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** صف الجدول المكثف — يقع داخل tbody الجولة التي يحمل رأسها الدوري ورقم الجولة */
+function ConfinedMatchRow({ item, onInspect, onAddParlay }: ConfinedMatchProps) {
+  const homeCol = getTeamColors(item.homeTeam, item.homeTeamId);
+  const awayCol = getTeamColors(item.awayTeam, item.awayTeamId);
+
+  return (
+    <tr
+      className={`hover:bg-panel/40 transition-colors cursor-pointer ${
+        item.isTrap ? "bg-rose-500/5" : ""
+      }`}
+      onClick={() => onInspect(item)}
+    >
+      <td className="p-3 whitespace-nowrap">
+        <KickoffStamp iso={item.utcDate} />
+      </td>
+
+      <td className="p-3 font-semibold text-ink">
+        <div className="flex items-center gap-2">
+          <span className="w-1 h-3.5 rounded-xs" style={{ backgroundColor: homeCol.hex }} />
+          <span>{item.homeTeam}</span>
+          <span className="text-muted font-normal text-[11px]">×</span>
+          <span className="w-1 h-3.5 rounded-xs" style={{ backgroundColor: awayCol.hex }} />
+          <span>{item.awayTeam}</span>
+        </div>
+        {item.isTrap && (
+          <span className="mt-1 inline-block px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-500/20">
+            مصيدة قيمة
+          </span>
+        )}
+      </td>
+
+      <td className="p-3 whitespace-nowrap">
+        <span className="text-muted">{item.leagueName}</span>
+        {item.matchday != null ? (
+          <span className="block text-[11px] font-semibold text-accent tabular">
+            الجولة {item.matchday}
+          </span>
+        ) : null}
+      </td>
+
+      <td className="p-3 text-center">
+        <span className="font-bold text-ink">{item.pickLabel}</span>
+      </td>
+
+      <td className="p-3 text-center tabular font-bold text-ink">{pct(item.probability)}</td>
+
+      <td className="p-3 text-center tabular text-ink">
+        {item.odds ? item.odds.toFixed(2) : "—"}
+      </td>
+
+      <td className="p-3 text-center tabular font-semibold">
+        <span
+          className={
+            (item.edge ?? 0) > 0 ? "text-emerald-700 dark:text-emerald-400" : "text-muted"
+          }
+        >
+          {item.edge !== null && item.edge !== undefined
+            ? `${item.edge > 0 ? "+" : ""}${Math.round(item.edge * 100)}%`
+            : "—"}
+        </span>
+      </td>
+
+      <td className="p-3 text-center tabular text-muted">{item.stabilityScore ?? 70}%</td>
+
+      <td className="p-3 text-center tabular font-bold text-ink">{item.selectionScore}</td>
+
+      <td className="p-3 text-center" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-center gap-1.5">
+          <button
+            onClick={() => onAddParlay(item)}
+            className="px-2 py-1 rounded bg-panel hover:bg-ink hover:text-surface text-ink text-[11px] font-semibold border border-line transition-colors"
+          >
+            + بارلي
+          </button>
+          <Link
+            href={`/match/${item.matchId}`}
+            className="p-1 text-muted hover:text-accent text-[11px]"
+            title="فتح صفحة المباراة في تقدير العام"
+          >
+            ↗
+          </Link>
+        </div>
+      </td>
+    </tr>
   );
 }

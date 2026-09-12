@@ -90,6 +90,18 @@ export function formatShortDate(iso: string, tz?: string): string {
   );
 }
 
+/** تاريخ بلا اسم يوم: ١٥ أغسطس ٢٠٢٦ — يُقرن باسم اليوم دون تكراره */
+export function formatDateNoWeekday(iso: string, tz?: string): string {
+  return cleanSpace(
+    new Intl.DateTimeFormat("ar", {
+      timeZone: tz || DISPLAY_TZ,
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    }).format(parseDate(iso)),
+  );
+}
+
 /** يوم كامل بدون وقت: السبت ١٥ أغسطس ٢٠٢٦ */
 export function formatLongDate(iso: string, tz?: string): string {
   return cleanSpace(
@@ -247,6 +259,112 @@ export function groupByDay<T extends { utcDate: string }>(
         label: formatDayHeading(sample, now),
         relative: formatRelativeDay(sample, now),
         items: group,
+      };
+    });
+}
+
+/** اسم اليوم في منطقة العرض: الجمعة، السبت، الأحد، الاثنين */
+export function formatWeekday(iso: string, tz?: string): string {
+  return cleanSpace(
+    new Intl.DateTimeFormat("ar", {
+      timeZone: tz || DISPLAY_TZ,
+      weekday: "long",
+    }).format(parseDate(iso)),
+  );
+}
+
+/** مباراة تحمل جولتها ودوريها — مدخل تجميع الأيام والجولات */
+export type RoundedFixture = {
+  utcDate: string;
+  matchday?: number | null;
+  leagueId?: string | null;
+  leagueName?: string | null;
+};
+
+export type RoundGroup<T> = {
+  key: string;
+  leagueId: string | null;
+  leagueName: string;
+  matchday: number | null;
+  /** «الجولة ٤» أو «جولة غير مرقّمة» للمؤجلات */
+  roundLabel: string;
+  firstKickoff: string;
+  items: T[];
+};
+
+export type DayRoundGroup<T> = {
+  /** YYYY-MM-DD في منطقة العرض */
+  key: string;
+  weekday: string;
+  dateLabel: string;
+  relative: string | null;
+  firstKickoff: string;
+  /** جولات اليوم مرتبة بأول انطلاق */
+  rounds: RoundGroup<T>[];
+  /** كل مباريات اليوم مسطّحة تصاعدياً */
+  items: T[];
+};
+
+function roundLabelOf(matchday: number | null): string {
+  return matchday != null ? `الجولة ${matchday}` : "جولة غير مرقّمة";
+}
+
+/**
+ * تجميع المباريات في أيام تصاعدياً، مع جولة كل دوري داخل اليوم على حدة.
+ * رقم جولة واحد ليوم يخلط دوريات مختلفة يكون مضللاً، فالجولة تُنسب لدوريها دائماً.
+ * `sortWithin` يعيد ترتيب المباريات داخل اليوم — ترتيب الأيام نفسها يبقى زمنياً.
+ */
+export function groupByDayAndRound<T extends RoundedFixture>(
+  items: T[],
+  now = new Date(),
+  sortWithin?: (a: T, b: T) => number,
+): DayRoundGroup<T>[] {
+  const byKickoff = (a: T, b: T) => a.utcDate.localeCompare(b.utcDate);
+  const days = new Map<string, Map<string, T[]>>();
+
+  for (const item of [...items].sort(byKickoff)) {
+    const dayId = dayKey(item.utcDate);
+    const roundId = `${item.leagueId || item.leagueName || "-"}|${item.matchday ?? "na"}`;
+    let rounds = days.get(dayId);
+    if (!rounds) {
+      rounds = new Map();
+      days.set(dayId, rounds);
+    }
+    const list = rounds.get(roundId);
+    if (list) list.push(item);
+    else rounds.set(roundId, [item]);
+  }
+
+  return [...days.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([dayId, roundMap]) => {
+      const rounds: RoundGroup<T>[] = [...roundMap.entries()]
+        .map(([roundId, group]) => ({
+          key: `${dayId}|${roundId}`,
+          leagueId: group[0]!.leagueId ?? null,
+          leagueName: group[0]!.leagueName ?? "",
+          matchday: group[0]!.matchday ?? null,
+          roundLabel: roundLabelOf(group[0]!.matchday ?? null),
+          firstKickoff: group[0]!.utcDate,
+          items: group,
+        }))
+        .sort(
+          (a, b) =>
+            a.firstKickoff.localeCompare(b.firstKickoff) ||
+            a.leagueName.localeCompare(b.leagueName, "ar"),
+        );
+
+      const flat = rounds.flatMap((r) => r.items).sort(sortWithin ?? byKickoff);
+      const sample = [...flat].sort(byKickoff)[0]!.utcDate;
+
+      return {
+        key: dayId,
+        weekday: formatWeekday(sample),
+        dateLabel: formatDateNoWeekday(sample),
+        relative: formatRelativeDay(sample, now),
+        firstKickoff: sample,
+        rounds,
+        items: flat,
       };
     });
 }

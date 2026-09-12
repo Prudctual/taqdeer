@@ -35,6 +35,9 @@ export function Model2Breakdown({
               <strong className="tabular text-ink">{model2.rank}</strong>
               {model2.slateN != null ? ` من ${model2.slateN}` : ""}
             </p>
+          ) : model2.candidate ? (
+            // مرشح اجتاز البوابة لكن ترتيب اللائحة لا يُحسب إلا لجولة قريبة
+            <p>مرشح · ترتيب اللائحة يُحسب عند اقتراب الجولة</p>
           ) : (
             <p>{reason || "خارج بوابة الفوز المباشر"}</p>
           )}

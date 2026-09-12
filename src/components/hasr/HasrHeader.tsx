@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { LEAGUES } from "@/lib/leagues";
 import { useTheme } from "../ThemeContext";
 
 interface HasrHeaderProps {
@@ -25,15 +26,10 @@ export function HasrHeader({
 }: HasrHeaderProps) {
   const { mode, setMode } = useTheme();
 
+  // المعرّفات من LEAGUES كي تطابق league_id في قاعدة البيانات ولا تنحرف عنها
   const leagues = [
     { id: "all", label: "كافة الدوريات" },
-    { id: "PL", label: "الدوري الإنجليزي" },
-    { id: "PD", label: "الدوري الإسباني" },
-    { id: "SA", label: "الدوري الإيطالي" },
-    { id: "BL1", label: "الدوري الألماني" },
-    { id: "FL1", label: "الدوري الفرنسي" },
-    { id: "PPD", label: "الدوري البرتغالي" },
-    { id: "DED", label: "الدوري الهولندي" },
+    ...LEAGUES.map((l) => ({ id: l.id, label: l.nameAr })),
   ];
 
   return (

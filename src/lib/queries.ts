@@ -6,9 +6,10 @@ import {
   isSettledArchiveMatch,
   SQL_SETTLED_MATCH,
 } from "./match-status";
-import { keepCurrentRound } from "./current-round";
+import { keepCurrentRound, roundBucket } from "./current-round";
 import {
   calculateSelectionScore,
+  dayKey,
   decimalToAmerican,
   oddsToImpliedProb,
   calculateEdge,
@@ -1327,6 +1328,11 @@ export type Model2Report = {
   coverage: number;
   coverageWarning: boolean;
   groups: Model2Group[];
+  /**
+   * `groups` أُسقطت من الحمولة توفيراً للحجم ولم تُفقد — تُطلب عند الحاجة من
+   * `/api/v1/hasr/model2/[matchId]`. تمييزها عن «لم تُحسب» شرط للشفافية.
+   */
+  groupsOmitted?: boolean;
   rank: number | null;
   slateRank: number | null;
   slateN: number | null;
@@ -1389,6 +1395,7 @@ export type BankerPick = {
   awayCrestUrl?: string | null;
   utcDate: string;
   matchday?: number | null;
+  leagueId: string;
   leagueName: string;
   pickLabel: string;
   pickKey?: "H" | "A" | "D";
@@ -1433,15 +1440,163 @@ export type BankerPick = {
   };
 };
 
+/**
+ * مدى الترشيح الزمني.
+ * - `current-round`: الجولة الأقرب لكل دوري داخل نافذة 14 يوماً — عرف الصفحة
+ *   الرئيسية وصفحات الدوريات، فلا تُزاح لائحتها إلى الجولة التالية قبل اكتمالها.
+ * - `full-schedule`: كل مباريات الجدول القادم حتى نهاية الموسم بكل جولاتها —
+ *   نطاق منصة الحصر.
+ */
+export type FixtureScope = "current-round" | "full-schedule";
+
+/** الحد الأعلى للنافذة: مقصور على أسبوعين للجولة الحالية، ومفتوح لكامل الجدول */
+function scopeUpperBound(scope: FixtureScope): string {
+  return scope === "current-round"
+    ? "AND substr(m.utc_date, 1, 19) <= strftime('%Y-%m-%dT%H:%M:%S', 'now', '+14 days')"
+    : "";
+}
+
+/**
+ * سقف الصفوف المقروءة. الجولة الحالية لا تحتاج أكثر من 160 صفاً، أما كامل
+ * الجدول فيبلغ ~2100 مباراة للدوريات السبعة — والسقف 4000 هامش أمان لا قصّ.
+ */
+function scopeRowCap(scope: FixtureScope): number {
+  return scope === "current-round" ? 160 : 4000;
+}
+
+/** الحد الأدنى ثابت: نُبقي المباريات الجارية مرئية ونُخرج المنتهية */
+const LOWER_BOUND_SQL =
+  "AND substr(m.utc_date, 1, 19) >= strftime('%Y-%m-%dT%H:%M:%S', 'now', '-12 hours')";
+
+/**
+ * حقول بوابة العشوائية والنموذج 2 مستخرجة داخل SQLite.
+ * قراءة `analytics_json` كاملاً لكل الجدول = ~38 ميغابايت وتحليل JSON لكل طلب؛
+ * الاستخراج هنا يقصر التكلفة على العشرين قيمة التي تحتاجها البوابة فعلاً.
+ */
+const GATE_COLUMNS_SQL = `
+       json_extract(p.analytics_json, '$.randomness.is_strictly_excluded')       as randExcluded,
+       json_extract(p.analytics_json, '$.randomness.verdict')                    as randVerdict,
+       json_extract(p.analytics_json, '$.randomness.match_randomness_index')     as randMri,
+       json_extract(p.analytics_json, '$.randomness.stability_score')            as randStability,
+       json_extract(p.analytics_json, '$.randomness.pillars.draw_trap.active')   as drawTrapActive,
+       json_extract(p.analytics_json, '$.randomness.pillars.draw_trap.severity') as drawTrapSeverity,
+       json_type(p.analytics_json, '$.model2')                                   as model2Type,
+       json_extract(p.analytics_json, '$.model2.reliability')      as m2Reliability,
+       json_extract(p.analytics_json, '$.model2.coverage')         as m2Coverage,
+       json_extract(p.analytics_json, '$.model2.coverage_warning') as m2CoverageWarning,
+       json_extract(p.analytics_json, '$.model2.rank')             as m2Rank,
+       json_extract(p.analytics_json, '$.model2.slate_rank')       as m2SlateRank,
+       json_extract(p.analytics_json, '$.model2.slate_n')          as m2SlateN,
+       json_extract(p.analytics_json, '$.model2.candidate')        as m2Candidate,
+       json_extract(p.analytics_json, '$.model2.exclude_reason')   as m2ExcludeReason,
+       json_extract(p.analytics_json, '$.model2.pick')             as m2Pick,
+       json_extract(p.analytics_json, '$.model2.p_pick')           as m2PPick,
+       json_extract(p.analytics_json, '$.model2.gap')              as m2Gap`;
+
+type GateColumns = {
+  randExcluded: number | null;
+  randVerdict: string | null;
+  randMri: number | null;
+  randStability: number | null;
+  drawTrapActive: number | null;
+  drawTrapSeverity: string | null;
+  model2Type: string | null;
+  m2Reliability: number | null;
+  m2Coverage: number | null;
+  m2CoverageWarning: number | null;
+  m2Rank: number | null;
+  m2SlateRank: number | null;
+  m2SlateN: number | null;
+  m2Candidate: number | null;
+  m2ExcludeReason: string | null;
+  m2Pick: string | null;
+  m2PPick: number | null;
+  m2Gap: number | null;
+};
+
+/**
+ * حكم بوابة العشوائية لمباراة واحدة.
+ * `modelled = false` تعني أن النموذج لم يُنتج مؤشر عشوائية لهذه المباراة، وحينها
+ * لا نصطنع أرقام أمان افتراضية بل تُستبعد وتُدرج في «بانتظار تشغيل النموذج».
+ */
+function readRandomnessGate(r: GateColumns): {
+  modelled: boolean;
+  isStrictlyExcluded: boolean;
+  mri: number;
+  stability: number;
+  isDrawTrap: boolean;
+} {
+  if (r.randMri == null) {
+    return { modelled: false, isStrictlyExcluded: false, mri: 0, stability: 0, isDrawTrap: false };
+  }
+  const mri = r.randMri;
+  return {
+    modelled: true,
+    isStrictlyExcluded: Boolean(r.randExcluded) || r.randVerdict === "STRICT_EXCLUDE",
+    mri,
+    stability: r.randStability ?? 100 - mri,
+    isDrawTrap: Boolean(r.drawTrapActive) && r.drawTrapSeverity !== "LOW",
+  };
+}
+
+/** النموذج 2 من القيم المستخرجة، بلا `groups` — تُطلب عند فتح بطاقة المباراة */
+function model2FromColumns(r: GateColumns): Model2Report | undefined {
+  if (r.model2Type !== "object") return undefined;
+  return {
+    reliability: r.m2Reliability,
+    coverage: r.m2Coverage ?? 0,
+    coverageWarning: Boolean(r.m2CoverageWarning),
+    groups: [],
+    groupsOmitted: true,
+    rank: r.m2Rank,
+    slateRank: r.m2SlateRank,
+    slateN: r.m2SlateN,
+    candidate: Boolean(r.m2Candidate),
+    excludeReason: r.m2ExcludeReason,
+    pick: r.m2Pick ?? undefined,
+    pPick: r.m2PPick ?? undefined,
+    gap: r.m2Gap ?? undefined,
+  };
+}
+
+/**
+ * تقرير النموذج 2 كاملاً بعوامله الثلاثين لمباراة واحدة.
+ * لوائح الحصر تشحن التقرير بلا `groups` لأن كل مباراة تكلّف ~4.6 كيلوبايت من
+ * التفاصيل التي لا تُقرأ إلا عند فتح بطاقة واحدة؛ هذه الدالة تخدم ذلك الفتح.
+ */
+export const getModel2Report = cache(function getModel2Report(
+  matchId: string
+): Model2Report | undefined {
+  return withTtl(`model2:${matchId}`, QUERY_TTL_MS, () => {
+    try {
+      const row = getDb()
+        .prepare(
+          `SELECT json_extract(analytics_json, '$.model2') as model2
+           FROM predictions WHERE match_id = ?`
+        )
+        .get(matchId) as { model2: string | null } | undefined;
+      if (!row?.model2) return undefined;
+      return parseModel2(JSON.parse(row.model2));
+    } catch (e) {
+      console.error("Error in getModel2Report:", e);
+      return undefined;
+    }
+  });
+});
+
 export const getBankerPicks = cache(function getBankerPicks(
   limit = 4,
-  leagueId?: string
+  leagueId?: string,
+  scope: FixtureScope = "current-round"
 ): BankerPick[] {
-  return withTtl(`bankers:${limit}:${leagueId || "all"}`, HEAVY_TTL_MS, () => {
+  return withTtl(`bankers:${limit}:${leagueId || "all"}:${scope}`, HEAVY_TTL_MS, () => {
   try {
     const db = getDb();
     const leagueFilter = leagueId ? "AND m.league_id = ?" : "";
     const params: unknown[] = leagueId ? [leagueId] : [];
+    // تفاصيل الحراس/التكتيك/المدرب وعوامل النموذج 2 الثلاثين تُقرأ من الـ blob،
+    // وهي مجدية لجولة واحدة لا لألفي مباراة — لذا تُقصر على النطاق القريب.
+    const wantsBlob = scope === "current-round";
 
     const fetched = db
       .prepare(
@@ -1453,19 +1608,20 @@ export const getBankerPicks = cache(function getBankerPicks(
              m.matchday,
              p.p_home, p.p_draw, p.p_away, p.confidence, m.utc_date, m.utc_date as utcDate,
              m.odds_home, m.odds_draw, m.odds_away,
-             p.analytics_json
+             ${wantsBlob ? "p.analytics_json" : "NULL"} as analytics_json,
+${GATE_COLUMNS_SQL}
       FROM matches m
       JOIN leagues l ON l.id = m.league_id
       JOIN teams ht ON ht.id = m.home_team_id
       JOIN teams at ON at.id = m.away_team_id
       JOIN predictions p ON p.match_id = m.id
       WHERE m.status IN ('SCHEDULED', 'TIMED')
-        AND substr(m.utc_date, 1, 19) >= strftime('%Y-%m-%dT%H:%M:%S', 'now', '-12 hours')
-        AND substr(m.utc_date, 1, 19) <= strftime('%Y-%m-%dT%H:%M:%S', 'now', '+14 days')
+        ${LOWER_BOUND_SQL}
+        ${scopeUpperBound(scope)}
         AND (p.p_home IS NOT NULL OR p.p_away IS NOT NULL)
       ${leagueFilter}
       ORDER BY m.utc_date ASC
-      LIMIT 160
+      LIMIT ${scopeRowCap(scope)}
     `
       )
       .all(...params) as Array<{
@@ -1489,35 +1645,32 @@ export const getBankerPicks = cache(function getBankerPicks(
       odds_draw: number | null;
       odds_away: number | null;
       analytics_json: string | null;
-    }>;
+    } & GateColumns>;
 
-    // الجولة الحالية فقط لكل دوري — لا تطفر اللائحة إلى الجولة القادمة قبل اكتمالها
-    const rows = keepCurrentRound(fetched, db, leagueId);
+    // النطاق القريب يبقى محصوراً على الجولة الأقرب لكل دوري كما كان؛
+    // نطاق كامل الجدول يعرض كل الجولات المتبقية بلا حصر.
+    const rows =
+      scope === "current-round" ? keepCurrentRound(fetched, db, leagueId) : fetched;
 
     const candidates: BankerPick[] = [];
 
     for (const r of rows) {
-      // Parse anti-randomness analytics
-      let isStrictlyExcluded = false;
-      let mri = 30;
-      let stability = 70;
-      let isDrawTrap = false;
+      // بوابة العشوائية تُقرأ من القيم المستخرجة في SQL — نفس المنطق للنطاقين
+      const gate = readRandomnessGate(r);
+      // مباراة بلا مؤشر عشوائية = النموذج لم يمرّ عليها. لا نمنحها أرقام أمان
+      // افتراضية؛ تُستبعد هنا وتُعرض في لائحة «بانتظار تشغيل النموذج».
+      if (!gate.modelled) continue;
+
+      const { isStrictlyExcluded, mri, stability, isDrawTrap } = gate;
       let gkStats: BankerPick["goalkeeperStats"] = undefined;
       let tacMatchup: BankerPick["tacticalMatchup"] = undefined;
       let mgrImpact: BankerPick["managerImpact"] = undefined;
-      let model2: Model2Report | undefined;
+      let model2: Model2Report | undefined = model2FromColumns(r);
 
       if (r.analytics_json) {
         try {
           const parsed = JSON.parse(r.analytics_json);
-          model2 = parseModel2(parsed.model2);
-          const rand = parsed.randomness;
-          if (rand) {
-            isStrictlyExcluded = Boolean(rand.is_strictly_excluded || rand.verdict === "STRICT_EXCLUDE");
-            mri = rand.match_randomness_index ?? 30;
-            stability = rand.stability_score ?? (100 - mri);
-            isDrawTrap = Boolean(rand.pillars?.draw_trap?.active && rand.pillars?.draw_trap?.severity !== "LOW");
-          }
+          model2 = parseModel2(parsed.model2) ?? model2;
           const comps = parsed.components || {};
           if (comps.goalkeeper) {
             const gk = comps.goalkeeper;
@@ -1604,6 +1757,7 @@ export const getBankerPicks = cache(function getBankerPicks(
         awayCrestUrl: r.awayCrestUrl,
         utcDate: r.utc_date,
         matchday: r.matchday,
+        leagueId: r.leagueId,
         leagueName: r.leagueName,
         pickLabel: top1.label,
         pickKey: top1.key,
@@ -1915,9 +2069,10 @@ export interface ParlayCandidateMatch {
 
 export const getParlayCandidates = cache(function getParlayCandidates(
   leagueId?: string,
-  limit = 16
+  limit = 16,
+  scope: FixtureScope = "current-round"
 ): ParlayCandidateMatch[] {
-  return withTtl(`parlay:${leagueId || "all"}:${limit}`, HEAVY_TTL_MS, () => {
+  return withTtl(`parlay:${leagueId || "all"}:${limit}:${scope}`, HEAVY_TTL_MS, () => {
   try {
     const db = getDb();
     const leagueFilter =
@@ -1932,19 +2087,20 @@ export const getParlayCandidates = cache(function getParlayCandidates(
              m.utc_date as utcDate, m.matchday, ht.name_ar as homeTeam, at.name_ar as awayTeam,
              p.p_home, p.p_draw, p.p_away, p.confidence,
              m.odds_home, m.odds_draw, m.odds_away,
-             p.analytics_json
+             NULL as analytics_json,
+${GATE_COLUMNS_SQL}
       FROM matches m
       JOIN leagues l ON l.id = m.league_id
       JOIN teams ht ON ht.id = m.home_team_id
       JOIN teams at ON at.id = m.away_team_id
       JOIN predictions p ON p.match_id = m.id
       WHERE m.status IN ('SCHEDULED', 'TIMED')
-        AND substr(m.utc_date, 1, 19) >= strftime('%Y-%m-%dT%H:%M:%S', 'now', '-12 hours')
-        AND substr(m.utc_date, 1, 19) <= strftime('%Y-%m-%dT%H:%M:%S', 'now', '+14 days')
+        ${LOWER_BOUND_SQL}
+        ${scopeUpperBound(scope)}
         AND (p.p_home IS NOT NULL OR p.p_away IS NOT NULL)
       ${leagueFilter}
       ORDER BY (m.odds_home IS NOT NULL) DESC, m.utc_date ASC
-      LIMIT 160
+      LIMIT ${scopeRowCap(scope)}
     `
       )
       .all(...params) as Array<{
@@ -1963,35 +2119,21 @@ export const getParlayCandidates = cache(function getParlayCandidates(
       odds_draw: number | null;
       odds_away: number | null;
       analytics_json: string | null;
-    }>;
+    } & GateColumns>;
 
-    // البارلي من مباريات الجولة الحالية فقط
-    const rows = keepCurrentRound(fetched, db, leagueId);
+    // البارلي يتبع نطاق الطالب: الجولة الحالية للصفحة الرئيسية، وكامل الجدول للحصر
+    const rows =
+      scope === "current-round" ? keepCurrentRound(fetched, db, leagueId) : fetched;
 
     const candidates: ParlayCandidateMatch[] = [];
 
     for (const r of rows) {
-      // Parse anti-randomness analytics
-      let isStrictlyExcluded = false;
-      let mri = 30;
-      let stability = 70;
-      let model2Rel: number | null = null;
+      const gate = readRandomnessGate(r);
+      // بلا مؤشر عشوائية = بلا تقييم أمان؛ لا تدخل بارلي بأرقام مفترضة
+      if (!gate.modelled) continue;
 
-      if (r.analytics_json) {
-        try {
-          const parsed = JSON.parse(r.analytics_json);
-          const rand = parsed.randomness;
-          if (rand) {
-            isStrictlyExcluded = Boolean(rand.is_strictly_excluded || rand.verdict === "STRICT_EXCLUDE");
-            mri = rand.match_randomness_index ?? 30;
-            stability = rand.stability_score ?? (100 - mri);
-          }
-          const m2 = parseModel2(parsed.model2);
-          if (m2?.reliability != null) model2Rel = m2.reliability;
-        } catch {
-          // ignore
-        }
-      }
+      const { isStrictlyExcluded, mri, stability } = gate;
+      const model2Rel = r.m2Reliability;
 
       // Parlays multiply risk: strictly exclude matches with high randomness or critical instability
       if (isStrictlyExcluded || mri >= 62) {
@@ -2594,6 +2736,7 @@ export interface StrictlyExcludedMatch {
   homeTeam: string;
   awayTeam: string;
   utcDate: string;
+  matchday: number | null;
   matchRandomnessIndex: number;
   stabilityScore: number;
   verdictAr: string;
@@ -2605,117 +2748,227 @@ export interface StrictlyExcludedMatch {
 
 export const getStrictlyExcludedMatches = cache(function getStrictlyExcludedMatches(
   limit = 40,
-  leagueId?: string
+  leagueId?: string,
+  scope: FixtureScope = "current-round"
 ): StrictlyExcludedMatch[] {
-  try {
-    const db = getDb();
-    const leagueFilter = leagueId && leagueId !== "all" ? "AND m.league_id = ?" : "";
-    const params: unknown[] = leagueId && leagueId !== "all" ? [leagueId] : [];
+  return withTtl(
+    `excluded:${limit}:${leagueId || "all"}:${scope}`,
+    HEAVY_TTL_MS,
+    () => {
+      try {
+        const db = getDb();
+        const leagueFilter = leagueId && leagueId !== "all" ? "AND m.league_id = ?" : "";
+        const params: unknown[] = leagueId && leagueId !== "all" ? [leagueId] : [];
 
-    const fetched = db
-      .prepare(
-        `
+        const fetched = db
+          .prepare(
+            `
       SELECT m.id as matchId, m.league_id as leagueId, l.name_ar as leagueNameAr,
              m.utc_date as utcDate, m.matchday, ht.name_ar as homeTeam, at.name_ar as awayTeam,
-             p.analytics_json
+             json_extract(p.analytics_json, '$.randomness.match_randomness_index') as mri,
+             json_extract(p.analytics_json, '$.randomness.stability_score')        as stability,
+             json_extract(p.analytics_json, '$.randomness.verdict_ar')             as verdictAr,
+             json_extract(p.analytics_json, '$.randomness.recommended_action_ar')  as actionAr,
+             json_extract(p.analytics_json, '$.randomness.pillars.draw_trap.active')     as dtActive,
+             json_extract(p.analytics_json, '$.randomness.pillars.draw_trap.severity')   as dtSeverity,
+             json_extract(p.analytics_json, '$.randomness.pillars.draw_trap.reason_ar')  as dtReason,
+             json_extract(p.analytics_json, '$.randomness.pillars.second_half_fragility.active')    as shActive,
+             json_extract(p.analytics_json, '$.randomness.pillars.second_half_fragility.severity')  as shSeverity,
+             json_extract(p.analytics_json, '$.randomness.pillars.second_half_fragility.reason_ar') as shReason,
+             json_extract(p.analytics_json, '$.randomness.pillars.disciplinary_risk.active')    as drActive,
+             json_extract(p.analytics_json, '$.randomness.pillars.disciplinary_risk.severity')  as drSeverity,
+             json_extract(p.analytics_json, '$.randomness.pillars.disciplinary_risk.reason_ar') as drReason,
+             json_extract(p.analytics_json, '$.randomness.pillars.volatility_risk.score')     as volScore,
+             json_extract(p.analytics_json, '$.randomness.pillars.volatility_risk.reason_ar')  as volReason
       FROM matches m
       JOIN leagues l ON l.id = m.league_id
       JOIN teams ht ON ht.id = m.home_team_id
       JOIN teams at ON at.id = m.away_team_id
       JOIN predictions p ON p.match_id = m.id
       WHERE m.status IN ('SCHEDULED', 'TIMED')
-        AND substr(m.utc_date, 1, 19) >= strftime('%Y-%m-%dT%H:%M:%S', 'now', '-12 hours')
-        AND substr(m.utc_date, 1, 19) <= strftime('%Y-%m-%dT%H:%M:%S', 'now', '+14 days')
+        ${LOWER_BOUND_SQL}
+        ${scopeUpperBound(scope)}
         AND p.analytics_json IS NOT NULL
+        AND (json_extract(p.analytics_json, '$.randomness.is_strictly_excluded') = 1
+             OR json_extract(p.analytics_json, '$.randomness.verdict') = 'STRICT_EXCLUDE')
         ${leagueFilter}
       ORDER BY m.utc_date ASC
-      LIMIT 160
+      LIMIT ${scopeRowCap(scope)}
     `
-      )
-      .all(...params) as Array<{
-      matchId: string;
-      leagueId: string;
-      leagueNameAr: string;
-      utcDate: string;
-      matchday: number | null;
-      homeTeam: string;
-      awayTeam: string;
-      analytics_json: string;
-    }>;
+          )
+          .all(...params) as Array<{
+          matchId: string;
+          leagueId: string;
+          leagueNameAr: string;
+          utcDate: string;
+          matchday: number | null;
+          homeTeam: string;
+          awayTeam: string;
+          mri: number | null;
+          stability: number | null;
+          verdictAr: string | null;
+          actionAr: string | null;
+          dtActive: number | null;
+          dtSeverity: string | null;
+          dtReason: string | null;
+          shActive: number | null;
+          shSeverity: string | null;
+          shReason: string | null;
+          drActive: number | null;
+          drSeverity: string | null;
+          drReason: string | null;
+          volScore: number | null;
+          volReason: string | null;
+        }>;
 
-    // المستبعدة من الجولة الحالية نفسها — كي تتطابق مع لائحة المحصورة
-    const rows = keepCurrentRound(fetched, db, leagueId);
+        // المستبعدة تتبع نطاق اللائحة المحصورة نفسه كي يتقابل الرادار معها
+        const rows =
+          scope === "current-round" ? keepCurrentRound(fetched, db, leagueId) : fetched;
 
-    const results: StrictlyExcludedMatch[] = [];
+        const results: StrictlyExcludedMatch[] = [];
 
-    for (const r of rows) {
-      try {
-        const data = JSON.parse(r.analytics_json);
-        const rand = data.randomness;
-        if (!rand || (!rand.is_strictly_excluded && rand.verdict !== "STRICT_EXCLUDE")) {
-          continue;
+        for (const r of rows) {
+          const mri = r.mri ?? 74;
+          const stability = r.stability ?? 100 - mri;
+
+          let primaryPillar: StrictlyExcludedMatch["primaryExclusionPillar"] = "other";
+          let primaryReason = r.actionAr || "مباراة عالية العشوائية مستبعدة إحصائياً";
+          let severity = "CRITICAL";
+
+          if (r.dtSeverity === "CRITICAL" || r.dtActive) {
+            primaryPillar = "draw_trap";
+            primaryReason = r.dtReason ?? primaryReason;
+            severity = r.dtSeverity || "CRITICAL";
+          } else if (r.shSeverity === "CRITICAL" || r.shActive) {
+            primaryPillar = "second_half_fragility";
+            primaryReason = r.shReason ?? primaryReason;
+            severity = r.shSeverity || "HIGH";
+          } else if (r.drSeverity === "CRITICAL" || r.drActive) {
+            primaryPillar = "disciplinary_risk";
+            primaryReason = r.drReason ?? primaryReason;
+            severity = r.drSeverity || "HIGH";
+          } else if ((r.volScore ?? 0) >= 0.70) {
+            primaryPillar = "volatility";
+            primaryReason = r.volReason || "تذبذب حاد وغير مستقر في نتائج الفريقين";
+            severity = "HIGH";
+          }
+
+          results.push({
+            matchId: r.matchId,
+            leagueId: r.leagueId,
+            leagueNameAr: r.leagueNameAr,
+            homeTeam: r.homeTeam,
+            awayTeam: r.awayTeam,
+            utcDate: r.utcDate,
+            matchday: r.matchday,
+            matchRandomnessIndex: mri,
+            stabilityScore: stability,
+            verdictAr: r.verdictAr || "استبعاد صارم (عالية العشوائية)",
+            recommendedActionAr: r.actionAr || "",
+            primaryExclusionPillar: primaryPillar,
+            primaryReasonAr: primaryReason,
+            pillarSeverity: severity,
+          });
+
+          if (results.length >= limit) break;
         }
 
-        const mri = rand.match_randomness_index ?? 74;
-        const stability = rand.stability_score ?? (100 - mri);
-        const pillars = rand.pillars || {};
-
-        let primaryPillar: StrictlyExcludedMatch["primaryExclusionPillar"] = "other";
-        let primaryReason = rand.recommended_action_ar || "مباراة عالية العشوائية مستبعدة إحصائياً";
-        let severity = "CRITICAL";
-
-        if (pillars.draw_trap?.severity === "CRITICAL" || pillars.draw_trap?.active) {
-          primaryPillar = "draw_trap";
-          primaryReason = pillars.draw_trap.reason_ar;
-          severity = pillars.draw_trap.severity || "CRITICAL";
-        } else if (pillars.second_half_fragility?.severity === "CRITICAL" || pillars.second_half_fragility?.active) {
-          primaryPillar = "second_half_fragility";
-          primaryReason = pillars.second_half_fragility.reason_ar;
-          severity = pillars.second_half_fragility.severity || "HIGH";
-        } else if (pillars.disciplinary_risk?.severity === "CRITICAL" || pillars.disciplinary_risk?.active) {
-          primaryPillar = "disciplinary_risk";
-          primaryReason = pillars.disciplinary_risk.reason_ar;
-          severity = pillars.disciplinary_risk.severity || "HIGH";
-        } else if (pillars.volatility_risk?.score >= 0.70) {
-          primaryPillar = "volatility";
-          primaryReason = pillars.volatility_risk.reason_ar || "تذبذب حاد وغير مستقر في نتائج الفريقين";
-          severity = "HIGH";
-        }
-
-        results.push({
-          matchId: r.matchId,
-          leagueId: r.leagueId,
-          leagueNameAr: r.leagueNameAr,
-          homeTeam: r.homeTeam,
-          awayTeam: r.awayTeam,
-          utcDate: r.utcDate,
-          matchRandomnessIndex: mri,
-          stabilityScore: stability,
-          verdictAr: rand.verdict_ar || "استبعاد صارم (عالية العشوائية)",
-          recommendedActionAr: rand.recommended_action_ar || "",
-          primaryExclusionPillar: primaryPillar,
-          primaryReasonAr: primaryReason,
-          pillarSeverity: severity,
-        });
-
-        if (results.length >= limit) break;
-      } catch {
-        // ignore parse error
+        return results;
+      } catch (e) {
+        console.error("Error in getStrictlyExcludedMatches:", e);
+        return [];
       }
     }
+  );
+});
 
-    return results;
-  } catch (e) {
-    console.error("Error in getStrictlyExcludedMatches:", e);
-    return [];
-  }
+/**
+ * مباراة مجدولة لم يُنتج لها النموذج مؤشر عشوائية بعد.
+ * تُعرض على حالها بلا احتمالات ولا درجة أمان — بديل ذلك اصطناع أرقام لا يقف
+ * خلفها نموذج، وهو ما يخالف مبدأ «كل رقم قابل للتتبع».
+ */
+export interface AwaitingModelMatch {
+  matchId: string;
+  leagueId: string;
+  leagueName: string;
+  homeTeam: string;
+  awayTeam: string;
+  utcDate: string;
+  matchday: number | null;
+  /** سبب الغياب: لا صف توقع أصلاً، أم صف بلا تحليلات النموذج 2 والعشوائية */
+  reason: "no_prediction" | "no_analytics";
+}
+
+/**
+ * المباريات المجدولة التي تعذّر حصرها لغياب تحليلات النموذج.
+ * `prediction_snapshots` ليس بديلاً هنا: جدوله لا يحمل `analytics_json` ولا
+ * النموذج 2، فيغذّي الاحتمالات المجردة فقط لا بوابة العشوائية.
+ */
+export const getMatchesAwaitingModel = cache(function getMatchesAwaitingModel(
+  leagueId?: string,
+  limit = 200
+): AwaitingModelMatch[] {
+  return withTtl(`awaiting:${leagueId || "all"}:${limit}`, HEAVY_TTL_MS, () => {
+    try {
+      const db = getDb();
+      const scoped = !!leagueId && leagueId !== "all";
+      const rows = db
+        .prepare(
+          `
+      SELECT m.id as matchId, m.league_id as leagueId, l.name_ar as leagueName,
+             ht.name_ar as homeTeam, at.name_ar as awayTeam,
+             m.utc_date as utcDate, m.matchday,
+             (p.match_id IS NULL) as noPrediction
+      FROM matches m
+      JOIN leagues l ON l.id = m.league_id
+      JOIN teams ht ON ht.id = m.home_team_id
+      JOIN teams at ON at.id = m.away_team_id
+      LEFT JOIN predictions p ON p.match_id = m.id
+      WHERE m.status IN ('SCHEDULED', 'TIMED')
+        ${LOWER_BOUND_SQL}
+        AND json_extract(p.analytics_json, '$.randomness.match_randomness_index') IS NULL
+        ${scoped ? "AND m.league_id = ?" : ""}
+      ORDER BY m.utc_date ASC
+      LIMIT ${limit}
+    `
+        )
+        .all(...(scoped ? [leagueId] : [])) as Array<{
+        matchId: string;
+        leagueId: string;
+        leagueName: string;
+        homeTeam: string;
+        awayTeam: string;
+        utcDate: string;
+        matchday: number | null;
+        noPrediction: number;
+      }>;
+
+      return rows.map((r) => ({
+        matchId: r.matchId,
+        leagueId: r.leagueId,
+        leagueName: r.leagueName,
+        homeTeam: r.homeTeam,
+        awayTeam: r.awayTeam,
+        utcDate: r.utcDate,
+        matchday: r.matchday,
+        reason: r.noPrediction ? ("no_prediction" as const) : ("no_analytics" as const),
+      }));
+    } catch (e) {
+      console.error("Error in getMatchesAwaitingModel:", e);
+      return [];
+    }
+  });
 });
 
 export interface ConfinedPlatformData {
+  /** لحظة حساب اللائحة على الخادم — تُعرض كختم «آخر تحديث» */
+  generatedAt: string;
   summaryStats: {
     totalEvaluated: number;
     totalConfined: number;
     totalExcluded: number;
+    /** مجدولة بلا تحليلات نموذج — لم تُحصر ولم تُستبعد */
+    totalAwaitingModel: number;
     avgStability: number;
     topSafetyPick: BankerPick | null;
     topValuePick: BankerPick | null;
@@ -2724,21 +2977,43 @@ export interface ConfinedPlatformData {
     slateN: number;
     candidates: number;
     topN: number;
+    /** عدد الأيام وعدد الجولات التي تغطيها اللائحة — مقياس اتساع النطاق */
+    days: number;
+    rounds: number;
   };
   confinedMatches: BankerPick[];
   strategies: SelectionStrategyResult;
   parlayCandidates: ParlayCandidateMatch[];
   excludedMatches: StrictlyExcludedMatch[];
+  awaitingModel: AwaitingModelMatch[];
   calibration: CalibrationSummary;
 }
+
+/**
+ * سقوف لائحة الحصر. الجدول القادم للدوريات السبعة ~2100 مباراة حتى نهاية
+ * الموسم، والسقوف أعلى منه كي لا تقصّ اللائحة — وجودها حماية من انفجار الحمولة
+ * لو تضخّم الجدول، لا حدّ عرض مقصود.
+ */
+const HASR_CONFINED_CAP = 2500;
+const HASR_EXCLUDED_CAP = 2500;
+/** البارلي اختيار من قائمة منسدلة؛ ما بعد النافذة القريبة بلا أودز سوق أصلاً */
+const HASR_PARLAY_CAP = 120;
+const HASR_AWAITING_CAP = 500;
 
 export const getConfinedPlatformData = cache(function getConfinedPlatformData(
   leagueId?: string
 ): ConfinedPlatformData {
   return withTtl(`hasr:${leagueId || "all"}`, HEAVY_TTL_MS, () => {
-  const allBankers = getBankerPicks(100, leagueId);
-  const excludedMatches = getStrictlyExcludedMatches(50, leagueId);
-  const parlayCandidates = getParlayCandidates(leagueId, 24);
+  // نطاق الحصر = كامل الجدول القادم بكل جولاته. السقوف هنا هوامش أمان فوق حجم
+  // الموسم الفعلي (~2100 مباراة للدوريات السبعة) لا حدود عرض تقصّ اللائحة.
+  const allBankers = getBankerPicks(HASR_CONFINED_CAP, leagueId, "full-schedule");
+  const excludedMatches = getStrictlyExcludedMatches(
+    HASR_EXCLUDED_CAP,
+    leagueId,
+    "full-schedule",
+  );
+  const parlayCandidates = getParlayCandidates(leagueId, HASR_PARLAY_CAP, "full-schedule");
+  const awaitingModel = getMatchesAwaitingModel(leagueId, HASR_AWAITING_CAP);
   const calibration = getCalibrationBins(leagueId);
 
   // الفرق المحصورة المؤهلة: استبعاد أي مباراة مستبعدة أو منخفضة الأمان، وترتيبها تصاعدياً حسب موعد اللقاء
@@ -2778,11 +3053,19 @@ export const getConfinedPlatformData = cache(function getConfinedPlatformData(
     0,
   );
 
+  // اتساع النطاق كما تراه اللائحة فعلاً — يوم التقويم بمنطقة العرض نفسها
+  const days = new Set(strictlyConfined.map((p) => dayKey(p.utcDate)));
+  const rounds = new Set(
+    strictlyConfined.map((p) => `${p.leagueId}|${roundBucket(p.matchday, p.utcDate)}`),
+  );
+
   return {
+    generatedAt: new Date().toISOString(),
     summaryStats: {
       totalEvaluated: allBankers.length + excludedMatches.length,
       totalConfined: strictlyConfined.length,
       totalExcluded: excludedMatches.length,
+      totalAwaitingModel: awaitingModel.length,
       avgStability,
       topSafetyPick: safety[0] || null,
       topValuePick: value[0] || null,
@@ -2791,6 +3074,8 @@ export const getConfinedPlatformData = cache(function getConfinedPlatformData(
       slateN,
       candidates: strictlyConfined.length,
       topN: Math.min(8, strictlyConfined.length),
+      days: days.size,
+      rounds: rounds.size,
     },
     confinedMatches: strictlyConfined,
     strategies: {
@@ -2801,6 +3086,7 @@ export const getConfinedPlatformData = cache(function getConfinedPlatformData(
     },
     parlayCandidates,
     excludedMatches,
+    awaitingModel,
     calibration,
   };
   });
