@@ -9,8 +9,11 @@ interface HasrHeaderProps {
     totalEvaluated: number;
     totalConfined: number;
     totalExcluded: number;
+    totalArchive: number;
+    totalAltMarket: number;
     avgStability: number;
   };
+  listedCount: number;
   activeTab: "screener" | "parlay" | "radar" | "calibration";
   onTabChange: (tab: "screener" | "parlay" | "radar" | "calibration") => void;
   selectedLeague: string;
@@ -19,6 +22,7 @@ interface HasrHeaderProps {
 
 export function HasrHeader({
   summaryStats,
+  listedCount,
   activeTab,
   onTabChange,
   selectedLeague,
@@ -83,13 +87,19 @@ export function HasrHeader({
           {/* Summary Metric Badges */}
           <div className="flex flex-wrap items-center gap-2 text-xs">
             <div className="px-3 py-1.5 rounded bg-panel border border-line">
-              <span className="text-muted text-[11px] block">المحصورة المقبولة</span>
+              <span className="text-muted text-[11px] block">المحسوم</span>
               <span className="font-bold text-ink tabular text-xs">
                 {summaryStats.totalConfined} مباراة
               </span>
             </div>
             <div className="px-3 py-1.5 rounded bg-panel border border-line">
-              <span className="text-muted text-[11px] block">المستبعدة للعشوائية</span>
+              <span className="text-muted text-[11px] block">أرشيف الإشارة</span>
+              <span className="font-bold text-ink tabular text-xs">
+                {summaryStats.totalArchive ?? 0} مباراة
+              </span>
+            </div>
+            <div className="px-3 py-1.5 rounded bg-panel border border-line">
+              <span className="text-muted text-[11px] block">مستبعد الغربال</span>
               <span className="font-bold text-ink tabular text-xs">
                 {summaryStats.totalExcluded} مواجهة
               </span>
@@ -114,7 +124,7 @@ export function HasrHeader({
                   : "border-transparent text-muted hover:text-ink"
               }`}
             >
-              المباريات المحصورة ({summaryStats.totalConfined})
+              المباريات ({listedCount})
             </button>
             <button
               onClick={() => onTabChange("parlay")}
@@ -134,7 +144,7 @@ export function HasrHeader({
                   : "border-transparent text-muted hover:text-ink"
               }`}
             >
-              رادار المستبعدات والفخاخ ({summaryStats.totalExcluded})
+              رادار المستبعدات ({summaryStats.totalExcluded})
             </button>
             <button
               onClick={() => onTabChange("calibration")}

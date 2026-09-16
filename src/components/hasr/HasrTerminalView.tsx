@@ -52,11 +52,17 @@ function exclusionPillarLabel(pillar: StrictlyExcludedMatch["primaryExclusionPil
       return "تذبذب نتائج حاد";
     case "other":
       return "عشوائية حرجة";
+    case "sieve":
+      return "غربال المحسوم";
     default: {
       const never: never = pillar;
       return never;
     }
   }
+}
+
+function canAddToParlay(item: BankerPick): boolean {
+  return !item.settled && (item.sieveTier == null || item.sieveTier === "banker");
 }
 
 function roundCountAr(count: number): string {
@@ -228,7 +234,7 @@ export function HasrTerminalView({ initialData }: HasrTerminalViewProps) {
   const [data, setData] = useState<ConfinedPlatformData>(initialData);
   const [activeTab, setActiveTab] = useState<"screener" | "parlay" | "radar" | "calibration">("screener");
   const [selectedLeague, setSelectedLeague] = useState<string>("all");
-  const [strategyFilter, setStrategyFilter] = useState<"all" | "safety" | "value" | "balanced" | "traps">("all");
+  const [slateFilter, setSlateFilter] = useState<"all" | "banker" | "alt-market" | "weak" | "settled">("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [viewMode, setViewMode] = useState<"cards" | "table">("cards");
   // الافتراضي تصاعدي بساعة الانطلاق — الجدول يُقرأ كجدول جولة لا كلائحة ترتيب
@@ -277,18 +283,22 @@ export function HasrTerminalView({ initialData }: HasrTerminalViewProps) {
     };
   }, []);
 
+  const archiveMatches = data.archiveMatches ?? [];
+  const altMarketMatches = data.altMarketMatches ?? [];
+  const settledArchive = data.settledArchive ?? [];
+
   // Filter and sort confined matches
   const filteredConfined = useMemo(() => {
     let list =
-      strategyFilter === "safety"
-        ? data.strategies.safety
-        : strategyFilter === "value"
-          ? data.strategies.value
-          : strategyFilter === "balanced"
-            ? data.strategies.balanced
-            : strategyFilter === "traps"
-              ? data.strategies.traps
-              : data.confinedMatches;
+      slateFilter === "banker"
+        ? data.confinedMatches
+        : slateFilter === "alt-market"
+          ? altMarketMatches
+          : slateFilter === "weak"
+            ? archiveMatches
+            : slateFilter === "settled"
+              ? settledArchive
+              : [...data.confinedMatches, ...altMarketMatches, ...archiveMatches];
 
     if (selectedLeague !== "all") {
       list = list.filter((m) => m.leagueId === selectedLeague);
@@ -305,7 +315,7 @@ export function HasrTerminalView({ initialData }: HasrTerminalViewProps) {
     }
 
     return list;
-  }, [data, selectedLeague, strategyFilter, searchQuery]);
+  }, [data, selectedLeague, slateFilter, searchQuery, archiveMatches, altMarketMatches, settledArchive]);
 
   /** ترتيب المباريات داخل اليوم — ترتيب الأيام نفسها يبقى زمنياً تصاعدياً */
   const sortWithinDay = useMemo(() => {
@@ -367,6 +377,23 @@ export function HasrTerminalView({ initialData }: HasrTerminalViewProps) {
     [excludedDays]
   );
 
+  const settledDays = useMemo(() => {
+    let list = settledArchive;
+    if (selectedLeague !== "all") {
+      list = list.filter((m) => m.leagueId === selectedLeague);
+    }
+    if (searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase();
+      list = list.filter(
+        (m) =>
+          m.homeTeam.toLowerCase().includes(q) ||
+          m.awayTeam.toLowerCase().includes(q) ||
+          m.leagueName.toLowerCase().includes(q)
+      );
+    }
+    return groupByDayAndRound(list, new Date());
+  }, [settledArchive, selectedLeague, searchQuery]);
+
   /** بانتظار النموذج — تتبع تصفية الدوري كي لا تخالف اللائحة المعروضة */
   const awaitingModel = useMemo(
     () =>
@@ -388,7 +415,7 @@ export function HasrTerminalView({ initialData }: HasrTerminalViewProps) {
   };
 
   /** أعداد أزرار الاستراتيجيات تتبع نفس تصفية الدوري والبحث كي لا تخالف اللائحة المعروضة */
-  const strategyCounts = useMemo(() => {
+  const slateCounts = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     const visible = (list: BankerPick[]) =>
       list.filter(
@@ -401,13 +428,13 @@ export function HasrTerminalView({ initialData }: HasrTerminalViewProps) {
       ).length;
 
     return {
-      all: visible(data.confinedMatches),
-      safety: visible(data.strategies.safety),
-      value: visible(data.strategies.value),
-      balanced: visible(data.strategies.balanced),
-      traps: visible(data.strategies.traps),
+      all: visible([...data.confinedMatches, ...altMarketMatches, ...archiveMatches]),
+      banker: visible(data.confinedMatches),
+      alt: visible(altMarketMatches),
+      weak: visible(archiveMatches),
+      settled: visible(settledArchive),
     };
-  }, [data, selectedLeague, searchQuery]);
+  }, [data, selectedLeague, searchQuery, archiveMatches, altMarketMatches, settledArchive]);
 
   // Dual Parlay calculations
   const parlayStats = useMemo(() => {
@@ -461,6 +488,7 @@ export function HasrTerminalView({ initialData }: HasrTerminalViewProps) {
   }, [selectedMatch1, selectedMatch2]);
 
   const addMatchToParlay = (item: BankerPick) => {
+    if (!canAddToParlay(item)) return;
     const existing = data.parlayCandidates.find((c) => c.matchId === item.matchId);
     const chosen: ParlayCandidateMatch = existing || {
       matchId: item.matchId,
@@ -499,6 +527,17 @@ export function HasrTerminalView({ initialData }: HasrTerminalViewProps) {
       {/* Header */}
       <HasrHeader
         summaryStats={data.summaryStats}
+        listedCount={
+          slateFilter === "banker"
+            ? slateCounts.banker
+            : slateFilter === "alt-market"
+              ? slateCounts.alt
+              : slateFilter === "weak"
+                ? slateCounts.weak
+                : slateFilter === "settled"
+                  ? slateCounts.settled
+                  : slateCounts.all + slateCounts.settled
+        }
         activeTab={activeTab}
         onTabChange={setActiveTab}
         selectedLeague={selectedLeague}
@@ -519,54 +558,59 @@ export function HasrTerminalView({ initialData }: HasrTerminalViewProps) {
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex flex-wrap items-center gap-1.5 text-xs">
                   <button
-                    onClick={() => setStrategyFilter("all")}
+                    type="button"
+                    onClick={() => setSlateFilter("all")}
                     className={`px-3 py-1.5 rounded font-medium border transition-colors ${
-                      strategyFilter === "all"
+                      slateFilter === "all"
                         ? "bg-ink text-surface border-ink"
                         : "bg-panel text-muted hover:text-ink border-line"
                     }`}
                   >
-                    كافة المحصورة ({strategyCounts.all})
+                    الجولة ({slateCounts.all})
                   </button>
                   <button
-                    onClick={() => setStrategyFilter("safety")}
+                    type="button"
+                    onClick={() => setSlateFilter("banker")}
                     className={`px-3 py-1.5 rounded font-medium border transition-colors ${
-                      strategyFilter === "safety"
+                      slateFilter === "banker"
                         ? "bg-ink text-surface border-ink"
                         : "bg-panel text-muted hover:text-ink border-line"
                     }`}
                   >
-                    الأعلى أماناً ({strategyCounts.safety})
+                    محسوم ({slateCounts.banker})
                   </button>
                   <button
-                    onClick={() => setStrategyFilter("value")}
+                    type="button"
+                    onClick={() => setSlateFilter("alt-market")}
                     className={`px-3 py-1.5 rounded font-medium border transition-colors ${
-                      strategyFilter === "value"
+                      slateFilter === "alt-market"
                         ? "bg-ink text-surface border-ink"
                         : "bg-panel text-muted hover:text-ink border-line"
                     }`}
                   >
-                    أعلى قيمة ({strategyCounts.value})
+                    سوق بديل ({slateCounts.alt})
                   </button>
                   <button
-                    onClick={() => setStrategyFilter("balanced")}
+                    type="button"
+                    onClick={() => setSlateFilter("weak")}
                     className={`px-3 py-1.5 rounded font-medium border transition-colors ${
-                      strategyFilter === "balanced"
+                      slateFilter === "weak"
                         ? "bg-ink text-surface border-ink"
                         : "bg-panel text-muted hover:text-ink border-line"
                     }`}
                   >
-                    المتوازنة ({strategyCounts.balanced})
+                    إشارة ضعيفة ({slateCounts.weak})
                   </button>
                   <button
-                    onClick={() => setStrategyFilter("traps")}
+                    type="button"
+                    onClick={() => setSlateFilter("settled")}
                     className={`px-3 py-1.5 rounded font-medium border transition-colors ${
-                      strategyFilter === "traps"
+                      slateFilter === "settled"
                         ? "bg-ink text-surface border-ink"
                         : "bg-panel text-muted hover:text-ink border-line"
                     }`}
                   >
-                    مصائد السوق ({strategyCounts.traps})
+                    أرشيف منتهٍ ({slateCounts.settled})
                   </button>
                 </div>
 
@@ -676,14 +720,37 @@ export function HasrTerminalView({ initialData }: HasrTerminalViewProps) {
             ) : null}
 
             {/* Content: Empty State or Day → Round Listing */}
-            {confinedDays.length === 0 ? (
+            {confinedDays.length === 0 &&
+            !(slateFilter === "all" && settledDays.length > 0) ? (
               <div className="p-12 text-center rounded border border-line bg-panel space-y-2">
-                <p className="text-sm font-semibold text-ink">
-                  لا توجد مباريات مطابقة للبحث أو التصفية
-                </p>
-                <p className="text-xs text-muted">
-                  جرب تعديل كلمة البحث أو اختيار دوري واستراتيجية مختلفة
-                </p>
+                {searchQuery.trim() ? (
+                  <>
+                    <p className="text-sm font-semibold text-ink">لا نتائج لهذا البحث</p>
+                    <p className="text-xs text-muted">امسح البحث أو غيّر الدوري لعرض لائحة الجولة.</p>
+                  </>
+                ) : slateFilter === "banker" ? (
+                  <>
+                    <p className="text-sm font-semibold text-ink">لا محسوم في هذه الجولة</p>
+                    <p className="text-xs text-muted">
+                      الغربال لم يمرّر أي مباراة كمحسوم. الإشارات التي لم تبلغ العتبة في «إشارة ضعيفة»
+                      و«أرشيف منتهٍ»، والمستبعد في رادار الغربال.
+                    </p>
+                  </>
+                ) : slateFilter === "settled" ? (
+                  <>
+                    <p className="text-sm font-semibold text-ink">لا أرشيف منتهٍ في آخر 21 يوماً</p>
+                    <p className="text-xs text-muted">
+                      يُحفظ هنا حكم الغربال بعد صافرة النهاية: محسوم أو إشارة ضعيفة أو سوق بديل.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-sm font-semibold text-ink">لا مباريات في هذه الشريحة</p>
+                    <p className="text-xs text-muted">
+                      غيّر الشريحة أو الدوري، أو راجع رادار المستبعدات لأسباب الإسقاط.
+                    </p>
+                  </>
+                )}
               </div>
             ) : (
               <div className="space-y-3">
@@ -691,7 +758,7 @@ export function HasrTerminalView({ initialData }: HasrTerminalViewProps) {
                   <DayPanel
                     key={day.key}
                     day={day}
-                    unit="محصورة"
+                    unit={slateFilter === "settled" ? "مؤرشفة" : "محصورة"}
                     open={isDayOpen("confined", day.key, index)}
                     onToggle={() => toggleDay("confined", day.key, index)}
                     label={`المباريات المحصورة ${day.weekday} ${day.dateLabel}`}
@@ -703,7 +770,7 @@ export function HasrTerminalView({ initialData }: HasrTerminalViewProps) {
                             key={item.matchId}
                             item={item}
                             rank={reliabilityRank.get(item.matchId) ?? null}
-                            showRank={strategyFilter === "all"}
+                            showRank={slateFilter === "all" || slateFilter === "banker"}
                             onInspect={setInspectingMatch}
                             onAddParlay={addMatchToParlay}
                           />
@@ -746,6 +813,76 @@ export function HasrTerminalView({ initialData }: HasrTerminalViewProps) {
                 ))}
               </div>
             )}
+
+            {slateFilter === "all" && settledDays.length > 0 ? (
+              <div className="space-y-3 pt-2">
+                <div className="space-y-1">
+                  <h2 className="text-sm font-bold text-ink">أرشيف الجولات المنتهية</h2>
+                  <p className="text-xs text-muted">
+                    حكم الغربال بعد الصافرة لآخر 21 يوماً — يُحفظ حتى لا تختفي الإشارة بعد انتهاء المباراة.
+                  </p>
+                </div>
+                {settledDays.map((day, index) => (
+                  <DayPanel
+                    key={`settled-${day.key}`}
+                    day={day}
+                    unit="مؤرشفة"
+                    open={isDayOpen("settled", day.key, index)}
+                    onToggle={() => toggleDay("settled", day.key, index)}
+                    label={`الأرشيف المنتهي ${day.weekday} ${day.dateLabel}`}
+                  >
+                    {() =>
+                      viewMode === "cards" ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                          {day.items.map((item) => (
+                            <ConfinedMatchCard
+                              key={item.matchId}
+                              item={item}
+                              rank={null}
+                              showRank={false}
+                              onInspect={setInspectingMatch}
+                              onAddParlay={addMatchToParlay}
+                            />
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="overflow-x-auto rounded border border-line bg-surface">
+                          <table className="w-full text-xs text-right border-collapse">
+                            <caption className="sr-only">
+                              الأرشيف المنتهي — {day.weekday} {day.dateLabel}
+                            </caption>
+                            <thead>
+                              <tr className="border-b border-line bg-panel/50 text-muted font-semibold">
+                                <th className="p-3">ساعة الانطلاق</th>
+                                <th className="p-3">المباراة والفرق</th>
+                                <th className="p-3">الدوري والجولة</th>
+                                <th className="p-3 text-center">الترشيح</th>
+                                <th className="p-3 text-center">احتمال النموذج</th>
+                                <th className="p-3 text-center">سعر السوق</th>
+                                <th className="p-3 text-center">القيمة (Edge)</th>
+                                <th className="p-3 text-center">مؤشر الأمان</th>
+                                <th className="p-3 text-center">درجة الحصر</th>
+                                <th className="p-3 text-center">إجراء</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-line">
+                              {day.items.map((item) => (
+                                <ConfinedMatchRow
+                                  key={item.matchId}
+                                  item={item}
+                                  onInspect={setInspectingMatch}
+                                  onAddParlay={addMatchToParlay}
+                                />
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )
+                    }
+                  </DayPanel>
+                ))}
+              </div>
+            ) : null}
           </div>
         )}
 
@@ -934,11 +1071,10 @@ export function HasrTerminalView({ initialData }: HasrTerminalViewProps) {
           <div className="space-y-4">
             <div className="p-4 rounded border border-line bg-panel space-y-1">
               <h2 className="text-sm font-bold text-ink">
-                رادار الاستبعاد الصارم
+                رادار المستبعد من الغربال
               </h2>
               <p className="text-xs text-muted">
-                المباريات والفرق التي تم إسقاطها من الحصر والبارلي، موزعة على أيام الجولة نفسها
-                تصاعدياً لتوضيح أسباب الحظر
+                مباريات النافذة القادمة (10 أيام) التي أسقطها غربال المحسوم، مع القواعد التي أخفقت. ليست أرشيف إشارة ضعيفة.
               </p>
             </div>
 
@@ -971,10 +1107,8 @@ export function HasrTerminalView({ initialData }: HasrTerminalViewProps) {
                             <th className="p-3">ساعة الانطلاق</th>
                             <th className="p-3">المباراة والفرق</th>
                             <th className="p-3">الدوري والجولة</th>
-                            <th className="p-3 text-center">مؤشر العشوائية (MRI)</th>
-                            <th className="p-3 text-center">مؤشر الأمان</th>
                             <th className="p-3 text-center">السبب المباشر</th>
-                            <th className="p-3">التفصيل الإحصائي</th>
+                            <th className="p-3">قواعد الغربال</th>
                             <th className="p-3 text-center">تفاصيل</th>
                           </tr>
                         </thead>
@@ -1014,19 +1148,19 @@ export function HasrTerminalView({ initialData }: HasrTerminalViewProps) {
                                     </span>
                                   ) : null}
                                 </td>
-                                <td className="p-3 text-center tabular font-bold text-rose-700 dark:text-rose-400">
-                                  {match.matchRandomnessIndex} / 100
-                                </td>
-                                <td className="p-3 text-center tabular text-muted font-medium">
-                                  {match.stabilityScore}%
-                                </td>
                                 <td className="p-3 text-center">
                                   <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-500/20">
                                     {exclusionPillarLabel(match.primaryExclusionPillar)}
                                   </span>
                                 </td>
-                                <td className="p-3 text-muted text-[11px] leading-relaxed max-w-sm">
-                                  {match.primaryReasonAr}
+                                <td className="p-3 max-w-md">
+                                  {match.sieveRules && match.sieveRules.length > 0 ? (
+                                    <SieveRulesChips rules={match.sieveRules} compact />
+                                  ) : (
+                                    <span className="text-muted text-[11px] leading-relaxed">
+                                      {match.primaryReasonAr}
+                                    </span>
+                                  )}
                                 </td>
                                 <td className="p-3 text-center">
                                   <Link
@@ -1404,6 +1538,11 @@ function ConfinedMatchCard({
         <div className="flex items-center gap-1.5 min-w-0">
           <span className="inline-block w-1.5 h-1.5 rounded-full bg-accent shrink-0" />
           <KickoffStamp iso={item.utcDate} />
+          {item.settled && item.homeGoals != null && item.awayGoals != null ? (
+            <span className="ms-auto font-mono font-bold tabular text-ink">
+              {item.homeGoals}–{item.awayGoals}
+            </span>
+          ) : null}
         </div>
       </div>
 
@@ -1568,12 +1707,14 @@ function ConfinedMatchCard({
             صفحة اللقاء الكاملة
           </Link>
 
-          <button
-            onClick={() => onAddParlay(item)}
-            className="px-2.5 py-1 rounded bg-panel hover:bg-ink hover:text-surface text-ink text-[11px] font-semibold border border-line transition-colors"
-          >
-            + بارلي
-          </button>
+          {canAddToParlay(item) ? (
+            <button
+              onClick={() => onAddParlay(item)}
+              className="px-2.5 py-1 rounded bg-panel hover:bg-ink hover:text-surface text-ink text-[11px] font-semibold border border-line transition-colors"
+            >
+              + بارلي
+            </button>
+          ) : null}
         </div>
       </div>
     </div>
@@ -1594,6 +1735,11 @@ function ConfinedMatchRow({ item, onInspect, onAddParlay }: ConfinedMatchProps) 
     >
       <td className="p-3 whitespace-nowrap">
         <KickoffStamp iso={item.utcDate} />
+        {item.settled && item.homeGoals != null && item.awayGoals != null ? (
+          <span className="block mt-0.5 font-mono font-bold tabular text-ink">
+            {item.homeGoals}–{item.awayGoals}
+          </span>
+        ) : null}
       </td>
 
       <td className="p-3 font-semibold text-ink">
@@ -1621,7 +1767,10 @@ function ConfinedMatchRow({ item, onInspect, onAddParlay }: ConfinedMatchProps) 
       </td>
 
       <td className="p-3 text-center">
-        <span className="font-bold text-ink">{item.pickLabel}</span>
+        <span className="font-bold text-ink inline-flex items-center justify-center gap-1.5">
+          {item.pickLabel}
+          <SieveTierBadge tier={item.sieveTier} />
+        </span>
       </td>
 
       <td className="p-3 text-center tabular font-bold text-ink">{pct(item.probability)}</td>
@@ -1648,12 +1797,14 @@ function ConfinedMatchRow({ item, onInspect, onAddParlay }: ConfinedMatchProps) 
 
       <td className="p-3 text-center" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-center gap-1.5">
-          <button
-            onClick={() => onAddParlay(item)}
-            className="px-2 py-1 rounded bg-panel hover:bg-ink hover:text-surface text-ink text-[11px] font-semibold border border-line transition-colors"
-          >
-            + بارلي
-          </button>
+          {canAddToParlay(item) ? (
+            <button
+              onClick={() => onAddParlay(item)}
+              className="px-2 py-1 rounded bg-panel hover:bg-ink hover:text-surface text-ink text-[11px] font-semibold border border-line transition-colors"
+            >
+              + بارلي
+            </button>
+          ) : null}
           <Link
             href={`/match/${item.matchId}`}
             className="p-1 text-muted hover:text-accent text-[11px]"

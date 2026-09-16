@@ -1413,6 +1413,10 @@ export type BankerPick = {
   matchRandomnessIndex?: number;
   stabilityScore?: number;
   isStrictlyExcluded?: boolean;
+  /** مباراة منتهية من أرشيف الغربال */
+  settled?: boolean;
+  homeGoals?: number | null;
+  awayGoals?: number | null;
   /** غربال «المحسوم» (خطة 006 §ج) — null للصفوف السابقة على الغربال */
   sieveTier?: SieveTier | null;
   sieveRules?: SieveRule[];
@@ -1644,16 +1648,31 @@ export const getModel2Report = cache(function getModel2Report(
 export const getBankerPicks = cache(function getBankerPicks(
   limit = 4,
   leagueId?: string,
-  scope: FixtureScope = "current-round"
+  scope: FixtureScope = "current-round",
+  sieveTiers: readonly SieveTier[] = ["banker"],
+  listing: "upcoming" | "settled" = "upcoming",
+  keepRound = true,
 ): BankerPick[] {
-  return withTtl(`bankers:${limit}:${leagueId || "all"}:${scope}`, HEAVY_TTL_MS, () => {
+  const tierKey = sieveTiers.join(",");
+  return withTtl(
+    `bankers:${limit}:${leagueId || "all"}:${scope}:${tierKey}:${listing}:${keepRound}`,
+    HEAVY_TTL_MS,
+    () => {
   try {
     const db = getDb();
     const leagueFilter = leagueId ? "AND m.league_id = ?" : "";
     const params: unknown[] = leagueId ? [leagueId] : [];
+    const upcoming = listing === "upcoming";
+    const allowedTiers = new Set(sieveTiers);
     // تفاصيل الحراس/التكتيك/المدرب وعوامل النموذج 2 الثلاثين تُقرأ من الـ blob،
     // وهي مجدية لجولة واحدة لا لألفي مباراة — لذا تُقصر على النطاق القريب.
-    const wantsBlob = scope === "current-round";
+    const wantsBlob = upcoming && scope === "current-round" && keepRound;
+    const statusSql = upcoming
+      ? `m.status IN ('SCHEDULED', 'TIMED')
+        ${LOWER_BOUND_SQL}
+        ${scopeUpperBound(scope)}`
+      : `m.status = 'FINISHED'
+        AND substr(m.utc_date, 1, 19) >= strftime('%Y-%m-%dT%H:%M:%S', 'now', '-21 days')`;
 
     const fetched = db
       .prepare(
@@ -1664,6 +1683,7 @@ export const getBankerPicks = cache(function getBankerPicks(
              ht.crest_url as homeCrestUrl, at.crest_url as awayCrestUrl,
              m.matchday,
              p.p_home, p.p_draw, p.p_away, p.confidence, m.utc_date, m.utc_date as utcDate,
+             m.home_goals as homeGoals, m.away_goals as awayGoals,
              m.odds_home, m.odds_draw, m.odds_away,
              ${wantsBlob ? "p.analytics_json" : "NULL"} as analytics_json,
 ${GATE_COLUMNS_SQL}
@@ -1672,13 +1692,11 @@ ${GATE_COLUMNS_SQL}
       JOIN teams ht ON ht.id = m.home_team_id
       JOIN teams at ON at.id = m.away_team_id
       JOIN predictions p ON p.match_id = m.id
-      WHERE m.status IN ('SCHEDULED', 'TIMED')
-        ${LOWER_BOUND_SQL}
-        ${scopeUpperBound(scope)}
+      WHERE ${statusSql}
         AND (p.p_home IS NOT NULL OR p.p_away IS NOT NULL)
       ${leagueFilter}
-      ORDER BY m.utc_date ASC
-      LIMIT ${scopeRowCap(scope)}
+      ORDER BY m.utc_date ${upcoming ? "ASC" : "DESC"}
+      LIMIT ${upcoming ? scopeRowCap(scope) : Math.max(limit, 400)}
     `
       )
       .all(...params) as Array<{
@@ -1698,25 +1716,37 @@ ${GATE_COLUMNS_SQL}
       confidence: number | null;
       utc_date: string;
       utcDate: string;
+      homeGoals: number | null;
+      awayGoals: number | null;
       odds_home: number | null;
       odds_draw: number | null;
       odds_away: number | null;
       analytics_json: string | null;
     } & GateColumns>;
 
-    // النطاق القريب يبقى محصوراً على الجولة الأقرب لكل دوري كما كان؛
-    // نطاق كامل الجدول يعرض كل الجولات المتبقية بلا حصر.
+    // الصفحة الرئيسية تُحصر على الجولة الأقرب؛ منصة الحصر تعرض نافذة الغربال بلا قصّ الجولة.
     const rows =
-      scope === "current-round" ? keepCurrentRound(fetched, db, leagueId) : fetched;
+      upcoming && scope === "current-round" && keepRound
+        ? keepCurrentRound(fetched, db, leagueId)
+        : fetched;
 
     const candidates: BankerPick[] = [];
 
     for (const r of rows) {
+      const sieveTier = parseSieveTier(r.sieveTier);
+      if (sieveTier !== null) {
+        if (!allowedTiers.has(sieveTier)) continue;
+      } else if (!(allowedTiers.has("banker") && sieveTiers.length === 1)) {
+        // الصفوف السابقة على الغربال تُعرض في ودجة البنكر فقط، لا في أرشيف الحصر
+        continue;
+      }
+
       // بوابة العشوائية تُقرأ من القيم المستخرجة في SQL — نفس المنطق للنطاقين
       const gate = readRandomnessGate(r);
       // مباراة بلا مؤشر عشوائية = النموذج لم يمرّ عليها. لا نمنحها أرقام أمان
       // افتراضية؛ تُستبعد هنا وتُعرض في لائحة «بانتظار تشغيل النموذج».
-      if (!gate.modelled) continue;
+      // إن حكم الغربال موجود فالصف مُقيَّم حتى لو غاب مؤشر العشوائية.
+      if (!gate.modelled && sieveTier === null) continue;
 
       const { isStrictlyExcluded, mri, stability, isDrawTrap } = gate;
       let gkStats: BankerPick["goalkeeperStats"] = undefined;
@@ -1768,15 +1798,10 @@ ${GATE_COLUMNS_SQL}
         }
       }
 
-      // غربال «المحسوم» (خطة 006 §ج) هو الحَكَم حين يتوفر: banker فقط يمرّ.
-      // الصفوف السابقة على الغربال (sieve_tier NULL) تبقى على البوابة القديمة.
-      const sieveTier = parseSieveTier(r.sieveTier);
-      if (sieveTier !== null) {
-        if (sieveTier !== "banker" || isStrictlyExcluded) continue;
-      } else if (isStrictlyExcluded || mri >= 60 || isDrawTrap) {
-        // Bankers must be strictly safe: exclude chaotic matches, draw traps, and severe volatility
-        continue;
-      }
+      // غربال «المحسوم»: الشريحة المطلوبة تُحدَّد من المستدعي.
+      // المحسوم يبقى محصّناً ببوابة العشوائية؛ الأرشيف والمستبعد يُعرضان بحكم الغربال.
+      if (sieveTier === "banker" && isStrictlyExcluded) continue;
+      if (sieveTier === null && (isStrictlyExcluded || mri >= 60 || isDrawTrap)) continue;
 
       const pH = r.p_home ?? 0.33;
       const pD = r.p_draw ?? 0.33;
@@ -1791,8 +1816,8 @@ ${GATE_COLUMNS_SQL}
       const top1 = outcomes[0]!;
       const top2 = outcomes[1]!;
 
-      // استبعاد التعادل كترشيح بنكر صريح
-      if (top1.key === "D") continue;
+      // استبعاد التعادل كترشيح بنكر صريح — الأرشيف والمستبعد يُعرضان حتى لو أعلى احتمال تعادل
+      if (top1.key === "D" && (sieveTier === "banker" || sieveTier === null)) continue;
 
       const separationGap = Number((top1.p - top2.p).toFixed(4));
       // البوابة القديمة فقط: حد أدنى للأفضلية 4% واحتمال فوز >= 44% (الغربال يملك عتباته)
@@ -1842,6 +1867,9 @@ ${GATE_COLUMNS_SQL}
         matchRandomnessIndex: mri,
         stabilityScore: stability,
         isStrictlyExcluded,
+        settled: !upcoming,
+        homeGoals: r.homeGoals,
+        awayGoals: r.awayGoals,
         sieveTier,
         sieveRules: sieveTier !== null ? parseSieveRules(r.sieveJson) : undefined,
         sieveTheta: r.sieveTheta,
@@ -1857,19 +1885,21 @@ ${GATE_COLUMNS_SQL}
       });
     }
 
-    // الفرز: المحسوم (الغربال) أولاً بأعلى احتمال نهائي، ثم الصفوف القديمة بموثوقية النموذج 2
-    candidates.sort((a, b) => {
-      const aS = a.sieveTier === "banker" ? 1 : 0;
-      const bS = b.sieveTier === "banker" ? 1 : 0;
-      if (aS !== bS) return bS - aS;
-      if (aS === 1) return b.probability - a.probability;
-      const ar = a.model2?.reliability ?? a.selectionScore ?? 0;
-      const br = b.model2?.reliability ?? b.selectionScore ?? 0;
-      if (br !== ar) return br - ar;
-      const aRank = a.model2?.rank ?? 999;
-      const bRank = b.model2?.rank ?? 999;
-      return aRank - bRank;
-    });
+    // الفرز: المحسوم أولاً بأعلى احتمال نهائي، ثم الصفوف القديمة بموثوقية النموذج 2
+    if (upcoming) {
+      candidates.sort((a, b) => {
+        const rank = (t: SieveTier | null | undefined) =>
+          t === "banker" ? 0 : t === "alt-market" ? 1 : t === "weak" ? 2 : t === "excluded" ? 3 : 4;
+        const ar = rank(a.sieveTier);
+        const br = rank(b.sieveTier);
+        if (ar !== br) return ar - br;
+        if (a.sieveTier === "banker") return b.probability - a.probability;
+        const aRel = a.model2?.reliability ?? a.selectionScore ?? 0;
+        const bRel = b.model2?.reliability ?? b.selectionScore ?? 0;
+        if (bRel !== aRel) return bRel - aRel;
+        return a.utcDate.localeCompare(b.utcDate);
+      });
+    }
     return candidates.slice(0, limit);
   } catch (e) {
     console.error("Error in getBankerPicks:", e);
@@ -2821,9 +2851,10 @@ export interface StrictlyExcludedMatch {
   stabilityScore: number;
   verdictAr: string;
   recommendedActionAr: string;
-  primaryExclusionPillar: "draw_trap" | "second_half_fragility" | "disciplinary_risk" | "volatility" | "other";
+  primaryExclusionPillar: "draw_trap" | "second_half_fragility" | "disciplinary_risk" | "volatility" | "other" | "sieve";
   primaryReasonAr: string;
   pillarSeverity: string;
+  sieveRules?: SieveRule[];
 }
 
 export const getStrictlyExcludedMatches = cache(function getStrictlyExcludedMatches(
@@ -3047,6 +3078,9 @@ export interface ConfinedPlatformData {
     totalEvaluated: number;
     totalConfined: number;
     totalExcluded: number;
+    /** إشارات ضعيفة قادمة + أرشيف الجولات المنتهية */
+    totalArchive: number;
+    totalAltMarket: number;
     /** مجدولة بلا تحليلات نموذج — لم تُحصر ولم تُستبعد */
     totalAwaitingModel: number;
     avgStability: number;
@@ -3062,6 +3096,12 @@ export interface ConfinedPlatformData {
     rounds: number;
   };
   confinedMatches: BankerPick[];
+  /** سوق بديل: الجهة متفق عليها لكن الفوز غير حاسم */
+  altMarketMatches: BankerPick[];
+  /** إشارة ضعيفة قادمة — أرشيف بلا ادعاء */
+  archiveMatches: BankerPick[];
+  /** جولات منتهية حَكَم عليها الغربال (آخر 21 يوماً) */
+  settledArchive: BankerPick[];
   strategies: SelectionStrategyResult;
   parlayCandidates: ParlayCandidateMatch[];
   excludedMatches: StrictlyExcludedMatch[];
@@ -3326,28 +3366,87 @@ const HASR_EXCLUDED_CAP = 2500;
 const HASR_PARLAY_CAP = 120;
 const HASR_AWAITING_CAP = 500;
 
+const SIEVE_RULE_REASON: Record<string, string> = {
+  league_active: "الدوري غير مُفعَّل في الحزام",
+  same_side: "النموذج والسوق مختلفان على الجهة",
+  p_final_ge_theta: "الاحتمال النهائي دون عتبة θ",
+  gap_bounded: "فجوة النموذج عن السوق أكبر من 8 نقاط",
+  market_favourite: "السوق الحاد لا يرجّح بوضوح",
+  not_coin_flip: "المباراة قريبة من 50–50",
+  draw_head_low: "رأس التعادل مرتفع",
+  not_derby: "ديربي",
+  pillars_available: "غياب ركيزة للمرشّح",
+  not_promoted_early: "صاعد في أول الجولات",
+  season_sample_ok: "عينة الموسم أقل من 6 مباريات",
+};
+
+function sievePickToExcluded(p: BankerPick): StrictlyExcludedMatch {
+  const failed = (p.sieveRules ?? []).filter((r) => !r.ok);
+  return {
+    matchId: p.matchId,
+    leagueId: p.leagueId,
+    leagueNameAr: p.leagueName,
+    homeTeam: p.homeTeam,
+    awayTeam: p.awayTeam,
+    utcDate: p.utcDate,
+    matchday: p.matchday ?? null,
+    matchRandomnessIndex: p.matchRandomnessIndex ?? 0,
+    stabilityScore: p.stabilityScore ?? 0,
+    verdictAr: "مستبعد من غربال المحسوم",
+    recommendedActionAr: "",
+    primaryExclusionPillar: "sieve",
+    primaryReasonAr:
+      failed.length > 0
+        ? failed.map((r) => SIEVE_RULE_REASON[r.name] ?? r.name).join(" · ")
+        : "لم يجتز قواعد الغربال",
+    pillarSeverity: "HIGH",
+    sieveRules: p.sieveRules,
+  };
+}
+
 export const getConfinedPlatformData = cache(function getConfinedPlatformData(
   leagueId?: string
 ): ConfinedPlatformData {
   return withTtl(`hasr:${leagueId || "all"}`, HEAVY_TTL_MS, () => {
-  // نطاق الحصر = كامل الجدول القادم بكل جولاته. السقوف هنا هوامش أمان فوق حجم
-  // الموسم الفعلي (~2100 مباراة للدوريات السبعة) لا حدود عرض تقصّ اللائحة.
-  const allBankers = getBankerPicks(HASR_CONFINED_CAP, leagueId, "full-schedule");
-  const excludedMatches = getStrictlyExcludedMatches(
-    HASR_EXCLUDED_CAP,
+  // نافذة الغربال (10 أيام) بلا قصّ الجولة: الإشارة الضعيفة في الجولة التالية لا تُخفى،
+  // والمنتهي يُقرأ من أرشيف 21 يوماً حتى لا يختفي بعد صافرة النهاية.
+  const horizonMs = 10 * 24 * 60 * 60 * 1000;
+  const horizonEnd = Date.now() + horizonMs;
+  const inSieveHorizon = (p: BankerPick) => {
+    const t = Date.parse(p.utcDate);
+    return Number.isFinite(t) && t <= horizonEnd;
+  };
+  const slate = getBankerPicks(
+    HASR_CONFINED_CAP,
     leagueId,
-    "full-schedule",
+    "current-round",
+    ["banker", "alt-market", "weak", "excluded"],
+    "upcoming",
+    false,
+  ).filter(inSieveHorizon);
+  const confinedMatches = slate.filter((p) => p.sieveTier === "banker" || p.sieveTier == null);
+  const altMarketMatches = slate.filter((p) => p.sieveTier === "alt-market");
+  const archiveMatches = slate.filter((p) => p.sieveTier === "weak");
+  const excludedFromSieve = slate.filter((p) => p.sieveTier === "excluded");
+  const settledArchive = getBankerPicks(
+    HASR_CONFINED_CAP,
+    leagueId,
+    "current-round",
+    ["banker", "alt-market", "weak"],
+    "settled",
+    false,
   );
-  const parlayCandidates = getParlayCandidates(leagueId, HASR_PARLAY_CAP, "full-schedule");
+  const excludedMatches = excludedFromSieve.map(sievePickToExcluded);
+  const parlayCandidates = getParlayCandidates(leagueId, HASR_PARLAY_CAP, "current-round");
   const awaitingModel = getMatchesAwaitingModel(leagueId, HASR_AWAITING_CAP);
   const calibration = getCalibrationBins(leagueId);
   const sieve = getSieveSlateSummary(leagueId);
 
-  // الفرق المحصورة المؤهلة: استبعاد أي مباراة مستبعدة أو منخفضة الأمان، وترتيبها تصاعدياً حسب موعد اللقاء
-  const strictlyConfined = allBankers
-    .filter((p) => !p.isStrictlyExcluded && (p.stabilityScore ?? 50) >= 42);
+  const strictlyConfined = confinedMatches.filter(
+    (p) => !p.isStrictlyExcluded && (p.stabilityScore ?? 50) >= 42,
+  );
 
-  // تقسيم الاستراتيجيات الصارم
+  // تقسيم الاستراتيجيات الصارم — على المحسوم فقط
   const safety = [...strictlyConfined]
     .sort((a, b) => b.probability - a.probability)
     .slice(0, 8);
@@ -3362,7 +3461,7 @@ export const getConfinedPlatformData = cache(function getConfinedPlatformData(
     .sort((a, b) => (b.selectionScore ?? 0) - (a.selectionScore ?? 0))
     .slice(0, 8);
 
-  const traps = allBankers
+  const traps = strictlyConfined
     .filter((p) => p.isTrap)
     .sort((a, b) => (a.edge ?? 0) - (b.edge ?? 0))
     .slice(0, 8);
@@ -3374,24 +3473,26 @@ export const getConfinedPlatformData = cache(function getConfinedPlatformData(
       )
     : 70;
 
+  const visibleUpcoming = [...strictlyConfined, ...altMarketMatches, ...archiveMatches];
   const slateN = Math.max(
-    ...strictlyConfined.map((p) => p.model2?.slateN ?? 0),
-    allBankers.length + excludedMatches.length,
+    ...visibleUpcoming.map((p) => p.model2?.slateN ?? 0),
+    visibleUpcoming.length + excludedMatches.length,
     0,
   );
 
-  // اتساع النطاق كما تراه اللائحة فعلاً — يوم التقويم بمنطقة العرض نفسها
-  const days = new Set(strictlyConfined.map((p) => dayKey(p.utcDate)));
+  const days = new Set(visibleUpcoming.map((p) => dayKey(p.utcDate)));
   const rounds = new Set(
-    strictlyConfined.map((p) => `${p.leagueId}|${roundBucket(p.matchday, p.utcDate)}`),
+    visibleUpcoming.map((p) => `${p.leagueId}|${roundBucket(p.matchday, p.utcDate)}`),
   );
 
   return {
     generatedAt: new Date().toISOString(),
     summaryStats: {
-      totalEvaluated: allBankers.length + excludedMatches.length,
+      totalEvaluated: visibleUpcoming.length + excludedMatches.length,
       totalConfined: strictlyConfined.length,
       totalExcluded: excludedMatches.length,
+      totalArchive: archiveMatches.length + settledArchive.length,
+      totalAltMarket: altMarketMatches.length,
       totalAwaitingModel: awaitingModel.length,
       avgStability,
       topSafetyPick: safety[0] || null,
@@ -3405,6 +3506,9 @@ export const getConfinedPlatformData = cache(function getConfinedPlatformData(
       rounds: rounds.size,
     },
     confinedMatches: strictlyConfined,
+    altMarketMatches,
+    archiveMatches,
+    settledArchive,
     strategies: {
       safety,
       value,

@@ -1,15 +1,12 @@
-import type { SieveSlateSummary, SieveTier } from "@/lib/queries";
-import { pct } from "@/lib/format";
-import { LEAGUE_STATUS_LABELS, SIEVE_TIER_HINTS, sieveRuleLabel, sieveTierLabel } from "@/lib/sieve-labels";
-
-const TIER_ORDER: SieveTier[] = ["banker", "alt-market", "weak", "excluded"];
+import type { SieveSlateSummary } from "@/lib/queries";
+import { sieveRuleLabel } from "@/lib/sieve-labels";
 
 /**
- * لوحة غربال «المحسوم»: ما الذي يمرّ وما الذي يسقط ولماذا — حالة كل دوري وعتبته
- * وα، وتوزيع الشرائح على النافذة القريبة، وأكثر القواعد إسقاطاً.
+ * لوحة غربال «المحسوم»: تعريف الحسم وأكثر القواعد إسقاطاً في النافذة القريبة.
+ * تفاصيل θ/α لكل دوري تبقى في المحرك وصفحة الدقة، لا في واجهة الحصر.
  */
 export function SievePanel({ summary }: { summary: SieveSlateSummary }) {
-  const { tiers, total, failedRules, leagues, horizonDays } = summary;
+  const { total, failedRules, leagues, horizonDays } = summary;
   const activeCount = leagues.filter((l) => l.status === "active").length;
   const topFails = failedRules.slice(0, 5);
 
@@ -35,70 +32,6 @@ export function SievePanel({ summary }: { summary: SieveSlateSummary }) {
           </span>
         </div>
       </div>
-
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
-        {TIER_ORDER.map((tier) => (
-          <div key={tier} className="rounded-xl border border-line bg-panel/60 p-3 space-y-1">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-ink">{sieveTierLabel(tier)}</span>
-              <span className="font-mono font-bold text-ink tabular text-sm">{tiers[tier]}</span>
-            </div>
-            <p className="text-[10px] text-muted leading-relaxed">{SIEVE_TIER_HINTS[tier]}</p>
-          </div>
-        ))}
-      </div>
-
-      {leagues.length > 0 ? (
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs border-collapse">
-            <caption className="sr-only">حالة كل دوري في الغربال: العتبة θ ووزن النموذج α ونتائج شريحة المحسوم في الحزام التاريخي</caption>
-            <thead>
-              <tr className="border-b border-line text-muted text-[11px] font-bold">
-                <th scope="col" className="py-2 px-2 text-start">الدوري</th>
-                <th scope="col" className="py-2 px-2 text-center">الحالة</th>
-                <th scope="col" className="py-2 px-2 text-center">θ</th>
-                <th scope="col" className="py-2 px-2 text-center">α النموذج</th>
-                <th scope="col" className="py-2 px-2 text-center">شريحة المحسوم تاريخياً</th>
-                <th scope="col" className="py-2 px-2 text-center">نزع الهامش</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-line">
-              {leagues.map((l) => (
-                <tr key={l.leagueId}>
-                  <td className="py-2 px-2 font-semibold text-ink">{l.leagueNameAr}</td>
-                  <td className="py-2 px-2 text-center">
-                    <span
-                      className={`rounded-md border px-1.5 py-0.5 text-[10px] font-bold ${
-                        l.status === "active"
-                          ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
-                          : "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400"
-                      }`}
-                      title={l.statusReason ?? undefined}
-                    >
-                      {LEAGUE_STATUS_LABELS[l.status] ?? l.status}
-                    </span>
-                  </td>
-                  <td className="py-2 px-2 text-center font-mono tabular text-ink">{l.theta.toFixed(2)}</td>
-                  <td className="py-2 px-2 text-center font-mono tabular text-ink">
-                    {l.alphaAnnounce != null ? l.alphaAnnounce.toFixed(2) : "—"}
-                  </td>
-                  <td className="py-2 px-2 text-center font-mono tabular text-muted">
-                    {l.sliceN ? (
-                      <>
-                        إصابة {l.sliceHit != null ? pct(l.sliceHit, 0) : "—"} · مُعلَن{" "}
-                        {l.sliceStated != null ? pct(l.sliceStated, 0) : "—"} · n={l.sliceN}
-                      </>
-                    ) : (
-                      "—"
-                    )}
-                  </td>
-                  <td className="py-2 px-2 text-center font-mono text-muted">{l.demarginMethod ?? "—"}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ) : null}
 
       {topFails.length > 0 ? (
         <div className="space-y-1.5">
