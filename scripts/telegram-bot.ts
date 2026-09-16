@@ -274,9 +274,9 @@ async function answerCallbackQuery(callbackQueryId: string, text?: string) {
 
 const BOT_REPLY_KEYBOARD = {
   keyboard: [
-    [{ text: "🛡️ أأمن التوقعات" }, { text: "💎 فرص القيمة" }],
-    [{ text: "⚽ مباريات اليوم" }, { text: "📅 المباريات القادمة" }],
-    [{ text: "🏆 ترتيب الدوريات" }, { text: "📊 سجل الدقة" }],
+    [{ text: "🛡️ المحسوم" }, { text: "⚽ مباريات اليوم" }],
+    [{ text: "📅 المباريات القادمة" }, { text: "🏆 ترتيب الدوريات" }],
+    [{ text: "📊 سجل الدقة" }, { text: "🧠 المنهجية" }],
   ],
   resize_keyboard: true,
   is_persistent: true,
@@ -289,16 +289,16 @@ const MAIN_KEYBOARD = {
       { text: "📅 المباريات القادمة", callback_data: "cmd_upcoming" },
     ],
     [
-      { text: "💎 فرص القيمة (+EV)", callback_data: "cmd_value" },
-      { text: "🛡️ أأمن التوقعات (Bankers)", callback_data: "cmd_bankers" },
-    ],
-    [
+      { text: "🛡️ المحسوم (غربال)", callback_data: "cmd_hasr" },
       { text: "🏆 ترتيب الدوريات الـ 8", callback_data: "cmd_leagues" },
-      { text: "📊 سجل الدقة والأداء", callback_data: "cmd_accuracy" },
     ],
     [
+      { text: "📊 سجل الدقة والأداء", callback_data: "cmd_accuracy" },
       { text: "🧠 المنهجية الحسابية", callback_data: "cmd_methodology" },
+    ],
+    [
       { text: "🌐 منصة «تقدير» الحية", url: `${SITE_URL}` },
+      { text: "🌐 صفحة المحسوم", url: `${SITE_URL}/hasr` },
     ],
   ],
 };
@@ -353,7 +353,7 @@ function getLeagueStandings(leagueId: string) {
   return { leagueName: league?.name_ar || leagueId, rows };
 }
 
-function getValueBets(): MatchRow[] {
+function getSieveBankers(limit: number = 6): MatchRow[] {
   const query = `
     SELECT m.id, m.utc_date, m.status,
            ht.name_ar as home_team, at.name_ar as away_team,
@@ -367,53 +367,12 @@ function getValueBets(): MatchRow[] {
     JOIN teams ht ON ht.id = m.home_team_id
     JOIN teams at ON at.id = m.away_team_id
     JOIN predictions p ON p.match_id = m.id
-    WHERE (m.status = 'TIMED' OR m.status = 'SCHEDULED')
-      AND m.utc_date >= datetime('now')
-    ORDER BY p.confidence DESC
-    LIMIT 6;
-  `;
-  return db.query(query).all() as MatchRow[];
-}
-
-function getBankerPicks(limit: number = 4): MatchRow[] {
-  const query = `
-    SELECT m.id, m.utc_date, m.status,
-           ht.name_ar as home_team, at.name_ar as away_team,
-           m.home_goals, m.away_goals,
-           l.name_ar as league_name,
-           p.p_home, p.p_draw, p.p_away, p.confidence,
-           p.lambda_home, p.lambda_away,
-           m.odds_home, m.odds_draw, m.odds_away
-    FROM matches m
-    JOIN leagues l ON l.id = m.league_id
-    JOIN teams ht ON ht.id = m.home_team_id
-    JOIN teams at ON at.id = m.away_team_id
-    JOIN predictions p ON p.match_id = m.id
-    WHERE (m.status IN ('SCHEDULED', 'TIMED') OR m.utc_date >= date('now'))
-      AND (p.p_home IS NOT NULL OR p.p_away IS NOT NULL)
-    ORDER BY m.utc_date ASC, MAX(COALESCE(p.p_home, 0), COALESCE(p.p_away, 0)) DESC
+    WHERE m.status IN ('SCHEDULED', 'TIMED')
+      AND p.sieve_tier = 'banker'
+    ORDER BY MAX(COALESCE(p.p_home, 0), COALESCE(p.p_away, 0)) DESC, m.utc_date ASC
     LIMIT ?;
   `;
-  const rows = db.query(query).all(limit) as MatchRow[];
-  if (rows.length > 0) return rows;
-
-  const fallbackQuery = `
-    SELECT m.id, m.utc_date, m.status,
-           ht.name_ar as home_team, at.name_ar as away_team,
-           m.home_goals, m.away_goals,
-           l.name_ar as league_name,
-           p.p_home, p.p_draw, p.p_away, p.confidence,
-           p.lambda_home, p.lambda_away,
-           m.odds_home, m.odds_draw, m.odds_away
-    FROM matches m
-    JOIN leagues l ON l.id = m.league_id
-    JOIN teams ht ON ht.id = m.home_team_id
-    JOIN teams at ON at.id = m.away_team_id
-    JOIN predictions p ON p.match_id = m.id
-    ORDER BY p.confidence DESC
-    LIMIT ?;
-  `;
-  return db.query(fallbackQuery).all(limit) as MatchRow[];
+  return db.query(query).all(limit) as MatchRow[];
 }
 
 // Anti-Spam & Rate Limiter Store
@@ -547,20 +506,6 @@ async function handleUpdate(update: TelegramUpdate) {
     }
 
     if (
-      text.startsWith("/bankers") ||
-      normText.includes("اامن") ||
-      normText.includes("أأمن") ||
-      normText.includes("مضمون") ||
-      normText.includes("banker")
-    ) {
-      const matches = getBankerPicks();
-      let reply = `<b>🛡️ أأمن التوقعات للجولة الحالية (Banker Picks):</b>\n\n`;
-      reply += matches.map((m) => formatMatchCard(m)).join("\n──────────────\n");
-      await sendMessage(chatId, reply, MAIN_KEYBOARD);
-      return;
-    }
-
-    if (
       text.startsWith("/today") ||
       text.startsWith("/matches") ||
       normText.includes("اليوم")
@@ -597,18 +542,29 @@ async function handleUpdate(update: TelegramUpdate) {
     }
 
     if (
+      text.startsWith("/hasr") ||
       text.startsWith("/value") ||
+      text.startsWith("/bankers") ||
+      normText.includes("اامن") ||
+      normText.includes("أأمن") ||
+      normText.includes("مضمون") ||
+      normText.includes("banker") ||
+      normText.includes("محسوم") ||
+      normText.includes("غربال") ||
       normText.includes("قيمه") ||
       normText.includes("قيمة") ||
       normText.includes("فرص") ||
-      normText.includes("value")
+      normText.includes("value") ||
+      normText.includes("بنكر")
     ) {
-      const matches = getValueBets();
-      let reply = `<b>💎 أبرز فرص القيمة والأعلى ثقة (+EV):</b>\n\n`;
-      reply += matches.map((m) => formatMatchCard(m)).join("\n──────────────\n");
-      reply += `\n\nاستعرض جميع الفرص والتفاصيل المالية عبر المنصة:`;
+      const matches = getSieveBankers(6);
+      let reply = `<b>🛡️ المحسوم — غربال يتفق فيه النموذج مع السوق الحاد:</b>\n\n`;
+      reply += matches.length
+        ? matches.map((m) => formatMatchCard(m)).join("\n──────────────\n")
+        : "لا مباريات اجتازت الغربال حالياً — أول الجولات تُنشر كإشارة ضعيفة حتى تكتمل عيّنة الموسم (6 مباريات لكل طرف).";
+      reply += `\n\nلا تنبيهات +EV ولا حصص كيلي. التفاصيل والقواعد على المنصة:`;
       const kb = {
-        inline_keyboard: [[{ text: "🌐 فتح صفحة فرص القيمة", url: `${SITE_URL}/value` }]],
+        inline_keyboard: [[{ text: "🌐 فتح صفحة المحسوم", url: `${SITE_URL}/hasr` }]],
       };
       await sendMessage(chatId, reply, kb);
       return;
@@ -695,18 +651,15 @@ async function handleUpdate(update: TelegramUpdate) {
       let reply = `<b>المباريات القادمة المجدولة:</b>\n\n`;
       reply += matches.length ? matches.map((m) => formatMatchCard(m)).join("\n──────────────\n") : "لا تتوفر مباريات قادمة.";
       await sendMessage(chatId, reply, MAIN_KEYBOARD);
-    } else if (data === "cmd_bankers") {
-      const matches = getBankerPicks();
-      let reply = `<b>🛡️ أأمن التوقعات للجولة الحالية (Banker Picks):</b>\n\n`;
-      reply += matches.map((m) => formatMatchCard(m)).join("\n──────────────\n");
-      await sendMessage(chatId, reply, MAIN_KEYBOARD);
-    } else if (data === "cmd_value") {
-      const matches = getValueBets();
-      let reply = `<b>💎 أبرز فرص القيمة والأعلى ثقة (+EV):</b>\n\n`;
-      reply += matches.map((m) => formatMatchCard(m)).join("\n──────────────\n");
+    } else if (data === "cmd_bankers" || data === "cmd_value" || data === "cmd_hasr") {
+      const matches = getSieveBankers(6);
+      let reply = `<b>🛡️ المحسوم — غربال يتفق فيه النموذج مع السوق الحاد:</b>\n\n`;
+      reply += matches.length
+        ? matches.map((m) => formatMatchCard(m)).join("\n──────────────\n")
+        : "لا مباريات اجتازت الغربال حالياً — أول الجولات تُنشر كإشارة ضعيفة حتى تكتمل عيّنة الموسم.";
       const kb = {
         inline_keyboard: [
-          [{ text: "🌐 استعراض كافة فرص القيمة بالمنصة", url: `${SITE_URL}/value` }],
+          [{ text: "🌐 فتح صفحة المحسوم", url: `${SITE_URL}/hasr` }],
           [{ text: "🔙 القائمة الرئيسية", callback_data: "cmd_main_menu" }],
         ],
       };
@@ -812,8 +765,8 @@ async function setupBotMetadata() {
           { command: "start", description: "البدء واستعراض القائمة الرئيسية" },
           { command: "today", description: "مباريات اليوم والتوقعات" },
           { command: "upcoming", description: "المباريات القادمة" },
-          { command: "bankers", description: "أأمن التوقعات" },
-          { command: "value", description: "فرص القيمة (+EV)" },
+          { command: "hasr", description: "المحسوم — غربال النموذج والسوق" },
+          { command: "bankers", description: "المحسوم (نفس الغربال)" },
           { command: "leagues", description: "جدول ترتيب الدوريات" },
           { command: "accuracy", description: "سجل الدقة والأداء" },
           { command: "methodology", description: "المنهجية الحسابية" },

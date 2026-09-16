@@ -7,7 +7,7 @@ import { useTheme, ColorPreset } from "./ThemeContext";
 const QUICK_LINKS = [
   { label: "الرئيسية والمباريات", href: "/", icon: "⚽" },
   { label: "الدوريات والجداول", href: "/leagues", icon: "🏆" },
-  { label: "فرص القيمة (+EV)", href: "/value", icon: "📈" },
+  { label: "المحسوم (غربال)", href: "/hasr", icon: "🛡️" },
   { label: "الفرصة المزدوجة", href: "/double-chance", icon: "🎯" },
   { label: "الرسوم البيانية", href: "/charts", icon: "📊" },
   { label: "دقة النماذج", href: "/accuracy", icon: "🎯" },

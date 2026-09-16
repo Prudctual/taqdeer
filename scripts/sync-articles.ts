@@ -71,10 +71,10 @@ const INITIAL_ARTICLES = [
   {
     id: "art-002",
     slug: "value-bets-kelly-criterion-guide",
-    title: "هندسة إشارات القيمة (+EV) وحصة كيلي الربعية",
+    title: "غربال المحسوم والإرساء على إغلاق السوق الحاد",
     summary:
-      "كيف تُستخرج فرص القيمة من احتمال النموذج المعاير مقابل السوق، ولماذا نقيّد EV بين 3% و15%.",
-    category: "فرص القيمة +EV",
+      "لماذا لا تُوصف مباراة بالمحسومة إلا باتفاق اللبّ والسوق، وكيف يُقاس كل توقع مقابل إغلاق بيناكل لا مقابل سعر أول.",
+    category: "المحسوم والغربال",
     imageUrl: "/crests/pd.svg",
     author: "قسم الرياضيات والتحليل الكمي",
     readTimeMins: 5,
@@ -82,23 +82,19 @@ const INITIAL_ARTICLES = [
     isFeatured: 0,
     publishedAt: new Date(Date.now() - 3600 * 1000 * 12).toISOString(),
     contentMd: `
-# هندسة إشارات القيمة (+EV) وحصة كيلي الربعية
+# غربال المحسوم والإرساء على إغلاق السوق الحاد
 
-تعتمد تقدير على مبدأ: **لا توجد مراهنة مضمونة، بل فرص ذات قيمة متوقعة إيجابية (+EV)**.
+تعتمد تقدير على مبدأ: **لا يقين مزيّف، ولا تنبيهات رهان**. سقف 1X2 الواقعي نحو 50–55٪. الدقة تأتي من إشارة أنظف وغربال صارم، لا من نموذج أعقد.
 
 ---
 
-### 1. ما هي فرصة القيمة؟
+### 1. السوق الحاد بعد اللبّ لا داخله
 
-$$\\text{EV} = (P \\times \\text{Odds}) - 1.0$$
+اللبّ الإحصائي ($p_m$) يُعاير بحرارة مُتعلَّمة ثم يُدمج مع بيناكل/Betfair منزوع الهامش بوزن $\\alpha$. إن لم يتفوّق الدمج على الإغلاق في bootstrap مقترن يكون $\\alpha = 0$: الاحتمال المنشور هو السوق نفسه.
 
-حيث $P$ احتمال النموذج المعاير (بعد إزالة هامش السوق من الأودز عبر Power Method عند الحاجة). نقبل الإشارات عندما $\\text{EV}$ بين **3% و 15%**.
+### 2. متى تُوصف المباراة بالمحسومة؟
 
-### 2. كيلي الربعي
-
-$$f^* = 0.25 \\times \\left( \\frac{P \\times b - (1 - P)}{b} \\right)$$
-
-حيث $b = \\text{Odds} - 1.0$. أي إشارة فوق 15% تُستبعد كتحذير من نقطة عمياء في البيانات.
+اتفاق الجهة بين اللبّ والسوق، احتمال نهائي $\\ge \\theta$ المعايرة (تُرفع فقط)، فجوة محدودة، لا ديربي ولا غياب ركيزة ولا صاعد في أول 8 جولات، وعيّنة موسم $\\ge 6$ لكل طرف. كل ما عداه أرشيف «إشارة ضعيفة». الحافة مقابل السوق تُحسب للتشخيص فقط — بلا +EV ولا حصص كيلي.
 `,
   },
 ];
@@ -173,6 +169,20 @@ function upsertMetricsArticle() {
   const valueMeta = db
     .prepare(`SELECT value FROM app_meta WHERE key = 'value_backtest'`)
     .get() as { value: string } | undefined;
+  let sieveCounts: Array<{ tier: string; n: number }> = [];
+  try {
+    sieveCounts = db
+      .prepare(
+        `SELECT p.sieve_tier AS tier, COUNT(*) AS n
+         FROM predictions p
+         JOIN matches m ON m.id = p.match_id
+         WHERE m.status IN ('SCHEDULED','TIMED') AND p.sieve_tier IS NOT NULL
+         GROUP BY p.sieve_tier`,
+      )
+      .all() as Array<{ tier: string; n: number }>;
+  } catch {
+    sieveCounts = [];
+  }
 
   type PickRow = {
     home: string;
@@ -195,8 +205,9 @@ function upsertMetricsArticle() {
          JOIN teams t2 ON t2.id = m.away_team_id
          JOIN leagues l ON l.id = m.league_id
          WHERE m.status IN ('SCHEDULED','TIMED')
+           AND p.sieve_tier = 'banker'
            AND datetime(m.utc_date) BETWEEN datetime('now') AND datetime('now', '+7 days')
-         ORDER BY p.confidence DESC
+         ORDER BY MAX(COALESCE(p.p_home, 0), COALESCE(p.p_away, 0)) DESC
          LIMIT 5`,
       )
       .all() as PickRow[];
@@ -212,7 +223,13 @@ function upsertMetricsArticle() {
   const n = overall?.n_matches ?? 0;
   const ver = overall?.model_version ?? "ensemble-v3";
 
-  let valueBlock = "لا بطاقة value-backtest بعد آخر تدريب.";
+  const sieveBlock =
+    sieveCounts.length === 0
+      ? "لا غربال منشور بعد آخر تدريب."
+      : sieveCounts
+          .map((r) => `- ${r.tier}: ${r.n}`)
+          .join("\n");
+  let valueBlock = "سياسة +EV أُوقفت؛ الحافة تُحسب للتشخيص فقط.";
   if (valueMeta?.value) {
     try {
       const vb = JSON.parse(valueMeta.value) as {
@@ -220,7 +237,7 @@ function upsertMetricsArticle() {
         policy?: string;
       };
       const t = vb.total ?? {};
-      valueBlock = `سياسة: ${vb.policy ?? "—"}\n- رهانات: ${t.n_bets ?? 0}\n- PnL: ${(t.pnl ?? 0).toFixed(3)}u على ${(t.staked ?? 0).toFixed(3)}u`;
+      valueBlock = `أرشيف قديم (${vb.policy ?? "—"}) — ${t.n_bets ?? 0} رهاناً تاريخياً، ليست تنبيهات حية.`;
     } catch {
       /* keep default */
     }
@@ -228,7 +245,7 @@ function upsertMetricsArticle() {
 
   const pickLines =
     picks.length === 0
-      ? "- لا توقعات عالية الثقة في الأيام السبعة القادمة."
+      ? "- لا مباراة اجتازت غربال المحسوم في الأيام السبعة القادمة."
       : picks
           .map((p) => {
             const side =
@@ -257,11 +274,15 @@ function upsertMetricsArticle() {
 
 > هذه الأرقام تقيس اللبّ الإحصائي بلا إثراء حي (طقس/إصابات).
 
-## اختبار القيمة (+EV)
+## غربال المحسوم على الجدول الحالي
+
+${sieveBlock}
+
+## ملاحظة عن سياسة القيمة
 
 ${valueBlock}
 
-## أعلى ثقة خلال 7 أيام
+## محسوم خلال 7 أيام
 
 ${pickLines}
 `;
@@ -270,7 +291,7 @@ ${pickLines}
     "art-metrics-weekly",
     "weekly-model-metrics",
     `نشرة المقاييس · ${weekKey}`,
-    `ملخص تلقائي لدقة ${ver} وفرص الثقة العالية من القاعدة المحلية.`,
+    `ملخص تلقائي لدقة ${ver} وشرائح الغربال من القاعدة المحلية.`,
     contentMd,
     "مقاييس النموذج",
     "/crests/bl1.svg",

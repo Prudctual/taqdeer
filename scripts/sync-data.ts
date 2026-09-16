@@ -600,6 +600,7 @@ export function ingestCsv(
       odds_sharp_home=COALESCE(excluded.odds_sharp_home, matches.odds_sharp_home),
       odds_sharp_draw=COALESCE(excluded.odds_sharp_draw, matches.odds_sharp_draw),
       odds_sharp_away=COALESCE(excluded.odds_sharp_away, matches.odds_sharp_away),
+      -- إغلاق بيناكل من CSV (PSCH) هو المرجع؛ إن غاب يبقى ما التقطناه حياً قبل الصافرة
       odds_close_home=COALESCE(excluded.odds_close_home, matches.odds_close_home),
       odds_close_draw=COALESCE(excluded.odds_close_draw, matches.odds_close_draw),
       odds_close_away=COALESCE(excluded.odds_close_away, matches.odds_close_away),
@@ -635,6 +636,67 @@ export function ingestCsv(
     return rounded;
   };
 
+  // خطوط الإغلاق الحقيقية من CSV — لكل مصدر صف؛ بيناكل هو المرجع (authoritative)
+  const insertClosing = db.prepare(`
+    INSERT INTO closing_lines (
+      match_id, source, is_authoritative, oh, od, oa,
+      ou_line, ou_over, ou_under, ah_line, ah_home, ah_away, captured_at
+    ) VALUES (
+      @match_id, @source, @auth, @oh, @od, @oa,
+      @ou_line, @ou_over, @ou_under, @ah_line, @ah_home, @ah_away, @captured_at
+    )
+    ON CONFLICT(match_id, source) DO UPDATE SET
+      is_authoritative=excluded.is_authoritative,
+      oh=excluded.oh, od=excluded.od, oa=excluded.oa,
+      ou_line=excluded.ou_line, ou_over=excluded.ou_over, ou_under=excluded.ou_under,
+      ah_line=excluded.ah_line, ah_home=excluded.ah_home, ah_away=excluded.ah_away,
+      captured_at=excluded.captured_at
+  `);
+  const CLOSING_SOURCES: Array<{
+    source: string;
+    auth: 0 | 1;
+    h: string; d: string; a: string;
+    over: string; under: string;
+    ahH: string; ahA: string;
+  }> = [
+    { source: "pinnacle-csv", auth: 1, h: "PSCH", d: "PSCD", a: "PSCA", over: "PC>2.5", under: "PC<2.5", ahH: "PCAHH", ahA: "PCAHA" },
+    { source: "avg-csv", auth: 0, h: "AvgCH", d: "AvgCD", a: "AvgCA", over: "AvgC>2.5", under: "AvgC<2.5", ahH: "AvgCAHH", ahA: "AvgCAHA" },
+    { source: "max-csv", auth: 0, h: "MaxCH", d: "MaxCD", a: "MaxCA", over: "MaxC>2.5", under: "MaxC<2.5", ahH: "MaxCAHH", ahA: "MaxCAHA" },
+    { source: "b365-csv", auth: 0, h: "B365CH", d: "B365CD", a: "B365CA", over: "B365C>2.5", under: "B365C<2.5", ahH: "B365CAHH", ahA: "B365CAHA" },
+    { source: "betfair-csv", auth: 0, h: "BFECH", d: "BFECD", a: "BFECA", over: "BFEC>2.5", under: "BFEC<2.5", ahH: "BFECAHH", ahA: "BFECAHA" },
+  ];
+  const writeClosingLines = (matchId: string, r: Record<string, string | undefined>, capturedAt: string) => {
+    const ahLine = num(r.AHCh);
+    for (const s of CLOSING_SOURCES) {
+      const oh = num(r[s.h]);
+      const od = num(r[s.d]);
+      const oa = num(r[s.a]);
+      const over = num(r[s.over]);
+      const under = num(r[s.under]);
+      const ahH = num(r[s.ahH]);
+      const ahA = num(r[s.ahA]);
+      const has1x2 = oh != null && od != null && oa != null && oh > 1 && od > 1 && oa > 1;
+      const hasOu = over != null && under != null;
+      const hasAh = ahLine != null && ahH != null && ahA != null;
+      if (!has1x2 && !hasOu && !hasAh) continue;
+      insertClosing.run({
+        match_id: matchId,
+        source: s.source,
+        auth: s.auth,
+        oh: has1x2 ? oh : null,
+        od: has1x2 ? od : null,
+        oa: has1x2 ? oa : null,
+        ou_line: hasOu ? 2.5 : null,
+        ou_over: hasOu ? over : null,
+        ou_under: hasOu ? under : null,
+        ah_line: hasAh ? ahLine : null,
+        ah_home: hasAh ? ahH : null,
+        ah_away: hasAh ? ahA : null,
+        captured_at: capturedAt,
+      });
+    }
+  };
+
   let n = 0;
   const tx = db.transaction(() => {
     for (const r of rows) {
@@ -667,19 +729,22 @@ export function ingestCsv(
         away_goals: ag,
         source: "football-data.co.uk",
         external_id: null,
+        // current = متوسط السوق المبكر؛ open = أول سعر متاح؛ sharp = بيناكل المبكر فقط
         odds_home: num(r.AvgH) ?? num(r.B365H) ?? num(r.PSH),
         odds_draw: num(r.AvgD) ?? num(r.B365D) ?? num(r.PSD),
         odds_away: num(r.AvgA) ?? num(r.B365A) ?? num(r.PSA),
         odds_open_home: num(r.PSH) ?? num(r.B365H),
         odds_open_draw: num(r.PSD) ?? num(r.B365D),
         odds_open_away: num(r.PSA) ?? num(r.B365A),
-        odds_sharp_home: num(r.PSH) ?? num(r.PPH) ?? null,
-        odds_sharp_draw: num(r.PSD) ?? num(r.PPD) ?? null,
-        odds_sharp_away: num(r.PSA) ?? num(r.PPA) ?? null,
-        // للمباريات المنتهية في CSV: خط الإغلاق ≈ آخر سعر حاد/متوسط متاح
-        odds_close_home: num(r.PSH) ?? num(r.B365H) ?? num(r.AvgH),
-        odds_close_draw: num(r.PSD) ?? num(r.B365D) ?? num(r.AvgD),
-        odds_close_away: num(r.PSA) ?? num(r.B365A) ?? num(r.AvgA),
+        odds_sharp_home: num(r.PSH),
+        odds_sharp_draw: num(r.PSD),
+        odds_sharp_away: num(r.PSA),
+        // الإغلاق الحاد عند الصافرة: بيناكل (PSCH)، وإن غاب (football-data أوقفته منذ
+        // 2026-01) فبورصة Betfair عند الإغلاق (BFECH) — سوق حاد حقيقي أيضاً، لا اختلاق.
+        // الأسعار الثلاثة من مصدر واحد دائماً (لا خلط بيناكل/بتفير داخل الصف نفسه).
+        odds_close_home: num(r.PSCH) ?? (num(r.BFECD) && num(r.BFECA) ? num(r.BFECH) : null),
+        odds_close_draw: num(r.PSCH) ? num(r.PSCD) : (num(r.BFECH) && num(r.BFECA) ? num(r.BFECD) : null),
+        odds_close_away: num(r.PSCH) ? num(r.PSCA) : (num(r.BFECH) && num(r.BFECD) ? num(r.BFECA) : null),
         shots_home: num(r.HS),
         shots_away: num(r.AS),
         sot_home: num(r.HST),
@@ -696,11 +761,37 @@ export function ingestCsv(
         ht_home_goals: num(r.HTHG),
         ht_away_goals: num(r.HTAG),
       });
+      writeClosingLines(id, r, utc);
       n++;
     }
   });
   tx();
   return n;
+}
+
+/**
+ * تصحيح لمرة واحدة: قبل خطة 006 كان PSH (بيناكل المبكر) يُنسخ في odds_close_*.
+ * نُفرغ الإغلاق لمباريات CSV كي يملأه ingestCsv من PSCH الحقيقي، ونُبقي ما التقطه
+ * التقاط الإغلاق الحي للمباريات الأخرى.
+ */
+export function resetFabricatedClosingOnce(db: ReturnType<typeof getDb>) {
+  const key = "closing_odds_fixed_v1";
+  const done = db.prepare(`SELECT value FROM app_meta WHERE key = ?`).get(key) as
+    | { value: string }
+    | undefined;
+  if (done?.value) return;
+  const r = db
+    .prepare(
+      `UPDATE matches
+       SET odds_close_home = NULL, odds_close_draw = NULL, odds_close_away = NULL
+       WHERE source = 'football-data.co.uk'`,
+    )
+    .run();
+  db.prepare(
+    `INSERT INTO app_meta (key, value) VALUES (?, ?)
+     ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+  ).run(key, new Date().toISOString());
+  console.log(`  أُفرغ إغلاق مُختلَق لـ${r.changes} مباراة — سيُملأ من PSCH`);
 }
 
 /** معرّفات API-Football لدورياتنا — تُستخدم مع fixtures?date= (بلا موسم؛ الخطة المجانية تقفل seasons الحديثة) */
@@ -928,6 +1019,14 @@ async function syncUpcomingOddsFromApiFootball(
   let kickoffsUpdated = 0;
   let oddsCalls = 0;
 
+  // نحفظ معرّف المباراة في API-Football كي يلتقط taqdeer-enrich سعر الإغلاق قبل الصافرة
+  const upsertFixtureId = db.prepare(`
+    INSERT INTO external_id_map (source, entity_type, local_id, external_id, label, updated_at)
+    VALUES ('api-football', 'fixture', ?, ?, NULL, ?)
+    ON CONFLICT(source, entity_type, local_id) DO UPDATE SET
+      external_id = excluded.external_id, updated_at = excluded.updated_at
+  `);
+
   type ResolvedHit = FxHit & { matchId: string; hasOdds: boolean };
   const resolved: ResolvedHit[] = [];
   for (const h of hits) {
@@ -939,6 +1038,7 @@ async function syncUpcomingOddsFromApiFootball(
       | { id: string; odds_home: number | null; utc_date: string }
       | undefined;
     if (!row) continue;
+    upsertFixtureId.run(row.id, String(h.fixtureId), new Date().toISOString());
     if (h.referee) {
       const r = updRefOnly.run(h.referee, row.id);
       refsUpdated += r.changes;
@@ -1077,9 +1177,9 @@ export async function syncUpcomingOdds(db: ReturnType<typeof getDb>) {
                AND ABS(odds_open_away - @book_a) >= 1e-9 THEN @book_a
           ELSE odds_open_away
         END,
-        odds_sharp_home = COALESCE(@book_h, odds_sharp_home),
-        odds_sharp_draw = COALESCE(@book_d, odds_sharp_draw),
-        odds_sharp_away = COALESCE(@book_a, odds_sharp_away)
+        odds_sharp_home = COALESCE(@sharp_h, odds_sharp_home),
+        odds_sharp_draw = COALESCE(@sharp_d, odds_sharp_draw),
+        odds_sharp_away = COALESCE(@sharp_a, odds_sharp_away)
       WHERE id = (
         SELECT id FROM matches
         WHERE league_id = @league AND home_team_id = @home AND away_team_id = @away
@@ -1101,7 +1201,7 @@ export async function syncUpcomingOdds(db: ReturnType<typeof getDb>) {
         const away = resolveTeamName(awayRaw);
         const utc = parseUkDate(r.Date, r.Time);
         if (!utc) continue;
-        // open = book (PS/B365/PP); current = Avg (fallback book)
+        // open = book (PS/B365/PP); current = Avg (fallback book); sharp = بيناكل فقط
         const bookH = num(r.PSH) ?? num(r.B365H) ?? num(r.PPH);
         const bookD = num(r.PSD) ?? num(r.B365D) ?? num(r.PPD);
         const bookA = num(r.PSA) ?? num(r.B365A) ?? num(r.PPA);
@@ -1116,6 +1216,9 @@ export async function syncUpcomingOdds(db: ReturnType<typeof getDb>) {
           book_h: bookH ?? oh,
           book_d: bookD ?? od,
           book_a: bookA ?? oa,
+          sharp_h: num(r.PSH),
+          sharp_d: num(r.PSD),
+          sharp_a: num(r.PSA),
           league: leagueId,
           home: teamId(leagueId, home),
           away: teamId(leagueId, away),
@@ -1600,23 +1703,8 @@ async function main() {
     return;
   }
 
-  // sharp من open إن نقص؛ ثم ثبّت closing للمنتهية
-  db.prepare(`
-    UPDATE matches SET
-      odds_sharp_home = COALESCE(odds_sharp_home, odds_open_home),
-      odds_sharp_draw = COALESCE(odds_sharp_draw, odds_open_draw),
-      odds_sharp_away = COALESCE(odds_sharp_away, odds_open_away)
-    WHERE odds_sharp_home IS NULL AND odds_open_home IS NOT NULL
-  `).run();
-  db.prepare(`
-    UPDATE matches SET
-      odds_close_home = COALESCE(odds_close_home, odds_sharp_home, odds_home),
-      odds_close_draw = COALESCE(odds_close_draw, odds_sharp_draw, odds_draw),
-      odds_close_away = COALESCE(odds_close_away, odds_sharp_away, odds_away)
-    WHERE status = 'FINISHED'
-      AND odds_close_home IS NULL
-      AND odds_home IS NOT NULL
-  `).run();
+  // خطة 006: لا اختلاق لخط حاد أو إغلاق — إن غاب بيناكل يبقى NULL ويُستثنى من المقاييس
+  resetFabricatedClosingOnce(db);
 
   seedLeagues(db);
   mergeAliasTeams(db);

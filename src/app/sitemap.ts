@@ -13,7 +13,7 @@ export default async function sitemap() {
     { url: `${SITE_URL}/history`, lastModified: new Date(), changeFrequency: "hourly" as const, priority: 0.7 },
     { url: `${SITE_URL}/charts`, lastModified: new Date(), changeFrequency: "hourly" as const, priority: 0.7 },
     { url: `${SITE_URL}/methodology`, lastModified: new Date(), changeFrequency: "monthly" as const, priority: 0.5 },
-    { url: `${SITE_URL}/value`, lastModified: new Date(), changeFrequency: "hourly" as const, priority: 0.8 },
+    { url: `${SITE_URL}/hasr`, lastModified: new Date(), changeFrequency: "hourly" as const, priority: 0.8 },
     { url: `${SITE_URL}/double-chance`, lastModified: new Date(), changeFrequency: "hourly" as const, priority: 0.8 },
     { url: `${SITE_URL}/articles`, lastModified: new Date(), changeFrequency: "daily" as const, priority: 0.7 },
     { url: `${SITE_URL}/news`, lastModified: new Date(), changeFrequency: "hourly" as const, priority: 0.6 },

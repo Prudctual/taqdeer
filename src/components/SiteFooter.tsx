@@ -3,7 +3,7 @@ import Link from "next/link";
 const FOOTER_LINKS = [
   { href: "/", label: "المباريات" },
   { href: "/leagues", label: "الدوريات" },
-  { href: "/value", label: "فرص القيمة" },
+  { href: "/hasr", label: "المحسوم" },
   { href: "/double-chance", label: "الفرصة المزدوجة" },
   { href: "/accuracy", label: "دقة النماذج" },
   { href: "/methodology", label: "المنهجية" },

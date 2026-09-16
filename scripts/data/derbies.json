@@ -1,0 +1,76 @@
+{
+  "_comment": "أزواج ديربي/عداء تاريخي تُستثنى من «محسوم فوز» (خطة 006 §5). معرّفات teams.id، الترتيب لا يهم.",
+  "pl": [
+    ["pl-arsenal", "pl-tottenham"],
+    ["pl-liverpool", "pl-everton"],
+    ["pl-man-city", "pl-man-united"],
+    ["pl-liverpool", "pl-man-united"],
+    ["pl-arsenal", "pl-chelsea"],
+    ["pl-chelsea", "pl-tottenham"],
+    ["pl-newcastle", "pl-sunderland"],
+    ["pl-aston-villa", "pl-birmingham"],
+    ["pl-west-ham", "pl-tottenham"],
+    ["pl-crystal-palace", "pl-brighton"],
+    ["pl-southampton", "pl-portsmouth"],
+    ["pl-nott-m-forest", "pl-derby"],
+    ["pl-leeds", "pl-man-united"]
+  ],
+  "pd": [
+    ["pd-real-madrid", "pd-barcelona"],
+    ["pd-real-madrid", "pd-ath-madrid"],
+    ["pd-barcelona", "pd-espanol"],
+    ["pd-sevilla", "pd-betis"],
+    ["pd-ath-bilbao", "pd-sociedad"],
+    ["pd-valencia", "pd-levante"],
+    ["pd-valencia", "pd-villarreal"],
+    ["pd-celta", "pd-la-coruna"],
+    ["pd-cadiz", "pd-sevilla"]
+  ],
+  "sa": [
+    ["sa-inter", "sa-milan"],
+    ["sa-roma", "sa-lazio"],
+    ["sa-juventus", "sa-torino"],
+    ["sa-juventus", "sa-inter"],
+    ["sa-genoa", "sa-sampdoria"],
+    ["sa-napoli", "sa-roma"],
+    ["sa-fiorentina", "sa-juventus"],
+    ["sa-bologna", "sa-fiorentina"]
+  ],
+  "bl1": [
+    ["bl1-bayern-munich", "bl1-dortmund"],
+    ["bl1-fc-koln", "bl1-m-gladbach"],
+    ["bl1-hamburg", "bl1-werder-bremen"],
+    ["bl1-dortmund", "bl1-schalke-04"],
+    ["bl1-ein-frankfurt", "bl1-mainz"],
+    ["bl1-stuttgart", "bl1-freiburg"],
+    ["bl1-hertha", "bl1-union-berlin"],
+    ["bl1-leverkusen", "bl1-fc-koln"],
+    ["bl1-nurnberg", "bl1-greuther-furth"]
+  ],
+  "fl1": [
+    ["fl1-paris-sg", "fl1-marseille"],
+    ["fl1-nice", "fl1-monaco"],
+    ["fl1-lyon", "fl1-st-etienne"],
+    ["fl1-lyon", "fl1-marseille"],
+    ["fl1-rennes", "fl1-nantes"],
+    ["fl1-bordeaux", "fl1-toulouse"],
+    ["fl1-lens", "fl1-lille"]
+  ],
+  "ppd": [
+    ["ppd-benfica", "ppd-porto"],
+    ["ppd-benfica", "ppd-sp-lisbon"],
+    ["ppd-porto", "ppd-sp-lisbon"],
+    ["ppd-porto", "ppd-boavista"],
+    ["ppd-sp-braga", "ppd-guimaraes"],
+    ["ppd-porto", "ppd-sp-braga"]
+  ],
+  "ded": [
+    ["ded-ajax", "ded-feyenoord"],
+    ["ded-ajax", "ded-psv-eindhoven"],
+    ["ded-feyenoord", "ded-psv-eindhoven"],
+    ["ded-twente", "ded-heracles"],
+    ["ded-groningen", "ded-heerenveen"],
+    ["ded-utrecht", "ded-ajax"],
+    ["ded-az-alkmaar", "ded-ajax"]
+  ]
+}

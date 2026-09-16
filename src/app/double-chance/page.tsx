@@ -22,7 +22,7 @@ export default function DoubleChancePage() {
         crumbs={[{ href: "/", label: "المباريات" }, { label: "الفرصة المزدوجة" }]}
       />
       <DoubleChanceMatchesView matches={matches} />
-      <BackBar links={[{ href: "/", label: "الرئيسية" }, { href: "/value", label: "فرص القيمة" }]} />
+      <BackBar links={[{ href: "/", label: "الرئيسية" }, { href: "/hasr", label: "المحسوم" }]} />
     </div>
   );
 }

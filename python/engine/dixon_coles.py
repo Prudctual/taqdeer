@@ -32,6 +32,8 @@ class DixonColesResult:
     rho: float
     intercept: float = 0.0
     match_counts: Dict[str, int] = field(default_factory=dict)
+    # حجم العيّنة الفعّال بعد الاندثار الزمني — ما يراه الـridge والانكماش فعلاً
+    effective_counts: Dict[str, float] = field(default_factory=dict)
 
 
 def _poisson_logpmf(k: np.ndarray, lam: np.ndarray) -> np.ndarray:
@@ -80,23 +82,21 @@ def fit_dixon_coles(
     matches: List[MatchObs],
     half_life_days: float = 150.0,
     league_id: str | None = None,
+    *,
+    priors: Dict[str, Tuple[float, float]] | None = None,
+    effective_counts: bool = True,
 ) -> DixonColesResult:
+    """MLE موزون زمنياً مع ridge نحو أسبقية لكل فريق.
+
+    priors: {team: (attack_prior, defense_prior)} — عادةً تقدير الموسم السابق؛ الفرق بلا
+      أسبقية تنكمش نحو الصفر (متوسط الدوري). قوة الشدّ تتناسب عكسياً مع حجم العيّنة.
+    effective_counts: استعمال Σ الأوزان الزمنية بدل العدّ الخام لقياس العيّنة — عند بداية
+      الموسم تكون العيّنة الحديثة صغيرة فيشتدّ الانكماش تلقائياً.
+    """
     teams = sorted({m.home for m in matches} | {m.away for m in matches})
     n = len(teams)
     idx = {t: i for i, t in enumerate(teams)}
     profile = get_league_profile(league_id)
-
-    # Compute team match counts for empirical Bayes shrinkage / small sample regularization
-    match_counts: Dict[str, int] = {t: 0 for t in teams}
-    for m in matches:
-        match_counts[m.home] = match_counts.get(m.home, 0) + 1
-        match_counts[m.away] = match_counts.get(m.away, 0) + 1
-    counts_arr = np.array([match_counts[t] for t in teams], dtype=float)
-
-    # Dynamic Bayesian prior precision per team:
-    # Teams with small sample sizes (N < 10) have strong prior regularization towards 0 (league average)
-    # to prevent extreme attack/defense parameter explosion (e.g. 0 goals conceded in 3 games).
-    tau_teams = 0.015 + 2.5 / np.maximum(counts_arr, 1.0)
 
     home_i = np.array([idx[m.home] for m in matches], dtype=int)
     away_i = np.array([idx[m.away] for m in matches], dtype=int)
@@ -104,6 +104,29 @@ def fit_dixon_coles(
     yg = np.array([m.away_goals for m in matches], dtype=float)
     margins = [m.home_goals - m.away_goals for m in matches]
     weights = make_weights([m.days_ago for m in matches], half_life_days, margins)
+
+    # Compute team match counts for empirical Bayes shrinkage / small sample regularization
+    match_counts: Dict[str, int] = {t: 0 for t in teams}
+    eff_counts = np.zeros(n, dtype=float)
+    for m, w_m in zip(matches, weights):
+        match_counts[m.home] = match_counts.get(m.home, 0) + 1
+        match_counts[m.away] = match_counts.get(m.away, 0) + 1
+        eff_counts[idx[m.home]] += float(w_m)
+        eff_counts[idx[m.away]] += float(w_m)
+    raw_counts = np.array([match_counts[t] for t in teams], dtype=float)
+    counts_arr = eff_counts if effective_counts else raw_counts
+
+    # Dynamic Bayesian prior precision per team:
+    # Teams with small (effective) samples get strong regularization towards their prior
+    # to prevent extreme attack/defense parameter explosion (e.g. 0 goals conceded in 3 games).
+    tau_teams = 0.015 + 2.5 / np.maximum(counts_arr, 1.0)
+    prior_a = np.zeros(n, dtype=float)
+    prior_d = np.zeros(n, dtype=float)
+    if priors:
+        for t, (pa, pd) in priors.items():
+            if t in idx:
+                prior_a[idx[t]] = float(np.clip(pa, -1.1, 1.1))
+                prior_d[idx[t]] = float(np.clip(pd, -1.1, 1.1))
 
     def unpack(theta: np.ndarray) -> Tuple[np.ndarray, np.ndarray, float, float, float]:
         attack = theta[:n].copy()
@@ -126,7 +149,7 @@ def fit_dixon_coles(
         t = tau_vec(xg, yg, lam, mu, rho)
         logp = np.log(t) + _poisson_logpmf(xg, lam) + _poisson_logpmf(yg, mu)
         total = -float(np.sum(weights * logp))
-        total += float(np.sum(tau_teams * (attack**2 + defense**2)))
+        total += float(np.sum(tau_teams * ((attack - prior_a) ** 2 + (defense - prior_d) ** 2)))
         return total
 
     x0 = np.zeros(2 * n + 3)
@@ -144,10 +167,11 @@ def fit_dixon_coles(
         print(f"    ⚠ Dixon-Coles لم يتقارب: {res.message}")
     attack, defense, home_adv, rho, intercept = unpack(res.x)
 
-    # Empirical Bayes shrinkage towards league average (0.0) for teams with small sample sizes (N < 10)
+    # Empirical Bayes shrinkage towards the prior (previous season, else league average)
+    # for teams with small (effective) sample sizes (N < 10)
     shrink_factors = np.minimum(1.0, counts_arr / 10.0)
-    attack = attack * shrink_factors
-    defense = defense * shrink_factors
+    attack = prior_a + (attack - prior_a) * shrink_factors
+    defense = prior_d + (defense - prior_d) * shrink_factors
 
     # Defensively clamp parameters to realistic football ranges relative to league mean
     attack = np.clip(attack, -1.1, 1.1)
@@ -161,6 +185,7 @@ def fit_dixon_coles(
         rho=float(rho),
         intercept=float(intercept),
         match_counts=dict(match_counts),
+        effective_counts={t: float(eff_counts[idx[t]]) for t in teams},
     )
 
 

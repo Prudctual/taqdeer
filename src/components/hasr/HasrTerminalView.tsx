@@ -26,6 +26,8 @@ import type {
 import { HasrHeader } from "./HasrHeader";
 import { ChevronIcon } from "@/components/ChevronIcon";
 import { Model2BreakdownLazy } from "@/components/Model2BreakdownLazy";
+import { SievePanel } from "@/components/SievePanel";
+import { SieveRulesChips, SieveTierBadge } from "@/components/SieveRulesChips";
 
 interface HasrTerminalViewProps {
   initialData: ConfinedPlatformData;
@@ -508,6 +510,9 @@ export function HasrTerminalView({ initialData }: HasrTerminalViewProps) {
         {/* TAB 1: SCREENER (المباريات المحصورة) */}
         {activeTab === "screener" && (
           <div className="space-y-4">
+            {/* غربال المحسوم: ما يمرّ وما يسقط ولماذا — قبل اللائحة كي يُفهم فراغها أو امتلاؤها */}
+            <SievePanel summary={data.sieve} />
+
             {/* Control Bar: Filters, Search, Sort & View Switch */}
             <div className="flex flex-col gap-3 border-b border-line pb-4">
               {/* Category Filter Buttons */}
@@ -627,7 +632,7 @@ export function HasrTerminalView({ initialData }: HasrTerminalViewProps) {
                     <option value="date_asc">ساعة الانطلاق تصاعدياً</option>
                     <option value="score_desc">الأعلى موثوقية (النموذج 2)</option>
                     <option value="prob_desc">أعلى نسبة احتمال فوز</option>
-                    <option value="edge_desc">أعلى قيمة مضافة (+EV Edge)</option>
+                    <option value="edge_desc">أكبر فجوة مقابل السوق الحاد</option>
                   </select>
                 </div>
                 <p className="basis-full text-[11px] text-faint">
@@ -1469,13 +1474,44 @@ function ConfinedMatchCard({
         <div className="p-2.5 rounded bg-panel/70 border border-line flex items-center justify-between text-xs">
           <div className="space-y-0.5">
             <span className="text-[10px] text-muted block">ترشيح الحصر</span>
-            <span className="font-bold text-ink">{item.pickLabel}</span>
+            <span className="font-bold text-ink flex items-center gap-1.5">
+              {item.pickLabel}
+              <SieveTierBadge tier={item.sieveTier} />
+            </span>
           </div>
           <div className="text-end space-y-0.5">
-            <span className="text-[10px] text-muted block">احتمال النموذج</span>
+            <span className="text-[10px] text-muted block">الاحتمال النهائي</span>
             <span className="text-sm font-black text-ink tabular">{pct(item.probability)}</span>
           </div>
         </div>
+
+        {/* لبّ النموذج مقابل السوق الحاد: الفجوة وα والعتبة — شفافية الدمج */}
+        {item.sieveTier ? (
+          <div className="space-y-1.5">
+            <div className="grid grid-cols-3 gap-1.5 text-center text-[10px]">
+              <div className="p-1.5 rounded bg-panel/40 border border-line/60">
+                <span className="text-muted block">لبّ النموذج</span>
+                <span className="font-bold tabular text-ink">
+                  {item.coreProbability != null ? pct(item.coreProbability, 0) : "—"}
+                </span>
+              </div>
+              <div className="p-1.5 rounded bg-panel/40 border border-line/60">
+                <span className="text-muted block">السوق الحاد</span>
+                <span className="font-bold tabular text-ink">
+                  {item.marketProbability != null ? pct(item.marketProbability, 0) : "—"}
+                </span>
+              </div>
+              <div className="p-1.5 rounded bg-panel/40 border border-line/60">
+                <span className="text-muted block">θ · α</span>
+                <span className="font-bold tabular text-ink">
+                  {item.sieveTheta != null ? item.sieveTheta.toFixed(2) : "—"} ·{" "}
+                  {item.alpha != null ? item.alpha.toFixed(2) : "—"}
+                </span>
+              </div>
+            </div>
+            <SieveRulesChips rules={item.sieveRules ?? []} compact />
+          </div>
+        ) : null}
 
         {/* 3 Metrics Row */}
         <div className="grid grid-cols-3 gap-2 text-center text-xs">

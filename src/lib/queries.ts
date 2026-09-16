@@ -1413,6 +1413,17 @@ export type BankerPick = {
   matchRandomnessIndex?: number;
   stabilityScore?: number;
   isStrictlyExcluded?: boolean;
+  /** غربال «المحسوم» (خطة 006 §ج) — null للصفوف السابقة على الغربال */
+  sieveTier?: SieveTier | null;
+  sieveRules?: SieveRule[];
+  sieveTheta?: number | null;
+  /** α = وزن النموذج في الدمج اللوجستي مع السوق الحاد (0 = السوق وحده) */
+  alpha?: number | null;
+  /** احتمال اللبّ (بلا سوق) والسوق الحاد منزوع الهامش للجهة المختارة */
+  coreProbability?: number | null;
+  marketProbability?: number | null;
+  gapVsMarket?: number | null;
+  drawHead?: number | null;
   goalkeeperStats?: {
     homeSavePct?: number;
     awaySavePct?: number;
@@ -1439,6 +1450,34 @@ export type BankerPick = {
     summaryAr?: string;
   };
 };
+
+export type SieveTier = "banker" | "alt-market" | "weak" | "excluded";
+export type SieveRule = { name: string; ok: boolean };
+
+const SIEVE_TIERS: readonly SieveTier[] = ["banker", "alt-market", "weak", "excluded"];
+
+export function parseSieveTier(raw: unknown): SieveTier | null {
+  return typeof raw === "string" && (SIEVE_TIERS as readonly string[]).includes(raw)
+    ? (raw as SieveTier)
+    : null;
+}
+
+/** قواعد الغربال من `sieve_json` (قائمة {name, ok}) — تُعرض في بطاقة المحسوم */
+export function parseSieveRules(raw: string | null): SieveRule[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw) as { rules?: unknown };
+    if (!Array.isArray(parsed.rules)) return [];
+    return parsed.rules
+      .filter(
+        (r): r is { name: string; ok: unknown } =>
+          typeof r === "object" && r !== null && typeof (r as { name?: unknown }).name === "string"
+      )
+      .map((r) => ({ name: r.name, ok: Boolean(r.ok) }));
+  } catch {
+    return [];
+  }
+}
 
 /**
  * مدى الترشيح الزمني.
@@ -1491,9 +1530,27 @@ const GATE_COLUMNS_SQL = `
        json_extract(p.analytics_json, '$.model2.exclude_reason')   as m2ExcludeReason,
        json_extract(p.analytics_json, '$.model2.pick')             as m2Pick,
        json_extract(p.analytics_json, '$.model2.p_pick')           as m2PPick,
-       json_extract(p.analytics_json, '$.model2.gap')              as m2Gap`;
+       json_extract(p.analytics_json, '$.model2.gap')              as m2Gap,
+       p.sieve_tier                                                as sieveTier,
+       p.sieve_json                                                as sieveJson,
+       json_extract(p.sieve_json, '$.theta')                       as sieveTheta,
+       p.alpha                                                     as alpha,
+       p.pm_home, p.pm_draw, p.pm_away,
+       p.market_home, p.market_draw, p.market_away,
+       p.p_draw_head                                               as pDrawHead`;
 
 type GateColumns = {
+  sieveTier: string | null;
+  sieveJson: string | null;
+  sieveTheta: number | null;
+  alpha: number | null;
+  pm_home: number | null;
+  pm_draw: number | null;
+  pm_away: number | null;
+  market_home: number | null;
+  market_draw: number | null;
+  market_away: number | null;
+  pDrawHead: number | null;
   randExcluded: number | null;
   randVerdict: string | null;
   randMri: number | null;
@@ -1711,8 +1768,13 @@ ${GATE_COLUMNS_SQL}
         }
       }
 
-      // Bankers must be strictly safe: exclude chaotic matches, draw traps, and severe volatility
-      if (isStrictlyExcluded || mri >= 60 || isDrawTrap) {
+      // غربال «المحسوم» (خطة 006 §ج) هو الحَكَم حين يتوفر: banker فقط يمرّ.
+      // الصفوف السابقة على الغربال (sieve_tier NULL) تبقى على البوابة القديمة.
+      const sieveTier = parseSieveTier(r.sieveTier);
+      if (sieveTier !== null) {
+        if (sieveTier !== "banker" || isStrictlyExcluded) continue;
+      } else if (isStrictlyExcluded || mri >= 60 || isDrawTrap) {
+        // Bankers must be strictly safe: exclude chaotic matches, draw traps, and severe volatility
         continue;
       }
 
@@ -1721,9 +1783,9 @@ ${GATE_COLUMNS_SQL}
       const pA = r.p_away ?? 0.33;
 
       const outcomes = [
-        { key: "H" as const, p: pH, odds: r.odds_home, label: "فوز المضيف (1)" },
-        { key: "D" as const, p: pD, odds: r.odds_draw, label: "تعادل (X)" },
-        { key: "A" as const, p: pA, odds: r.odds_away, label: "فوز الضيف (2)" },
+        { key: "H" as const, p: pH, odds: r.odds_home, label: "فوز المضيف (1)", core: r.pm_home, market: r.market_home },
+        { key: "D" as const, p: pD, odds: r.odds_draw, label: "تعادل (X)", core: r.pm_draw, market: r.market_draw },
+        { key: "A" as const, p: pA, odds: r.odds_away, label: "فوز الضيف (2)", core: r.pm_away, market: r.market_away },
       ].sort((a, b) => b.p - a.p);
 
       const top1 = outcomes[0]!;
@@ -1733,8 +1795,14 @@ ${GATE_COLUMNS_SQL}
       if (top1.key === "D") continue;
 
       const separationGap = Number((top1.p - top2.p).toFixed(4));
-      // فحص تكافؤ اللقاء: حد أدنى للأفضلية 4% واحتمال فوز >= 44%
-      if (separationGap < 0.04 || top1.p < 0.44) continue;
+      // البوابة القديمة فقط: حد أدنى للأفضلية 4% واحتمال فوز >= 44% (الغربال يملك عتباته)
+      if (sieveTier === null && (separationGap < 0.04 || top1.p < 0.44)) continue;
+      const coreProbability = top1.core != null ? Number(top1.core.toFixed(3)) : null;
+      const marketProbability = top1.market != null ? Number(top1.market.toFixed(3)) : null;
+      const gapVsMarket =
+        coreProbability != null && marketProbability != null
+          ? Number((coreProbability - marketProbability).toFixed(3))
+          : null;
 
       const conf = r.confidence ?? top1.p;
       const fallbackScore = calculateSelectionScore(top1.p, top2.p, conf);
@@ -1774,6 +1842,14 @@ ${GATE_COLUMNS_SQL}
         matchRandomnessIndex: mri,
         stabilityScore: stability,
         isStrictlyExcluded,
+        sieveTier,
+        sieveRules: sieveTier !== null ? parseSieveRules(r.sieveJson) : undefined,
+        sieveTheta: r.sieveTheta,
+        alpha: r.alpha,
+        coreProbability,
+        marketProbability,
+        gapVsMarket,
+        drawHead: r.pDrawHead,
         goalkeeperStats: gkStats,
         tacticalMatchup: tacMatchup,
         managerImpact: mgrImpact,
@@ -1781,8 +1857,12 @@ ${GATE_COLUMNS_SQL}
       });
     }
 
-    // فرز وفق موثوقية النموذج 2 ثم درجة الاختيار الاحتياطية
+    // الفرز: المحسوم (الغربال) أولاً بأعلى احتمال نهائي، ثم الصفوف القديمة بموثوقية النموذج 2
     candidates.sort((a, b) => {
+      const aS = a.sieveTier === "banker" ? 1 : 0;
+      const bS = b.sieveTier === "banker" ? 1 : 0;
+      if (aS !== bS) return bS - aS;
+      if (aS === 1) return b.probability - a.probability;
       const ar = a.model2?.reliability ?? a.selectionScore ?? 0;
       const br = b.model2?.reliability ?? b.selectionScore ?? 0;
       if (br !== ar) return br - ar;
@@ -2987,6 +3067,252 @@ export interface ConfinedPlatformData {
   excludedMatches: StrictlyExcludedMatch[];
   awaitingModel: AwaitingModelMatch[];
   calibration: CalibrationSummary;
+  /** غربال «المحسوم»: حالة الدوريات وعتباتها وتوزيع الشرائح على النافذة القريبة */
+  sieve: SieveSlateSummary;
+}
+
+/** صف league_calibration — عتبة θ وحالة الدوري وα من الحزام التاريخي */
+export type LeagueCalibrationRow = {
+  leagueId: string;
+  leagueNameAr: string;
+  theta: number;
+  status: string;
+  alphaAnnounce: number | null;
+  alphaClose: number | null;
+  dcHalfLife: number | null;
+  demarginMethod: string | null;
+  sliceN: number | null;
+  sliceHit: number | null;
+  sliceStated: number | null;
+  sliceBrier: number | null;
+  sliceCloseBrier: number | null;
+  coverageBrier: number | null;
+  coverageCloseBrier: number | null;
+  statusReason: string | null;
+  updatedAt: string | null;
+};
+
+export function getLeagueCalibration(): LeagueCalibrationRow[] {
+  return withTtl("league-calibration", QUERY_TTL_MS, () => {
+    const db = getDb();
+    try {
+      const rows = db
+        .prepare(
+          `SELECT c.league_id as leagueId, l.name_ar as leagueNameAr, c.theta, c.status,
+                  c.alpha_announce as alphaAnnounce, c.alpha_close as alphaClose,
+                  c.dc_half_life as dcHalfLife, c.demargin_method as demarginMethod,
+                  c.slice_n as sliceN, c.slice_hit as sliceHit, c.slice_stated as sliceStated,
+                  c.slice_brier as sliceBrier, c.slice_close_brier as sliceCloseBrier,
+                  c.coverage_brier as coverageBrier, c.coverage_close_brier as coverageCloseBrier,
+                  c.status_reason as statusReason, c.updated_at as updatedAt
+           FROM league_calibration c
+           JOIN leagues l ON l.id = c.league_id
+           ORDER BY l.name_ar`,
+        )
+        .all() as LeagueCalibrationRow[];
+      return rows.map((r) => ({ ...r, theta: Number(r.theta ?? 0.6), status: String(r.status ?? "watch") }));
+    } catch {
+      // الجدول يُنشأ من محرك بايثون؛ قبل أول fit لا وجود له
+      return [];
+    }
+  });
+}
+
+export type SieveSlateSummary = {
+  horizonDays: number;
+  total: number;
+  tiers: Record<SieveTier, number>;
+  failedRules: { name: string; count: number }[];
+  leagues: LeagueCalibrationRow[];
+};
+
+/** توزيع شرائح الغربال وأكثر القواعد إسقاطاً على المباريات القادمة خلال النافذة */
+export function getSieveSlateSummary(leagueId?: string, horizonDays = 10): SieveSlateSummary {
+  return withTtl(`sieve-slate:${leagueId || "all"}:${horizonDays}`, QUERY_TTL_MS, () => {
+    const db = getDb();
+    const tiers: Record<SieveTier, number> = { banker: 0, "alt-market": 0, weak: 0, excluded: 0 };
+    const leagueFilter = leagueId ? "AND m.league_id = ?" : "";
+    const params: unknown[] = leagueId ? [horizonDays, leagueId] : [horizonDays];
+    let total = 0;
+    let failedRules: { name: string; count: number }[] = [];
+    try {
+      const tierRows = db
+        .prepare(
+          `SELECT p.sieve_tier as tier, count(*) as n
+           FROM predictions p
+           JOIN matches m ON m.id = p.match_id
+           WHERE m.status IN ('SCHEDULED','TIMED')
+             AND datetime(m.utc_date) BETWEEN datetime('now') AND datetime('now', '+' || ? || ' days')
+             AND p.sieve_tier IS NOT NULL
+             ${leagueFilter}
+           GROUP BY p.sieve_tier`,
+        )
+        .all(...params) as { tier: string; n: number }[];
+      for (const r of tierRows) {
+        const t = parseSieveTier(r.tier);
+        if (t) {
+          tiers[t] += Number(r.n);
+          total += Number(r.n);
+        }
+      }
+      failedRules = (
+        db
+          .prepare(
+            `SELECT j.value as name, count(*) as count
+             FROM predictions p
+             JOIN matches m ON m.id = p.match_id, json_each(p.sieve_json, '$.failed') j
+             WHERE m.status IN ('SCHEDULED','TIMED')
+               AND datetime(m.utc_date) BETWEEN datetime('now') AND datetime('now', '+' || ? || ' days')
+               ${leagueFilter}
+             GROUP BY j.value
+             ORDER BY count DESC`,
+          )
+          .all(...params) as { name: string; count: number }[]
+      ).map((r) => ({ name: String(r.name), count: Number(r.count) }));
+    } catch {
+      // أعمدة الغربال تُضاف من محرك بايثون
+    }
+    const leagues = getLeagueCalibration().filter((l) => !leagueId || l.leagueId === leagueId);
+    return { horizonDays, total, tiers, failedRules, leagues };
+  });
+}
+
+export type ScopeMetrics = {
+  scope: "coverage" | "banker";
+  n: number;
+  days: number;
+  hitRate: number | null;
+  statedMean: number | null;
+  brier: number | null;
+  closeBrier: number | null;
+  logLoss: number | null;
+  closeLogLoss: number | null;
+  skillVsClose: number | null;
+  drawTopShare: number | null;
+  drawActualShare: number | null;
+};
+
+export type DailyMetricsSummary = {
+  since: string;
+  windowDays: number;
+  coverage: ScopeMetrics | null;
+  banker: ScopeMetrics | null;
+};
+
+/** المقياسان المنفصلان (خطة 006 §د): تغطية كل المباريات مقابل شريحة «المحسوم» — من daily_metrics */
+export function getDailyMetricsSummary(windowDays = 90, snapshotKind = "announce"): DailyMetricsSummary {
+  return withTtl(`daily-metrics:${windowDays}:${snapshotKind}`, QUERY_TTL_MS, () => {
+    const db = getDb();
+    const since = new Date(Date.now() - windowDays * 86_400_000).toISOString().slice(0, 10);
+    const out: DailyMetricsSummary = { since, windowDays, coverage: null, banker: null };
+    try {
+      const rows = db
+        .prepare(
+          `SELECT scope,
+                  SUM(n) as n,
+                  COUNT(DISTINCT date) as days,
+                  SUM(n * brier) / SUM(n) as brier,
+                  SUM(CASE WHEN close_brier IS NOT NULL THEN n * close_brier END) / NULLIF(SUM(CASE WHEN close_brier IS NOT NULL THEN n END), 0) as closeBrier,
+                  SUM(n * log_loss) / SUM(n) as logLoss,
+                  SUM(CASE WHEN close_log_loss IS NOT NULL THEN n * close_log_loss END) / NULLIF(SUM(CASE WHEN close_log_loss IS NOT NULL THEN n END), 0) as closeLogLoss,
+                  SUM(CASE WHEN hit_rate IS NOT NULL THEN n * hit_rate END) / NULLIF(SUM(CASE WHEN hit_rate IS NOT NULL THEN n END), 0) as hitRate,
+                  SUM(CASE WHEN stated_mean IS NOT NULL THEN n * stated_mean END) / NULLIF(SUM(CASE WHEN stated_mean IS NOT NULL THEN n END), 0) as statedMean,
+                  SUM(CASE WHEN draw_top_share IS NOT NULL THEN n * draw_top_share END) / NULLIF(SUM(CASE WHEN draw_top_share IS NOT NULL THEN n END), 0) as drawTopShare,
+                  SUM(CASE WHEN draw_actual_share IS NOT NULL THEN n * draw_actual_share END) / NULLIF(SUM(CASE WHEN draw_actual_share IS NOT NULL THEN n END), 0) as drawActualShare
+           FROM daily_metrics
+           WHERE league_id = 'all' AND snapshot_kind = ? AND date >= ?
+           GROUP BY scope`,
+        )
+        .all(snapshotKind, since) as Array<Omit<ScopeMetrics, "skillVsClose"> & { scope: string }>;
+      for (const r of rows) {
+        if (r.scope !== "coverage" && r.scope !== "banker") continue;
+        const brier = r.brier != null ? Number(r.brier) : null;
+        const closeBrier = r.closeBrier != null ? Number(r.closeBrier) : null;
+        const m: ScopeMetrics = {
+          scope: r.scope,
+          n: Number(r.n ?? 0),
+          days: Number(r.days ?? 0),
+          hitRate: r.hitRate != null ? Number(r.hitRate) : null,
+          statedMean: r.statedMean != null ? Number(r.statedMean) : null,
+          brier,
+          closeBrier,
+          logLoss: r.logLoss != null ? Number(r.logLoss) : null,
+          closeLogLoss: r.closeLogLoss != null ? Number(r.closeLogLoss) : null,
+          skillVsClose: brier != null && closeBrier != null && closeBrier > 0 ? 1 - brier / closeBrier : null,
+          drawTopShare: r.drawTopShare != null ? Number(r.drawTopShare) : null,
+          drawActualShare: r.drawActualShare != null ? Number(r.drawActualShare) : null,
+        };
+        if (m.scope === "coverage") out.coverage = m;
+        else out.banker = m;
+      }
+    } catch {
+      // daily_metrics يُنشأ من evaluate_daily.py
+    }
+    return out;
+  });
+}
+
+export type TimelineSnapshotKind = "announce" | "lineup" | "close";
+
+export type TimelineSnapshot = {
+  kind: TimelineSnapshotKind;
+  at: string;
+  pick: string | null;
+  pPick: number | null;
+  gapPick: number | null;
+  alpha: number | null;
+  tier: SieveTier | null;
+  oddsSource: string | null;
+  pm: [number, number, number] | null;
+  ps: [number, number, number] | null;
+  pf: [number, number, number] | null;
+  odds: [number, number, number] | null;
+  modelVersion: string | null;
+};
+
+function triple(a: unknown, b: unknown, c: unknown): [number, number, number] | null {
+  if (a == null || b == null || c == null) return null;
+  return [Number(a), Number(b), Number(c)];
+}
+
+/** لقطات المسار الزمني للتوقع (إعلان → تشكيلة → إغلاق) لمباراة واحدة */
+export function getPredictionTimeline(matchId: string): TimelineSnapshot[] {
+  const db = getDb();
+  try {
+    const rows = db
+      .prepare(
+        `SELECT snapshot_kind, snapshot_at, pick, p_pick, gap_pick, alpha, banker_tier, odds_source, model_version,
+                pm_home, pm_draw, pm_away, ps_home, ps_draw, ps_away, pf_home, pf_draw, pf_away,
+                odds_home, odds_draw, odds_away
+         FROM prediction_timeline
+         WHERE match_id = ?
+         ORDER BY CASE snapshot_kind WHEN 'announce' THEN 0 WHEN 'lineup' THEN 1 ELSE 2 END, snapshot_at`,
+      )
+      .all(matchId) as Record<string, unknown>[];
+    const out: TimelineSnapshot[] = [];
+    for (const r of rows) {
+      const kind = String(r.snapshot_kind);
+      if (kind !== "announce" && kind !== "lineup" && kind !== "close") continue;
+      out.push({
+        kind,
+        at: String(r.snapshot_at ?? ""),
+        pick: r.pick != null ? String(r.pick) : null,
+        pPick: r.p_pick != null ? Number(r.p_pick) : null,
+        gapPick: r.gap_pick != null ? Number(r.gap_pick) : null,
+        alpha: r.alpha != null ? Number(r.alpha) : null,
+        tier: parseSieveTier(r.banker_tier),
+        oddsSource: r.odds_source != null ? String(r.odds_source) : null,
+        pm: triple(r.pm_home, r.pm_draw, r.pm_away),
+        ps: triple(r.ps_home, r.ps_draw, r.ps_away),
+        pf: triple(r.pf_home, r.pf_draw, r.pf_away),
+        odds: triple(r.odds_home, r.odds_draw, r.odds_away),
+        modelVersion: r.model_version != null ? String(r.model_version) : null,
+      });
+    }
+    return out;
+  } catch {
+    return [];
+  }
 }
 
 /**
@@ -3015,6 +3341,7 @@ export const getConfinedPlatformData = cache(function getConfinedPlatformData(
   const parlayCandidates = getParlayCandidates(leagueId, HASR_PARLAY_CAP, "full-schedule");
   const awaitingModel = getMatchesAwaitingModel(leagueId, HASR_AWAITING_CAP);
   const calibration = getCalibrationBins(leagueId);
+  const sieve = getSieveSlateSummary(leagueId);
 
   // الفرق المحصورة المؤهلة: استبعاد أي مباراة مستبعدة أو منخفضة الأمان، وترتيبها تصاعدياً حسب موعد اللقاء
   const strictlyConfined = allBankers
@@ -3088,6 +3415,7 @@ export const getConfinedPlatformData = cache(function getConfinedPlatformData(
     excludedMatches,
     awaitingModel,
     calibration,
+    sieve,
   };
   });
 });

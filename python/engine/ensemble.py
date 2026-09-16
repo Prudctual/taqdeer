@@ -1,24 +1,28 @@
-"""Multi-signal ensemble for match outcomes (ensemble-v4)."""
+"""Multi-signal ensemble for match outcomes (ensemble-v5): core stack + sharp-market logit-pool anchor."""
 
 from __future__ import annotations
 
+import math
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
 import numpy as np
+from scipy.optimize import minimize
 
-from .calibrate import apply_temperature, odds_to_probs
+from .calibrate import DEFAULT_DEMARGIN, apply_temperature, odds_to_probs
 from .dixon_coles import (
     DixonColesResult,
     expected_goals as dc_xg,
     markets_from_matrix,
     score_matrix,
 )
+from .draw_head import predict_draw_head
 from .elo import elo_home_adv_from_profile, elo_outcome_probs
 from .evaluate import apply_binary_temperature
 from .form import TeamForm, apply_congestion, form_lambda_adjust, multi_window_form, tiered_form
 from .h2h_engine import evaluate_h2h_advantage
 from .league_profiles import get_league_profile
 from .logistics_engine import evaluate_logistics_and_external_factors
+from .market_anchor import logit_pool
 from .pi_ratings import PiState, pi_expected_goals, pi_home_boost_from_profile
 from .player_impact import apply_absence_penalties
 from .referee_engine import evaluate_referee_impact
@@ -44,18 +48,50 @@ from .randomness_engine import (
 
 Prob3 = Tuple[float, float, float]
 
-WEIGHT_KEYS = ("dc", "pi", "elo", "form", "market", "context")
-FORM_BLEND_WEIGHT = 0.20
-OTHER_WEIGHT_KEYS = ("dc", "pi", "elo", "market", "context")
+# ensemble-v5: لبّ النموذج = خمسة مكوّنات بلا سوق؛ السوق يدخل بعد المعايرة عبر
+# logit-pool بوزن α لكل دوري (market_anchor). لا حصة ثابتة للفورم بعد الآن.
+CORE_KEYS = ("dc", "pi", "elo", "form", "context")
+WEIGHT_KEYS = CORE_KEYS
+FORM_BLEND_WEIGHT = 0.20  # الافتراضي الأولي فقط — يُتعلَّم كبقية الأوزان
 DEFAULT_WEIGHTS: Dict[str, float] = {
-    "dc": 0.34,
-    "pi": 0.14,
-    "elo": 0.14,
+    "dc": 0.38,
+    "pi": 0.16,
+    "elo": 0.16,
     "form": FORM_BLEND_WEIGHT,
-    "market": 0.11,
-    "context": 0.07,
+    "context": 0.10,
 }
 EARLY_SEASON_DAYS = 60
+
+# أعلام الـablation: كل مضاعف λ ومكوّن سياقي خلف علم. الافتراضيات تُضبط من تقرير
+# python/engine/backtest.py (--ablate) لا يدوياً؛ ما لا يثبت نفعه يُطفأ.
+DEFAULT_FLAGS: Dict[str, bool] = {
+    "h2h": True,
+    "turf": True,
+    "tactics": True,
+    "manager": True,
+    "gk": True,
+    "weather": True,
+    "players": True,
+    "referee": True,
+    "tight_damping": True,
+    "congestion": True,
+    "shots_dc": True,
+    "xg_dc": True,
+    "rand_temperature": True,
+    "draw_boost_pre": True,
+    "draw_boost_post": False,  # مجمّد (خطة 006 §0.7): تعديل التعادل بعد الحرارة يفسد المعايرة
+    "early_adjust": True,
+    "steam_bonus": True,
+}
+
+
+def resolve_flags(flags: Optional[Mapping[str, bool]]) -> Dict[str, bool]:
+    out = dict(DEFAULT_FLAGS)
+    if flags:
+        for k, v in flags.items():
+            if k in out:
+                out[k] = bool(v)
+    return out
 
 
 def _norm(h: float, d: float, a: float) -> Prob3:
@@ -73,37 +109,30 @@ def _blend_many(parts: list[tuple[Prob3, float]]) -> Prob3:
     return _norm(h, d, a)
 
 
+def normalize_weights(weights: Mapping[str, float] | None) -> Dict[str, float]:
+    """يطبّع أوزان اللبّ على المفاتيح الخمسة؛ يتجاهل مفاتيح قديمة (market) بصمت."""
+    raw = {k: max(0.0, float((weights or {}).get(k, DEFAULT_WEIGHTS[k]))) for k in CORE_KEYS}
+    s = sum(raw.values())
+    if s <= 0:
+        return dict(DEFAULT_WEIGHTS)
+    return {k: v / s for k, v in raw.items()}
+
+
 def lock_form_weight(
     weights: Dict[str, float],
     form_share: float = FORM_BLEND_WEIGHT,
 ) -> Dict[str, float]:
-    keys = [k for k in WEIGHT_KEYS if k in weights]
-    if not keys:
-        return dict(DEFAULT_WEIGHTS)
-
-    form_share = float(min(max(form_share, 0.0), 1.0))
-    if "form" not in keys:
-        raw = {k: max(0.0, float(weights.get(k, 0.0))) for k in keys}
-        s = sum(raw.values()) or 1.0
-        return {k: raw[k] / s for k in keys}
-
-    others = [k for k in keys if k != "form"]
-    rest = 1.0 - form_share
-    raw = {k: max(0.0, float(weights.get(k, 0.0))) for k in others}
-    s = sum(raw.values())
-    if not others:
-        return {"form": 1.0}
-    if s <= 0:
-        out = {k: rest / len(others) for k in others}
-    else:
-        out = {k: rest * raw[k] / s for k in others}
-    out["form"] = form_share
-    return out
+    """متروكة للتوافق مع من يستوردها — لم يعد للفورم حصة مقفلة في v5؛ تُعيد التطبيع فقط."""
+    return normalize_weights(weights)
 
 
-def blend_components(comp: Dict[str, Optional[Prob3]], weights: Dict[str, float]) -> Prob3:
-    present = [k for k in WEIGHT_KEYS if comp.get(k) is not None]
-    w = lock_form_weight({k: float(weights.get(k, DEFAULT_WEIGHTS[k])) for k in present})
+def blend_components(comp: Dict[str, Optional[Prob3]], weights: Mapping[str, float]) -> Prob3:
+    present = [k for k in CORE_KEYS if comp.get(k) is not None]
+    if not present:
+        return 1 / 3, 1 / 3, 1 / 3
+    w = normalize_weights({k: float(weights.get(k, DEFAULT_WEIGHTS[k])) for k in present} | {
+        k: 0.0 for k in CORE_KEYS if k not in present
+    })
     parts = [(comp[k], w[k]) for k in present]
     return _blend_many(parts)
 
@@ -113,35 +142,43 @@ def fit_weights(
     outcomes: list[str],
     ridge: float = 1.0,
 ) -> Dict[str, float]:
-    import math
-
+    """أوزان اللبّ الخمسة (softmax) بأقل NLL مع ridge نحو الافتراضي — لا قفل للفورم."""
     if len(comps) < 40:
         return dict(DEFAULT_WEIGHTS)
-    from scipy.optimize import minimize
 
-    theta0 = np.log(
-        np.array([max(DEFAULT_WEIGHTS[k], 1e-6) for k in OTHER_WEIGHT_KEYS], dtype=float)
-    )
-    y_idx = [{"H": 0, "D": 1, "A": 2}[o] for o in outcomes]
-    rest = 1.0 - FORM_BLEND_WEIGHT
+    theta0 = np.log(np.array([max(DEFAULT_WEIGHTS[k], 1e-6) for k in CORE_KEYS], dtype=float))
+    y_idx = np.array([{"H": 0, "D": 1, "A": 2}[o] for o in outcomes], dtype=int)
+    # مصفوفة المكوّنات n×5×3 — الغائب يُستبدل بالتوزيع المنتظم ووزنه يُصفَّر بالقناع
+    P = np.zeros((len(comps), len(CORE_KEYS), 3), dtype=float)
+    mask = np.zeros((len(comps), len(CORE_KEYS)), dtype=float)
+    for i, c in enumerate(comps):
+        for j, k in enumerate(CORE_KEYS):
+            v = c.get(k)
+            if v is None:
+                P[i, j] = (1 / 3, 1 / 3, 1 / 3)
+            else:
+                P[i, j] = v
+                mask[i, j] = 1.0
 
     def pack(theta: np.ndarray) -> Dict[str, float]:
-        w_other = np.exp(theta - theta.max())
-        w_other = (w_other / w_other.sum()) * rest
-        wd = {k: float(v) for k, v in zip(OTHER_WEIGHT_KEYS, w_other)}
-        wd["form"] = FORM_BLEND_WEIGHT
-        return wd
+        w = np.exp(theta - theta.max())
+        w = w / w.sum()
+        return {k: float(v) for k, v in zip(CORE_KEYS, w)}
 
     def nll(theta: np.ndarray) -> float:
-        wd = pack(theta)
-        total = ridge * float(np.sum((theta - theta0) ** 2))
-        for c, yi in zip(comps, y_idx):
-            p = blend_components(c, wd)
-            total -= math.log(max(float(p[yi]), 1e-12))
-        return total
+        w = np.exp(theta - theta.max())
+        w = w / w.sum()
+        wm = mask * w[None, :]
+        wm_sum = wm.sum(axis=1, keepdims=True)
+        wm_sum[wm_sum <= 0] = 1.0
+        wm = wm / wm_sum
+        blended = np.einsum("ij,ijk->ik", wm, P)
+        blended = blended / blended.sum(axis=1, keepdims=True)
+        picked = np.clip(blended[np.arange(len(y_idx)), y_idx], 1e-12, 1.0)
+        return float(-np.sum(np.log(picked)) + ridge * np.sum((theta - theta0) ** 2))
 
     res = minimize(
-        nll, theta0, method="Nelder-Mead", options={"maxiter": 800, "xatol": 1e-3, "fatol": 1e-3}
+        nll, theta0, method="Nelder-Mead", options={"maxiter": 1500, "xatol": 1e-4, "fatol": 1e-4}
     )
     return pack(res.x)
 
@@ -341,8 +378,6 @@ def _blend_lambdas(
     lam_xg: Optional[float],
     mu_xg: Optional[float],
 ) -> Tuple[float, float]:
-    import math
-
     lam_f = max(0.25, lam_f)
     mu_f = max(0.25, mu_f)
     lam_pi = max(0.25, lam_pi)
@@ -421,7 +456,7 @@ def predict_match(
     form_away: TeamForm,
     market_odds: Optional[tuple[float, float, float]] = None,
     temperature: float = 1.0,
-    weights: Optional[Dict[str, float]] = None,
+    weights: Optional[Mapping[str, float]] = None,
     dc_shots: Optional[DixonColesResult] = None,
     dc_true_xg: Optional[DixonColesResult] = None,
     h2h_matches: Optional[list] = None,
@@ -467,13 +502,25 @@ def predict_match(
     venue_split: Optional[Mapping[str, Any]] = None,
     similar_opponents: Optional[Mapping[str, Any]] = None,
     second_half: Optional[Mapping[str, Any]] = None,
+    # --- v5 ---
+    alpha: Optional[float] = None,
+    demargin_method: str = DEFAULT_DEMARGIN,
+    draw_head_coefs: Optional[Sequence[float]] = None,
+    flags: Optional[Mapping[str, bool]] = None,
 ) -> Dict:
+    """ensemble-v5.
+
+    اللبّ (pm) = خلط dc/pi/elo/form/context بأوزان مُتعلَّمة ثم حرارة. السوق الحاد
+    (ps) لا يدخل اللبّ؛ يُدمج بعده بـlogit-pool بوزن النموذج α (0 = السوق وحده).
+    `flags` تُطفئ/تُشعل مضاعفات λ والمكوّنات السياقية للـablation.
+    """
+    fl = resolve_flags(flags)
     profile = get_league_profile(league_id)
-    w = dict(weights or DEFAULT_WEIGHTS)
+    w = normalize_weights(weights)
     early = days_into_season is not None and float(days_into_season) < EARLY_SEASON_DAYS
-    if early:
-        w["dc"] = float(w.get("dc", DEFAULT_WEIGHTS["dc"])) * 0.88
-        w["elo"] = float(w.get("elo", DEFAULT_WEIGHTS["elo"])) * 1.08
+    if early and fl["early_adjust"]:
+        w["dc"] = w["dc"] * 0.88
+        w["elo"] = w["elo"] * 1.08
     dc_counts = getattr(dc, "match_counts", None)
     if dc_counts:
         n_h = dc_counts.get(home, 0)
@@ -484,12 +531,14 @@ def predict_match(
     min_n = min(n_h, n_a)
     if min_n < 10:
         dc_factor = 0.70 + 0.03 * min_n
-        w["dc"] = float(w.get("dc", DEFAULT_WEIGHTS["dc"])) * dc_factor
-        w["elo"] = float(w.get("elo", DEFAULT_WEIGHTS["elo"])) * (2.0 - dc_factor)
-    w.setdefault("context", DEFAULT_WEIGHTS["context"])
-    w = lock_form_weight(w, FORM_BLEND_WEIGHT)
-    temperature = float(temperature) * float(profile.noise_factor)
-    if early:
+        w["dc"] = w["dc"] * dc_factor
+        w["elo"] = w["elo"] * (2.0 - dc_factor)
+    w = normalize_weights(w)
+    # T المُمرَّرة هي الحرارة المُتعلَّمة لكل دوري (الحزام الطويل) — لا يُضرب بها
+    # noise_factor الثابت من البروفايل كي لا تُسطَّح الاحتمالات مرتين
+    temperature_in = float(temperature)
+    temperature = temperature_in
+    if early and fl["early_adjust"]:
         temperature *= 1.12
 
     elo_ha = elo_home_adv_from_profile(profile.home_advantage)
@@ -519,24 +568,23 @@ def predict_match(
         elo_home=elo_home,
         elo_away=elo_away,
     )
-    f_h, f_a = apply_congestion(
-        f_h,
-        f_a,
-        home_matches_7d=home_matches_7d,
-        away_matches_7d=away_matches_7d,
-    )
+    if fl["congestion"]:
+        f_h, f_a = apply_congestion(
+            f_h,
+            f_a,
+            home_matches_7d=home_matches_7d,
+            away_matches_7d=away_matches_7d,
+        )
     lam_f = lam_dc * f_h
     mu_f = mu_dc * f_a
 
     lam_pi, mu_pi = pi_expected_goals(pi, home, away, home_boost=pi_boost)
 
-    import math
-
     lam_sh = mu_sh = None
-    if dc_shots is not None:
+    if dc_shots is not None and fl["shots_dc"]:
         lam_sh, mu_sh = dc_xg(dc_shots, home, away)
     lam_tx = mu_tx = None
-    if dc_true_xg is not None:
+    if dc_true_xg is not None and fl["xg_dc"]:
         lam_tx, mu_tx = dc_xg(dc_true_xg, home, away)
 
     lam, mu = _blend_lambdas(
@@ -553,11 +601,12 @@ def predict_match(
     )
 
     h2h_res = evaluate_h2h_advantage(home, away, h2h_matches)
-    lam *= float(h2h_res["home_lambda_mult"])
-    mu *= float(h2h_res["away_lambda_mult"])
+    if fl["h2h"]:
+        lam *= float(h2h_res["home_lambda_mult"])
+        mu *= float(h2h_res["away_lambda_mult"])
 
     clean_home = home.lower().replace(" ", "").replace("-", "")
-    if any(t in clean_home for t in profile.turf_teams):
+    if fl["turf"] and any(t in clean_home for t in profile.turf_teams):
         lam *= 1.05
 
     is_h_gk_missing = any(
@@ -594,16 +643,17 @@ def predict_match(
         home_low_block_aptitude=home_mgr.low_block_aptitude,
         away_low_block_aptitude=away_mgr.low_block_aptitude,
     )
-    lam *= float(tactics["home_lambda_mult"])
-    mu *= float(tactics["away_lambda_mult"])
+    if fl["tactics"]:
+        lam *= float(tactics["home_lambda_mult"])
+        mu *= float(tactics["away_lambda_mult"])
 
-    # Manager attack impact
-    lam *= float(home_mgr.lambda_attack_mult)
-    mu *= float(away_mgr.lambda_attack_mult)
+    if fl["manager"]:
+        lam *= float(home_mgr.lambda_attack_mult)
+        mu *= float(away_mgr.lambda_attack_mult)
 
-    # Goalkeeper shot-stopping impact on opponent goal expectation
-    mu *= float(home_gk.opponent_lambda_mult)
-    lam *= float(away_gk.opponent_lambda_mult)
+    if fl["gk"]:
+        mu *= float(home_gk.opponent_lambda_mult)
+        lam *= float(away_gk.opponent_lambda_mult)
 
     weather_res = apply_weather_to_lambdas(
         lam,
@@ -613,8 +663,9 @@ def predict_match(
         wind_kmh=(weather or {}).get("wind_kmh"),
         multiplier=(weather or {}).get("multiplier"),
     )
-    lam = float(weather_res["lambda_home"])
-    mu = float(weather_res["lambda_away"])
+    if fl["weather"]:
+        lam = float(weather_res["lambda_home"])
+        mu = float(weather_res["lambda_away"])
 
     player_res = apply_absence_penalties(
         lam,
@@ -629,12 +680,14 @@ def predict_match(
         away_bench=away_bench,
         lineup_confirmed=lineup_confirmed,
     )
-    lam = float(player_res["lambda_home"])
-    mu = float(player_res["lambda_away"])
+    if fl["players"]:
+        lam = float(player_res["lambda_home"])
+        mu = float(player_res["lambda_away"])
 
     referee_res = evaluate_referee_impact(referee_profile)
-    lam *= float(referee_res["lambda_mult"])
-    mu *= float(referee_res["lambda_mult"])
+    if fl["referee"]:
+        lam *= float(referee_res["lambda_mult"])
+        mu *= float(referee_res["lambda_mult"])
 
     market_for_steam, market_src = pick_market_odds(
         sharp=sharp_odds, current=market_odds, soft_avg=market_odds
@@ -685,7 +738,7 @@ def predict_match(
     total_xg = lam + mu
     is_low_scoring = total_xg <= (profile.avg_match_goals * 0.70)
     is_tight = elo_diff < 60 or abs(lam - mu) < 0.28 or is_low_scoring
-    if is_tight:
+    if is_tight and fl["tight_damping"]:
         if is_low_scoring:
             lam *= 0.94
             mu *= 0.94
@@ -738,79 +791,65 @@ def predict_match(
         form_draw += 0.03
     if is_low_scoring:
         form_draw += 0.04
-    if rand_report["multipliers"]["draw_boost"] > 0:
-        form_draw = min(0.48, form_draw + rand_report["multipliers"]["draw_boost"])
+    d_boost = float(rand_report["multipliers"]["draw_boost"])
+    if fl["draw_boost_pre"] and d_boost > 0:
+        form_draw = min(0.48, form_draw + d_boost)
     form_p = _norm(home_lean * (1 - form_draw), form_draw, (1 - home_lean) * (1 - form_draw))
 
-    blend_odds, blend_src = pick_market_odds(
-        sharp=sharp_odds, current=market_odds, soft_avg=None
-    )
+    # --- السوق الحاد منزوع الهامش (لا يدخل اللبّ) ---
+    blend_odds, blend_src = pick_market_odds(sharp=sharp_odds, current=market_odds, soft_avg=None)
     market_p = None
     if blend_odds:
-        market_p = odds_to_probs(*blend_odds)
+        market_p = odds_to_probs(*blend_odds, method=demargin_method)
     elif market_odds:
-        market_p = odds_to_probs(*market_odds)
+        market_p = odds_to_probs(*market_odds, method=demargin_method)
         blend_src = "avg"
 
-    present_keys = ["dc", "pi", "elo", "form", "context"]
-    if market_p is not None:
-        present_keys.append("market")
-    w_eff = lock_form_weight({k: w[k] for k in present_keys}, FORM_BLEND_WEIGHT)
-
+    # --- اللبّ: خمسة مكوّنات ← حرارة ← pm ---
     parts: list[tuple[Prob3, float]] = [
-        (dc_p, w_eff["dc"]),
-        (pi_p, w_eff["pi"]),
-        (elo_p, w_eff["elo"]),
-        (form_p, w_eff["form"]),
-        (context_p, w_eff["context"]),
+        (dc_p, w["dc"]),
+        (pi_p, w["pi"]),
+        (elo_p, w["elo"]),
+        (form_p, w["form"]),
+        (context_p, w["context"]),
     ]
-    if market_p is not None:
-        parts.append((market_p, w_eff["market"]))
-
     blended = _blend_many(parts)
-    effective_temp = temperature * rand_report["multipliers"]["temperature_mult"]
-    calibrated = apply_temperature(blended, effective_temp)
+    rand_temp_mult = float(rand_report["multipliers"]["temperature_mult"]) if fl["rand_temperature"] else 1.0
+    effective_temp = temperature * rand_temp_mult
+    pm = apply_temperature(blended, effective_temp)
 
-    d_boost = rand_report["multipliers"]["draw_boost"]
-    if d_boost > 0:
-        # Direct ensemble calibration boost on draw probability to protect against draw traps (/boost)
-        ch, cd, ca = calibrated
+    if fl["draw_boost_post"] and d_boost > 0:
+        ch, cd, ca = pm
         target_d = min(0.48, cd + d_boost)
         if cd < 1.0 and cd < target_d:
             rem_scale = (1.0 - target_d) / max(0.001, (1.0 - cd))
-            calibrated = _norm(ch * rem_scale, target_d, ca * rem_scale)
+            pm = _norm(ch * rem_scale, target_d, ca * rem_scale)
+
+    # --- المرساة: pf = pool(pm, ps, α). بلا α مُقدَّرة وبوجود سوق → السوق وحده ---
+    if market_p is None:
+        alpha_used = 1.0
+    elif alpha is None:
+        alpha_used = 0.0
+    else:
+        alpha_used = float(min(max(alpha, 0.0), 1.0))
+    calibrated = logit_pool(pm, market_p, alpha_used)
 
     mat = align_matrix_to_probs(mat, calibrated)
     mk = markets_from_matrix(mat)
 
-    # Apply randomness temperature multiplier to goal markets to damp overconfidence on chaotic matches (/goal)
-    goal_temp_mult = rand_report["multipliers"]["temperature_mult"]
+    goal_temp_mult = rand_temp_mult
     p_over25 = apply_binary_temperature(float(mk["p_over25"]), temp_over25 * goal_temp_mult)
     p_btts = apply_binary_temperature(float(mk["p_btts_yes"]), temp_btts * goal_temp_mult)
 
+    p_draw_head = predict_draw_head(draw_head_coefs, lam, mu, pm[1])
+
+    # القيمة/الحافة تُحسب من اللبّ مقابل أول سعر (للتشخيص فقط — لا تنبيهات رهان)
     edge = None
     value = None
-    w_fair = lock_form_weight(
-        {k: w[k] for k in ("dc", "pi", "elo", "form", "context")},
-        FORM_BLEND_WEIGHT,
-    )
-    fair_parts = [
-        (dc_p, w_fair["dc"]),
-        (pi_p, w_fair["pi"]),
-        (elo_p, w_fair["elo"]),
-        (form_p, w_fair["form"]),
-        (context_p, w_fair["context"]),
-    ]
-    fair = apply_temperature(_blend_many(fair_parts), temperature)
-    if d_boost > 0:
-        fh, fd, fa = fair
-        target_fd = min(0.48, fd + d_boost)
-        if fd < 1.0 and fd < target_fd:
-            rem_scale = (1.0 - target_fd) / max(0.001, (1.0 - fd))
-            fair = _norm(fh * rem_scale, target_fd, fa * rem_scale)
+    fair = pm
     value_odds = open_odds if open_odds else (sharp_odds or market_odds)
     if value_odds:
-        value_market = odds_to_probs(*value_odds)
+        value_market = odds_to_probs(*value_odds, method=demargin_method)
         if value_market:
             edge = {
                 "home": fair[0] - value_market[0],
@@ -839,9 +878,8 @@ def predict_match(
         abs(dc_p[0] - elo_p[0]) + abs(dc_p[0] - pi_p[0]) + abs(dc_p[0] - form_p[0])
     ) / 3
     confidence = float(min(0.95, max(0.18, 0.55 * conf + 0.35 * max(agree, 0))))
-    confidence = float(
-        min(0.95, confidence + steam_confidence_bonus(steam_res, model_side))
-    )
+    if fl["steam_bonus"]:
+        confidence = float(min(0.95, confidence + steam_confidence_bonus(steam_res, model_side)))
     confidence = float(min(0.95, max(0.15, confidence * rand_report["multipliers"]["confidence_mult"])))
 
     p_1x = float(calibrated[0] + calibrated[1])
@@ -854,12 +892,25 @@ def predict_match(
         "best": "1X" if p_1x >= max(p_x2, p_12) else ("X2" if p_x2 >= p_12 else "12"),
     }
 
+    gap_pick = None
+    if market_p is not None:
+        i_pick = max(range(3), key=lambda i: pm[i])
+        gap_pick = float(pm[i_pick] - market_p[i_pick])
+
     return {
         "lambda_home": lam,
         "lambda_away": mu,
         "p_home": calibrated[0],
         "p_draw": calibrated[1],
         "p_away": calibrated[2],
+        "pm": pm,
+        "ps": market_p,
+        "pf": calibrated,
+        "alpha": alpha_used,
+        "gap_pick": gap_pick,
+        "p_draw_head": p_draw_head,
+        "demargin_method": demargin_method,
+        "flags": fl,
         "p_btts_yes": p_btts,
         "p_over25": p_over25,
         "matrix": mat,
@@ -882,12 +933,14 @@ def predict_match(
                 "away_pts": form_away.pts,
                 "home_gd": form_home.gd,
                 "away_gd": form_away.gd,
-                "blend_weight": FORM_BLEND_WEIGHT,
+                "blend_weight": w["form"],
             },
             "market": {
                 "p": market_p,
                 "odds": blend_odds or market_odds,
                 "source": blend_src,
+                "alpha": alpha_used,
+                "demargin": demargin_method,
             },
             "shots_dc": {"lambda": [lam_sh, mu_sh]} if lam_sh is not None else None,
             "true_xg_dc": {"lambda": [lam_tx, mu_tx]} if lam_tx is not None else None,
@@ -911,15 +964,19 @@ def predict_match(
             "home_sw": sw_home,
             "away_sw": sw_away,
             "blended_pre_cal": blended,
-            "temperature": temperature,
+            "core_calibrated": pm,
+            "draw_head": p_draw_head,
+            "temperature": effective_temp,
+            "temp_mult": float(effective_temp / float(temperature_in)) if temperature_in > 0 else 1.0,
             "temp_over25": temp_over25,
             "temp_btts": temp_btts,
             "double_chance": double_chance,
             "is_low_scoring": bool(total_xg < 1.8),
             "early_season": bool(early),
+            "flags": fl,
         },
         "edge": edge,
         "value": value,
-        "weights": w_eff,
+        "weights": w,
         "clv": clv_res,
     }

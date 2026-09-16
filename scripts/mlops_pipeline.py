@@ -118,68 +118,49 @@ def run_step(cmd: list[str], label: str) -> bool:
         return False
 
 
-def scan_and_alert_value_bets():
-    """Scan database for high +EV bets (real odds only)."""
+def summarize_banker_slice():
+    """ملخّص شريحة «المحسوم» بعد الدورة — لا تنبيهات EV (خطة 006 §و)."""
     if not DB_PATH.exists():
         return
-
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
-
-    query = """
-        SELECT m.id, m.utc_date,
-               ht.name_ar as home_team, at.name_ar as away_team,
-               l.name_ar as league_name,
-               p.p_home, p.p_draw, p.p_away, p.confidence,
-               m.odds_home, m.odds_draw, m.odds_away
-        FROM matches m
-        JOIN leagues l ON l.id = m.league_id
-        JOIN teams ht ON ht.id = m.home_team_id
-        JOIN teams at ON at.id = m.away_team_id
-        JOIN predictions p ON p.match_id = m.id
-        WHERE m.status IN ('SCHEDULED', 'TIMED')
-          AND m.utc_date >= datetime('now')
-          AND m.odds_home IS NOT NULL
-          AND m.odds_draw IS NOT NULL
-          AND m.odds_away IS NOT NULL
-        ORDER BY m.utc_date ASC
-        LIMIT 40;
-    """
-
-    matches = conn.execute(query).fetchall()
+    try:
+        rows = conn.execute(
+            """
+            SELECT p.sieve_tier AS tier, COUNT(*) AS n
+            FROM predictions p
+            JOIN matches m ON m.id = p.match_id
+            WHERE m.status IN ('SCHEDULED', 'TIMED')
+              AND m.utc_date >= datetime('now')
+            GROUP BY p.sieve_tier
+            """
+        ).fetchall()
+        bankers = conn.execute(
+            """
+            SELECT ht.name_ar AS home_team, at.name_ar AS away_team, l.name_ar AS league_name,
+                   p.p_home, p.p_draw, p.p_away, p.alpha
+            FROM predictions p
+            JOIN matches m ON m.id = p.match_id
+            JOIN leagues l ON l.id = m.league_id
+            JOIN teams ht ON ht.id = m.home_team_id
+            JOIN teams at ON at.id = m.away_team_id
+            WHERE p.sieve_tier = 'banker'
+              AND m.status IN ('SCHEDULED', 'TIMED')
+              AND m.utc_date >= datetime('now')
+            ORDER BY m.utc_date ASC
+            LIMIT 12
+            """
+        ).fetchall()
+    except sqlite3.OperationalError as e:
+        log(f"⚠️ banker summary skipped: {e}")
+        conn.close()
+        return
     conn.close()
-
-    high_value_bets = []
-    for m in matches:
-        sides = [
-            ("مضيف", m["p_home"] or 0, m["odds_home"]),
-            ("تعادل", m["p_draw"] or 0, m["odds_draw"]),
-            ("ضيف", m["p_away"] or 0, m["odds_away"]),
-        ]
-        for name, p, odds in sides:
-            if not odds or odds <= 1:
-                continue
-            b = odds - 1.0
-            ev = p * odds - 1.0
-            kelly = (p * b - (1 - p)) / b
-            if 0.03 <= ev <= 0.15 and kelly >= 0.02:
-                high_value_bets.append(
-                    {
-                        "match": f"{m['home_team']} × {m['away_team']}",
-                        "league": m["league_name"],
-                        "side": name,
-                        "odds": odds,
-                        "ev": f"+{int(ev * 100)}%",
-                        "kelly": f"{round(0.25 * kelly * 100, 2)}%",
-                    }
-                )
-
-    log(f"📊 MLOps Value Bet Scan: {len(high_value_bets)} high-EV bets.")
-    for bet in high_value_bets[:8]:
-        log(
-            f"  💎 {bet['match']} ({bet['league']}) -> {bet['side']} @ {bet['odds']} "
-            f"(EV: {bet['ev']}, Kelly: {bet['kelly']})"
-        )
+    tiers = {str(r["tier"]): int(r["n"]) for r in rows}
+    log(f"🧭 Sieve tiers (upcoming): {tiers}")
+    for b in bankers:
+        top = max((("مضيف", b["p_home"] or 0), ("تعادل", b["p_draw"] or 0), ("ضيف", b["p_away"] or 0)), key=lambda x: x[1])
+        log(f"  🎯 {b['home_team']} × {b['away_team']} ({b['league_name']}) -> {top[0]} p={top[1]:.2f} α={b['alpha']}")
 
 
 def run_full_mlops_cycle():
@@ -193,8 +174,10 @@ def run_full_mlops_cycle():
         [py, "scripts/fit-and-predict.py", "--repredict-flagged"],
         "Narrow repredict (lineup-confirmed)",
     )
+    # تقييم يومي: daily_metrics (تغطية/محسوم) + حوادث المحسوم + سلاسل التكرار + حالة الدوريات
+    run_step([py, "scripts/evaluate_daily.py"], "Daily evaluation vs closing")
     if ok_sync and ok_fit:
-        scan_and_alert_value_bets()
+        summarize_banker_slice()
         log("🎉 MLOps Cycle Finished cleanly.")
     else:
         log("⚠️ MLOps Cycle finished with errors — انظر إشعار Telegram/اللوج")

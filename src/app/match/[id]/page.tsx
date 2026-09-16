@@ -28,7 +28,8 @@ import { DoubleChancePanel } from "@/components/DoubleChancePanel";
 import { LiveInPlaySimulator } from "@/components/LiveInPlaySimulator";
 import { AntiRandomnessCard, type RandomnessReport } from "@/components/AntiRandomnessCard";
 import { Model2Breakdown } from "@/components/Model2Breakdown";
-import { parseModel2 } from "@/lib/queries";
+import { PredictionTimelineWidget } from "@/components/PredictionTimelineWidget";
+import { getPredictionTimeline, parseModel2, parseSieveTier, type SieveRule } from "@/lib/queries";
 import { getMatchDetailedInfo } from "@/lib/match-details";
 
 
@@ -87,6 +88,8 @@ type Analytics = {
   is_strictly_excluded?: boolean;
   model2?: Record<string, unknown> | null;
   version?: string;
+  /** غربال «المحسوم» كما حُفظ لحظة التوقع (ensemble-v5) */
+  sieve?: { tier?: string; theta?: number; rules?: Array<{ name?: string; ok?: boolean }> } | null;
 };
 
 
@@ -313,6 +316,10 @@ export default async function MatchPage({
   );
   const tops = Array.isArray(topsRaw) ? topsRaw : [];
   const analytics = parseJson<Analytics | null>(match.analytics_json, null);
+  const timeline = getPredictionTimeline(match.id);
+  const sieveRules: SieveRule[] = (analytics?.sieve?.rules ?? [])
+    .filter((r): r is { name: string; ok: boolean } => typeof r?.name === "string" && typeof r?.ok === "boolean")
+    .map((r) => ({ name: r.name, ok: r.ok }));
 
   const hasPred =
     match.p_home != null && match.p_draw != null && match.p_away != null;
@@ -626,6 +633,15 @@ export default async function MatchPage({
           homeName={match.home_name_ar}
           awayName={match.away_name_ar}
           report={analytics.randomness}
+        />
+      ) : null}
+
+      {hasPred ? (
+        <PredictionTimelineWidget
+          snapshots={timeline}
+          sieveTier={parseSieveTier(analytics?.sieve?.tier)}
+          sieveRules={sieveRules}
+          sieveTheta={typeof analytics?.sieve?.theta === "number" ? analytics.sieve.theta : null}
         />
       ) : null}
 

@@ -51,7 +51,7 @@ export function StudioHomeView({
   parlayCandidates = [],
 }: StudioHomeViewProps) {
   const [activeTab, setActiveTab] = useState<
-    "matches" | "value" | "bankers" | "parlay" | "standings"
+    "matches" | "bankers" | "parlay" | "standings"
   >("matches");
   const [matchesViewMode, setMatchesViewMode] = useState<"cards" | "table">("cards");
 
@@ -145,17 +145,10 @@ export function StudioHomeView({
           </button>
           <button
             type="button"
-            onClick={() => setActiveTab("value")}
-            className={tabClass(activeTab === "value")}
-          >
-            فرص القيمة (+EV)
-          </button>
-          <button
-            type="button"
             onClick={() => setActiveTab("bankers")}
             className={tabClass(activeTab === "bankers")}
           >
-            أأمن التوقعات
+            المحسوم
           </button>
           <button
             type="button"
@@ -248,38 +241,26 @@ export function StudioHomeView({
           </div>
         )}
 
-        {activeTab === "value" && (
-          <div className="card p-5 sm:p-6 space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <h3 className="type-section text-ink">فرص القيمة (+EV ≥ 3%)</h3>
-              <span className="text-xs font-medium text-muted">حاسبة كيلي</span>
-            </div>
-            <p className="text-sm text-muted leading-relaxed max-w-2xl">
-              مباريات يظهر فيها النموذج انحرافاً إيجابياً عن أسعار السوق. الاحتمال ليس يقيناً؛ راجع الثقة والمعايرة قبل أي قرار.
-            </p>
-            <div className="flex flex-wrap gap-2">
-              <Link
-                href="/value"
-                className="press-scale inline-flex items-center gap-2 rounded-lg bg-accent text-on-fill px-4 py-2 text-xs font-semibold no-underline hover:opacity-90"
-              >
-                تصفح صفحة القيمة
-              </Link>
-              <Link
-                href="/double-chance"
-                className="press-scale inline-flex items-center gap-2 rounded-lg border border-line bg-surface text-ink px-4 py-2 text-xs font-semibold no-underline hover:border-accent"
-              >
-                الفرصة المزدوجة
-              </Link>
-            </div>
-          </div>
-        )}
-
         {activeTab === "bankers" && (
           <div className="space-y-6">
-            <BankerPicksWidget
-              picks={bankerPicks}
-              title="نموذج الاختيار وأأمن الترشيحات (Selection Model)"
-            />
+            {bankerPicks.length > 0 ? (
+              <BankerPicksWidget picks={bankerPicks} title="المحسوم — ما اجتاز الغربال" />
+            ) : (
+              <div className="card p-5 sm:p-6 space-y-3">
+                <h3 className="type-section text-ink">لا «محسوم» في هذه النافذة</h3>
+                <p className="text-sm text-muted leading-relaxed max-w-2xl">
+                  لا تُوصف مباراة بالمحسومة إلا إذا اتفق النموذج مع السوق الحاد على الجهة وبلغ الاحتمال عتبة θ
+                  لكل دوري، بعينة موسم كافية وبلا ديربي أو غياب مؤثر. الفراغ هنا نتيجة الغربال لا عطلاً — راجع
+                  أسباب الإسقاط في صفحة المحسوم.
+                </p>
+                <Link
+                  href="/hasr"
+                  className="press-scale inline-flex items-center gap-2 rounded-lg border border-line bg-surface text-ink px-4 py-2 text-xs font-semibold no-underline hover:border-accent"
+                >
+                  غربال المحسوم وقواعده
+                </Link>
+              </div>
+            )}
             {parlayCandidates.length > 0 && (
               <ParlayBuilderWidget candidates={parlayCandidates} />
             )}

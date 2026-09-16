@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
 
 
@@ -41,6 +41,41 @@ def log_home_adv_to_elo(log_ha: float) -> float:
     return float(400.0 * math.log10(max(ratio, 1.01)))
 
 
+SEASON_SHRINK_GAMES = 8
+
+
+@dataclass
+class SeasonState:
+    """تقييم بداية الموسم وعدد مباريات الموسم لكل فريق — لانكماش أول الجولات."""
+
+    start: Dict[str, float] = field(default_factory=dict)
+    games: Dict[str, int] = field(default_factory=dict)
+    season: Dict[str, str] = field(default_factory=dict)
+
+
+def shrink_to_season_start(
+    current: float,
+    start: float | None,
+    n_season: int | None,
+    *,
+    k_games: int = SEASON_SHRINK_GAMES,
+) -> float:
+    """r = w·start + (1−w)·current حيث w = max(0, 1 − n/k) — يكبح صدمة أول 6–8 جولات."""
+    if start is None or n_season is None or k_games <= 0:
+        return float(current)
+    w = max(0.0, 1.0 - float(n_season) / float(k_games))
+    return float(w * start + (1.0 - w) * current)
+
+
+def shrunk_ratings(
+    ratings: Dict[str, float], state: SeasonState, *, k_games: int = SEASON_SHRINK_GAMES
+) -> Dict[str, float]:
+    return {
+        t: shrink_to_season_start(r, state.start.get(t), state.games.get(t), k_games=k_games)
+        for t, r in ratings.items()
+    }
+
+
 def update_elo(
     matches: List[EloMatch],
     k: float = 20.0,
@@ -50,13 +85,19 @@ def update_elo(
     *,
     early_season_boost: bool = False,
     mean_reversion: float = 0.33,
+    season_state: SeasonState | None = None,
 ) -> Tuple[Dict[str, float], List[Tuple[str, str, float]]]:
-    """`seeds` overrides `initial` per team at first appearance (promoted-team prior)."""
+    """`seeds` overrides `initial` per team at first appearance (promoted-team prior).
+
+    `season_state` (اختياري) يُملأ بتقييم بداية كل موسم وعدد مباريات الموسم لكل فريق
+    — يستهلكه `shrunk_ratings` لانكماش بداية الموسم (يحلّ محل early_season_boost).
+    """
     seeds = seeds or {}
     ratings: Dict[str, float] = {}
     history: List[Tuple[str, str, float]] = []
     base_k = k * (1.35 if early_season_boost else 1.0)
-    
+    st = season_state
+
     team_seasons: Dict[str, str] = {}
 
     def get_k_factor(team_id: str) -> float:
@@ -65,15 +106,30 @@ def update_elo(
             return base_k * 2.5
         return base_k
 
+    def begin_season(team: str, season: str) -> None:
+        if st is None:
+            return
+        st.season[team] = season
+        st.start[team] = ratings.get(team, seeds.get(team, initial))
+        st.games[team] = 0
+
     for m in matches:
         if m.season:
             if m.home in ratings and m.home in team_seasons and team_seasons[m.home] != m.season:
                 ratings[m.home] = initial + (ratings[m.home] - initial) * (1.0 - mean_reversion)
-            team_seasons[m.home] = m.season
-            
+            if team_seasons.get(m.home) != m.season:
+                team_seasons[m.home] = m.season
+                begin_season(m.home, m.season)
+
             if m.away in ratings and m.away in team_seasons and team_seasons[m.away] != m.season:
                 ratings[m.away] = initial + (ratings[m.away] - initial) * (1.0 - mean_reversion)
-            team_seasons[m.away] = m.season
+            if team_seasons.get(m.away) != m.season:
+                team_seasons[m.away] = m.season
+                begin_season(m.away, m.season)
+        elif st is not None:
+            for t in (m.home, m.away):
+                if t not in st.start:
+                    begin_season(t, "")
 
         rh = ratings.get(m.home, seeds.get(m.home, initial))
         ra = ratings.get(m.away, seeds.get(m.away, initial))
@@ -90,6 +146,9 @@ def update_elo(
         ka = get_k_factor(m.away)
         ratings[m.home] = rh + kh * g * (sh - eh)
         ratings[m.away] = ra + ka * g * (sa - ea)
+        if st is not None:
+            st.games[m.home] = st.games.get(m.home, 0) + 1
+            st.games[m.away] = st.games.get(m.away, 0) + 1
         history.append((m.home, m.date, ratings[m.home]))
         history.append((m.away, m.date, ratings[m.away]))
 

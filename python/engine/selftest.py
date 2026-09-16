@@ -7,13 +7,17 @@ if __name__ == "__main__" and not __package__:
 import numpy as np
 from .dixon_coles import DixonColesResult, MatchObs, fit_dixon_coles, score_matrix, tau_vec, expected_goals
 from .elo import EloMatch, update_elo
+from .calibrate import odds_to_probs
+from .elo import SeasonState, shrunk_ratings
+from .market_anchor import fit_alpha, logit_pool
+from .sieve import SieveContext, effective_theta, evaluate_banker
 from .ensemble import (
+    CORE_KEYS,
     DEFAULT_WEIGHTS,
-    FORM_BLEND_WEIGHT,
+    normalize_weights,
     align_matrix_to_probs,
     blend_components,
     fit_weights,
-    lock_form_weight,
     predict_match,
     value_signal,
     decimal_to_american,
@@ -146,13 +150,64 @@ def main() -> None:
         outs.append(o)
     w = fit_weights(comps, outs)
     assert abs(sum(w.values()) - 1.0) < 1e-9
-    assert abs(w["form"] - FORM_BLEND_WEIGHT) < 1e-9, w
-    assert abs(DEFAULT_WEIGHTS["form"] - FORM_BLEND_WEIGHT) < 1e-9
-    locked = lock_form_weight({"dc": 0.5, "pi": 0.1, "elo": 0.1, "form": 0.05, "market": 0.1, "context": 0.05})
-    assert abs(locked["form"] - FORM_BLEND_WEIGHT) < 1e-9
-    assert abs(sum(locked.values()) - 1.0) < 1e-9
-    # مع فورم مقفول؛ الكتلة المتعلَّمة على DC يجب أن ترتفع فوق الافتراضي داخل الـ80٪
-    assert w["dc"] > DEFAULT_WEIGHTS["dc"], w
+    assert set(w) == set(CORE_KEYS), w
+    # v5: لا قفل للفورم ولا وزن للسوق داخل اللبّ — الكتلة تنتقل إلى المكوّنات المُخبِرة (dc/context)
+    assert w["dc"] + w["context"] > DEFAULT_WEIGHTS["dc"] + DEFAULT_WEIGHTS["context"], w
+    assert w["form"] < DEFAULT_WEIGHTS["form"], w
+    normalized = normalize_weights({"dc": 0.5, "pi": 0.1, "elo": 0.1, "form": 0.05, "market": 0.1, "context": 0.05})
+    assert "market" not in normalized and abs(sum(normalized.values()) - 1.0) < 1e-9
+
+    # 3b. الدمج اللوجستي مع السوق: α=0 → السوق وحده، α=1 → النموذج وحده، بلا سوق → النموذج
+    pm_ = (0.70, 0.20, 0.10)
+    ps_ = (0.50, 0.30, 0.20)
+    assert all(abs(x - y) < 1e-9 for x, y in zip(logit_pool(pm_, ps_, 0.0), ps_))
+    assert all(abs(x - y) < 1e-9 for x, y in zip(logit_pool(pm_, ps_, 1.0), pm_))
+    assert all(abs(x - y) < 1e-9 for x, y in zip(logit_pool(pm_, None, 0.0), pm_))
+    mid = logit_pool(pm_, ps_, 0.5)
+    assert ps_[0] < mid[0] < pm_[0] and abs(sum(mid) - 1.0) < 1e-9
+    # α يُقبل فقط إن تفوّق النموذج على السوق بثقة؛ نموذج مشوَّش → α=0
+    rng_a = np.random.default_rng(3)
+    ps_list, pm_list, ys = [], [], []
+    for _ in range(300):
+        truth = rng_a.dirichlet((2.0, 1.5, 1.5))
+        ps_list.append(tuple(truth))
+        noise = rng_a.dirichlet((1.0, 1.0, 1.0))
+        pm_list.append(tuple(0.5 * truth + 0.5 * noise))
+        ys.append(int(rng_a.choice(3, p=truth)))
+    a_fit = fit_alpha(pm_list, ps_list, ys, n_boot=100)
+    assert a_fit["alpha"] == 0.0, a_fit
+
+    # 3c. نزع الهامش: power/shin/basic تُعيد توزيعاً صحيحاً وتحافظ على ترتيب الأسعار
+    for method_ in ("basic", "power", "shin"):
+        pr_ = odds_to_probs(1.5, 4.0, 7.0, method=method_)
+        assert abs(sum(pr_) - 1.0) < 1e-9 and pr_[0] > pr_[1] > pr_[2], (method_, pr_)
+    # Shin يحمّل الهامش على الأسعار الطويلة (favourite–longshot bias) → المفضّل أعلى من التطبيع البسيط
+    assert odds_to_probs(1.5, 4.0, 7.0, method="shin")[0] > odds_to_probs(1.5, 4.0, 7.0, method="basic")[0]
+    assert odds_to_probs(1.5, 4.0, 7.0, method="shin")[2] < odds_to_probs(1.5, 4.0, 7.0, method="basic")[2]
+
+    # 3d. غربال «المحسوم»: اتفاق النموذج والسوق فوق θ → banker؛ دوري غير مفعّل → لا banker
+    ctx_ok = SieveContext(
+        pm=(0.68, 0.20, 0.12), ps=(0.64, 0.22, 0.14), pf=(0.66, 0.21, 0.13),
+        p_draw_head=0.20, league_status="active", theta=0.60, days_into_season=120,
+        fav_round=15, fav_n_season=14, opp_n_season=14,
+    )
+    sv_ok = evaluate_banker(ctx_ok)
+    assert sv_ok.tier == "banker" and sv_ok.pick == "H", sv_ok.to_dict()
+    ctx_watch = SieveContext(**{**ctx_ok.__dict__, "league_status": "watch"})
+    assert evaluate_banker(ctx_watch).tier != "banker"
+    ctx_disagree = SieveContext(**{**ctx_ok.__dict__, "ps": (0.40, 0.30, 0.30), "pf": (0.55, 0.25, 0.20)})
+    assert evaluate_banker(ctx_disagree).tier != "banker"
+    assert effective_theta(0.60, 20) > 0.60 and effective_theta(0.60, 200) == 0.60
+
+    # 3e. انكماش بداية الموسم: بعد 0 مباريات = تقييم البداية، بعد 8 = التقييم الحالي
+    st_ = SeasonState()
+    st_.start["T"] = 1500.0
+    st_.games["T"] = 0
+    assert shrunk_ratings({"T": 1600.0}, st_)["T"] == 1500.0
+    st_.games["T"] = 8
+    assert shrunk_ratings({"T": 1600.0}, st_)["T"] == 1600.0
+    st_.games["T"] = 4
+    assert abs(shrunk_ratings({"T": 1600.0}, st_)["T"] - 1550.0) < 1e-9
 
     # 4. كيلي والإشارات المجدية
     v = value_signal((0.6, 0.2, 0.2), (1.75, 4.0, 6.0))
@@ -552,7 +607,28 @@ def main() -> None:
     )
     assert pred_draw_trap["randomness"]["pillars"]["draw_trap"]["severity"] == "CRITICAL"
     assert pred_draw_trap["is_strictly_excluded"] is True
-    assert pred_draw_trap["p_draw"] > 0.35, f"p_draw {pred_draw_trap['p_draw']}"
+    # v5: مصيدة التعادل تُستبعد عبر الغربال/الأعمدة، ولا يُضخَّم p_draw بعد الحرارة
+    # (draw_boost_post مجمَّد) — بلا α مُثبت يكون الناتج = السوق منزوع الهامش
+    mk_draw = pred_draw_trap["components"]["market"]["p"][1]
+    assert abs(pred_draw_trap["p_draw"] - mk_draw) < 1e-6, (pred_draw_trap["p_draw"], mk_draw)
+    assert pred_draw_trap["alpha"] == 0.0
+    assert all(abs(a - b) < 1e-9 for a, b in zip(pred_draw_trap["pf"], pred_draw_trap["ps"]))
+    # ومع α=1 يعود لبّ النموذج وحده (بلا سوق)
+    pred_core_only = predict_match(
+        home="TeamD",
+        away="TeamD",
+        dc=dc_model,
+        elo_home=1500.0,
+        elo_away=1500.0,
+        pi=pi_state,
+        form_home=avg,
+        form_away=avg,
+        market_odds=(2.50, 3.20, 2.80),
+        home_randomness_stats=stat_d,
+        away_randomness_stats=stat_d,
+        alpha=1.0,
+    )
+    assert all(abs(a - b) < 1e-9 for a, b in zip(pred_core_only["pf"], pred_core_only["pm"]))
     if pred_draw_trap.get("value"):
         assert pred_draw_trap["value"]["bet"] is False
 
@@ -839,7 +915,7 @@ def main() -> None:
     assert any(f["id"] == 20 and f["available"] for g in live["groups"] for f in g["factors"])
     assert any(f["id"] == 30 and f["available"] for g in live["groups"] for f in g["factors"])
 
-    print("selftest ok — ensemble-v4 mathematical engine verified cleanly!")
+    print("selftest ok — ensemble-v5 mathematical engine verified cleanly!")
 
 
 

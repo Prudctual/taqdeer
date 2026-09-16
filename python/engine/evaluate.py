@@ -151,6 +151,7 @@ def calibration_bins(
         win_rate = hits / n if n > 0 else 0.0
         mean_p = (sum(x["prob"] for x in items) / n) if n > 0 else ((low + min(high, 1.0)) / 2.0)
         cal_err = abs(win_rate - mean_p) if n > 0 else 0.0
+        ci_low, ci_high = wilson_interval(hits, n)
 
         results.append(
             {
@@ -162,9 +163,24 @@ def calibration_bins(
                 "win_rate": float(round(win_rate, 4)),
                 "mean_prob": float(round(mean_p, 4)),
                 "calibration_error": float(round(cal_err, 4)),
+                "ci_low": float(round(ci_low, 4)),
+                "ci_high": float(round(ci_high, 4)),
+                # المعايرة «سليمة» إن كان متوسط الاحتمال المُعلَن داخل فاصل Wilson 95%
+                "calibrated": bool(n > 0 and ci_low <= mean_p <= ci_high),
             }
         )
     return results
+
+
+def wilson_interval(hits: int, n: int, z: float = 1.96) -> Tuple[float, float]:
+    """فاصل Wilson 95% لنسبة نجاح — يصمد عند n الصغيرة وعند النسب القريبة من 0/1."""
+    if n <= 0:
+        return 0.0, 1.0
+    p = hits / n
+    denom = 1.0 + z * z / n
+    centre = (p + z * z / (2 * n)) / denom
+    half = z * math.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / denom
+    return max(0.0, centre - half), min(1.0, centre + half)
 
 
 def expected_calibration_error(

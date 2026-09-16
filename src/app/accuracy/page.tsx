@@ -16,7 +16,11 @@ import {
   getMeta,
   getFinishedPredictionsHistory,
   getCalibrationBins,
+  getDailyMetricsSummary,
+  getLeagueCalibration,
 } from "@/lib/queries";
+import { ScopeMetricsPanels } from "@/components/ScopeMetricsPanels";
+import { LeagueCalibrationTable } from "@/components/LeagueCalibrationTable";
 
 export const metadata: Metadata = {
   title: "دقة النماذج والمعايرة",
@@ -49,29 +53,26 @@ const GLOSSARY: { term: string; body: string }[] = [
     body: "Ranked Probability Score — المقياس المرجعي في أدبيات توقع كرة القدم. يعامل النتائج كسلّم مرتّب (فوز، تعادل، خسارة) فيعاقب من توقّع الفوز وجاءت الخسارة أشد مما لو جاء التعادل.",
   },
   {
-    term: "خط السوق",
-    body: "احتمالات أسعار المراهنات بعد خصم هامش الشركة، مقيّمة على نفس شريحة المباريات تماماً — المقارنة التي تفحص إضافة النموذج فوق السوق.",
+    term: "إغلاق بيناكل",
+    body: "خط الأساس: آخر سعر لدى بيناكل (أو بورصة بيتفير) قبل الصافرة بعد نزع الهامش (Shin/Power حسب الدوري)، مقيَّم على نفس شريحة المباريات تماماً. السوق الحاد عند الإغلاق أصعب خط أساس معروف؛ إن لم يتفوّق عليه النموذج يصبح وزنه α صفراً ويُنشر السوق وحده.",
+  },
+  {
+    term: "α (وزن النموذج)",
+    body: "وزن لبّ النموذج في الدمج اللوجستي مع السوق الحاد. يُقدَّر لكل دوري على مواسم كاملة ولا يُقبل إلا إذا أثبت bootstrap مقترن أن الدمج يتفوّق على السوق؛ α = 0 يعني أن الاحتمال المنشور هو السوق منزوع الهامش.",
+  },
+  {
+    term: "تغطية مقابل محسوم",
+    body: "مقياسان لا يُخلطان: التغطية تقيس كل المباريات المنشورة، والمحسوم يقيس فقط ما اجتاز الغربال. نسبة إصابة المحسوم تُقارن بالاحتمال المُعلَن لا بنسبة تسويقية.",
   },
 ];
-
-type ValueBacktest = {
-  policy: string;
-  total: { n_bets: number; hits: number; staked: number; pnl: number };
-};
 
 export default function AccuracyPage() {
   const allMetrics = getModelMetrics();
   const lastFit = getMeta("last_fit");
   const historyItems = getFinishedPredictionsHistory("all", 150);
   const calibrationData = getCalibrationBins();
-
-  let vb: ValueBacktest | null = null;
-  try {
-    const raw = getMeta("value_backtest");
-    vb = raw ? (JSON.parse(raw) as ValueBacktest) : null;
-  } catch {
-    vb = null;
-  }
+  const scopeSummary = getDailyMetricsSummary(90);
+  const leagueCalibration = getLeagueCalibration();
 
   // صفوف خط أساس السوق تعيش في نفس الجدول بعلامة model_version='market'
   const isMarketRow = (m: (typeof allMetrics)[0]) =>
@@ -140,7 +141,7 @@ export default function AccuracyPage() {
               دقة النموذج وسجل الاختبار المباشر
             </h1>
             <p className="text-xs sm:text-sm font-semibold text-muted leading-relaxed max-w-3xl">
-              تقييم زمني مستقل (Walk-Forward): يتم تدريب النماذج على التاريخ السابق فقط دون تسريب بيانات المستقبَل، وتُقاس الدقة والمعايرة على{windowSize ? ` آخر ${windowSize} مباراة` : " آخر نافذة اختبار"} لكل دوري.
+              تقييم زمني مستقل (Walk-Forward): يتم تدريب النماذج على التاريخ السابق فقط دون تسريب بيانات المستقبَل، وتُقاس الدقة والمعايرة على{windowSize ? ` آخر ${windowSize} مباراة` : " آخر نافذة اختبار"} لكل دوري — دائماً مقابل خط أساس واحد: إغلاق بيناكل منزوع الهامش. السقف الواقعي لدقة 1X2 نحو 50–55٪؛ الهدف هو إشارة أنظف ومعايرة أصدق، لا رقم تسويقي.
             </p>
           </div>
 
@@ -213,41 +214,11 @@ export default function AccuracyPage() {
             </div>
           </SectionCard>
 
-          {/* نتائج محاكاة الاستراتيجية والقيمة Backtest */}
-          {vb && vb.total.n_bets > 0 && vb.total.staked > 0 ? (
-            <SectionCard
-              title="سجل أداء القيمة المستهدفة (+EV Backtest)"
-              subtitle={`سياسة ${vb.policy} على نافذة القياس النظيفة · نتائج للاسترشاد العلمي`}
-            >
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 p-4 sm:p-5">
-                <div className="rounded-xl border border-line bg-panel p-3.5 space-y-1">
-                  <span className="text-xs font-bold text-muted">إجمالي الرهانات</span>
-                  <div className="text-xl font-semibold text-ink font-mono tabular">{vb.total.n_bets}</div>
-                </div>
+          {/* المقياسان المنفصلان: تغطية كل المباريات مقابل شريحة «المحسوم» — من التقييم اليومي مقابل الإغلاق */}
+          <ScopeMetricsPanels summary={scopeSummary} />
 
-                <div className="rounded-xl border border-line bg-panel p-3.5 space-y-1">
-                  <span className="text-xs font-bold text-muted">نسبة النجاح</span>
-                  <div className="text-xl font-semibold text-ink font-mono tabular">{pct(vb.total.hits / vb.total.n_bets, 0)}</div>
-                </div>
-
-                <div className="rounded-xl border border-line bg-panel p-3.5 space-y-1">
-                  <span className="text-xs font-bold text-muted">عائد الاستثمار (ROI)</span>
-                  <div className={`text-xl font-semibold font-mono tabular ${vb.total.pnl >= 0 ? "text-success" : "text-danger"}`}>
-                    {vb.total.pnl >= 0 ? "+" : ""}
-                    {((vb.total.pnl / vb.total.staked) * 100).toFixed(1)}%
-                  </div>
-                </div>
-
-                <div className="rounded-xl border border-line bg-panel p-3.5 space-y-1">
-                  <span className="text-xs font-bold text-muted">الصافي الإجمالي</span>
-                  <div className={`text-xl font-semibold font-mono tabular ${vb.total.pnl >= 0 ? "text-success" : "text-danger"}`}>
-                    {vb.total.pnl >= 0 ? "+" : ""}
-                    {vb.total.pnl.toFixed(2)} وحدة
-                  </div>
-                </div>
-              </div>
-            </SectionCard>
-          ) : null}
+          {/* معايرة كل دوري من الحزام التاريخي: θ، α، الحالة، شريحة المحسوم */}
+          <LeagueCalibrationTable rows={leagueCalibration} />
 
           {/* الرسم البياني الأفقي لدقة النماذج حسب الدوري */}
           <LeagueAccuracyChart
@@ -275,7 +246,7 @@ export default function AccuracyPage() {
             <div className="overflow-x-auto p-4 sm:p-5">
               <table className="w-full text-xs text-start border-collapse">
                 <caption className="sr-only">
-                  دقة النموذج ومقاييس المعايرة لكل دوري في نافذة الاختبار الأخيرة، مع خط أساس السوق على النافذة نفسها.
+                  دقة النموذج ومقاييس المعايرة لكل دوري في نافذة الاختبار الأخيرة، مع خط الأساس (إغلاق بيناكل منزوع الهامش) على النافذة نفسها.
                 </caption>
                 <thead>
                   <tr className="border-b border-line text-muted text-[11px] font-bold">
@@ -333,7 +304,7 @@ export default function AccuracyPage() {
                         {mkt && (
                           <tr className="bg-panel/40 hover:bg-panel/70 transition-colors text-[11px]">
                             <td className="py-2.5 px-4 ps-8 text-muted font-bold">
-                              ← خط أساس السوق (Market Odds)
+                              ← خط الأساس: إغلاق بيناكل منزوع الهامش
                             </td>
                             <td className="py-2.5 px-3 text-muted font-mono">{mkt.window_label}</td>
                             <td className="py-2.5 px-3 text-center font-mono text-muted tabular">{mkt.n_matches}</td>

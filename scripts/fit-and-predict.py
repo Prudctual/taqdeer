@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""Taqdeer ensemble-v4: DC + shots-DC + true-xG + Pi + Elo + Form + sharp market + context."""
+"""Taqdeer ensemble-v5: لبّ (DC + shots-DC + true-xG + Pi + Elo + Form + سياق) مُعاير،
+ثم دمج لوجستي مع إغلاق السوق الحاد بوزن α لكل دوري، ثم غربال «المحسوم».
+
+الخطة 006: السوق لا يدخل اللبّ؛ α=0 يعني «السوق وحده» حتى يثبت النموذج تفوّقه."""
 
 from __future__ import annotations
 
@@ -17,20 +20,27 @@ sys.path.insert(0, str(ROOT / "python"))
 
 MAX_TRAIN = 1000
 HALF_LIFE = 140.0
-MODEL_VERSION = "ensemble-v4"
+MODEL_VERSION = "ensemble-v5"
+DERBIES_PATH = ROOT / "scripts" / "data" / "derbies.json"
 
-from engine.calibrate import apply_temperature, fit_temperature, odds_to_probs  # noqa: E402
-from engine.dixon_coles import MatchObs, fit_dixon_coles, top_scores  # noqa: E402
-from engine.elo import EloMatch, elo_home_adv_from_profile, update_elo  # noqa: E402
+from engine.calibrate import (  # noqa: E402
+    DEFAULT_DEMARGIN,
+    apply_temperature,
+    choose_demargin_method,
+    fit_temperature,
+    odds_to_probs,
+)
+from engine.dixon_coles import fit_dixon_coles, top_scores  # noqa: E402
+from engine.draw_head import draw_features, fit_draw_head  # noqa: E402
+from engine.elo import SeasonState, elo_home_adv_from_profile, shrunk_ratings, update_elo  # noqa: E402
 from engine.ensemble import (  # noqa: E402
+    DEFAULT_FLAGS,
     DEFAULT_WEIGHTS,
-    EARLY_SEASON_DAYS,
-    FORM_BLEND_WEIGHT,
     blend_components,
     fit_weights,
-    lock_form_weight,
+    normalize_weights,
     predict_match,
-    value_signal,
+    resolve_flags,
 )
 from engine.evaluate import (  # noqa: E402
     calibration_bins,
@@ -40,14 +50,33 @@ from engine.evaluate import (  # noqa: E402
     summarize_with_closing,
 )
 from engine.form import (  # noqa: E402
-    FormMatch,
-    TeamForm,
     rolling_form,
     second_half_impact,
     similar_opponent_form,
     venue_form,
 )
 from engine.league_profiles import get_league_profile  # noqa: E402
+from engine.market_anchor import fit_alpha, logit_pool  # noqa: E402
+from engine.pipeline import (  # noqa: E402
+    H2HIndex,
+    build_elo_matches,
+    build_form_matches,
+    build_obs,
+    build_obs_shots,
+    build_obs_true_xg,
+    build_pi_matches,
+    count_matches_in_window,
+    days_into_season,
+    dc_priors_from,
+    empty_form,
+    odds3,
+    promoted_seeds,
+    rolling_team_ppda,
+    season_index,
+)
+from engine.schema import ensure_model_schema  # noqa: E402
+from engine.sieve import DEFAULT_THETA, SieveContext, evaluate_banker  # noqa: E402
+from engine.timeline import record_snapshot  # noqa: E402
 from engine.logistics_engine import (  # noqa: E402
     classify_match_importance,
     count_midweek_in_window,
@@ -57,7 +86,7 @@ from engine.model2 import score_match, score_slate  # noqa: E402
 from engine.referee_engine import evaluate_referee_impact  # noqa: E402
 from engine.sharp_market import detect_steam  # noqa: E402
 from engine.tactical_matchup import style_family  # noqa: E402
-from engine.pi_ratings import PiMatch, update_pi  # noqa: E402
+from engine.pi_ratings import shrunk_pi, update_pi  # noqa: E402
 from engine.goalkeeper_engine import (  # noqa: E402
     compute_team_goalkeeper_profile,
     GoalkeeperProfile,
@@ -267,52 +296,6 @@ def load_team_strength_map(conn: sqlite3.Connection, team_id: str) -> dict[str, 
     except sqlite3.OperationalError:
         return {}
     return {str(r["player_name"]).strip().lower(): float(r["strength"]) for r in rows}
-
-
-def days_into_season(utc_date: str | None, season: str | None) -> float | None:
-    if not utc_date:
-        return None
-    try:
-        dt = datetime.fromisoformat(str(utc_date).replace("Z", "+00:00"))
-        if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=timezone.utc)
-    except Exception:
-        return None
-    # موسم أوروبي تقريبي: أغسطس 1
-    year = dt.year if dt.month >= 8 else dt.year - 1
-    if season:
-        try:
-            year = int(str(season).split("/")[0][:4])
-        except Exception:
-            pass
-    start = datetime(year, 8, 1, tzinfo=timezone.utc)
-    return max(0.0, (dt - start).total_seconds() / 86400.0)
-
-
-def count_matches_in_window(
-    rows: list, team_id: str, as_of_utc: str, *, days: float = 7.0
-) -> float:
-    """عدد مباريات الفريق في النافذة السابقة لتاريخ as_of (ازدحام)."""
-    try:
-        ref = datetime.fromisoformat(str(as_of_utc).replace("Z", "+00:00"))
-        if ref.tzinfo is None:
-            ref = ref.replace(tzinfo=timezone.utc)
-    except Exception:
-        return 0.0
-    n = 0
-    for m in rows:
-        if m["home_team_id"] != team_id and m["away_team_id"] != team_id:
-            continue
-        try:
-            dt = datetime.fromisoformat(str(m["utc_date"]).replace("Z", "+00:00"))
-            if dt.tzinfo is None:
-                dt = dt.replace(tzinfo=timezone.utc)
-        except Exception:
-            continue
-        delta = (ref - dt).total_seconds() / 86400.0
-        if 0 < delta <= days:
-            n += 1
-    return float(n)
 
 
 def persist_congestion(
@@ -657,110 +640,71 @@ def ensure_columns(conn: sqlite3.Connection) -> None:
     )
 
 
-def empty_form() -> TeamForm:
-    return TeamForm(0, 0, 0, 0, 0, 0, 0)
+def default_fit_params() -> dict:
+    return {
+        "weights": dict(DEFAULT_WEIGHTS),
+        "temperature": 1.0,
+        "temp_over25": 1.0,
+        "temp_btts": 1.0,
+        # α = وزن النموذج في الدمج اللوجستي؛ 0 = السوق وحده حتى يثبت النموذج تفوّقه
+        "alpha_announce": 0.0,
+        "alpha_lineup": 0.0,
+        "alpha_close": 0.0,
+        "demargin_method": DEFAULT_DEMARGIN,
+        "dc_half_life": HALF_LIFE,
+        "draw_head": None,
+        "flags": dict(DEFAULT_FLAGS),
+    }
 
 
-def _row_ppda(m, side: str) -> float | None:
-    """Read stored ppda_* or compute shot-proxy PPDA from match stats."""
-    key = f"ppda_{side}"
-    try:
-        v = m[key]
-        if v is not None:
-            return float(v)
-    except (IndexError, KeyError):
-        pass
-    if side == "home":
-        if m["shots_home"] is None and m["fouls_home"] is None:
-            return None
-        return float(
-            compute_advanced_metrics(
-                int(m["home_goals"]),
-                int(m["away_goals"]),
-                m["shots_home"],
-                m["shots_away"],
-                m["sot_home"],
-                m["sot_away"],
-                m["fouls_home"],
-                m["fouls_away"],
-                m["corners_home"],
-                m["corners_away"],
-            )["ppda_home"]
-        )
-    if m["shots_away"] is None and m["fouls_away"] is None:
-        return None
-    return float(
-        compute_advanced_metrics(
-            int(m["home_goals"]),
-            int(m["away_goals"]),
-            m["shots_home"],
-            m["shots_away"],
-            m["sot_home"],
-            m["sot_away"],
-            m["fouls_home"],
-            m["fouls_away"],
-            m["corners_home"],
-            m["corners_away"],
-        )["ppda_away"]
-    )
-
-
-def rolling_team_ppda(
-    finished: list, team_id: str, *, last_n: int = 12
-) -> tuple[float | None, int]:
-    """Mean proxy PPDA for a team over its last N finished matches with data."""
-    vals: list[float] = []
-    for m in reversed(finished):
-        if m["home_team_id"] == team_id:
-            v = _row_ppda(m, "home")
-        elif m["away_team_id"] == team_id:
-            v = _row_ppda(m, "away")
-        else:
-            continue
-        if v is not None:
-            vals.append(v)
-        if len(vals) >= last_n:
-            break
-    if not vals:
-        return None, 0
-    return sum(vals) / len(vals), len(vals)
-
-
-def load_fit_params(conn: sqlite3.Connection, league_id: str) -> tuple[dict, float, float, float]:
-    """Load blend weights + 1X2/O2.5/BTTS temperatures (else defaults)."""
+def load_fit_params(conn: sqlite3.Connection, league_id: str) -> dict:
+    """أوزان اللبّ + الحرارات + α لكل لقطة + طريقة نزع الهامش + رأس التعادل + الأعلام."""
+    params = default_fit_params()
     row = conn.execute(
         "SELECT value FROM app_meta WHERE key=?",
         (f"fit_params_{league_id}",),
     ).fetchone()
-    if not row or not row["value"]:
-        return dict(DEFAULT_WEIGHTS), 1.0, 1.0, 1.0
-    try:
-        data = json.loads(row["value"])
-        weights = data.get("weights") or DEFAULT_WEIGHTS
-        temp = float(data.get("temperature") or 1.0)
-        t_o = float(data.get("temp_over25") or 1.0)
-        t_b = float(data.get("temp_btts") or 1.0)
-        raw = {k: float(weights.get(k, DEFAULT_WEIGHTS[k])) for k in DEFAULT_WEIGHTS}
-        return lock_form_weight(raw, FORM_BLEND_WEIGHT), temp, t_o, t_b
-    except Exception:
-        return dict(DEFAULT_WEIGHTS), 1.0, 1.0, 1.0
+    if row and row["value"]:
+        try:
+            data = json.loads(row["value"])
+            w = data.get("weights") or {}
+            params["weights"] = normalize_weights({k: float(w.get(k, DEFAULT_WEIGHTS[k])) for k in DEFAULT_WEIGHTS})
+            for key in ("temperature", "temp_over25", "temp_btts", "dc_half_life"):
+                if data.get(key) is not None:
+                    params[key] = float(data[key])
+            for key in ("alpha_announce", "alpha_lineup", "alpha_close"):
+                if data.get(key) is not None:
+                    params[key] = min(1.0, max(0.0, float(data[key])))
+            if data.get("demargin_method"):
+                params["demargin_method"] = str(data["demargin_method"])
+            if isinstance(data.get("draw_head"), list):
+                params["draw_head"] = [float(x) for x in data["draw_head"]]
+            if isinstance(data.get("flags"), dict):
+                params["flags"] = resolve_flags(data["flags"])
+            # وسم الحزام الطويل: يجعل الأوزان/الحرارة/رأس التعادل مُقدَّرة على مواسم
+            # كاملة بدل النافذة القصيرة (تُصان عبر save_fit_params)
+            if data.get("backtest_applied_at"):
+                params["backtest_applied_at"] = str(data["backtest_applied_at"])
+        except Exception:
+            params = default_fit_params()
+    # league_calibration (من الحزام الطويل) له الأسبقية على ملاءمة النافذة القصيرة
+    cal = load_league_calibration(conn, league_id)
+    for src_key, dst_key in (
+        ("alpha_announce", "alpha_announce"),
+        ("alpha_lineup", "alpha_lineup"),
+        ("alpha_close", "alpha_close"),
+        ("dc_half_life", "dc_half_life"),
+        ("demargin_method", "demargin_method"),
+    ):
+        if cal.get(src_key) is not None:
+            params[dst_key] = cal[src_key]
+    return params
 
 
-def save_fit_params(
-    conn: sqlite3.Connection,
-    league_id: str,
-    weights: dict | None,
-    temperature: float,
-    temp_over25: float = 1.0,
-    temp_btts: float = 1.0,
-) -> None:
-    locked = lock_form_weight(weights or DEFAULT_WEIGHTS, FORM_BLEND_WEIGHT)
+def save_fit_params(conn: sqlite3.Connection, league_id: str, params: dict) -> None:
     payload = {
-        "weights": locked,
-        "form_blend_weight": FORM_BLEND_WEIGHT,
-        "temperature": float(temperature),
-        "temp_over25": float(temp_over25),
-        "temp_btts": float(temp_btts),
+        **params,
+        "weights": normalize_weights(params.get("weights") or DEFAULT_WEIGHTS),
         "model_version": MODEL_VERSION,
         "updated_at": now_iso(),
     }
@@ -769,104 +713,306 @@ def save_fit_params(
         INSERT INTO app_meta(key, value) VALUES(?, ?)
         ON CONFLICT(key) DO UPDATE SET value=excluded.value
         """,
-        (f"fit_params_{league_id}", json.dumps(payload)),
+        (f"fit_params_{league_id}", json.dumps(payload, ensure_ascii=False)),
     )
 
 
-def build_obs_shots(rows, obs_prefix):
-    """Scaled shot-proxy pseudo-goals for parallel DC (needs ≥300 shot matches)."""
+def load_league_calibration(conn: sqlite3.Connection, league_id: str) -> dict:
+    """صف league_calibration إن وُجد؛ وإلا watch/θ الافتراضية (لا محسوم قبل الدليل)."""
+    try:
+        row = conn.execute(
+            """
+            SELECT theta, alpha_announce, alpha_lineup, alpha_close, dc_half_life,
+                   demargin_method, status
+            FROM league_calibration WHERE league_id=?
+            """,
+            (league_id,),
+        ).fetchone()
+    except sqlite3.OperationalError:
+        row = None
+    if not row:
+        return {"theta": DEFAULT_THETA, "status": "watch"}
+    out = dict(row)
+    out["theta"] = float(out.get("theta") or DEFAULT_THETA)
+    out["status"] = out.get("status") or "watch"
+    return out
 
-    def shot_value(shots: float, sot: float) -> float:
-        return 0.30 * sot + 0.04 * max(shots - sot, 0.0)
 
-    sh = [
-        m
-        for m in rows
-        if m["shots_home"] is not None
-        and m["sot_home"] is not None
-        and m["shots_away"] is not None
-        and m["sot_away"] is not None
-    ]
-    if len(sh) < 300:
-        return None
-    tot_g = sum(m["home_goals"] + m["away_goals"] for m in sh)
-    tot_v = sum(
-        shot_value(m["shots_home"], m["sot_home"])
-        + shot_value(m["shots_away"], m["sot_away"])
-        for m in sh
+_DERBIES_CACHE: dict[str, set[frozenset]] | None = None
+
+
+def load_derbies() -> dict[str, set[frozenset]]:
+    global _DERBIES_CACHE
+    if _DERBIES_CACHE is not None:
+        return _DERBIES_CACHE
+    out: dict[str, set[frozenset]] = {}
+    try:
+        data = json.loads(DERBIES_PATH.read_text(encoding="utf-8"))
+        for lid, pairs in (data.get("leagues") or data).items():
+            if not isinstance(pairs, list):
+                continue
+            out[lid] = {frozenset(p) for p in pairs if isinstance(p, list) and len(p) == 2}
+    except Exception:
+        out = {}
+    _DERBIES_CACHE = out
+    return out
+
+
+def is_derby(league_id: str, home_id: str, away_id: str) -> bool:
+    return frozenset((home_id, away_id)) in load_derbies().get(league_id, set())
+
+
+PILLAR_STRENGTH_MIN = 0.80
+
+
+def favourite_pillar_missing(missing: list | None, strength: dict | None) -> bool:
+    """عمود غائب = لاعب مؤكَّد الغياب قوته ≥ 0.80 في خريطة قوة الفريق (إن وُجدت)."""
+    if not missing:
+        return False
+    if not strength:
+        return False
+    for r in missing:
+        status = str(r.get("status") or "").lower()
+        if status and status not in ("out", "injured", "suspended", "doubtful", "missing"):
+            continue
+        name = str(r.get("player_name") or "").strip().lower()
+        if name and strength.get(name, 0.0) >= PILLAR_STRENGTH_MIN:
+            return True
+    return False
+
+
+def season_game_counts(finished: list, season: str) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for m in finished:
+        if str(m["season"] or "") != str(season or ""):
+            continue
+        counts[m["home_team_id"]] = counts.get(m["home_team_id"], 0) + 1
+        counts[m["away_team_id"]] = counts.get(m["away_team_id"], 0) + 1
+    return counts
+
+
+def build_sieve(
+    *,
+    league_id: str,
+    pred: dict,
+    home_id: str,
+    away_id: str,
+    season: str,
+    season_counts: dict[str, int],
+    first_season: dict[str, str],
+    days_in: float | None,
+    calibration: dict,
+    home_missing: list | None = None,
+    away_missing: list | None = None,
+    home_strength: dict | None = None,
+    away_strength: dict | None = None,
+) -> dict:
+    pm = pred["pm"]
+    fav_home = float(pm[0]) >= float(pm[2])
+    fav_id, opp_id = (home_id, away_id) if fav_home else (away_id, home_id)
+    fav_missing = favourite_pillar_missing(
+        home_missing if fav_home else away_missing,
+        home_strength if fav_home else away_strength,
     )
-    scale = tot_g / tot_v if tot_v > 0 else 1.0
+    ctx = SieveContext(
+        pm=pm,
+        ps=pred.get("ps"),
+        pf=pred["pf"],
+        p_draw_head=pred.get("p_draw_head"),
+        league_status=str(calibration.get("status") or "watch"),
+        theta=float(calibration.get("theta") or DEFAULT_THETA),
+        days_into_season=int(days_in) if days_in is not None else None,
+        is_derby=is_derby(league_id, home_id, away_id),
+        favourite_pillar_missing=fav_missing,
+        fav_is_promoted=first_season.get(fav_id) == season,
+        fav_round=season_counts.get(fav_id, 0) + 1,
+        fav_n_season=season_counts.get(fav_id, 0),
+        opp_n_season=season_counts.get(opp_id, 0),
+        market_available=pred.get("ps") is not None,
+    )
+    return evaluate_banker(ctx).to_dict()
 
-    def pseudo(g: int, shots, sot) -> float:
-        if shots is None or sot is None:
-            return float(g)
-        return 0.5 * g + 0.5 * scale * shot_value(shots, sot)
 
-    return [
-        MatchObs(
-            home=o.home,
-            away=o.away,
-            home_goals=pseudo(m["home_goals"], m["shots_home"], m["sot_home"]),
-            away_goals=pseudo(m["away_goals"], m["shots_away"], m["sot_away"]),
-            days_ago=o.days_ago,
-        )
-        for o, m in zip(obs_prefix, rows)
-    ]
+def insert_prediction_row(
+    conn: sqlite3.Connection,
+    *,
+    match_id: str,
+    pred: dict,
+    elo_h: float,
+    elo_a: float,
+    ts: str,
+    sieve: dict | None,
+    analytics_extra: dict | None = None,
+) -> None:
+    """صف predictions + prediction_snapshots (متوافق مع الواجهة) بأعمدة v5."""
+    tops = top_scores(pred["matrix"], 8)
+    market = pred["components"]["market"]["p"]
+    pm = pred["pm"]
+    analytics = {
+        "version": MODEL_VERSION,
+        # components has tuples — roundtrip to plain lists
+        "components": json.loads(json.dumps(pred["components"], default=list)),
+        "edge": pred["edge"],
+        "value": pred["value"],
+        "weights": pred["weights"],
+        "xpts": [pred["xpts_home"], pred["xpts_away"]],
+        "double_chance": pred.get("double_chance"),
+        "randomness": pred.get("randomness"),
+        "match_randomness_index": pred.get("match_randomness_index"),
+        "stability_score": pred.get("stability_score"),
+        "is_strictly_excluded": pred.get("is_strictly_excluded"),
+        "alpha": pred.get("alpha"),
+        "gap_pick": pred.get("gap_pick"),
+        "demargin": pred.get("demargin_method"),
+        "sieve": sieve,
+        **(analytics_extra or {}),
+    }
+    conn.execute(
+        """
+        INSERT INTO predictions (
+          id, match_id, lambda_home, lambda_away,
+          p_home, p_draw, p_away, p_btts_yes, p_over25,
+          top_scores_json, score_matrix_json,
+          elo_home, elo_away, confidence, model_version,
+          created_at, updated_at,
+          analytics_json, xpts_home, xpts_away,
+          market_home, market_draw, market_away,
+          pm_home, pm_draw, pm_away, alpha, p_draw_head, sieve_tier, sieve_json
+        ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+        """,
+        (
+            str(uuid.uuid4()),
+            match_id,
+            pred["lambda_home"],
+            pred["lambda_away"],
+            pred["p_home"],
+            pred["p_draw"],
+            pred["p_away"],
+            pred["p_btts_yes"],
+            pred["p_over25"],
+            json.dumps(tops),
+            json.dumps(pred["matrix"].tolist()),
+            elo_h,
+            elo_a,
+            pred["confidence"],
+            MODEL_VERSION,
+            ts,
+            ts,
+            json.dumps(analytics, ensure_ascii=False),
+            pred["xpts_home"],
+            pred["xpts_away"],
+            market[0] if market else None,
+            market[1] if market else None,
+            market[2] if market else None,
+            float(pm[0]),
+            float(pm[1]),
+            float(pm[2]),
+            float(pred.get("alpha") if pred.get("alpha") is not None else 1.0),
+            pred.get("p_draw_head"),
+            (sieve or {}).get("tier"),
+            json.dumps(sieve, ensure_ascii=False) if sieve is not None else None,
+        ),
+    )
+
+    # Snapshot: refresh while match not finished; lock after final whistle
+    conn.execute(
+        """
+        INSERT INTO prediction_snapshots (
+          id, match_id, league_id, utc_date,
+          p_home, p_draw, p_away, p_btts_yes, p_over25,
+          lambda_home, lambda_away, elo_home, elo_away,
+          confidence, model_version, snapshot_at
+        ) SELECT
+            ?, m.id, m.league_id, m.utc_date,
+            ?, ?, ?, ?, ?,
+            ?, ?, ?, ?,
+            ?, ?, ?
+        FROM matches m WHERE m.id = ?
+        ON CONFLICT(match_id) DO UPDATE SET
+          p_home = excluded.p_home,
+          p_draw = excluded.p_draw,
+          p_away = excluded.p_away,
+          p_btts_yes = excluded.p_btts_yes,
+          p_over25 = excluded.p_over25,
+          lambda_home = excluded.lambda_home,
+          lambda_away = excluded.lambda_away,
+          elo_home = excluded.elo_home,
+          elo_away = excluded.elo_away,
+          confidence = excluded.confidence,
+          model_version = excluded.model_version,
+          snapshot_at = excluded.snapshot_at
+        WHERE (SELECT status FROM matches WHERE id = prediction_snapshots.match_id)
+              NOT IN ('FINISHED', 'AWARDED')
+        """,
+        (
+            str(uuid.uuid4()),
+            pred["p_home"],
+            pred["p_draw"],
+            pred["p_away"],
+            pred["p_btts_yes"],
+            pred["p_over25"],
+            pred["lambda_home"],
+            pred["lambda_away"],
+            elo_h,
+            elo_a,
+            pred["confidence"],
+            MODEL_VERSION,
+            ts,
+            match_id,
+        ),
+    )
 
 
-def build_obs_true_xg(rows, obs_prefix):
-    """DC موازٍ على xG تتبّعي (Understat) — يحتاج ≥200 مباراة بـ xg_true."""
-    keyed = []
-    for o, m in zip(obs_prefix, rows):
-        try:
-            xh = m["xg_true_home"]
-            xa = m["xg_true_away"]
-        except (KeyError, IndexError):
-            xh = xa = None
-        if xh is None or xa is None:
-            continue
-        try:
-            xh_f, xa_f = float(xh), float(xa)
-        except (TypeError, ValueError):
-            continue
-        if xh_f < 0.01 or xa_f < 0.01:
-            continue
-        keyed.append(
-            MatchObs(
-                home=o.home,
-                away=o.away,
-                home_goals=xh_f,
-                away_goals=xa_f,
-                days_ago=o.days_ago,
-            )
-        )
-    if len(keyed) < 200:
+def write_timeline_snapshot(
+    conn: sqlite3.Connection,
+    match_id: str,
+    kind: str,
+    pred: dict,
+    sieve: dict | None,
+    *,
+    overwrite: bool = True,
+) -> None:
+    """لقطة announce/lineup في prediction_timeline — للمباريات غير المنتهية فقط."""
+    st = conn.execute("SELECT status FROM matches WHERE id=?", (match_id,)).fetchone()
+    if not st or st["status"] in ("FINISHED", "AWARDED"):
+        return
+    mk = pred["components"]["market"]
+    record_snapshot(
+        conn,
+        match_id,
+        kind,
+        pm=pred["pm"],
+        ps=pred.get("ps"),
+        odds=mk.get("odds"),
+        odds_source=mk.get("source"),
+        alpha=float(pred.get("alpha") if pred.get("alpha") is not None else 1.0),
+        model_version=MODEL_VERSION,
+        sieve=sieve,
+        pf=pred["pf"],
+        overwrite=overwrite,
+    )
+
+
+def fit_prior_dc(train_rows: list, current_season: str, ref: datetime, half_life: float, league_id: str):
+    """DC على ما قبل الموسم الحالي فقط → أسبقيات ridge للموسم الحالي (الصاعدون: متوسط المغادرين)."""
+    prev_rows = [m for m in train_rows if str(m["season"] or "") != str(current_season or "")]
+    if len(prev_rows) < 100:
         return None
-    return keyed
-
-
-def h2h_list_from_finished(
-    finished: list, home_id: str, away_id: str, *, limit: int = 5
-) -> list:
-    key = frozenset((home_id, away_id))
-    rows = [
-        m
-        for m in finished
-        if frozenset((m["home_team_id"], m["away_team_id"])) == key
-    ]
-    return [
-        {
-            "home_team": r["home_team_id"],
-            "away_team": r["away_team_id"],
-            "home_goals": int(r["home_goals"]),
-            "away_goals": int(r["away_goals"]),
-        }
-        for r in rows[-limit:]
-    ]
+    prev_model = fit_dixon_coles(build_obs(prev_rows, ref), half_life_days=half_life, league_id=league_id)
+    priors = dc_priors_from(prev_model) or {}
+    cur_teams = {m["home_team_id"] for m in train_rows if str(m["season"] or "") == str(current_season or "")}
+    cur_teams |= {m["away_team_id"] for m in train_rows if str(m["season"] or "") == str(current_season or "")}
+    dropped = [t for t in priors if t not in cur_teams]
+    if dropped:
+        pa = sum(priors[t][0] for t in dropped) / len(dropped)
+        pdf = sum(priors[t][1] for t in dropped) / len(dropped)
+        for t in cur_teams:
+            priors.setdefault(t, (pa, pdf))
+    return priors
 
 
 def repredict_flagged(conn: sqlite3.Connection) -> int:
-    """إعادة توقع ضيقة للمباريات المؤكَّد تشكيلتها — بأوزان/حرارة آخر fit كاملة الثراء."""
+    """إعادة توقع ضيقة للمباريات المؤكَّد تشكيلتها — لقطة «lineup» بأوزان/α آخر fit."""
     row = conn.execute(
         "SELECT value FROM app_meta WHERE key='enrich_repredict_matches'"
     ).fetchone()
@@ -910,80 +1056,39 @@ def repredict_flagged(conn: sqlite3.Connection) -> int:
             continue
         train = finished[-MAX_TRAIN:]
         ref = datetime.now(timezone.utc)
-        weights, temperature, temp_over25, temp_btts = load_fit_params(conn, lid)
+        params = load_fit_params(conn, lid)
+        calibration = load_league_calibration(conn, lid)
+        half_life = float(params.get("dc_half_life") or HALF_LIFE)
+        season = targets[0]["season"] if targets else (finished[-1]["season"] if finished else "")
 
-        def days_ago(utc: str) -> float:
-            try:
-                dt = datetime.fromisoformat(utc.replace("Z", "+00:00"))
-                if dt.tzinfo is None:
-                    dt = dt.replace(tzinfo=timezone.utc)
-                return max(0.0, (ref - dt).total_seconds() / 86400.0)
-            except Exception:
-                return 0.0
-
-        obs = [
-            MatchObs(
-                home=m["home_team_id"],
-                away=m["away_team_id"],
-                home_goals=int(m["home_goals"]),
-                away_goals=int(m["away_goals"]),
-                days_ago=days_ago(m["utc_date"]),
-            )
-            for m in train
-        ]
-        model = fit_dixon_coles(obs, half_life_days=HALF_LIFE, league_id=lid)
+        obs = build_obs(train, ref)
+        priors = fit_prior_dc(train, season, ref, half_life, lid)
+        model = fit_dixon_coles(obs, half_life_days=half_life, league_id=lid, priors=priors)
         shots_obs = build_obs_shots(train, obs)
-        model_shots = (
-            fit_dixon_coles(shots_obs, half_life_days=HALF_LIFE, league_id=lid)
-            if shots_obs
-            else None
-        )
+        model_shots = fit_dixon_coles(shots_obs, half_life_days=half_life, league_id=lid) if shots_obs else None
         xg_obs = build_obs_true_xg(train, obs)
-        model_true_xg = (
-            fit_dixon_coles(xg_obs, half_life_days=HALF_LIFE, league_id=lid)
-            if xg_obs
-            else None
-        )
+        model_true_xg = fit_dixon_coles(xg_obs, half_life_days=half_life, league_id=lid) if xg_obs else None
 
-        elo_matches = [
-            EloMatch(
-                home=m["home_team_id"],
-                away=m["away_team_id"],
-                home_goals=int(m["home_goals"]),
-                away_goals=int(m["away_goals"]),
-                date=m["utc_date"],
-                season=m["season"] if "season" in m.keys() and m["season"] is not None else "",
-            )
-            for m in train
-        ]
+        si = season_index(finished, targets)
+        elo_matches = build_elo_matches(finished)
+        pi_matches = build_pi_matches(finished)
+        form_matches = build_form_matches(finished)
+        elo_seeds, pi_off_seeds, pi_def_seeds = promoted_seeds(elo_matches, pi_matches, si)
         profile = get_league_profile(lid)
         elo_ha = elo_home_adv_from_profile(profile.home_advantage)
-        ratings, _ = update_elo(elo_matches, home_adv=elo_ha)
-        pi_matches = [
-            PiMatch(
-                home=m["home_team_id"],
-                away=m["away_team_id"],
-                home_goals=int(m["home_goals"]),
-                away_goals=int(m["away_goals"]),
-            )
-            for m in train
-        ]
-        pi_state = update_pi(pi_matches)
-        form_matches = [
-            FormMatch(
-                home=m["home_team_id"],
-                away=m["away_team_id"],
-                home_goals=int(m["home_goals"]),
-                away_goals=int(m["away_goals"]),
-                shots_home=m["shots_home"],
-                shots_away=m["shots_away"],
-                sot_home=m["sot_home"],
-                sot_away=m["sot_away"],
-                date=m["utc_date"],
-            )
-            for m in train
-        ]
+        season_state = SeasonState()
+        ratings, _ = update_elo(elo_matches, home_adv=elo_ha, seeds=elo_seeds, season_state=season_state)
+        for t_, v_ in elo_seeds.items():
+            ratings.setdefault(t_, v_)
+        ratings_used = shrunk_ratings(ratings, season_state)
+        pi_state = update_pi(pi_matches, off_seeds=pi_off_seeds, def_seeds=pi_def_seeds)
+        for t_, v_ in pi_off_seeds.items():
+            pi_state.off.setdefault(t_, v_)
+        for t_, v_ in pi_def_seeds.items():
+            pi_state.deff.setdefault(t_, v_)
+        pi_used = shrunk_pi(pi_state)
         forms = rolling_form(form_matches, window=5)
+        h2h = H2HIndex(finished)
         rand_profiles = {}
         gk_profiles = {}
         mgr_profiles = {}
@@ -1003,12 +1108,10 @@ def repredict_flagged(conn: sqlite3.Connection) -> int:
             if aid not in mgr_profiles:
                 mgr_profiles[aid] = compute_manager_profile(aid, finished, elo_rating=ratings.get(aid, 1500.0))
         ts = now_iso()
-        season = targets[0]["season"] if targets else (finished[-1]["season"] if finished else "")
         standings_map, n_teams = load_standings_map(conn, lid, season)
+        season_counts = season_game_counts(finished, season)
         for t in targets:
-            odds = None
-            if t["odds_home"] and t["odds_draw"] and t["odds_away"]:
-                odds = (float(t["odds_home"]), float(t["odds_draw"]), float(t["odds_away"]))
+            odds = odds3(t, "odds")
             enrich = load_live_enrichment(conn, t["id"], t["referee_name"])
             ppda_h, ppda_hn = rolling_team_ppda(finished, t["home_team_id"])
             ppda_a, ppda_an = rolling_team_ppda(finished, t["away_team_id"])
@@ -1029,19 +1132,17 @@ def repredict_flagged(conn: sqlite3.Connection) -> int:
                 home=t["home_team_id"],
                 away=t["away_team_id"],
                 dc=model,
-                elo_home=ratings.get(t["home_team_id"], 1500.0),
-                elo_away=ratings.get(t["away_team_id"], 1500.0),
-                pi=pi_state,
+                elo_home=ratings_used.get(t["home_team_id"], 1500.0),
+                elo_away=ratings_used.get(t["away_team_id"], 1500.0),
+                pi=pi_used,
                 form_home=forms.get(t["home_team_id"], empty_form()),
                 form_away=forms.get(t["away_team_id"], empty_form()),
                 market_odds=odds,
-                temperature=temperature,
-                weights=weights,
+                temperature=params["temperature"],
+                weights=params["weights"],
                 dc_shots=model_shots,
                 dc_true_xg=model_true_xg,
-                h2h_matches=h2h_list_from_finished(
-                    finished, t["home_team_id"], t["away_team_id"]
-                ),
+                h2h_matches=h2h.before(t["home_team_id"], t["away_team_id"]),
                 league_id=lid,
                 weather=enrich["weather"],
                 home_missing=enrich["home_missing"],
@@ -1058,8 +1159,8 @@ def repredict_flagged(conn: sqlite3.Connection) -> int:
                 home_bench=enrich.get("home_bench"),
                 away_bench=enrich.get("away_bench"),
                 lineup_confirmed=bool(enrich.get("lineup_confirmed")),
-                temp_over25=temp_over25,
-                temp_btts=temp_btts,
+                temp_over25=params["temp_over25"],
+                temp_btts=params["temp_btts"],
                 ppda_home=ppda_h,
                 ppda_away=ppda_a,
                 ppda_home_n=ppda_hn,
@@ -1071,111 +1172,39 @@ def repredict_flagged(conn: sqlite3.Connection) -> int:
                 away_gk_stats=gk_profiles.get(t["away_team_id"]),
                 home_manager_profile=mgr_profiles.get(t["home_team_id"]),
                 away_manager_profile=mgr_profiles.get(t["away_team_id"]),
+                alpha=params["alpha_lineup"],
+                demargin_method=params["demargin_method"],
+                draw_head_coefs=params.get("draw_head"),
+                flags=params.get("flags"),
                 **m2_ctx,
             )
+            sieve = build_sieve(
+                league_id=lid,
+                pred=pred,
+                home_id=t["home_team_id"],
+                away_id=t["away_team_id"],
+                season=season,
+                season_counts=season_counts,
+                first_season=si.first_season,
+                days_in=enrich.get("days_into_season"),
+                calibration=calibration,
+                home_missing=enrich["home_missing"],
+                away_missing=enrich["away_missing"],
+                home_strength=enrich.get("home_strength"),
+                away_strength=enrich.get("away_strength"),
+            )
             conn.execute("DELETE FROM predictions WHERE match_id=?", (t["id"],))
-            market = pred["components"]["market"]["p"]
-            analytics = {
-                "version": MODEL_VERSION,
-                "components": json.loads(json.dumps(pred["components"], default=list)),
-                "edge": pred["edge"],
-                "value": pred["value"],
-                "weights": pred["weights"],
-                "xpts": [pred["xpts_home"], pred["xpts_away"]],
-                "double_chance": pred.get("double_chance"),
-                "narrow_repredict": True,
-                "randomness": pred.get("randomness"),
-                "match_randomness_index": pred.get("match_randomness_index"),
-                "stability_score": pred.get("stability_score"),
-                "is_strictly_excluded": pred.get("is_strictly_excluded"),
-            }
-            tops = top_scores(pred["matrix"], 8)
-            elo_h = ratings.get(t["home_team_id"], 1500.0)
-            elo_a = ratings.get(t["away_team_id"], 1500.0)
-            conn.execute(
-                """
-                INSERT INTO predictions (
-                  id, match_id, lambda_home, lambda_away,
-                  p_home, p_draw, p_away, p_btts_yes, p_over25,
-                  top_scores_json, score_matrix_json,
-                  elo_home, elo_away, confidence, model_version,
-                  created_at, updated_at,
-                  analytics_json, xpts_home, xpts_away,
-                  market_home, market_draw, market_away
-                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-                """,
-                (
-                    str(uuid.uuid4()),
-                    t["id"],
-                    pred["lambda_home"],
-                    pred["lambda_away"],
-                    pred["p_home"],
-                    pred["p_draw"],
-                    pred["p_away"],
-                    pred["p_btts_yes"],
-                    pred["p_over25"],
-                    json.dumps(tops),
-                    json.dumps(pred["matrix"].tolist()),
-                    elo_h,
-                    elo_a,
-                    pred["confidence"],
-                    MODEL_VERSION,
-                    ts,
-                    ts,
-                    json.dumps(analytics, ensure_ascii=False),
-                    pred["xpts_home"],
-                    pred["xpts_away"],
-                    market[0] if market else None,
-                    market[1] if market else None,
-                    market[2] if market else None,
-                ),
+            insert_prediction_row(
+                conn,
+                match_id=t["id"],
+                pred=pred,
+                elo_h=ratings_used.get(t["home_team_id"], 1500.0),
+                elo_a=ratings_used.get(t["away_team_id"], 1500.0),
+                ts=ts,
+                sieve=sieve,
+                analytics_extra={"narrow_repredict": True},
             )
-            conn.execute(
-                """
-                INSERT INTO prediction_snapshots (
-                  id, match_id, league_id, utc_date,
-                  p_home, p_draw, p_away, p_btts_yes, p_over25,
-                  lambda_home, lambda_away, elo_home, elo_away,
-                  confidence, model_version, snapshot_at
-                ) SELECT
-                    ?, m.id, m.league_id, m.utc_date,
-                    ?, ?, ?, ?, ?,
-                    ?, ?, ?, ?,
-                    ?, ?, ?
-                FROM matches m WHERE m.id = ?
-                ON CONFLICT(match_id) DO UPDATE SET
-                  p_home = excluded.p_home,
-                  p_draw = excluded.p_draw,
-                  p_away = excluded.p_away,
-                  p_btts_yes = excluded.p_btts_yes,
-                  p_over25 = excluded.p_over25,
-                  lambda_home = excluded.lambda_home,
-                  lambda_away = excluded.lambda_away,
-                  elo_home = excluded.elo_home,
-                  elo_away = excluded.elo_away,
-                  confidence = excluded.confidence,
-                  model_version = excluded.model_version,
-                  snapshot_at = excluded.snapshot_at
-                WHERE (SELECT status FROM matches WHERE id = prediction_snapshots.match_id)
-                      NOT IN ('FINISHED', 'AWARDED')
-                """,
-                (
-                    str(uuid.uuid4()),
-                    pred["p_home"],
-                    pred["p_draw"],
-                    pred["p_away"],
-                    pred["p_btts_yes"],
-                    pred["p_over25"],
-                    pred["lambda_home"],
-                    pred["lambda_away"],
-                    elo_h,
-                    elo_a,
-                    pred["confidence"],
-                    MODEL_VERSION,
-                    ts,
-                    t["id"],
-                ),
-            )
+            write_timeline_snapshot(conn, t["id"], "lineup", pred, sieve)
             n_written += 1
     conn.execute("DELETE FROM app_meta WHERE key='enrich_repredict_matches'")
     conn.commit()
@@ -1237,6 +1266,7 @@ def main() -> None:
     conn.execute("PRAGMA journal_mode = WAL")
     conn.execute("PRAGMA busy_timeout = 10000")
     ensure_columns(conn)
+    ensure_model_schema(conn)
 
     if "--help" in sys.argv or "-h" in sys.argv:
         print("Usage: fit-and-predict.py [--repredict-flagged] [--refresh-live] [--calibration-only]")
@@ -1266,9 +1296,8 @@ def main() -> None:
     conn.execute("DELETE FROM team_strengths")
     conn.execute("DELETE FROM model_metrics")
 
-    all_probs = []
+    all_probs = []      # الناتج النهائي المنشور (pf) على شرائح القياس النظيفة
     all_outcomes = []
-    value_backtests: dict[str, dict] = {}
 
     for league in leagues:
         lid = league["id"]
@@ -1327,85 +1356,21 @@ def main() -> None:
                 ),
             )
 
-        elo_source = list(finished)
+        params = load_fit_params(conn, lid)
+        calibration = load_league_calibration(conn, lid)
+        half_life = float(params.get("dc_half_life") or HALF_LIFE)
+        method = str(params.get("demargin_method") or DEFAULT_DEMARGIN)
+        flags = params.get("flags") or dict(DEFAULT_FLAGS)
+
         train = finished[-MAX_TRAIN:]
         ref = datetime.now(timezone.utc)
-
-        elo_matches = [
-            EloMatch(
-                home=m["home_team_id"],
-                away=m["away_team_id"],
-                home_goals=int(m["home_goals"]),
-                away_goals=int(m["away_goals"]),
-                date=m["utc_date"],
-                season=m["season"] if "season" in m.keys() and m["season"] is not None else "",
-            )
-            for m in elo_source
-        ]
-        pi_matches = [
-            PiMatch(
-                home=m["home_team_id"],
-                away=m["away_team_id"],
-                home_goals=int(m["home_goals"]),
-                away_goals=int(m["away_goals"]),
-            )
-            for m in elo_source
-        ]
-        form_matches = [
-            FormMatch(
-                home=m["home_team_id"],
-                away=m["away_team_id"],
-                home_goals=int(m["home_goals"]),
-                away_goals=int(m["away_goals"]),
-                shots_home=m["shots_home"],
-                shots_away=m["shots_away"],
-                sot_home=m["sot_home"],
-                sot_away=m["sot_away"],
-                date=m["utc_date"],
-            )
-            for m in elo_source
-        ]
-
-        obs = []
-        for m in train:
-            dt = datetime.fromisoformat(m["utc_date"].replace("Z", "+00:00"))
-            days = max((ref - dt).total_seconds() / 86400.0, 0.0)
-            obs.append(
-                MatchObs(
-                    home=m["home_team_id"],
-                    away=m["away_team_id"],
-                    home_goals=int(m["home_goals"]),
-                    away_goals=int(m["away_goals"]),
-                    days_ago=days,
-                )
-            )
-
-        # أهداف زائفة من التسديدات (بديل xG عملي) — انظر build_obs_shots
+        elo_matches = build_elo_matches(finished)
+        pi_matches = build_pi_matches(finished)
+        form_matches = build_form_matches(finished)
+        obs = build_obs(train, ref)
         obs_shots = build_obs_shots(train, obs)
-
-        # --- فهرس المواجهات المباشرة (H2H): لكل زوج فرق لقاءاتهما المنتهية
-        # مرتبة زمنياً. يُمرَّر آخر 5 لقاءات سابقة للمباراة فقط — نظيف زمنياً.
-        h2h_pairs: dict[frozenset, list[tuple[int, sqlite3.Row]]] = {}
-        for h2h_gi, h2h_m in enumerate(finished):
-            h2h_pairs.setdefault(
-                frozenset((h2h_m["home_team_id"], h2h_m["away_team_id"])), []
-            ).append((h2h_gi, h2h_m))
-
-        def h2h_before(
-            home_id: str, away_id: str, before_gi: int | None = None, last: int = 5
-        ) -> list[dict]:
-            rows = h2h_pairs.get(frozenset((home_id, away_id)), [])
-            if before_gi is not None:
-                rows = [r for r in rows if r[0] < before_gi]
-            return [
-                {
-                    "home_team": r["home_team_id"],
-                    "away_team": r["away_team_id"],
-                    "home_goals": int(r["home_goals"]),
-                    "away_goals": int(r["away_goals"]),
-                }
-                for _, r in rows[-last:]
-            ]
+        obs_true_xg = build_obs_true_xg(train, obs)
+        h2h = H2HIndex(finished)
 
         targets = conn.execute(
             """
@@ -1422,97 +1387,52 @@ def main() -> None:
         ).fetchall()
 
         # --- Promoted-team prior: فريق يظهر لأول مرة يرث متوسط تقييم الفرق التي
-        # غادرت الدوري قبل موسمه — لا 1500 (= متوسط الدوري) الذي يبالغ في تقديره.
-        # التقييمات تُقرأ عند بداية موسمه فقط: زمني بحت، لا معلومات من المستقبل.
-        # ponytail: تمريرة واحدة زمنية بلا نقطة ثبات، وفرق DC الباردة تنكمش لمتوسط
-        # الدوري عبر الـridge كما هي؛ الترقية: أسعار CSV لدوريات الدرجة الثانية.
-        season_first_idx: dict[str, int] = {}
-        season_teams: dict[str, set] = {}
-        first_season: dict[str, str] = {}
-        for i, m in enumerate(finished):
-            season_first_idx.setdefault(m["season"], i)
-            for tid in (m["home_team_id"], m["away_team_id"]):
-                season_teams.setdefault(m["season"], set()).add(tid)
-                first_season.setdefault(tid, m["season"])
-        # الموسم المجدول الذي لم تُلعب منه مباراة بعد: موسم زائف عند نهاية التاريخ،
-        # كي يُبذر الصاعدون الذين لا نتيجة لهم أصلاً (هم أبرد الفرق الباردة)
-        for m in targets:
-            season_first_idx.setdefault(m["season"], len(finished))
-            for tid in (m["home_team_id"], m["away_team_id"]):
-                season_teams.setdefault(m["season"], set()).add(tid)
-                first_season.setdefault(tid, m["season"])
-        elo_seeds: dict[str, float] = {}
-        pi_off_seeds: dict[str, float] = {}
-        pi_def_seeds: dict[str, float] = {}
-        seasons_seq = sorted(season_first_idx, key=lambda s: season_first_idx[s])
-        for si in range(1, len(seasons_seq)):
-            s = seasons_seq[si]
-            # كتيبة الموسم السابق مباشرة — لا كل من غادر يوماً بتقييم متجمد قديم
-            prev_teams = season_teams[seasons_seq[si - 1]]
-            dropped = prev_teams - season_teams[s]
-            newcomers = [t for t in season_teams[s] if first_season[t] == s]
-            if not dropped or not newcomers:
-                continue  # لا تاريخ هبوط (أول موسم كوري مثلاً) → الافتراضي كما هو
-            idx0 = season_first_idx[s]
-            pre_elo, _ = update_elo(elo_matches[:idx0], seeds=elo_seeds)
-            pre_pi = update_pi(
-                pi_matches[:idx0], off_seeds=pi_off_seeds, def_seeds=pi_def_seeds
-            )
-            evals = [pre_elo[t] for t in dropped if t in pre_elo]
-            if evals:
-                seed = sum(evals) / len(evals)
-                for t in newcomers:
-                    elo_seeds[t] = seed
-            offs = [pre_pi.off[t] for t in dropped if t in pre_pi.off]
-            defs = [pre_pi.deff[t] for t in dropped if t in pre_pi.deff]
-            if offs:
-                so = sum(offs) / len(offs)
-                sd = sum(defs) / len(defs) if defs else 0.0
-                for t in newcomers:
-                    pi_off_seeds[t] = so
-                    pi_def_seeds[t] = sd
+        # غادرت الدوري قبل موسمه — زمني بحت (engine.pipeline.promoted_seeds)
+        si = season_index(finished, targets)
+        elo_seeds, pi_off_seeds, pi_def_seeds = promoted_seeds(elo_matches, pi_matches, si)
 
-        obs_true_xg = build_obs_true_xg(train, obs)
-        print(
-            f"  {lid}: DC on {len(obs)} · shots-DC {'on' if obs_shots else 'off'} · xG-DC {'on' if obs_true_xg else 'off'} · Elo/Pi on {len(elo_source)}…",
-            flush=True,
-        )
-        model = fit_dixon_coles(obs, half_life_days=HALF_LIFE, league_id=lid)
-        model_shots = (
-            fit_dixon_coles(obs_shots, half_life_days=HALF_LIFE, league_id=lid) if obs_shots else None
-        )
-        model_true_xg = (
-            fit_dixon_coles(obs_true_xg, half_life_days=HALF_LIFE, league_id=lid)
-            if obs_true_xg
-            else None
-        )
-        profile = get_league_profile(lid)
-        elo_ha = elo_home_adv_from_profile(profile.home_advantage)
-        early_boost = any(
-            (days_into_season(m["utc_date"], m["season"]) or 999) < EARLY_SEASON_DAYS
-            for m in train[-20:]
-        )
-        ratings, history = update_elo(
-            elo_matches, home_adv=elo_ha, seeds=elo_seeds, early_season_boost=early_boost
-        )
-        pi_state = update_pi(
-            pi_matches, off_seeds=pi_off_seeds, def_seeds=pi_def_seeds
-        )
-        forms = rolling_form(form_matches, window=5)
-        # فريق صاعد لم يلعب بعدُ أي مباراة: البذرة هي تقييمه الحالي
-        for t_, v_ in elo_seeds.items():
-            ratings.setdefault(t_, v_)
-        for t_, v_ in pi_off_seeds.items():
-            pi_state.off.setdefault(t_, v_)
-        for t_, v_ in pi_def_seeds.items():
-            pi_state.deff.setdefault(t_, v_)
-
-        # Persist strengths
         season_row = conn.execute(
             "SELECT season FROM matches WHERE league_id=? ORDER BY utc_date DESC LIMIT 1",
             (lid,),
         ).fetchone()
         season = season_row["season"]
+
+        # طريقة نزع الهامش لكل دوري: تُختار من إغلاق بيناكل الحقيقي إن لم يحسمها الحزام الطويل
+        if calibration.get("demargin_method") is None:
+            close_pairs = [
+                (odds3(m, "odds_close"), "H" if int(m["home_goals"]) > int(m["away_goals"]) else ("A" if int(m["away_goals"]) > int(m["home_goals"]) else "D"))
+                for m in finished
+            ]
+            close_pairs = [(o, y) for o, y in close_pairs if o is not None]
+            if len(close_pairs) >= 100:
+                choice = choose_demargin_method([o for o, _ in close_pairs], [y for _, y in close_pairs])
+                method = choice["method"]
+                params["demargin_method"] = method
+
+        print(
+            f"  {lid}: DC on {len(obs)} (hl={half_life:.0f}) · shots-DC {'on' if obs_shots else 'off'} · xG-DC {'on' if obs_true_xg else 'off'} · Elo/Pi on {len(finished)} · demargin={method}…",
+            flush=True,
+        )
+        priors = fit_prior_dc(train, season, ref, half_life, lid)
+        model = fit_dixon_coles(obs, half_life_days=half_life, league_id=lid, priors=priors)
+        model_shots = fit_dixon_coles(obs_shots, half_life_days=half_life, league_id=lid) if obs_shots else None
+        model_true_xg = fit_dixon_coles(obs_true_xg, half_life_days=half_life, league_id=lid) if obs_true_xg else None
+        profile = get_league_profile(lid)
+        elo_ha = elo_home_adv_from_profile(profile.home_advantage)
+        # انكماش بداية الموسم بدلاً من تضخيم K: التقييم المستخدم = w·بداية الموسم + (1−w)·الحالي
+        season_state = SeasonState()
+        ratings, history = update_elo(elo_matches, home_adv=elo_ha, seeds=elo_seeds, season_state=season_state)
+        for t_, v_ in elo_seeds.items():
+            ratings.setdefault(t_, v_)
+        ratings_used = shrunk_ratings(ratings, season_state)
+        pi_state = update_pi(pi_matches, off_seeds=pi_off_seeds, def_seeds=pi_def_seeds)
+        for t_, v_ in pi_off_seeds.items():
+            pi_state.off.setdefault(t_, v_)
+        for t_, v_ in pi_def_seeds.items():
+            pi_state.deff.setdefault(t_, v_)
+        pi_used = shrunk_pi(pi_state)
+        forms = rolling_form(form_matches, window=5)
+
         standings_map, n_teams = load_standings_map(conn, lid, season)
 
         for tid, elo in ratings.items():
@@ -1552,115 +1472,83 @@ def main() -> None:
                         (str(uuid.uuid4()), tid, date, elo),
                     )
 
-        # --- Walk-forward calibration + metrics ---
+        # --- Walk-forward قصير: أوزان/حرارة/α/رأس تعادل عند غياب الحزام الطويل + مقاييس منشورة ---
         eval_n = min(200, max(len(train) // 5, 40))
         cut = len(train) - eval_n
         temp = 1.0
         temp_m = 1.0
         half = 0
-        fitted_w = None
-        eval_model = None
-        eval_model_shots = None
-        eval_model_true_xg = None
+        fitted_w = dict(params["weights"])
+        alpha_ann = float(params["alpha_announce"])
+        alpha_close = float(params["alpha_close"])
+        dh_coefs = params.get("draw_head")
         temp_over25 = 1.0
         temp_btts = 1.0
         wf_ctx: dict[str, dict] = {}  # match_id → مدخلات التوقع عند نقطة الزمن الصادقة
         if cut >= 60:
-            eval_model = fit_dixon_coles(
-                obs[:cut], half_life_days=HALF_LIFE, league_id=lid
-            )
-            eval_obs_shots = build_obs_shots(train[:cut], obs[:cut])
-            if eval_obs_shots:
-                eval_model_shots = fit_dixon_coles(
-                    eval_obs_shots, half_life_days=HALF_LIFE, league_id=lid
-                )
-            eval_obs_xg = build_obs_true_xg(train[:cut], obs[:cut])
-            if eval_obs_xg:
-                eval_model_true_xg = fit_dixon_coles(
-                    eval_obs_xg, half_life_days=HALF_LIFE, league_id=lid
-                )
-            cut_full = len(elo_source) - eval_n
+            cut_full = len(finished) - eval_n
+            eval_model = None
+            eval_model_shots = None
+            eval_model_true_xg = None
 
-            comps = []  # احتمالات كل مكوّن لكل مباراة — لتعلّم الأوزان وإعادة المزج
+            comps = []  # احتمالات مكوّنات اللبّ لكل مباراة — لتعلّم الأوزان وإعادة المزج
+            temp_mults = []  # مضاعف الحرارة لكل صف (بداية الموسم/العشوائية) كما يطبّقه predict_match
             outcomes = []
-            market_probs = []
+            ps_sharp_list = []   # السوق الحاد عند الإعلان (PSH) منزوع الهامش
+            ps_close_list = []   # إغلاق بيناكل (PSCH) منزوع الهامش
             close_odds_list = []
+            lam_list = []
             over_probs = []
             over_labels = []
             btts_probs = []
             btts_labels = []
             for k, m in enumerate(train[cut:]):
-                if k and k % 50 == 0:
-                    # إنعاش نموذجي DC داخل النافذة — بيانات حتى ما قبل هذه المباراة فقط
-                    eval_model = fit_dixon_coles(
-                        obs[: cut + k], half_life_days=HALF_LIFE, league_id=lid
+                if eval_model is None or (k and k % 50 == 0):
+                    # إنعاش DC داخل النافذة — بيانات حتى ما قبل هذه المباراة فقط،
+                    # والاندثار نسبةً إلى تاريخ المباراة المقيَّمة لا إلى اليوم
+                    ref_k = datetime.fromisoformat(str(m["utc_date"]).replace("Z", "+00:00"))
+                    if ref_k.tzinfo is None:
+                        ref_k = ref_k.replace(tzinfo=timezone.utc)
+                    obs_k = build_obs(train[: cut + k], ref_k)
+                    priors_k = fit_prior_dc(train[: cut + k], m["season"], ref_k, half_life, lid)
+                    eval_model = fit_dixon_coles(obs_k, half_life_days=half_life, league_id=lid, priors=priors_k)
+                    prefix_shots = build_obs_shots(train[: cut + k], obs_k)
+                    eval_model_shots = (
+                        fit_dixon_coles(prefix_shots, half_life_days=half_life, league_id=lid) if prefix_shots else None
                     )
-                    prefix_shots = build_obs_shots(train[: cut + k], obs[: cut + k])
-                    if prefix_shots:
-                        eval_model_shots = fit_dixon_coles(
-                            prefix_shots, half_life_days=HALF_LIFE, league_id=lid
-                        )
-                    prefix_xg = build_obs_true_xg(train[: cut + k], obs[: cut + k])
-                    if prefix_xg:
-                        eval_model_true_xg = fit_dixon_coles(
-                            prefix_xg, half_life_days=HALF_LIFE, league_id=lid
-                        )
+                    prefix_xg = build_obs_true_xg(train[: cut + k], obs_k)
+                    eval_model_true_xg = (
+                        fit_dixon_coles(prefix_xg, half_life_days=half_life, league_id=lid) if prefix_xg else None
+                    )
                 # حالات Elo/Pi/الفورم تتقدّم زمنياً حتى ما قبل هذه المباراة فقط
-                elo_k, _ = update_elo(elo_matches[: cut_full + k], seeds=elo_seeds)
+                st_k = SeasonState()
+                elo_k, _ = update_elo(elo_matches[: cut_full + k], home_adv=elo_ha, seeds=elo_seeds, season_state=st_k)
+                elo_k = shrunk_ratings(elo_k, st_k)
                 pi_k = update_pi(
                     pi_matches[: cut_full + k],
                     off_seeds=pi_off_seeds,
                     def_seeds=pi_def_seeds,
                 )
-                forms_k = rolling_form(form_matches[: cut_full + k], window=5)
-                # بذور الصاعدين تدخل قبل التوقع لا بعده — البذرة مشتقة من ما قبل
-                # موسم الفريق فقط (نظيفة زمنياً)، وبهذا يتطابق ما تقيسه المقاييس
-                # مع ما يُعرض رجعياً، وتتسق معاملة Pi مع معاملة Elo أدناه
                 for t_, v_ in pi_off_seeds.items():
                     pi_k.off.setdefault(t_, v_)
                 for t_, v_ in pi_def_seeds.items():
                     pi_k.deff.setdefault(t_, v_)
-                odds = None
-                if m["odds_home"] and m["odds_draw"] and m["odds_away"]:
-                    odds = (
-                        float(m["odds_home"]),
-                        float(m["odds_draw"]),
-                        float(m["odds_away"]),
-                    )
+                pi_k = shrunk_pi(pi_k)
+                forms_k = rolling_form(form_matches[: cut_full + k], window=5)
+                odds = odds3(m, "odds")
+                sharp = odds3(m, "odds_sharp")
+                close = odds3(m, "odds_close")
+                open_o = odds3(m, "odds_open")
                 h, a = m["home_team_id"], m["away_team_id"]
                 eh = elo_k.get(h, elo_seeds.get(h, 1500.0))
                 ea = elo_k.get(a, elo_seeds.get(a, 1500.0))
                 fh = forms_k.get(h, empty_form())
                 fa = forms_k.get(a, empty_form())
-                h2h_k = h2h_before(h, a, before_gi=cut_full + k)
-                # Walk-forward: core stack only (no live weather/injuries) — published metrics stay honest
-                ppda_h, ppda_hn = rolling_team_ppda(
-                    train[: cut + k], h
-                )
-                ppda_a, ppda_an = rolling_team_ppda(
-                    train[: cut + k], a
-                )
-                sharp = None
-                if m["odds_sharp_home"] and m["odds_sharp_draw"] and m["odds_sharp_away"]:
-                    sharp = (
-                        float(m["odds_sharp_home"]),
-                        float(m["odds_sharp_draw"]),
-                        float(m["odds_sharp_away"]),
-                    )
-                close = None
-                if m["odds_close_home"] and m["odds_close_draw"] and m["odds_close_away"]:
-                    close = (
-                        float(m["odds_close_home"]),
-                        float(m["odds_close_draw"]),
-                        float(m["odds_close_away"]),
-                    )
-                open_o = None
-                if m["odds_open_home"] and m["odds_open_draw"] and m["odds_open_away"]:
-                    open_o = (
-                        float(m["odds_open_home"]),
-                        float(m["odds_open_draw"]),
-                        float(m["odds_open_away"]),
-                    )
+                h2h_k = h2h.before(h, a, before_gi=cut_full + k)
+                # Walk-forward: اللبّ فقط (لا طقس/غيابات حية) — المقاييس المنشورة تبقى صادقة
+                ppda_h, ppda_hn = rolling_team_ppda(train[: cut + k], h)
+                ppda_a, ppda_an = rolling_team_ppda(train[: cut + k], a)
+                dis = days_into_season(m["utc_date"], m["season"])
                 pred = predict_match(
                     home=h,
                     away=a,
@@ -1684,13 +1572,12 @@ def main() -> None:
                     sharp_odds=sharp,
                     close_odds=close,
                     open_odds=open_o,
-                    home_matches_7d=count_matches_in_window(
-                        train[: cut + k], h, m["utc_date"]
-                    ),
-                    away_matches_7d=count_matches_in_window(
-                        train[: cut + k], a, m["utc_date"]
-                    ),
-                    days_into_season=days_into_season(m["utc_date"], m["season"]),
+                    home_matches_7d=count_matches_in_window(train[: cut + k], h, m["utc_date"]),
+                    away_matches_7d=count_matches_in_window(train[: cut + k], a, m["utc_date"]),
+                    days_into_season=dis,
+                    alpha=1.0,
+                    demargin_method=method,
+                    flags=flags,
                 )
                 comps.append(
                     {
@@ -1698,14 +1585,16 @@ def main() -> None:
                         "pi": pred["components"]["pi_ratings"]["p"],
                         "elo": pred["components"]["elo"]["p"],
                         "form": pred["components"]["form"]["p"],
-                        "market": pred["components"]["market"]["p"],
                         "context": pred["components"].get("context", {}).get("p"),
                     }
                 )
+                temp_mults.append(float(pred["components"].get("temp_mult", 1.0)))
                 hg, ag = int(m["home_goals"]), int(m["away_goals"])
                 outcomes.append("H" if hg > ag else "A" if hg < ag else "D")
-                market_probs.append(odds_to_probs(*odds) if odds else None)
+                ps_sharp_list.append(odds_to_probs(*sharp, method=method) if sharp else None)
+                ps_close_list.append(odds_to_probs(*close, method=method) if close else None)
                 close_odds_list.append(close)
+                lam_list.append((float(pred["lambda_home"]), float(pred["lambda_away"])))
                 over_probs.append(float(pred["p_over25"]))
                 over_labels.append(1 if (hg + ag) >= 3 else 0)
                 btts_probs.append(float(pred["p_btts_yes"]))
@@ -1725,31 +1614,67 @@ def main() -> None:
                     "sharp": sharp,
                     "close": close,
                     "open": open_o,
-                    "days_into_season": days_into_season(m["utc_date"], m["season"]),
+                    "days_into_season": dis,
                 }
 
-            # --- Stacking: أوزان الخلط تُتعلَّم من النصف الأول فقط (شطر معايرة T
-            # نفسه)، فتبقى شريحة القياس نظيفة — ثم يُعاد مزج النافذة كلها بها
+            # --- Stacking ---
+            # مع حزام طويل مُطبَّق: الأوزان/الحرارة/رأس التعادل مُقدَّرة على مواسم كاملة
+            # (production_params) — النافذة القصيرة (n≈200) تُستعمل للقياس فقط، لا لإعادة التقدير.
+            # بدونه: أوزان اللبّ من النصف الأول فقط (شطر معايرة T وα نفسه) فتبقى شريحة القياس نظيفة.
             half = eval_n // 2
-            fitted_w = fit_weights(comps[:half], outcomes[:half])
-            wf_probs = [blend_components(c, fitted_w) for c in comps]
+            seeded = bool(params.get("backtest_applied_at")) and bool(params.get("weights"))
+            if seeded:
+                fitted_w = normalize_weights(params["weights"])
+            else:
+                fitted_w = fit_weights(comps[:half], outcomes[:half])
+            wf_blend = [blend_components(c, fitted_w) for c in comps]
 
-            # حرارة العرض تُقدَّر على النافذة كاملة — مشروع للتوقعات الحية القادمة
-            temp = fit_temperature(wf_probs, outcomes)
-
-            # المقاييس المنشورة: T تُقدَّر على النصف الأول، والتقييم على الثاني فقط
             t_fit_ids = {m["id"] for m in train[cut : cut + half]}
             metric_ids = {m["id"] for m in train[cut + half :]}
             assert not (t_fit_ids & metric_ids), "calibration leakage: T-fit overlaps metric segment"
-            temp_m = fit_temperature(wf_probs[:half], outcomes[:half])
-            cal_probs = [apply_temperature(p, temp_m) for p in wf_probs[half:]]
+            if seeded:
+                temp = temp_m = float(params.get("temperature") or 1.0)
+            else:
+                # حرارة العرض تُقدَّر على النافذة كاملة — مشروع للتوقعات الحية القادمة؛
+                # والمقاييس المنشورة بحرارة النصف الأول فقط
+                temp = fit_temperature(wf_blend, outcomes, mults=temp_mults)
+                temp_m = fit_temperature(wf_blend[:half], outcomes[:half], mults=temp_mults[:half])
+            pm_all = [apply_temperature(p, temp_m * tm) for p, tm in zip(wf_blend, temp_mults)]
+
+            # α لكل لقطة: من الحزام الطويل إن وُجد، وإلا من النصف الأول (bootstrap مقترن، وإلا 0)
+            if calibration.get("alpha_announce") is None:
+                pairs = [(p, s, o) for p, s, o in zip(pm_all[:half], ps_sharp_list[:half], outcomes[:half]) if s]
+                if len(pairs) >= 30:
+                    a_res = fit_alpha([p for p, _, _ in pairs], [s for _, s, _ in pairs], [o for _, _, o in pairs])
+                    alpha_ann = float(a_res["alpha"])
+                else:
+                    alpha_ann = 0.0
+            if calibration.get("alpha_close") is None:
+                pairs_c = [(p, s, o) for p, s, o in zip(pm_all[:half], ps_close_list[:half], outcomes[:half]) if s]
+                if len(pairs_c) >= 30:
+                    a_res_c = fit_alpha([p for p, _, _ in pairs_c], [s for _, s, _ in pairs_c], [o for _, _, o in pairs_c])
+                    alpha_close = float(a_res_c["alpha"])
+                else:
+                    alpha_close = 0.0
+
+            # رأس التعادل الثنائي (للغربال فقط) — من الحزام الطويل إن وُجد، وإلا من النصف الأول
+            if not (seeded and params.get("draw_head")):
+                feats = [draw_features(lm[0], lm[1], p[1]) for lm, p in zip(lam_list[:half], pm_all[:half])]
+                dh_fit = fit_draw_head(feats, [1 if o == "D" else 0 for o in outcomes[:half]])
+                if dh_fit is not None:
+                    dh_coefs = dh_fit
+
+            cal_pm = pm_all[half:]
             seg_outcomes = outcomes[half:]
+            cal_pf = [
+                logit_pool(p, s, alpha_ann) if s else p
+                for p, s in zip(cal_pm, ps_sharp_list[half:])
+            ]
             temp_over25 = fit_binary_temperature(over_probs[:half], over_labels[:half])
             temp_btts = fit_binary_temperature(btts_probs[:half], btts_labels[:half])
-            metrics = summarize_with_closing(
-                cal_probs, seg_outcomes, close_odds_list[half:]
-            )
-            all_probs.extend(cal_probs)
+            metrics = summarize_with_closing(cal_pf, seg_outcomes, close_odds_list[half:])
+            metrics_core = summarize(cal_pm, seg_outcomes)
+            all_probs.extend(cal_pf)
             all_outcomes.extend(seg_outcomes)
             if metrics.get("close_n", 0) > 0:
                 print(
@@ -1758,67 +1683,40 @@ def main() -> None:
                     flush=True,
                 )
 
-            # --- Backtest سياسة القيمة على شريحة القياس النظيفة نفسها:
-            # كيلي ربعي بوحدات ثابتة (بلا مضاعفة) — يجيب «هل +EV يربح فعلاً؟»
-            bt = {"n_bets": 0, "hits": 0, "staked": 0.0, "pnl": 0.0}
-            for p_cal, m_row, oc in zip(cal_probs, train[cut + half :], seg_outcomes):
-                # تفضيل خط أسبق (open) للـbacktest عند التوفر
-                oh = m_row["odds_open_home"] or m_row["odds_home"]
-                od = m_row["odds_open_draw"] or m_row["odds_draw"]
-                oa = m_row["odds_open_away"] or m_row["odds_away"]
-                if not (oh and od and oa):
-                    continue
-                v = value_signal(
-                    p_cal,
-                    (float(oh), float(od), float(oa)),
+            for label, mv, mm in (
+                (f"{MODEL_VERSION} · α={alpha_ann:.2f} · T={temp_m:.2f} · آخر {int(metrics['n'])}", MODEL_VERSION, metrics),
+                (f"{MODEL_VERSION} لبّ بلا سوق · آخر {int(metrics_core['n'])}", f"{MODEL_VERSION}-core", metrics_core),
+            ):
+                conn.execute(
+                    """
+                    INSERT INTO model_metrics
+                      (id, league_id, window_label, n_matches, accuracy, brier, log_loss, rps, model_version, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        str(uuid.uuid4()),
+                        lid,
+                        label,
+                        int(mm["n"]),
+                        mm["accuracy"],
+                        mm["brier"],
+                        mm["log_loss"],
+                        mm["rps"],
+                        mv,
+                        now_iso(),
+                    ),
                 )
-                if not v or not v["bet"]:
-                    continue
-                won = {"home": "H", "draw": "D", "away": "A"}[v["side"]] == oc
-                bt["n_bets"] += 1
-                bt["hits"] += int(won)
-                bt["staked"] += v["stake"]
-                bt["pnl"] += v["stake"] * (v["odds"] - 1.0) if won else -v["stake"]
-            if bt["n_bets"]:
-                value_backtests[lid] = bt
-                print(
-                    f"    value-bt: {bt['n_bets']} bets, {bt['hits']} hits, "
-                    f"pnl={bt['pnl']:+.4f}u",
-                    flush=True,
-                )
-            conn.execute(
-                """
-                INSERT INTO model_metrics
-                  (id, league_id, window_label, n_matches, accuracy, brier, log_loss, rps, model_version, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    str(uuid.uuid4()),
-                    lid,
-                    f"{MODEL_VERSION} · T={temp_m:.2f} · آخر {int(metrics['n'])}",
-                    int(metrics["n"]),
-                    metrics["accuracy"],
-                    metrics["brier"],
-                    metrics["log_loss"],
-                    metrics["rps"],
-                    MODEL_VERSION,
-                    now_iso(),
-                ),
-            )
             wtxt = " ".join(f"{k}={v:.2f}" for k, v in fitted_w.items())
             print(
                 f"    weights {wtxt}\n"
-                f"    cal T={temp:.2f}/{temp_m:.2f} acc={metrics['accuracy']:.3f} "
-                f"brier={metrics['brier']:.3f} rps={metrics['rps']:.4f}",
+                f"    cal T={temp:.2f}/{temp_m:.2f} α={alpha_ann:.2f}/{alpha_close:.2f} "
+                f"final acc={metrics['accuracy']:.3f} brier={metrics['brier']:.3f} rps={metrics['rps']:.4f} "
+                f"| core brier={metrics_core['brier']:.3f}",
                 flush=True,
             )
 
-            # خط أساس السوق: احتمالات الأسعار بعد خصم الهامش، على نفس شريحة القياس
-            mkt = [
-                (p, o)
-                for p, o in zip(market_probs[half:], seg_outcomes)
-                if p is not None
-            ]
+            # خط الأساس: إغلاق بيناكل الحقيقي (PSCH) منزوع الهامش — لا سعر متوسط ولا اختلاق
+            mkt = [(p, o) for p, o in zip(ps_close_list[half:], seg_outcomes) if p is not None]
             if mkt:
                 mm = summarize([p for p, _ in mkt], [o for _, o in mkt])
                 conn.execute(
@@ -1830,7 +1728,7 @@ def main() -> None:
                     (
                         str(uuid.uuid4()),
                         lid,
-                        f"السوق · آخر {int(mm['n'])}",
+                        f"إغلاق بيناكل · آخر {int(mm['n'])}",
                         int(mm["n"]),
                         mm["accuracy"],
                         mm["brier"],
@@ -1841,7 +1739,7 @@ def main() -> None:
                     ),
                 )
                 print(
-                    f"    market acc={mm['accuracy']:.3f} brier={mm['brier']:.3f} rps={mm['rps']:.4f}",
+                    f"    close acc={mm['accuracy']:.3f} brier={mm['brier']:.3f} rps={mm['rps']:.4f} (n={int(mm['n'])})",
                     flush=True,
                 )
 
@@ -1877,119 +1775,10 @@ def main() -> None:
         ).fetchall()
 
         ts = now_iso()
-
-        def write_prediction(match_id: str, pred: dict, elo_h: float, elo_a: float) -> None:
-            tops = top_scores(pred["matrix"], 8)
-            market = pred["components"]["market"]["p"]
-            analytics = {
-                "version": MODEL_VERSION,
-                # components has tuples — roundtrip to plain lists
-                "components": json.loads(json.dumps(pred["components"], default=list)),
-                "edge": pred["edge"],
-                "value": pred["value"],
-                "weights": pred["weights"],
-                "xpts": [pred["xpts_home"], pred["xpts_away"]],
-                "double_chance": pred.get("double_chance"),
-                "randomness": pred.get("randomness"),
-                "match_randomness_index": pred.get("match_randomness_index"),
-                "stability_score": pred.get("stability_score"),
-                "is_strictly_excluded": pred.get("is_strictly_excluded"),
-            }
-            conn.execute(
-                """
-                INSERT INTO predictions (
-                  id, match_id, lambda_home, lambda_away,
-                  p_home, p_draw, p_away, p_btts_yes, p_over25,
-                  top_scores_json, score_matrix_json,
-                  elo_home, elo_away, confidence, model_version,
-                  created_at, updated_at,
-                  analytics_json, xpts_home, xpts_away,
-                  market_home, market_draw, market_away
-                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-                """,
-                (
-                    str(uuid.uuid4()),
-                    match_id,
-                    pred["lambda_home"],
-                    pred["lambda_away"],
-                    pred["p_home"],
-                    pred["p_draw"],
-                    pred["p_away"],
-                    pred["p_btts_yes"],
-                    pred["p_over25"],
-                    json.dumps(tops),
-                    json.dumps(pred["matrix"].tolist()),
-                    elo_h,
-                    elo_a,
-                    pred["confidence"],
-                    MODEL_VERSION,
-                    ts,
-                    ts,
-                    json.dumps(analytics, ensure_ascii=False),
-                    pred["xpts_home"],
-                    pred["xpts_away"],
-                    market[0] if market else None,
-                    market[1] if market else None,
-                    market[2] if market else None,
-                ),
-            )
-
-            # Snapshot: refresh while match not finished; lock after final whistle
-            conn.execute(
-                """
-                INSERT INTO prediction_snapshots (
-                  id, match_id, league_id, utc_date,
-                  p_home, p_draw, p_away, p_btts_yes, p_over25,
-                  lambda_home, lambda_away, elo_home, elo_away,
-                  confidence, model_version, snapshot_at
-                ) SELECT
-                    ?, m.id, m.league_id, m.utc_date,
-                    ?, ?, ?, ?, ?,
-                    ?, ?, ?, ?,
-                    ?, ?, ?
-                FROM matches m WHERE m.id = ?
-                ON CONFLICT(match_id) DO UPDATE SET
-                  p_home = excluded.p_home,
-                  p_draw = excluded.p_draw,
-                  p_away = excluded.p_away,
-                  p_btts_yes = excluded.p_btts_yes,
-                  p_over25 = excluded.p_over25,
-                  lambda_home = excluded.lambda_home,
-                  lambda_away = excluded.lambda_away,
-                  elo_home = excluded.elo_home,
-                  elo_away = excluded.elo_away,
-                  confidence = excluded.confidence,
-                  model_version = excluded.model_version,
-                  snapshot_at = excluded.snapshot_at
-                WHERE (SELECT status FROM matches WHERE id = prediction_snapshots.match_id)
-                      NOT IN ('FINISHED', 'AWARDED')
-                """,
-                (
-                    str(uuid.uuid4()),
-                    pred["p_home"],
-                    pred["p_draw"],
-                    pred["p_away"],
-                    pred["p_btts_yes"],
-                    pred["p_over25"],
-                    pred["lambda_home"],
-                    pred["lambda_away"],
-                    elo_h,
-                    elo_a,
-                    pred["confidence"],
-                    MODEL_VERSION,
-                    ts,
-                    match_id,
-                ),
-            )
+        season_counts = season_game_counts(finished, season)
 
         for t in targets:
-            odds = None
-            if t["odds_home"] and t["odds_draw"] and t["odds_away"]:
-                odds = (
-                    float(t["odds_home"]),
-                    float(t["odds_draw"]),
-                    float(t["odds_away"]),
-                )
+            odds = odds3(t, "odds")
             enrich = load_live_enrichment(conn, t["id"], t["referee_name"])
             ppda_h, ppda_hn = rolling_team_ppda(finished, t["home_team_id"])
             ppda_a, ppda_an = rolling_team_ppda(finished, t["away_team_id"])
@@ -2010,9 +1799,9 @@ def main() -> None:
                 home=t["home_team_id"],
                 away=t["away_team_id"],
                 dc=model,
-                elo_home=ratings.get(t["home_team_id"], 1500.0),
-                elo_away=ratings.get(t["away_team_id"], 1500.0),
-                pi=pi_state,
+                elo_home=ratings_used.get(t["home_team_id"], 1500.0),
+                elo_away=ratings_used.get(t["away_team_id"], 1500.0),
+                pi=pi_used,
                 form_home=forms.get(t["home_team_id"], empty_form()),
                 form_away=forms.get(t["away_team_id"], empty_form()),
                 market_odds=odds,
@@ -2020,7 +1809,7 @@ def main() -> None:
                 weights=fitted_w,
                 dc_shots=model_shots,
                 dc_true_xg=model_true_xg,
-                h2h_matches=h2h_before(t["home_team_id"], t["away_team_id"]),
+                h2h_matches=h2h.before(t["home_team_id"], t["away_team_id"]),
                 league_id=lid,
                 weather=enrich["weather"],
                 home_missing=enrich["home_missing"],
@@ -2050,15 +1839,38 @@ def main() -> None:
                 away_gk_stats=gk_profiles.get(t["away_team_id"]),
                 home_manager_profile=mgr_profiles.get(t["home_team_id"]),
                 away_manager_profile=mgr_profiles.get(t["away_team_id"]),
+                alpha=alpha_ann,
+                demargin_method=method,
+                draw_head_coefs=dh_coefs,
+                flags=flags,
                 **m2_ctx,
             )
-
-            write_prediction(
-                t["id"],
-                pred,
-                ratings.get(t["home_team_id"], 1500.0),
-                ratings.get(t["away_team_id"], 1500.0),
+            sieve = build_sieve(
+                league_id=lid,
+                pred=pred,
+                home_id=t["home_team_id"],
+                away_id=t["away_team_id"],
+                season=season,
+                season_counts=season_counts,
+                first_season=si.first_season,
+                days_in=enrich.get("days_into_season"),
+                calibration=calibration,
+                home_missing=enrich["home_missing"],
+                away_missing=enrich["away_missing"],
+                home_strength=enrich.get("home_strength"),
+                away_strength=enrich.get("away_strength"),
             )
+            insert_prediction_row(
+                conn,
+                match_id=t["id"],
+                pred=pred,
+                elo_h=ratings_used.get(t["home_team_id"], 1500.0),
+                elo_a=ratings_used.get(t["away_team_id"], 1500.0),
+                ts=ts,
+                sieve=sieve,
+            )
+            # لقطة الإعلان تُكتب مرة واحدة (أول نشر) — التحديثات اللاحقة لقطات lineup/close
+            write_timeline_snapshot(conn, t["id"], "announce", pred, sieve, overwrite=False)
 
         # المباريات المنتهية تُعرض بوصفها «توقّعنا» — فتُولَّد من نموذج نقطة التقييم
         # (DC حتى cut، وحالات متقدمة زمنياً فقط)، لا من نموذج رأى نتائجها
@@ -2068,12 +1880,9 @@ def main() -> None:
             if ctx is None:
                 # منتهية خارج نافذة walk-forward — نتخطّاها بدل التسريب
                 continue
-            # حرارة العرض هنا temp_m لا temp: temp مُقدَّرة على النافذة كاملة ومنها
-            # نتائج هذه المباريات نفسها — وtemp_m مقدَّرة على النصف الأول المنفصل،
-            # فتتسق التوقعات الرجعية مع المقاييس المنشورة بلا تسريب
+            # حرارة العرض هنا temp_m لا temp، وα من النصف الأول — فتتسق التوقعات
+            # الرجعية مع المقاييس المنشورة بلا تسريب
             if ctx["idx"] < cut + half:
-                # داخل شطر معايرة T/الأوزان — أوزانه وحرارته رأت نتيجتها، فنتخطى
-                # بدل إسقاط التدريب كله (assert سابقاً كان يقتل الدوريات جميعها)
                 continue
             pred = predict_match(
                 home=r["home_team_id"],
@@ -2099,11 +1908,39 @@ def main() -> None:
                 temp_btts=temp_btts,
                 home_randomness_stats=rand_profiles.get(r["home_team_id"]),
                 away_randomness_stats=rand_profiles.get(r["away_team_id"]),
+                alpha=alpha_ann,
+                demargin_method=method,
+                draw_head_coefs=dh_coefs,
+                flags=flags,
             )
-            write_prediction(r["id"], pred, ctx["elo_home"], ctx["elo_away"])
+            insert_prediction_row(
+                conn,
+                match_id=r["id"],
+                pred=pred,
+                elo_h=ctx["elo_home"],
+                elo_a=ctx["elo_away"],
+                ts=ts,
+                sieve=None,
+                analytics_extra={"retro": True},
+            )
             retro += 1
         print(f"    predictions: {len(targets)} scheduled + {retro} retro", flush=True)
-        save_fit_params(conn, lid, fitted_w, temp, temp_over25, temp_btts)
+        params.update(
+            {
+                "weights": fitted_w,
+                "temperature": float(temp),
+                "temp_over25": float(temp_over25),
+                "temp_btts": float(temp_btts),
+                "alpha_announce": float(alpha_ann),
+                "alpha_lineup": float(calibration.get("alpha_lineup") if calibration.get("alpha_lineup") is not None else alpha_ann),
+                "alpha_close": float(alpha_close),
+                "demargin_method": method,
+                "dc_half_life": float(half_life),
+                "draw_head": list(dh_coefs) if dh_coefs is not None else None,
+                "flags": resolve_flags(flags),
+            }
+        )
+        save_fit_params(conn, lid, params)
 
     if all_probs:
         overall = summarize(all_probs, all_outcomes)
@@ -2150,34 +1987,8 @@ def main() -> None:
             f"rps={overall['rps']:.4f} ece={ece:.4f} n={int(overall['n'])}"
         )
 
-    # حذف غير مشروط أولاً: تدريب بلا رهانات يجب ألا يترك بطاقة backtest قديمة
-    # تُنسب زوراً لختم «آخر تدريب» الجديد
+    # سياسة القيمة (EV) خارج المنتج (خطة 006 §و) — تُحذف بطاقتها إن بقيت من إصدار سابق
     conn.execute("DELETE FROM app_meta WHERE key='value_backtest'")
-    if value_backtests:
-        total = {
-            k: sum(bt[k] for bt in value_backtests.values())
-            for k in ("n_bets", "hits", "staked", "pnl")
-        }
-        conn.execute(
-            """
-            INSERT INTO app_meta(key, value) VALUES('value_backtest', ?)
-            ON CONFLICT(key) DO UPDATE SET value=excluded.value
-            """,
-            (
-                json.dumps(
-                    {
-                        "policy": "كيلي ربعي · نطاق EV ‏3–15%",
-                        "total": total,
-                        "leagues": value_backtests,
-                    },
-                    ensure_ascii=False,
-                ),
-            ),
-        )
-        print(
-            f"value backtest: {total['n_bets']} bets, pnl={total['pnl']:+.4f}u "
-            f"on {total['staked']:.4f}u staked"
-        )
 
     conn.execute(
         """

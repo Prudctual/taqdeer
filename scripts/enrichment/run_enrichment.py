@@ -25,10 +25,31 @@ from fotmob_client import (  # noqa: E402
     match_details,
     matches_by_date,
 )
+import apifootball_client as apif  # noqa: E402
 from name_match import names_match, slugify as _slug  # noqa: E402
 from team_matcher import get_mapped, put_mapped  # noqa: E402
+from engine.calibrate import odds_to_probs  # noqa: E402
+from engine.schema import ensure_model_schema  # noqa: E402
 from engine.sharp_market import detect_steam  # noqa: E402
+from engine.sieve import reconcile_at_close  # noqa: E402
+from engine.timeline import record_snapshot  # noqa: E402
 from engine.weather_engine import weather_goal_multiplier  # noqa: E402
+
+
+def _load_env_file() -> None:
+    """PM2 لا يحقن .env — نقرأه هنا كي تصل مفاتيح API-Football لطبقة الإغلاق."""
+    env_path = Path(__file__).resolve().parents[2] / ".env"
+    if not env_path.exists():
+        return
+    for line in env_path.read_text().splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        k, _, v = line.partition("=")
+        os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
+
+
+_load_env_file()
 
 DB_PATH = os.environ.get("DATABASE_URL", "file:./data/taqdeer.db")
 if DB_PATH.startswith("file:"):
@@ -49,6 +70,9 @@ INTERVAL_C = int(os.environ.get("ENRICH_INTERVAL_C", str(3 * 3600)))
 INTERVAL_D = int(os.environ.get("ENRICH_INTERVAL_D", str(18 * 60)))
 INTERVAL_E = int(os.environ.get("ENRICH_INTERVAL_E", str(24 * 3600)))
 INTERVAL_F = int(os.environ.get("ENRICH_INTERVAL_F", str(12 * 3600)))
+# G: التقاط سعر الإغلاق الحاد قبل الصافرة — نافذة قصيرة، تكرار كل 3 دقائق
+INTERVAL_G = int(os.environ.get("ENRICH_INTERVAL_G", str(3 * 60)))
+CLOSING_WINDOW_MIN = int(os.environ.get("ENRICH_CLOSING_WINDOW_MIN", "12"))
 LOOP_SLEEP = int(os.environ.get("ENRICH_LOOP_SLEEP", "60"))
 ONCE = "--once" in sys.argv
 
@@ -166,28 +190,8 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
             except Exception:
                 pass
     conn.commit()
-    # املأ sharp/close من open/current إن نقصت (تاريخي + قادم)
-    conn.execute(
-        """
-        UPDATE matches SET
-          odds_sharp_home = COALESCE(odds_sharp_home, odds_open_home),
-          odds_sharp_draw = COALESCE(odds_sharp_draw, odds_open_draw),
-          odds_sharp_away = COALESCE(odds_sharp_away, odds_open_away)
-        WHERE odds_sharp_home IS NULL AND odds_open_home IS NOT NULL
-        """
-    )
-    conn.execute(
-        """
-        UPDATE matches SET
-          odds_close_home = COALESCE(odds_close_home, odds_sharp_home, odds_home),
-          odds_close_draw = COALESCE(odds_close_draw, odds_sharp_draw, odds_draw),
-          odds_close_away = COALESCE(odds_close_away, odds_sharp_away, odds_away)
-        WHERE status = 'FINISHED'
-          AND odds_close_home IS NULL
-          AND odds_home IS NOT NULL
-        """
-    )
-    conn.commit()
+    # خطة 006: لا اختلاق لخط حاد/إغلاق من open/current — الغائب يبقى NULL
+    ensure_model_schema(conn)
 
 
 def meta_get(conn: sqlite3.Connection, key: str) -> float:
@@ -319,7 +323,7 @@ def tier_a_odds_steam(conn: sqlite3.Connection) -> None:
             except Exception:
                 return None
 
-        # open = book (PS/B365/PP); current = market Avg (fallback book)
+        # open = book (PS/B365/PP); current = market Avg (fallback book); sharp = بيناكل فقط
         open_csv_h = num("PSH") or num("B365H") or num("PPH")
         open_csv_d = num("PSD") or num("B365D") or num("PPD")
         open_csv_a = num("PSA") or num("B365A") or num("PPA")
@@ -331,6 +335,7 @@ def tier_a_odds_steam(conn: sqlite3.Connection) -> None:
         book_h = open_csv_h or oh
         book_d = open_csv_d or od
         book_a = open_csv_a or oa
+        sharp_h, sharp_d, sharp_a = num("PSH"), num("PSD"), num("PSA")
 
         rows = conn.execute(
             """
@@ -388,7 +393,7 @@ def tier_a_odds_steam(conn: sqlite3.Connection) -> None:
                 book_h, oh, book_h, book_h,
                 book_d, od, book_d, book_d,
                 book_a, oa, book_a, book_a,
-                book_h, book_d, book_a,
+                sharp_h, sharp_d, sharp_a,
                 mid,
             ),
         )
@@ -1037,9 +1042,194 @@ def upsert_player_strength(
         )
 
 
+# --- Tier G: التقاط خط الإغلاق الحاد قبل الصافرة ---
+_fixture_cache: dict[str, tuple[float, list[dict]]] = {}
+
+
+def _fixture_id_for(conn: sqlite3.Connection, m: sqlite3.Row) -> str | None:
+    """معرّف API-Football: من external_id_map أولاً، وإلا من fixtures?date= (مخبّأ لكل يوم)."""
+    row = conn.execute(
+        "SELECT external_id FROM external_id_map WHERE source='api-football' AND entity_type='fixture' AND local_id=?",
+        (m["id"],),
+    ).fetchone()
+    if row and row["external_id"]:
+        return str(row["external_id"])
+    day = str(m["utc_date"])[:10]
+    cached = _fixture_cache.get(day)
+    if not cached or time.time() - cached[0] > 6 * 3600:
+        try:
+            _fixture_cache[day] = (time.time(), apif.fixtures_by_date(day))
+        except apif.RateLimited:
+            print("  [G] API-Football 429 على fixtures — تأجيل", flush=True)
+            return None
+        except Exception as e:  # noqa: BLE001
+            print(f"  [G] fixtures?date={day} failed: {e}", flush=True)
+            return None
+    for fx in _fixture_cache[day][1]:
+        if fx["league_id"] != m["league_id"]:
+            continue
+        if names_match(m["hn"], fx["home"] or "") and names_match(m["an"], fx["away"] or ""):
+            fid = fx.get("fixture_id")
+            if fid:
+                conn.execute(
+                    """
+                    INSERT INTO external_id_map(source, entity_type, local_id, external_id, label, updated_at)
+                    VALUES('api-football','fixture',?,?,NULL,?)
+                    ON CONFLICT(source, entity_type, local_id) DO UPDATE SET
+                      external_id=excluded.external_id, updated_at=excluded.updated_at
+                    """,
+                    (m["id"], str(fid), now_iso()),
+                )
+                return str(fid)
+    return None
+
+
+def _upsert_closing_line(conn: sqlite3.Connection, match_id: str, source: str, auth: int, parsed: dict) -> None:
+    x12 = parsed.get("1x2")
+    ou = parsed.get("ou25")
+    ah = parsed.get("ah")
+    if not x12 and not ou and not ah:
+        return
+    conn.execute(
+        """
+        INSERT INTO closing_lines(match_id, source, is_authoritative, oh, od, oa,
+                                  ou_line, ou_over, ou_under, ah_line, ah_home, ah_away, captured_at)
+        VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)
+        ON CONFLICT(match_id, source) DO UPDATE SET
+          is_authoritative=excluded.is_authoritative,
+          oh=excluded.oh, od=excluded.od, oa=excluded.oa,
+          ou_line=excluded.ou_line, ou_over=excluded.ou_over, ou_under=excluded.ou_under,
+          ah_line=excluded.ah_line, ah_home=excluded.ah_home, ah_away=excluded.ah_away,
+          captured_at=excluded.captured_at
+        """,
+        (
+            match_id, source, auth,
+            x12[0] if x12 else None, x12[1] if x12 else None, x12[2] if x12 else None,
+            2.5 if ou else None, ou[0] if ou else None, ou[1] if ou else None,
+            ah[0] if ah else None, ah[1] if ah else None, ah[2] if ah else None,
+            now_iso(),
+        ),
+    )
+
+
+def _write_close_snapshot(conn: sqlite3.Connection, match_id: str, odds: tuple, source: str) -> None:
+    """لقطة close: آخر توقع محفوظ (لبّ pm) + سعر الإغلاق منزوع الهامش + الدمج بـα."""
+    pred = conn.execute(
+        """
+        SELECT p.p_home, p.p_draw, p.p_away, p.pm_home, p.pm_draw, p.pm_away, p.alpha,
+               p.model_version, p.sieve_json, m.league_id
+        FROM predictions p JOIN matches m ON m.id = p.match_id WHERE p.match_id=?
+        """,
+        (match_id,),
+    ).fetchone()
+    if not pred:
+        return
+    cal = conn.execute(
+        "SELECT alpha_close, demargin_method FROM league_calibration WHERE league_id=?",
+        (pred["league_id"],),
+    ).fetchone()
+    method = (cal["demargin_method"] if cal and cal["demargin_method"] else "power")
+    ps = odds_to_probs(odds[0], odds[1], odds[2], method=method)
+    if pred["pm_home"] is not None:
+        pm = (float(pred["pm_home"]), float(pred["pm_draw"]), float(pred["pm_away"]))
+    else:
+        pm = (float(pred["p_home"]), float(pred["p_draw"]), float(pred["p_away"]))
+    # α = وزن النموذج؛ بلا معايرة معروفة نعتمد السوق وحده (α=0) — الأمانة قبل الطموح
+    alpha = None
+    if cal and cal["alpha_close"] is not None:
+        alpha = float(cal["alpha_close"])
+    elif pred["alpha"] is not None:
+        alpha = float(pred["alpha"])
+    if alpha is None:
+        alpha = 0.0
+    sieve = None
+    if pred["sieve_json"]:
+        try:
+            sieve = json.loads(pred["sieve_json"])
+        except Exception:
+            sieve = None
+    if sieve is not None and ps is not None:
+        sieve = reconcile_at_close(sieve, pm, ps, alpha)
+    record_snapshot(
+        conn, match_id, "close",
+        pm=pm, ps=ps, odds=odds, odds_source=source, alpha=alpha,
+        model_version=str(pred["model_version"]), sieve=sieve,
+    )
+
+
+def tier_g_closing_capture(conn: sqlite3.Connection) -> None:
+    """يلتقط آخر سعر بيناكل قبل الصافرة (T−12..T+3 دقائق) ويكتب لقطة close."""
+    if not apif.api_key():
+        meta_set(conn, "tier_g", time.time())
+        return
+    rows = conn.execute(
+        f"""
+        SELECT m.id, m.league_id, m.utc_date, t1.name_en AS hn, t2.name_en AS an
+        FROM matches m
+        JOIN teams t1 ON t1.id = m.home_team_id
+        JOIN teams t2 ON t2.id = m.away_team_id
+        WHERE m.status IN ('SCHEDULED','TIMED')
+          AND datetime(m.utc_date) BETWEEN datetime('now', '-3 minutes')
+                                      AND datetime('now', '+{CLOSING_WINDOW_MIN} minutes')
+          AND NOT EXISTS (
+            SELECT 1 FROM closing_lines c WHERE c.match_id = m.id AND c.source = 'pinnacle-live'
+          )
+        ORDER BY m.utc_date
+        """
+    ).fetchall()
+    if not rows:
+        meta_set(conn, "tier_g", time.time())
+        return
+    print(f"[G] closing capture: {len(rows)} match(es) near kickoff…", flush=True)
+    captured = 0
+    for m in rows:
+        fid = _fixture_id_for(conn, m)
+        if not fid:
+            continue
+        try:
+            books = apif.odds_by_fixture(fid)
+        except apif.RateLimited:
+            print("  [G] API-Football 429 على odds — إيقاف هذه الدورة", flush=True)
+            break
+        except Exception as e:  # noqa: BLE001
+            print(f"  [G] odds?fixture={fid} failed: {e}", flush=True)
+            continue
+        parsed = apif.parse_closing_books(books)
+        pin = parsed.get("pinnacle") or {}
+        avg = parsed.get("avg") or {}
+        if avg.get("1x2"):
+            _upsert_closing_line(conn, m["id"], "avg-live", 0, avg)
+        if pin.get("1x2"):
+            _upsert_closing_line(conn, m["id"], "pinnacle-live", 1, pin)
+            oh, od, oa = pin["1x2"]
+            # إغلاق المباراة = بيناكل الحي حتى يأتي PSCH من CSV بعد المباراة
+            conn.execute(
+                """
+                UPDATE matches SET odds_close_home=?, odds_close_draw=?, odds_close_away=?,
+                                   odds_sharp_home=COALESCE(odds_sharp_home, ?),
+                                   odds_sharp_draw=COALESCE(odds_sharp_draw, ?),
+                                   odds_sharp_away=COALESCE(odds_sharp_away, ?)
+                WHERE id=?
+                """,
+                (oh, od, oa, oh, od, oa, m["id"]),
+            )
+            _write_close_snapshot(conn, m["id"], (oh, od, oa), "pinnacle-live")
+            captured += 1
+        elif avg.get("1x2"):
+            # لا بيناكل في الاستجابة: نسجّل لقطة close بمتوسط السوق (مصدر مُعلَن، ليس حاداً)
+            _write_close_snapshot(conn, m["id"], tuple(avg["1x2"]), "avg-live")
+        conn.commit()
+        time.sleep(0.4)
+    conn.commit()
+    print(f"  [G] pinnacle closing captured: {captured}/{len(rows)}", flush=True)
+    meta_set(conn, "tier_g", time.time())
+
+
 def run_cycle(force_all: bool = False) -> None:
     conn = connect()
     try:
+        if force_all or due(conn, "tier_g", INTERVAL_G):
+            tier_g_closing_capture(conn)
         if force_all or due(conn, "tier_a", INTERVAL_A):
             tier_a_odds_steam(conn)
         if force_all or due(conn, "tier_b", INTERVAL_B):

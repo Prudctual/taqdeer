@@ -11,6 +11,7 @@ This directory contains self-contained, prioritized execution plans for improvin
 | [003](003-match-filter-transitions.md) | Optimize Match Filter Search & Pill Button Transitions | MEDIUM | Performance & Easing | DONE |
 | [004](004-reduced-motion-accessibility.md) | Wrap Continuous Keyframe Animations in Reduced-Motion Queries | MEDIUM | Accessibility | DONE |
 | [005](005-unified-motion-tokens.md) | Introduce High-Craft Easing & Motion Tokens | LOW | Cohesion & Tokens | DONE |
+| [006](006-accuracy-and-decisive-sieve-roadmap.md) | دقة أعلى بإشارة أنظف وغربال محسوم — خارطة طريق المحرك والمنتج | HIGH | Model & Product | IN PROGRESS |
 
 ## Recommended Execution Order
 

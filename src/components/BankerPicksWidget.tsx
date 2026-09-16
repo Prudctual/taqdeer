@@ -5,6 +5,7 @@ import Link from "next/link";
 import { SectionCard } from "./ui";
 import { pct } from "@/lib/format";
 import type { BankerPick } from "@/lib/queries";
+import { SieveTierBadge } from "@/components/SieveRulesChips";
 
 export type { BankerPick };
 
@@ -33,10 +34,17 @@ export function BankerPicksWidget({
     return null;
   }
 
+  const sieved = rawList.some((p) => p.sieveTier != null);
+  const theta = rawList.find((p) => p.sieveTheta != null)?.sieveTheta ?? null;
+
   return (
     <SectionCard
       title={title}
-      subtitle="ترتيب الترشيحات وفق موثوقية النموذج 2 (ثلاثون عاملاً) فوق احتمالات النموذج 1"
+      subtitle={
+        sieved
+          ? "ما اجتاز غربال المحسوم: اتفاق لبّ النموذج مع السوق الحاد، وعتبة θ لكل دوري، وعينة موسم كافية"
+          : "ترتيب الترشيحات وفق موثوقية النموذج 2 (ثلاثون عاملاً) فوق احتمالات النموذج 1"
+      }
     >
       {/* Sub-navigation Controls */}
       <div className="px-4 sm:px-5 pt-3 pb-1 flex flex-wrap items-center justify-between gap-2 border-b border-line">
@@ -77,7 +85,7 @@ export function BankerPicksWidget({
         </div>
 
         <span className="text-[11px] font-bold text-muted">
-          عتبة الأمان: فارق حسم &gt; 4٪
+          {sieved ? `عتبة الحسم θ ${theta != null ? `≥ ${theta.toFixed(2)}` : "لكل دوري"}` : "عتبة الأمان: فارق حسم > 4٪"}
         </span>
       </div>
 
@@ -127,8 +135,28 @@ export function BankerPicksWidget({
 
                 <div className="text-[11px] font-semibold text-muted flex items-center justify-between">
                   <span>التوقع:</span>
-                  <strong className="text-ink font-semibold">{item.pickLabel}</strong>
+                  <strong className="text-ink font-semibold flex items-center gap-1.5">
+                    {item.pickLabel}
+                    <SieveTierBadge tier={item.sieveTier} />
+                  </strong>
                 </div>
+
+                {item.sieveTier ? (
+                  <div className="grid grid-cols-2 gap-1.5 text-[10px]">
+                    <div className="rounded-md bg-panel/70 border border-line/50 px-2 py-1 flex items-center justify-between">
+                      <span className="text-muted">لبّ النموذج</span>
+                      <span className="font-mono font-semibold text-ink tabular">
+                        {item.coreProbability != null ? pct(item.coreProbability, 0) : "—"}
+                      </span>
+                    </div>
+                    <div className="rounded-md bg-panel/70 border border-line/50 px-2 py-1 flex items-center justify-between">
+                      <span className="text-muted">السوق الحاد</span>
+                      <span className="font-mono font-semibold text-ink tabular">
+                        {item.marketProbability != null ? pct(item.marketProbability, 0) : "—"}
+                      </span>
+                    </div>
+                  </div>
+                ) : null}
 
                 {/* Separation & Probability Row */}
                 <div className="grid grid-cols-2 gap-2 pt-1 border-t border-line/60">

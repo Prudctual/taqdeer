@@ -1,24 +1,10 @@
-import type { Metadata } from "next";
-import { getValueMatches } from "@/lib/queries";
-import { PageNav, BackBar } from "@/components/ui";
-import { ValueMatchesView } from "@/components/ValueMatchesView";
+import { redirect } from "next/navigation";
 
-export const metadata: Metadata = {
-  title: "المباريات ذات القيمة (+EV Value Bets)",
-  description: "ترشيح المباريات القادمة التي تحتوي على عائد متوقع موجب (+EV) وحصة كيلي الموصى بها.",
-};
-
-// Live SQLite — avoid baking empty value list at build time
-export const revalidate = 20;
-
+/**
+ * صفحة «فرص القيمة (+EV)» أُوقفت (خطة 006 §و): المنصة لا تنشر تنبيهات رهان
+ * ولا حصص كيلي؛ الحافة مقابل السوق تُحسب للتشخيص فقط. الروابط القديمة تُحوَّل
+ * إلى غربال «المحسوم».
+ */
 export default function ValueMatchesPage() {
-  const matches = getValueMatches();
-
-  return (
-    <div className="space-y-8">
-      <PageNav backHref="/" backLabel="المباريات" crumbs={[{ href: "/", label: "المباريات" }, { label: "فرص القيمة (+EV)" }]} />
-      <ValueMatchesView matches={matches} />
-      <BackBar links={[{ href: "/", label: "الرئيسية" }]} />
-    </div>
-  );
+  redirect("/hasr");
 }
