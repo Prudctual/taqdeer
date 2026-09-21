@@ -805,12 +805,40 @@ def main() -> None:
         f"Referee avg_reds must be shrunk for small sample, got {ref_eval['pillars']['disciplinary_risk']['referee_avg_reds']}"
     )
     # 23. التحقق الصارم من الدوريات السبعة وغياب الدوري التركي والنرويجي
-    from .league_profiles import LEAGUE_PROFILES, get_league_profile
+    from .league_profiles import LEAGUE_PROFILES, assess_x2_baseline, get_league_profile
     assert len(LEAGUE_PROFILES) == 7, f"Expected 7 leagues, got {len(LEAGUE_PROFILES)}"
     assert set(LEAGUE_PROFILES.keys()) == {"pl", "pd", "bl1", "sa", "fl1", "ppd", "ded"}
     assert "tur1" not in LEAGUE_PROFILES and "no1" not in LEAGUE_PROFILES
     assert get_league_profile("tur1").league_id == "default"
     assert get_league_profile("no1").league_id == "default"
+    # بيئة 2025/26: X2 = تعادل + فوز الضيف، وكتلة التعادل في النموذج = معدل الموسم
+    expected_x2 = {
+        "sa": 232 / 380,
+        "ppd": 180 / 306,
+        "pl": 218 / 380,
+        "bl1": 172 / 306,
+        "ded": 170 / 306,
+        "fl1": 165 / 306,
+        "pd": 194 / 380,
+    }
+    ranked = sorted(LEAGUE_PROFILES, key=lambda k: LEAGUE_PROFILES[k].outcomes.p_x2, reverse=True)
+    assert ranked == ["sa", "ppd", "pl", "bl1", "ded", "fl1", "pd"], ranked
+    for lid, x2 in expected_x2.items():
+        prof = LEAGUE_PROFILES[lid]
+        assert abs(prof.outcomes.p_x2 - x2) < 1e-12
+        assert abs(prof.draw_baseline - prof.outcomes.p_draw) < 1e-12
+        assert prof.outcomes.home_wins + prof.outcomes.draws + prof.outcomes.away_wins == prof.outcomes.matches
+    near = assess_x2_baseline("sa", (0.40, 0.30, 0.30))
+    assert near["band"] == "yellow" and near["reason"] == "near_baseline"
+    assert abs(float(near["delta"]) - (0.60 - 232 / 380)) < 1e-9
+    high_no_market = assess_x2_baseline("sa", (0.25, 0.32, 0.43))
+    assert high_no_market["band"] == "yellow" and high_no_market["reason"] == "above_no_market"
+    green = assess_x2_baseline("sa", (0.30, 0.30, 0.40), (0.35, 0.30, 0.35))
+    assert green["band"] == "green" and green["reason"] == "above_and_value"
+    rich = assess_x2_baseline("sa", (0.30, 0.30, 0.40), (0.25, 0.35, 0.40))
+    assert rich["band"] == "red" and rich["reason"] == "market_richer"
+    below = assess_x2_baseline("sa", (0.55, 0.20, 0.25))
+    assert below["band"] == "red" and below["reason"] == "below_baseline"
 
     # 24. نموذج 2: ثلاثون عاملاً بلا تغيير 1X2
     p1x2 = {"p_home": 0.56, "p_draw": 0.24, "p_away": 0.20, "confidence": 0.7, "lambda_home": 1.7, "lambda_away": 1.1}

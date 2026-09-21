@@ -20,7 +20,7 @@ from .elo import elo_home_adv_from_profile, elo_outcome_probs
 from .evaluate import apply_binary_temperature
 from .form import TeamForm, apply_congestion, form_lambda_adjust, multi_window_form, tiered_form
 from .h2h_engine import evaluate_h2h_advantage
-from .league_profiles import get_league_profile
+from .league_profiles import assess_x2_baseline, get_league_profile
 from .logistics_engine import evaluate_logistics_and_external_factors
 from .market_anchor import logit_pool
 from .pi_ratings import PiState, pi_expected_goals, pi_home_boost_from_profile
@@ -891,6 +891,8 @@ def predict_match(
         "p_12": p_12,
         "best": "1X" if p_1x >= max(p_x2, p_12) else ("X2" if p_x2 >= p_12 else "12"),
     }
+    # بيئة الدوري تُقارَن بلبّ النموذج (pm) لا بالاحتمال المنشور بعد دمج السوق.
+    x2_baseline = assess_x2_baseline(league_id, pm, market_p)
 
     gap_pick = None
     if market_p is not None:
@@ -918,6 +920,7 @@ def predict_match(
         "xpts_home": xpts_home,
         "xpts_away": xpts_away,
         "double_chance": double_chance,
+        "x2_baseline": x2_baseline,
         "randomness": rand_report,
         "match_randomness_index": rand_report["match_randomness_index"],
         "stability_score": rand_report["stability_score"],

@@ -857,6 +857,7 @@ def insert_prediction_row(
         "weights": pred["weights"],
         "xpts": [pred["xpts_home"], pred["xpts_away"]],
         "double_chance": pred.get("double_chance"),
+        "x2_baseline": pred.get("x2_baseline"),
         "randomness": pred.get("randomness"),
         "match_randomness_index": pred.get("match_randomness_index"),
         "stability_score": pred.get("stability_score"),

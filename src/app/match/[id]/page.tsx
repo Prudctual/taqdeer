@@ -31,6 +31,7 @@ import { Model2Breakdown } from "@/components/Model2Breakdown";
 import { PredictionTimelineWidget } from "@/components/PredictionTimelineWidget";
 import { getPredictionTimeline, parseModel2, parseSieveTier, type SieveRule } from "@/lib/queries";
 import { getMatchDetailedInfo } from "@/lib/match-details";
+import { assessX2, parseX2Baseline } from "@/lib/x2-baseline";
 
 
 
@@ -90,6 +91,7 @@ type Analytics = {
   version?: string;
   /** غربال «المحسوم» كما حُفظ لحظة التوقع (ensemble-v5) */
   sieve?: { tier?: string; theta?: number; rules?: Array<{ name?: string; ok?: boolean }> } | null;
+  x2_baseline?: unknown;
 };
 
 
@@ -602,6 +604,19 @@ export default async function MatchPage({
           pHome={match.p_home}
           pDraw={match.p_draw}
           pAway={match.p_away}
+          x2Baseline={
+            parseX2Baseline(analytics?.x2_baseline) ??
+            assessX2({
+              leagueId: match.league_id,
+              pHome: match.p_home,
+              pDraw: match.p_draw,
+              pAway: match.p_away,
+              marketHome: match.market_home,
+              marketDraw: match.market_draw,
+              marketAway: match.market_away,
+              source: "published",
+            })
+          }
         />
       ) : null}
 

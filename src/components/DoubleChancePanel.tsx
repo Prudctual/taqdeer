@@ -1,5 +1,11 @@
 import { buildDoubleChance } from "@/lib/double-chance";
 import { pct } from "@/lib/format";
+import {
+  x2ChipLabel,
+  x2ReasonText,
+  type X2Assessment,
+  type X2Band,
+} from "@/lib/x2-baseline";
 
 type Props = {
   homeName: string;
@@ -9,6 +15,8 @@ type Props = {
   pAway: number;
   /** عرض مضغوط لقائمة المباريات */
   compact?: boolean;
+  /** مقارنة X2 ببيئة الدوري 2025/26 وبسعر السوق إن وُجد */
+  x2Baseline?: X2Assessment | null;
 };
 
 /**
@@ -21,6 +29,7 @@ export function DoubleChancePanel({
   pDraw,
   pAway,
   compact = false,
+  x2Baseline = null,
 }: Props) {
   const dc = buildDoubleChance(pHome, pDraw, pAway, homeName, awayName);
   const best = dc.best;
@@ -106,9 +115,78 @@ export function DoubleChancePanel({
         })}
       </div>
 
+      {x2Baseline ? <X2BaselineNote assessment={x2Baseline} /> : null}
+
       <p className="text-[10px] text-faint font-semibold leading-relaxed border-t border-line pt-3">
         1X = مضيف أو تعادل · X2 = تعادل أو ضيف · 12 = فوز أحد الطرفين (بدون تعادل)
       </p>
+    </div>
+  );
+}
+
+function signedPoints(delta: number): string {
+  const pp = delta * 100;
+  const sign = pp > 0 ? "+" : "";
+  return `${sign}${pp.toFixed(2)} نقطة`;
+}
+
+function bandChip(band: X2Band): string {
+  switch (band) {
+    case "green":
+      return "border-success/40 bg-success-dim text-success";
+    case "yellow":
+      return "border-warn/40 bg-warn-dim text-warn";
+    case "red":
+      return "border-danger/40 bg-danger-dim text-danger";
+    default: {
+      const exhaustive: never = band;
+      return exhaustive;
+    }
+  }
+}
+
+function X2BaselineNote({ assessment }: { assessment: X2Assessment }) {
+  const { baseline, model, market, delta, value, band, reason, season, matches, source } = assessment;
+  return (
+    <div className="rounded-xl border border-line bg-surface p-3.5 space-y-2.5">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-[11px] font-semibold text-ink">
+          بيئة الدوري {season}
+          <span className="text-muted font-semibold"> · {matches} مباراة</span>
+        </p>
+        <span className={`text-[10px] font-bold rounded-full border px-2.5 py-1 ${bandChip(band)}`}>
+          {x2ChipLabel(reason)}
+        </span>
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px]">
+        <Stat label="فوز المضيف" value={pct(baseline.home, 2)} />
+        <Stat label="تعادل" value={pct(baseline.draw, 2)} />
+        <Stat label="فوز الضيف" value={pct(baseline.away, 2)} />
+        <Stat label="X2 الدوري" value={pct(baseline.x2, 2)} />
+      </div>
+      <p className="text-[11px] font-semibold text-ink tabular leading-relaxed">
+        X2 النموذج {pct(model.x2, 2)}
+        <span className="text-muted"> · الفارق عن البيئة {signedPoints(delta)}</span>
+        {market && value != null ? (
+          <span className="text-muted"> · السوق {pct(market.x2, 2)} ({signedPoints(value)})</span>
+        ) : null}
+      </p>
+      <p className="text-[10px] text-muted font-semibold leading-relaxed">{x2ReasonText(reason)}</p>
+      <p className="text-[10px] text-faint font-semibold leading-relaxed">
+        {source === "core"
+          ? "المقارنة على لبّ النموذج قبل دمج السوق."
+          : "المقارنة على الاحتمال المنشور."}{" "}
+        معدل الدوري لا يعني أن كل مباراة تحمل نفس X2.
+      </p>
+    </div>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-line bg-panel px-2.5 py-2">
+      <p className="text-[10px] text-muted font-semibold">{label}</p>
+      <p className="text-xs font-semibold text-ink tabular">{value}</p>
     </div>
   );
 }
