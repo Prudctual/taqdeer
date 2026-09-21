@@ -6,7 +6,7 @@ import {
   isSettledArchiveMatch,
   SQL_SETTLED_MATCH,
 } from "./match-status";
-import { keepCurrentRound, roundBucket } from "./current-round";
+import { keepCurrentRound, roundBucket, roundWindowCutoffSql } from "./current-round";
 import {
   calculateSelectionScore,
   dayKey,
@@ -1495,7 +1495,7 @@ export type FixtureScope = "current-round" | "full-schedule";
 /** الحد الأعلى للنافذة: مقصور على أسبوعين للجولة الحالية، ومفتوح لكامل الجدول */
 function scopeUpperBound(scope: FixtureScope): string {
   return scope === "current-round"
-    ? "AND substr(m.utc_date, 1, 19) <= strftime('%Y-%m-%dT%H:%M:%S', 'now', '+14 days')"
+    ? `AND substr(m.utc_date, 1, 19) <= (${roundWindowCutoffSql()})`
     : "";
 }
 

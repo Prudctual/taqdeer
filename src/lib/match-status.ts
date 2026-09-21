@@ -57,6 +57,9 @@ export const MATCH_DURATION_MS = 115 * 60 * 1000;
 /** بعد هذا الحد تُعدّ الحالة المباشرة عالقة — المصدر توقف عن التحديث */
 export const STALE_LIVE_MS = 4 * 60 * 60 * 1000;
 
+/** مباراة مجدولة بلا نتيجة بعد هذا الحد تُعرض مؤجّلة، لا «انتهت» */
+export const UNPLAYED_GAP_MS = 36 * 60 * 60 * 1000;
+
 export type MatchStatusInput = {
   status: string;
   utcDate: string;
@@ -123,8 +126,10 @@ export function resolveMatchPhase(input: MatchStatusInput): MatchPhase {
   const elapsed = Number.isFinite(kickoff) ? now - kickoff : null;
 
   if (LIVE_STATUSES.has(status)) {
-    // حالة مباشرة عالقة بعد نهاية المباراة بزمن طويل → نعتبرها منتهية
-    if (elapsed != null && elapsed > STALE_LIVE_MS) return "finished";
+    if (elapsed != null && elapsed > STALE_LIVE_MS) {
+      // عالقة بلا أهداف مسجّلة: ليست نتيجة 0–0، بل مباراة لم تُلعب
+      return hasRecordedScore(input.homeGoals, input.awayGoals) ? "finished" : "postponed";
+    }
     return "live";
   }
 
@@ -135,7 +140,10 @@ export function resolveMatchPhase(input: MatchStatusInput): MatchPhase {
     return hasLiveSignal(input) ? "live" : "awaiting";
   }
 
-  // تجاوزت زمن اللعب بلا حالة مباشرة → انتهت
+  // بلا نتيجة بعد يوم ونصف: التأجيل أصدق من شارة «انتهت»
+  if (!hasRecordedScore(input.homeGoals, input.awayGoals) && elapsed > UNPLAYED_GAP_MS) {
+    return "postponed";
+  }
   return "finished";
 }
 

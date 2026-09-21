@@ -148,7 +148,7 @@ function bandChip(band: X2Band): string {
 function X2BaselineNote({ assessment }: { assessment: X2Assessment }) {
   const { baseline, model, market, delta, value, band, reason, season, matches, source } = assessment;
   return (
-    <div className="rounded-xl border border-line bg-surface p-3.5 space-y-2.5">
+    <div className="rounded-xl border border-line bg-surface p-3.5 space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-[11px] font-semibold text-ink">
           بيئة الدوري {season}
@@ -158,25 +158,26 @@ function X2BaselineNote({ assessment }: { assessment: X2Assessment }) {
           {x2ChipLabel(reason)}
         </span>
       </div>
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px]">
+      <div className="grid grid-cols-3 gap-2">
+        <Stat label="X2 الدوري" value={pct(baseline.x2, 2)} />
+        <Stat label="X2 النموذج" value={pct(model.x2, 2)} />
+        <Stat label="الفارق" value={signedPoints(delta)} />
+      </div>
+      <div className="grid grid-cols-3 gap-2 text-[11px]">
         <Stat label="فوز المضيف" value={pct(baseline.home, 2)} />
         <Stat label="تعادل" value={pct(baseline.draw, 2)} />
         <Stat label="فوز الضيف" value={pct(baseline.away, 2)} />
-        <Stat label="X2 الدوري" value={pct(baseline.x2, 2)} />
       </div>
-      <p className="text-[11px] font-semibold text-ink tabular leading-relaxed">
-        X2 النموذج {pct(model.x2, 2)}
-        <span className="text-muted"> · الفارق عن البيئة {signedPoints(delta)}</span>
-        {market && value != null ? (
-          <span className="text-muted"> · السوق {pct(market.x2, 2)} ({signedPoints(value)})</span>
-        ) : null}
-      </p>
+      {market && value != null ? (
+        <p className="text-[11px] font-semibold text-ink tabular">
+          سوق X2 {pct(market.x2, 2)}
+          <span className="text-muted"> · فرق النموذج عن السوق {signedPoints(value)}</span>
+        </p>
+      ) : null}
       <p className="text-[10px] text-muted font-semibold leading-relaxed">{x2ReasonText(reason)}</p>
       <p className="text-[10px] text-faint font-semibold leading-relaxed">
-        {source === "core"
-          ? "المقارنة على لبّ النموذج قبل دمج السوق."
-          : "المقارنة على الاحتمال المنشور."}{" "}
-        معدل الدوري لا يعني أن كل مباراة تحمل نفس X2.
+        {source === "core" ? "المقارنة على لبّ النموذج قبل دمج السوق." : "المقارنة على الاحتمال المنشور."}{" "}
+        معدل الدوري يصف الموسم، وكل مباراة تُقارن به على حدة.
       </p>
     </div>
   );

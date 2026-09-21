@@ -24,7 +24,7 @@ import { UpsetAlertBadge } from "@/components/UpsetAlertBadge";
 import { LiveMatchDataSync } from "@/components/LiveMatchDataSync";
 import { LiveEventsTimeline } from "@/components/LiveEventsTimeline";
 import { MatchRiskPanel } from "@/components/MatchRiskPanel";
-import { DoubleChancePanel } from "@/components/DoubleChancePanel";
+import { ProbBar } from "@/components/ProbBar";
 import { LiveInPlaySimulator } from "@/components/LiveInPlaySimulator";
 import { AntiRandomnessCard, type RandomnessReport } from "@/components/AntiRandomnessCard";
 import { Model2Breakdown } from "@/components/Model2Breakdown";
@@ -579,18 +579,12 @@ export default async function MatchPage({
           </div>
 
           {/* Simple Probability Bar */}
-          <div className="space-y-1.5 pt-1">
-            <div className="flex justify-between text-[11px] font-bold text-muted tabular">
-              <span>فوز {match.home_name_ar} ({match.p_home ? pct(match.p_home) : "—"})</span>
-              <span>تعادل ({match.p_draw ? pct(match.p_draw) : "—"})</span>
-              <span>فوز {match.away_name_ar} ({match.p_away ? pct(match.p_away) : "—"})</span>
-            </div>
-            <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-panel">
-              <div style={{ width: `${(match.p_home ?? 0) * 100}%` }} className="bg-home" />
-              <div style={{ width: `${(match.p_draw ?? 0) * 100}%` }} className="bg-draw" />
-              <div style={{ width: `${(match.p_away ?? 0) * 100}%` }} className="bg-away" />
-            </div>
-          </div>
+          <ProbBar
+            pHome={match.p_home ?? 0}
+            pDraw={match.p_draw ?? 0}
+            pAway={match.p_away ?? 0}
+            showLabels={false}
+          />
         </div>
       ) : null}
 

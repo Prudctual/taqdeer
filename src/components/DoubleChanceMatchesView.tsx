@@ -4,6 +4,8 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { buildDoubleChance, type DcCode } from "@/lib/double-chance";
 import { formatKickoffAbsolute, pct } from "@/lib/format";
+import { matchDisplay, type MatchPhase } from "@/lib/match-status";
+import { assessX2, x2ChipLabel } from "@/lib/x2-baseline";
 import type { DoubleChanceMatch } from "@/lib/queries";
 
 const LEAGUES_CONFIG = [
@@ -32,6 +34,11 @@ type Enriched = DoubleChanceMatch & {
   p1x: number;
   px2: number;
   p12: number;
+  x2League: number;
+  x2Delta: number;
+  x2Band: "green" | "yellow" | "red";
+  x2Chip: string;
+  phase: MatchPhase;
 };
 
 export function DoubleChanceMatchesView({ matches }: { matches: DoubleChanceMatch[] }) {
@@ -43,6 +50,13 @@ export function DoubleChanceMatchesView({ matches }: { matches: DoubleChanceMatc
   const enriched = useMemo<Enriched[]>(() => {
     return matches.map((m) => {
       const dc = buildDoubleChance(m.pHome, m.pDraw, m.pAway, m.homeNameAr, m.awayNameAr);
+      const x2 = assessX2({
+        leagueId: m.leagueId,
+        pHome: m.pHome,
+        pDraw: m.pDraw,
+        pAway: m.pAway,
+        source: "published",
+      });
       return {
         ...m,
         bestCode: dc.best.code,
@@ -52,6 +66,16 @@ export function DoubleChanceMatchesView({ matches }: { matches: DoubleChanceMatc
         p1x: dc.p1x,
         px2: dc.px2,
         p12: dc.p12,
+        x2League: x2.baseline.x2,
+        x2Delta: x2.delta,
+        x2Band: x2.band,
+        x2Chip: x2ChipLabel(x2.reason),
+        phase: matchDisplay({
+          status: m.status,
+          utcDate: m.utcDate,
+          homeGoals: null,
+          awayGoals: null,
+        }).phase,
       };
     });
   }, [matches]);
@@ -266,11 +290,16 @@ export function DoubleChanceMatchesView({ matches }: { matches: DoubleChanceMatc
                       <span className="text-[11px] font-bold text-muted">
                         {formatKickoffAbsolute(m.utcDate)}
                       </span>
-                      {(m.status === "IN_PLAY" || m.status === "PAUSED") && (
-                        <span className="text-[10px] font-bold text-danger bg-danger-dim px-2 py-0.5 rounded-md">
+                      {m.phase === "live" ? (
+                        <span className="text-[10px] font-bold text-live bg-live-dim px-2 py-0.5 rounded-md">
                           مباشرة
                         </span>
-                      )}
+                      ) : null}
+                      {m.phase === "postponed" ? (
+                        <span className="text-[10px] font-bold text-warn bg-warn-dim px-2 py-0.5 rounded-md">
+                          مؤجّلة
+                        </span>
+                      ) : null}
                     </div>
                     <Link
                       href={`/match/${encodeURIComponent(m.id)}#double-chance`}
@@ -309,6 +338,15 @@ export function DoubleChanceMatchesView({ matches }: { matches: DoubleChanceMatc
                       <p className="text-lg font-semibold text-accent tabular">{pct(m.bestP)}</p>
                       <p className="text-[10px] text-muted font-semibold leading-relaxed">
                         {m.bestExplain}
+                      </p>
+                      <p className="text-[10px] font-semibold tabular text-muted">
+                        X2 الدوري {pct(m.x2League, 2)} · النموذج {pct(m.px2, 2)} ·{" "}
+                        <span className={m.x2Delta >= 0 ? "text-ink" : "text-danger"}>
+                          {m.x2Delta > 0 ? "+" : ""}
+                          {(m.x2Delta * 100).toFixed(2)}
+                        </span>
+                        <span className="mx-1 text-faint">·</span>
+                        {m.x2Chip}
                       </p>
                     </div>
                   </div>

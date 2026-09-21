@@ -13,6 +13,25 @@ export type RoundRow = {
   utcDate: string;
 };
 
+/** نافذة الجولة: أسبوعان، وتمتد لأربعة إذا كانت الأسبوعان فارغة (استراحة منتخبات) */
+export const ROUND_NEAR_DAYS = 14;
+export const ROUND_FALLBACK_DAYS = 28;
+
+/** حد النافذة: أسبوعان، وأربعة أسابيع إذا لم يبقَ شيء في الأسبوعين */
+export function roundWindowCutoffSql(): string {
+  return `CASE
+      WHEN EXISTS (
+        SELECT 1 FROM matches nx
+        WHERE nx.status IN ('SCHEDULED','TIMED','IN_PLAY','PAUSED')
+          AND substr(nx.utc_date, 1, 19) >= strftime('%Y-%m-%dT%H:%M:%S', 'now', '-12 hours')
+          AND substr(nx.utc_date, 1, 19) <= strftime('%Y-%m-%dT%H:%M:%S', 'now', '+${ROUND_NEAR_DAYS} days')
+          AND nx.source NOT IN ('preview-holdout','synthetic','demo')
+      )
+      THEN strftime('%Y-%m-%dT%H:%M:%S', 'now', '+${ROUND_NEAR_DAYS} days')
+      ELSE strftime('%Y-%m-%dT%H:%M:%S', 'now', '+${ROUND_FALLBACK_DAYS} days')
+    END`;
+}
+
 /** مفتاح الجولة: رقم الجولة إن وُجد، وإلا يوم الانطلاق */
 export function roundBucket(
   matchday: number | null | undefined,
@@ -41,7 +60,7 @@ function loadRoundSizes(
              count(*) AS n
       FROM matches
       WHERE substr(utc_date, 1, 19) >= strftime('%Y-%m-%dT%H:%M:%S', 'now', '-7 days')
-        AND substr(utc_date, 1, 19) <= strftime('%Y-%m-%dT%H:%M:%S', 'now', '+14 days')
+        AND substr(utc_date, 1, 19) <= (${roundWindowCutoffSql()})
         AND status NOT IN ('POSTPONED', 'CANCELLED', 'CANCELED', 'SUSPENDED')
         ${scoped ? "AND league_id = ?" : ""}
       GROUP BY league_id, bucket

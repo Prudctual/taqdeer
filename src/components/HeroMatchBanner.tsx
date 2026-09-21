@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Crest } from "./Crest";
 import { LiveMatchClock } from "./LiveMatchClock";
+import { ProbBar } from "./ProbBar";
 import {
   formatKickoffAbsolute,
   formatCountdown,
@@ -29,9 +30,6 @@ export function HeroMatchBanner({ match }: { match: MatchCard | null }) {
 
   const hasPred =
     match.pHome != null && match.pDraw != null && match.pAway != null;
-  const pHome = hasPred ? match.pHome! * 100 : null;
-  const pDraw = hasPred ? match.pDraw! * 100 : null;
-  const pAway = hasPred ? match.pAway! * 100 : null;
 
   return (
     <div className={`relative overflow-hidden rounded-2xl border-2 p-5 sm:p-7 shadow-xs transition-all ${
@@ -99,20 +97,15 @@ export function HeroMatchBanner({ match }: { match: MatchCard | null }) {
             </div>
           </div>
 
-          {/* نسب النموذج الحالية فقط — بلا أرقام افتراضية */}
           {hasPred ? (
-          <div className="space-y-1.5 max-w-md">
-            <div className="flex justify-between text-[11px] font-bold text-muted tabular">
-              <span>فوز {match.homeNameAr} ({pHome!.toFixed(1)}٪)</span>
-              <span>تعادل ({pDraw!.toFixed(1)}٪)</span>
-              <span>فوز {match.awayNameAr} ({pAway!.toFixed(1)}٪)</span>
+            <div className="max-w-md">
+              <ProbBar
+                pHome={match.pHome!}
+                pDraw={match.pDraw!}
+                pAway={match.pAway!}
+                showLabels={false}
+              />
             </div>
-            <div className="flex h-2 w-full overflow-hidden rounded-full bg-panel">
-              <div style={{ width: `${pHome}%` }} className="bg-home" />
-              <div style={{ width: `${pDraw}%` }} className="bg-draw" />
-              <div style={{ width: `${pAway}%` }} className="bg-away" />
-            </div>
-          </div>
           ) : null}
         </div>
 

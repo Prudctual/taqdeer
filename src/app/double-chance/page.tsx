@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 export const revalidate = 20;
 
 export default function DoubleChancePage() {
-  const matches = getDoubleChanceMatches(14);
+  const matches = getDoubleChanceMatches(28);
 
   return (
     <div className="space-y-8">

@@ -581,6 +581,26 @@ function promoteKickoffLocal(db: ReturnType<typeof getDb>): number {
   return n;
 }
 
+/**
+ * مباراة بقيت «مباشر» ساعات بعد موعدها وبلا أهداف.
+ * لا نكتب 0–0. نرفع علم التأجيل ونمسح الدقيقة العالقة.
+ */
+function releaseUnscoredStaleLive(db: ReturnType<typeof getDb>): number {
+  const result = db
+    .prepare(
+      `UPDATE matches SET
+         status = 'POSTPONED',
+         minute = NULL,
+         live_status_ar = NULL
+       WHERE status IN ('IN_PLAY','PAUSED','LIVE','1H','2H','HT','ET','P','BREAK')
+         AND home_goals IS NULL
+         AND away_goals IS NULL
+         AND datetime(utc_date) < datetime('now', '-6 hours')`,
+    )
+    .run();
+  return result.changes;
+}
+
 /** إنهاء مباريات خرجت من نافذة اللعب — فقط إذا كانت أهدافها مسجلة وموثقة وليست فارغة */
 function finalizeStaleLive(db: ReturnType<typeof getDb>): number {
   // المباريات التي مرّ وقتها دون ورود أهداف من مزوّد حقيقي لا يجوز أبداً افتراض أنها 0-0!
@@ -657,8 +677,9 @@ export async function syncRealLiveMatches(): Promise<number> {
 
   // 3) ترقية محلية لأي مباراة انطلقت ولم تصلها تغذية بعد
   total += promoteKickoffLocal(db);
-  // 4) إنهاء المنتهية → تظهر في سجل التوقعات
+  // 4) إنهاء المنتهية ذات النتيجة، ورفع العالقة بلا أهداف
   total += finalizeStaleLive(db);
+  total += releaseUnscoredStaleLive(db);
   lockSnapshotsForFinished(db);
 
   return total;
