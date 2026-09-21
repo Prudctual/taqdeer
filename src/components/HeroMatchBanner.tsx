@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { MatchLink } from "./MatchLink";
 import { Crest } from "./Crest";
 import { LiveMatchClock } from "./LiveMatchClock";
 import { ProbBar } from "./ProbBar";
@@ -98,12 +98,12 @@ export function HeroMatchBanner({ match }: { match: MatchCard | null }) {
       ) : null}
 
       <div className="border-t border-line px-4 py-3 sm:px-5">
-        <Link
+        <MatchLink
           href={`/match/${match.id}`}
           className="motion-colors text-sm font-medium text-accent no-underline hover:text-ink"
         >
           تحليل المباراة
-        </Link>
+        </MatchLink>
       </div>
     </article>
   );

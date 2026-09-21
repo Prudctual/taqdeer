@@ -186,12 +186,10 @@ export function MatchTabContainer({
                 </div>
               </button>
 
-              <div className={`accordion-wrapper ${isOpen ? "is-open" : ""}`}>
-                <div className="accordion-content">
-                  <div className="border-t border-line p-4 sm:p-6 bg-surface animate-fade-in-up">
-                    {section.content}
-                  </div>
-                </div>
+              <div className={isOpen ? "border-t border-line" : "hidden"}>
+                {isOpen ? (
+                  <div className="bg-surface p-4 sm:p-6">{section.content}</div>
+                ) : null}
               </div>
             </section>
           );

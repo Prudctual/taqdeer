@@ -63,7 +63,9 @@ import {
 } from "@/lib/queries";
 import { toSquadStars } from "@/lib/players";
 
-export const revalidate = 20;
+export const revalidate = 30;
+/** أول زيارة تُبنى وتُخزَّن، والضغط التالي يُخدم من الذاكرة بدل إعادة البناء */
+export const dynamic = "force-static";
 
 /** مشترك بين generateMetadata والصفحة داخل الطلب نفسه */
 const loadMatch = cache((id: string) => getMatchById(id));

@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { MatchLink } from "./MatchLink";
 import { ChevronIcon } from "./ChevronIcon";
 import { Crest } from "./Crest";
 import { LiveMatchClock } from "./LiveMatchClock";
@@ -78,7 +78,7 @@ export function NextKickoff({ m }: { m: MatchRowItem }) {
   const tone = m.leagueId?.toLowerCase() || undefined;
 
   return (
-    <Link
+    <MatchLink
       href={`/match/${encodeURIComponent(m.id)}`}
       data-league={tone}
       aria-label={`تحليل ${m.homeNameAr} ضد ${m.awayNameAr}`}
@@ -205,6 +205,6 @@ export function NextKickoff({ m }: { m: MatchRowItem }) {
           </span>
         </div>
       </div>
-    </Link>
+    </MatchLink>
   );
 }

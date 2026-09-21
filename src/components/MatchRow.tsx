@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { MatchLink } from "./MatchLink";
 import { MatchWhen } from "./MatchWhen";
 import { ProbBar } from "./ProbBar";
 import { TeamNamesInline } from "./TeamMatchup";
@@ -91,7 +91,7 @@ export function MatchRow({
   const tone = m.leagueId.toLowerCase();
 
   return (
-    <Link
+    <MatchLink
       href={`/match/${encodeURIComponent(m.id)}`}
       data-league={tone}
       className={`match-row ${
@@ -173,6 +173,6 @@ export function MatchRow({
           ) : null}
         </span>
       </div>
-    </Link>
+    </MatchLink>
   );
 }

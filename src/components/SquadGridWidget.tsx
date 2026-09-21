@@ -111,6 +111,9 @@ export function SquadGridWidget({
                     <img
                       src={p.photoUrl}
                       alt={p.name}
+                      loading="lazy"
+                      decoding="async"
+                      fetchPriority="low"
                       className="h-full w-full object-cover object-top bg-panel"
                       onError={(e) => {
                         e.currentTarget.style.display = "none";
