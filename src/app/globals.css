@@ -34,7 +34,7 @@
   --home-fill: var(--home);
   --draw-fill: var(--draw);
   --away-fill: var(--away);
-  --draw-ink: var(--on-fill);
+  --draw-ink: oklch(0.28 0.05 75);
 
   --success: oklch(0.55 0.12 155);
   --success-dim: oklch(0.55 0.12 155 / 0.12);

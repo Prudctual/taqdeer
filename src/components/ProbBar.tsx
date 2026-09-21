@@ -174,11 +174,8 @@ export function ProbBar({
                   {s.glyph}
                 </span>
                 <span
-                  className={
-                    hot
-                      ? `prob-figure font-semibold ${inverted ? "text-on-fill" : "text-ink"}`
-                      : `prob-figure ${inverted ? "text-on-fill/70" : "text-muted"}`
-                  }
+                  className="prob-figure font-semibold"
+                  style={{ color: s.color, opacity: hot ? 1 : 0.72 }}
                 >
                   {displayVal}
                 </span>

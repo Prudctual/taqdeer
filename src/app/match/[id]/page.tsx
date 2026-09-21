@@ -555,21 +555,30 @@ export default async function MatchPage({
 
       {/* التوقع الأرجح الشامل */}
       {pick ? (
-        <div className="rounded-2xl border border-accent/30 bg-accent-dim/20 p-5 space-y-3 shadow-xs">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-accent flex items-center gap-1.5">
-              التوقع الأرجح للمباراة
+        <div className="card space-y-3 p-5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="type-label">التوقع الأرجح</span>
+            <span
+              className={`text-sm font-semibold tabular ${
+                pick.key === "H" ? "text-home" : pick.key === "A" ? "text-away" : "text-draw"
+              }`}
+            >
+              {pick.label} · {pct(pick.p)}
+              {pick.isEquallyBalanced ? " · متقاربة" : ""}
             </span>
-            <span className="text-[11px] font-bold text-ink bg-surface px-3 py-1 rounded-full border border-line tabular">
-              درجة الاحتمال: {pct(pick.p)}
-            </span>
-
           </div>
 
           <div className="space-y-1">
             <h3 className="text-lg font-semibold text-ink">
               {pick.isEquallyBalanced ? "قراءة النموذج: " : "التوقع النهائي: "}
-              <span className="text-accent font-semibold">{pick.label}</span> ({pct(pick.p)})
+              <span
+                className={`font-semibold ${
+                  pick.key === "H" ? "text-home" : pick.key === "A" ? "text-away" : "text-draw"
+                }`}
+              >
+                {pick.label}
+              </span>{" "}
+              ({pct(pick.p)})
             </h3>
 
             <p className="text-xs text-muted leading-relaxed">
@@ -1027,14 +1036,14 @@ export default async function MatchPage({
           <SignalBreakdown
             components={analytics.components}
             weights={analytics.weights}
-            pickKey={pick?.key === "EQ" ? "D" : (pick?.key ?? "H")}
+            pickKey={pick?.key ?? "H"}
           />
           <FormBars
             homePts={form?.home_pts}
             awayPts={form?.away_pts}
             homeGd={form?.home_gd}
             awayGd={form?.away_gd}
-            pickKey={pick?.key === "EQ" ? "D" : pick?.key}
+            pickKey={pick?.key}
           />
         </SectionCard>
       ) : null}

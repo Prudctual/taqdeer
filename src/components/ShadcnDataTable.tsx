@@ -6,6 +6,7 @@ import { ProbBar } from "./ProbBar";
 import { Crest } from "./Crest";
 import { formatKickoffAbsolute, topOutcome } from "@/lib/format";
 import { matchDisplay } from "@/lib/match-status";
+import { OutcomeChip } from "./OutcomeChip";
 
 export interface MatchTableRow {
   id: string;
@@ -312,17 +313,11 @@ export function ShadcnDataTable({
                     {/* Verdict */}
                     <td className="px-4 py-3 text-center align-middle">
                       {outcome && maxProb != null ? (
-                        <span
-                          className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-bold shadow-2xs ${
-                            outcome.isEquallyBalanced
-                              ? "bg-panel border-line text-muted"
-                              : "bg-panel border-accent/30 text-ink"
-                          }`}
-                        >
-                          {outcome.isEquallyBalanced
-                            ? "مواجهة متكافئة"
-                            : `${outcome.label} (${(maxProb * 100).toFixed(0)}٪)`}
-                        </span>
+                        <OutcomeChip
+                          side={outcome.key}
+                          p={maxProb}
+                          close={outcome.isEquallyBalanced}
+                        />
                       ) : (
                         <span className="text-[11px] font-bold text-faint">
                           —

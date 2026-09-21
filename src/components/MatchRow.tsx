@@ -2,7 +2,8 @@ import Link from "next/link";
 import { MatchWhen } from "./MatchWhen";
 import { ProbBar } from "./ProbBar";
 import { TeamNamesInline } from "./TeamMatchup";
-import { actualOutcome, pct, topOutcome } from "@/lib/format";
+import { actualOutcome, topOutcome } from "@/lib/format";
+import { OutcomeChip } from "./OutcomeChip";
 
 /** حقول الصف — MatchCard أو البطاقة المختصرة للقائمة */
 export type MatchRowItem = {
@@ -25,23 +26,6 @@ export type MatchRowItem = {
   liveStatusAr?: string | null;
 };
 import { matchDisplay } from "@/lib/match-status";
-
-/** لون النتيجة يملأ الشارة — النص بـ on-fill للقراءة على الخلفية الملوّنة */
-const pickFill: Record<string, string> = {
-  H: "bg-home-fill text-on-fill",
-  D: "bg-draw-fill text-draw-ink",
-  A: "bg-away-fill text-on-fill",
-  EQ: "bg-warn-dim text-warn border border-line",
-};
-
-/** الرمز يرافق اللون دائماً — لا معنى يُحمل باللون وحده */
-const pickGlyph: Record<string, string> = { H: "1", D: "X", A: "2", EQ: "⚖" };
-const pickName: Record<string, string> = {
-  H: "فوز المضيف",
-  D: "تعادل",
-  A: "فوز الضيف",
-  EQ: "مواجهة متكافئة",
-};
 
 /** شبكة موحّدة للرأس والصف — المحاذاة داخل كل عمود تتبع عنصره */
 export const rowGrid =
@@ -101,7 +85,7 @@ export function MatchRow({
     liveStatusAr: m.liveStatusAr,
   });
   const hit =
-    isFinished && pick && m.homeGoals != null && m.awayGoals != null
+    isFinished && pick && !pick.isEquallyBalanced && m.homeGoals != null && m.awayGoals != null
       ? actualOutcome(m.homeGoals, m.awayGoals) === pick.key
       : null;
   const tone = m.leagueId.toLowerCase();
@@ -172,11 +156,7 @@ export function MatchRow({
       <div className="flex items-start justify-end sm:col-start-4 sm:row-start-1 sm:items-center">
         <span className="inline-flex flex-col items-end gap-1">
           {pick ? (
-            <span className={`pick-chip ${pickFill[pick.key]}`}>
-              <span aria-hidden>{pickGlyph[pick.key]}</span>
-              <span className="sr-only">الأرجح {pickName[pick.key]}</span>
-              <span>{pct(pick.p)}</span>
-            </span>
+            <OutcomeChip side={pick.key} p={pick.p} close={pick.isEquallyBalanced} />
           ) : (
             <span className="text-xs text-faint" aria-hidden>
               —

@@ -15,20 +15,13 @@ import {
   formatMatchTime,
   formatRelativeDay,
   hasKnownKickoffTime,
-  pct,
   topOutcome,
 } from "@/lib/format";
 import { ProbBar } from "./ProbBar";
 import { matchDisplay } from "@/lib/match-status";
 import type { MatchRowItem } from "./MatchRow";
 
-const GLYPH: Record<string, string> = { H: "1", D: "X", A: "2", EQ: "⚖" };
-const TONE: Record<string, string> = {
-  H: "var(--home)",
-  D: "var(--draw)",
-  A: "var(--away)",
-  EQ: "oklch(0.75 0.16 75)",
-};
+import { OutcomeChip } from "./OutcomeChip";
 
 function TeamLine({
   name,
@@ -180,22 +173,15 @@ export function NextKickoff({ m }: { m: MatchRowItem }) {
         <div className="flex flex-col gap-3 border-t border-line px-4 py-3.5 sm:flex-row sm:items-center sm:gap-4 sm:px-5">
           {m.pHome != null && pick ? (
             <>
-              <div className="flex shrink-0 items-center gap-2">
+              <div className="flex shrink-0 flex-wrap items-center gap-2">
                 <span className="type-label">الأرجح</span>
+                <OutcomeChip side={pick.key} p={pick.p} close={pick.isEquallyBalanced} />
                 <span
-                  className="pick-chip"
-                  style={{ background: TONE[pick.key] }}
+                  className={`text-sm font-semibold ${
+                    pick.key === "H" ? "text-home" : pick.key === "A" ? "text-away" : "text-draw"
+                  }`}
                 >
-                  {GLYPH[pick.key]}
-                </span>
-                <span className="text-sm font-semibold text-ink">
                   {pick.label}
-                </span>
-                <span
-                  className="text-sm font-semibold tabular"
-                  style={{ color: TONE[pick.key] }}
-                >
-                  {pct(pick.p)}
                 </span>
               </div>
               <div className="min-w-0 flex-1">

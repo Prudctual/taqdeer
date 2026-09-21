@@ -387,13 +387,14 @@ export const BANKER_MIN_CONFIDENCE = 0.55;
 /** أأمن التوقعات: أفضلية حقيقية لـ 1 أو 2، لا تعادل ولا سباق متقارب */
 export const BANKER_MIN_PROBABILITY = 0.5;
 
-export type OutcomeKey = "H" | "D" | "A" | "EQ";
+export type SideKey = "H" | "D" | "A";
+export type OutcomeKey = SideKey | "EQ";
 
 export function topOutcome(
   pHome: number,
   pDraw: number,
   pAway: number,
-): { key: OutcomeKey; label: string; p: number; isEquallyBalanced?: boolean } {
+): { key: SideKey; label: string; p: number; isEquallyBalanced: boolean } {
   const sorted = [
     { key: "H" as const, label: "فوز المضيف", p: pHome },
     { key: "D" as const, label: "تعادل", p: pDraw },
@@ -403,18 +404,11 @@ export function topOutcome(
   const top1 = sorted[0]!;
   const top2 = sorted[1]!;
 
-  // حد التكافؤ: أقل من 8٪ بين الأول والثاني → لا نُقدّم «إشارة حاسمة»
-  // (حالة ساندفيورد 40٪ مقابل 33٪ كانت ستُعامل كمتكافئة)
-  if (top1.p - top2.p < BANKER_EDGE_GAP) {
-    return {
-      key: "EQ",
-      label: "مواجهة متكافئة",
-      p: top1.p,
-      isEquallyBalanced: true,
-    };
-  }
-
-  return top1;
+  // حد التكافؤ: أقل من 8 نقاط بين الأول والثاني. اللون يبقى لون الجهة الأرجح (1/X/2).
+  return {
+    ...top1,
+    isEquallyBalanced: top1.p - top2.p < BANKER_EDGE_GAP,
+  };
 }
 
 /**
@@ -428,7 +422,7 @@ export function selectBankerSide(
   confidence: number | null | undefined,
 ): { key: "H" | "A"; label: string; p: number } | null {
   const pick = topOutcome(pHome, pDraw, pAway);
-  if (pick.isEquallyBalanced || pick.key === "EQ" || pick.key === "D") {
+  if (pick.isEquallyBalanced || pick.key === "D") {
     return null;
   }
   if (pick.p < BANKER_MIN_PROBABILITY) return null;
