@@ -9,14 +9,14 @@ import { assessX2, x2ChipLabel } from "@/lib/x2-baseline";
 import type { DoubleChanceMatch } from "@/lib/queries";
 
 const LEAGUES_CONFIG = [
-  { id: "ALL", name: "جميع الدوريات", icon: "🌐" },
-  { id: "pl", name: "الدوري الإنجليزي", icon: "🏴󠁧󠁢󠁥󠁮󠁧󠁿" },
-  { id: "pd", name: "الدوري الإسباني", icon: "🇪🇸" },
-  { id: "bl1", name: "الدوري الألماني", icon: "🇩🇪" },
-  { id: "sa", name: "الدوري الإيطالي", icon: "🇮🇹" },
-  { id: "fl1", name: "الدوري الفرنسي", icon: "🇫🇷" },
-  { id: "ppd", name: "الدوري البرتغالي", icon: "🇵🇹" },
-  { id: "ded", name: "الدوري الهولندي", icon: "🇳🇱" },
+  { id: "ALL", name: "الكل" },
+  { id: "pl", name: "إنجلترا" },
+  { id: "pd", name: "إسبانيا" },
+  { id: "bl1", name: "ألمانيا" },
+  { id: "sa", name: "إيطاليا" },
+  { id: "fl1", name: "فرنسا" },
+  { id: "ppd", name: "البرتغال" },
+  { id: "ded", name: "هولندا" },
 ];
 
 const DC_FILTERS: { id: "ALL" | DcCode; label: string }[] = [
@@ -124,50 +124,19 @@ export function DoubleChanceMatchesView({ matches }: { matches: DoubleChanceMatc
   }, [sorted]);
 
   return (
-    <div className="space-y-4">
-      <div className="rounded-2xl border border-accent/30 bg-panel p-4 sm:p-5 space-y-4 shadow-2xs">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-accent-dim border border-accent/25 text-accent font-semibold text-[11px]">
-            فرصة مزدوجة من نسب النموذج
-          </span>
-          <span className="text-[11px] font-bold text-muted bg-surface px-3 py-0.5 rounded-full border border-line">
-            مباريات الأسابيع القادمة
-          </span>
-        </div>
-
-        <div className="space-y-1">
-          <h1 className="text-xl sm:text-3xl font-semibold text-ink tracking-tight leading-tight">
-            الفرصة المزدوجة
-          </h1>
-          <p className="text-xs font-semibold text-muted leading-relaxed max-w-3xl">
-            لكل مباراة بتوقع جاهز نعرض أفضل غطاء مزدوج (1X / X2 / 12) بوضوح — متى تفوز ومتى تخسر —
-            مرتّبة تصاعدياً حسب موعد المباراة. هذا مستقل عن اختيار النتيجة الوحيدة.
-          </p>
-        </div>
-
+    <div className="space-y-6">
+      <header className="space-y-3 border-b border-line pb-5">
+        <h1 className="type-page text-balance text-ink">الفرصة المزدوجة</h1>
+        <p className="max-w-[60ch] text-sm leading-relaxed text-muted">
+          أفضل غطاء من نسب النموذج: مضيف أو تعادل، ضيف أو تعادل، أو فوز أحد الطرفين.
+          الترتيب حسب موعد المباراة، مستقلاً عن النتيجة الأرجح.
+        </p>
         {sorted.length > 0 ? (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-2.5 border-t border-line">
-            <div className="rounded-xl border border-line bg-surface p-2.5 space-y-0.5">
-              <span className="text-[10px] font-bold text-muted block">مباريات متاحة</span>
-              <span className="text-xl font-semibold text-ink font-mono tabular">{sorted.length}</span>
-            </div>
-            <div className="rounded-xl border border-line bg-surface p-2.5 space-y-0.5">
-              <span className="text-[10px] font-bold text-muted block">متوسط التوصية</span>
-              <span className="text-xl font-semibold text-accent font-mono tabular">{pct(avgBest)}</span>
-            </div>
-            <div className="rounded-xl border border-line bg-surface p-2.5 space-y-0.5">
-              <span className="text-[10px] font-bold text-muted block">غطاء ≥ 75٪</span>
-              <span className="text-xl font-semibold text-ink font-mono tabular">{highCount}</span>
-            </div>
-            <div className="rounded-xl border border-line bg-surface p-2.5 space-y-0.5">
-              <span className="text-[10px] font-bold text-muted block">توزيع 1X · X2 · 12</span>
-              <span className="text-xs font-semibold text-ink block pt-1 tabular">
-                {codeCounts["1X"]} · {codeCounts.X2} · {codeCounts["12"]}
-              </span>
-            </div>
-          </div>
+          <p className="text-xs tabular text-faint">
+            {sorted.length} مباراة · متوسط التوصية {pct(avgBest)} · غطاء ≥ 75٪ {highCount} · 1X {codeCounts["1X"]} · X2 {codeCounts.X2} · 12 {codeCounts["12"]}
+          </p>
         ) : null}
-      </div>
+      </header>
 
       {sorted.length === 0 ? (
         <div className="rounded-2xl border border-line bg-surface p-8 text-center space-y-2">
@@ -184,11 +153,8 @@ export function DoubleChanceMatchesView({ matches }: { matches: DoubleChanceMatc
               <span className="text-[11px] font-bold text-muted">عرض ({filtered.length})</span>
             </div>
 
-            <div
-              className="w-full max-w-full overflow-x-auto scrollbar-none rounded-xl bg-panel p-1.5 border border-line"
-              dir="rtl"
-            >
-              <div className="flex items-center gap-1.5 min-w-max">
+            <div className="flex items-center gap-1 overflow-x-auto border-b border-line" dir="rtl">
+              <div className="flex min-w-max items-center">
                 {LEAGUES_CONFIG.map((league) => {
                   const count = leagueCounts[league.id] || 0;
                   const isActive = selectedLeague === league.id;
@@ -197,23 +163,14 @@ export function DoubleChanceMatchesView({ matches }: { matches: DoubleChanceMatc
                       key={league.id}
                       type="button"
                       onClick={() => setSelectedLeague(league.id)}
-                      className={`shrink-0 press-scale flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap ${
+                      className={`press-scale -mb-px flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2 text-[11px] font-semibold whitespace-nowrap cursor-pointer ${
                         isActive
-                          ? "bg-surface text-ink border border-accent/60 shadow-2xs font-semibold ring-1 ring-accent/30"
-                          : "text-muted hover:text-ink hover:bg-surface/50 border border-transparent"
+                          ? "border-accent text-ink"
+                          : "border-transparent text-muted hover:text-ink"
                       }`}
                     >
-                      <span className="text-xs shrink-0">{league.icon}</span>
-                      <span className="shrink-0">{league.name}</span>
-                      <span
-                        className={`shrink-0 px-1.5 rounded-full text-[9px] font-mono font-semibold ${
-                          isActive
-                            ? "bg-accent text-on-fill"
-                            : "bg-surface border border-line text-muted"
-                        }`}
-                      >
-                        {count}
-                      </span>
+                      <span>{league.name}</span>
+                      <span className="tabular text-faint">{count}</span>
                     </button>
                   );
                 })}
@@ -226,10 +183,10 @@ export function DoubleChanceMatchesView({ matches }: { matches: DoubleChanceMatc
                   key={f.id}
                   type="button"
                   onClick={() => setDcFilter(f.id)}
-                  className={`press-scale rounded-lg px-2.5 py-1.5 text-[11px] font-bold border cursor-pointer transition-colors ${
+                  className={`press-scale cursor-pointer rounded-md border px-2.5 py-1.5 text-[11px] font-semibold ${
                     dcFilter === f.id
-                      ? "border-accent/50 bg-accent-dim text-accent"
-                      : "border-line bg-surface text-muted hover:text-ink"
+                      ? "border-line-strong bg-panel text-ink"
+                      : "border-transparent text-muted hover:text-ink"
                   }`}
                 >
                   {f.label}
@@ -280,11 +237,11 @@ export function DoubleChanceMatchesView({ matches }: { matches: DoubleChanceMatc
               {filtered.map((m) => (
                 <article
                   key={m.id}
-                  className="rounded-xl border border-accent/25 bg-surface p-3.5 sm:p-4 space-y-3 shadow-2xs hover:border-accent/50 transition-all"
+                  className="card space-y-3 p-3.5 sm:p-4"
                 >
                   <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line pb-2.5">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="px-2.5 py-0.5 rounded-md bg-accent-dim text-accent font-semibold text-[11px]">
+                      <span className="type-label text-ink">
                         {m.leagueNameAr}
                       </span>
                       <span className="text-[11px] font-bold text-muted">
@@ -327,7 +284,7 @@ export function DoubleChanceMatchesView({ matches }: { matches: DoubleChanceMatc
                       </div>
                     </div>
 
-                    <div className="rounded-xl border border-accent/40 bg-accent-dim/20 px-3.5 py-2.5 space-y-1 shrink-0 min-w-[12rem]">
+                    <div className="min-w-[12rem] shrink-0 space-y-1 rounded-lg border border-line bg-panel px-3.5 py-2.5">
                       <div className="flex items-center justify-between gap-2">
                         <span className="text-[10px] font-bold text-accent">التوصية</span>
                         <span className="text-xs font-bold font-mono text-ink bg-surface border border-line px-2 py-0.5 rounded-md">
@@ -365,8 +322,8 @@ export function DoubleChanceMatchesView({ matches }: { matches: DoubleChanceMatc
                           key={row.code}
                           className={`rounded-lg border p-2 text-center space-y-0.5 ${
                             isBest
-                              ? "border-accent/45 bg-accent-dim/25"
-                              : "border-line bg-panel"
+                              ? "border-line-strong bg-panel"
+                              : "border-line bg-surface"
                           }`}
                         >
                           <span

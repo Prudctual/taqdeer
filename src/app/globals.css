@@ -894,7 +894,7 @@ a {
 }
 
 .topbar-icon-btn:active {
-  transform: scale(0.95);
+  opacity: 0.92;
 }
 
 /* Hide scrollbar for mobile nav */

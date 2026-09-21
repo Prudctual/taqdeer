@@ -118,10 +118,10 @@ export function StudioHomeView({
   const showKickoffHero = Boolean(heroMatch) && !isLiveActive;
 
   const tabClass = (active: boolean) =>
-    `press-scale flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-semibold motion-colors whitespace-nowrap ${
+    `press-scale -mb-px flex items-center gap-2 border-b-2 px-3 py-2.5 text-xs font-semibold motion-colors whitespace-nowrap ${
       active
-        ? "bg-surface text-ink border border-line"
-        : "text-muted hover:text-ink hover:bg-surface/50 border border-transparent"
+        ? "border-accent text-ink"
+        : "border-transparent text-muted hover:text-ink"
     }`;
 
   return (
@@ -135,7 +135,7 @@ export function StudioHomeView({
       ) : null}
 
       <div className="space-y-6">
-        <div className="flex items-center gap-2 overflow-x-auto scrollbar-none rounded-xl bg-panel p-1.5 border border-line">
+        <div className="flex items-center gap-1 overflow-x-auto border-b border-line">
           <button
             type="button"
             onClick={() => setActiveTab("matches")}
@@ -155,7 +155,7 @@ export function StudioHomeView({
             onClick={() => setActiveTab("parlay")}
             className={tabClass(activeTab === "parlay")}
           >
-            ⚡ محلل البارلي
+            محلل البارلي
           </button>
           <button
             type="button"

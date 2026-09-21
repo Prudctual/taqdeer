@@ -124,7 +124,7 @@ export function SiteSidebar() {
       {/* Brand Header */}
       <div className="sidebar-brand">
         <Link href="/" className="flex items-center gap-3 no-underline group">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent font-semibold text-sm text-on-fill group-hover:scale-105 active:scale-95 transition-transform duration-150 shadow-xs">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent font-semibold text-sm text-on-fill">
             ت
           </div>
           <div className="flex flex-col">

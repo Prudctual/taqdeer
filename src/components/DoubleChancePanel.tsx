@@ -51,7 +51,7 @@ export function DoubleChancePanel({
   return (
     <div
       id="double-chance"
-      className="rounded-2xl border border-accent/30 bg-accent-dim/15 p-5 space-y-4 shadow-xs"
+      className="card space-y-4 p-4 sm:p-5"
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="space-y-0.5">
@@ -60,12 +60,12 @@ export function DoubleChancePanel({
             تغطية نتيجتين من ثلاث — مستقلة عن التوقع الأرجح (1X2).
           </p>
         </div>
-        <span className="text-[11px] font-bold text-on-fill bg-accent px-3 py-1 rounded-full tabular">
-          التوصية: {best.code}
+        <span className="text-[11px] font-semibold tabular text-accent">
+          {best.code}
         </span>
       </div>
 
-      <div className="rounded-xl border border-accent/35 bg-surface p-4 space-y-2">
+      <div className="rounded-lg border border-line bg-panel p-4 space-y-2">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h3 className="text-base sm:text-lg font-semibold text-ink">
             {best.title}{" "}
@@ -91,7 +91,7 @@ export function DoubleChancePanel({
               key={code}
               className={`rounded-xl border p-3 space-y-1.5 ${
                 isBest
-                  ? "border-accent/50 bg-accent-dim/25 ring-1 ring-accent/20"
+                  ? "border-line-strong bg-panel"
                   : "border-line bg-surface"
               }`}
             >
