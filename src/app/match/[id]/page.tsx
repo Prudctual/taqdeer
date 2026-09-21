@@ -24,6 +24,7 @@ import { UpsetAlertBadge } from "@/components/UpsetAlertBadge";
 import { LiveMatchDataSync } from "@/components/LiveMatchDataSync";
 import { LiveEventsTimeline } from "@/components/LiveEventsTimeline";
 import { MatchRiskPanel } from "@/components/MatchRiskPanel";
+import { DoubleChancePanel } from "@/components/DoubleChancePanel";
 import { ProbBar } from "@/components/ProbBar";
 import { LiveInPlaySimulator } from "@/components/LiveInPlaySimulator";
 import { AntiRandomnessCard, type RandomnessReport } from "@/components/AntiRandomnessCard";
